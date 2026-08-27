@@ -174,3 +174,34 @@ BootstrapThemeManager.CurrentTheme = theme;
 ```
 
 Controls introduced in later phases must read semantic values from `BootstrapThemeManager.CurrentTheme`, subscribe to `ThemeChanged` only for the lifetime in which they need notifications, and unsubscribe deterministically when disposed. Reduced motion is part of the theme so animation infrastructure can consume one application-level preference without introducing a second settings channel.
+
+## 16. Phase 2 rendering and DPI API
+
+Phase 2 adds reusable stateless foundation types under `MyDmsVn.Bootstrap5WinFormUI.Rendering`:
+
+- `DpiScaler` treats design-token pixels as 96-DPI logical pixels and scales integer/floating values plus common `Size`, `Padding`, and `Rectangle` geometry for a target DPI.
+- `CornerRadius` represents uniform or independent top-left/top-right/bottom-right/bottom-left radii. `NormalizeTo(...)` proportionally reduces oversized radii so adjacent corners do not overlap.
+- `RoundedPath.Create(...)` creates a closed `GraphicsPath` from rectangle bounds and `CornerRadius`. The caller owns and must dispose the returned path.
+- `ColorUtil` provides sRGB relative luminance, contrast ratio, higher-contrast foreground selection, and color blending.
+- `ContentLayoutHelper` arranges two optional horizontal content items as one aligned group after applying WinForms `Padding`; it is intended for later icon/text combinations without coupling controls to an icon source.
+
+Example DPI scaling from the 100%-DPI metric baseline:
+
+```csharp
+var controlHeight = DpiScaler.Scale(theme.Metrics.ControlHeight, targetDpi);
+var padding = DpiScaler.Scale(new Padding(theme.Metrics.SpacingSM), targetDpi);
+```
+
+Example rounded-path ownership:
+
+```csharp
+using var path = RoundedPath.Create(
+    bounds,
+    new CornerRadius(DpiScaler.Scale((float)theme.Metrics.Radius, targetDpi)));
+
+graphics.FillPath(brush, path);
+```
+
+The foundation deliberately does not expose a reflection-based double-buffer toggle or create a base-control hierarchy in Phase 2. Concrete custom-painted controls should use normal protected WinForms buffering styles (`DoubleBuffered` / `SetStyle`) in their own construction path. A shared control base or lifecycle helper should be introduced only when later controls demonstrate real repeated behavior that cannot be cleanly expressed with standard WinForms APIs.
+
+The demo application's **Rendering / DPI** window renders the same foundation geometry at virtual 96/120/144/168/192 DPI (100/125/150/175/200%) and responds to runtime theme changes. This gives a repeatable visual verification path, but it does not replace testing the application under actual Windows display-scaling settings.

@@ -22,6 +22,15 @@ Prefer ordinary unit tests for logic that does not require a WinForms handle:
 
 These tests should run for all appropriate target frameworks.
 
+Phase 2 specifically covers the pure rendering foundation with automated tests for:
+
+- 96-DPI baseline and 125/150/175/200% scaling calculations
+- `Size`, `Padding`, and `Rectangle` scaling
+- Per-corner radius validation and normalization
+- Rounded-path geometry bounds
+- sRGB luminance, contrast ratio, foreground selection, and blending
+- Shared horizontal content alignment and spacing behavior
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -57,6 +66,8 @@ Manual checks include:
 - Designer behavior
 - Rapid resize
 
+For Phase 2, start the demo and choose **Rendering / DPI**. The preview draws shared rendering primitives at virtual 96/120/144/168/192 DPI so radius normalization, scaled strokes, contrast, and content layout can be compared side by side. Switch Light/Dark while the window is open to verify theme-dependent rendering. The virtual preview is a repeatable diagnostic aid; final DPI verification still requires real Windows scaling.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -78,6 +89,8 @@ Verify:
 - Nested layouts do not drift.
 - Accordion/Collapse measured heights remain correct.
 - DataGridView headers/rows remain aligned.
+
+The Phase 2 Rendering/DPI demo covers the geometry calculations at all five scale factors. Run the demo under each corresponding Windows display-scaling setting as components are added and during hardening; do not treat the virtual matrix as proof of OS-level DPI behavior.
 
 ## 4. Theme matrix
 
