@@ -162,45 +162,51 @@ public sealed class TextBoxCardDemoForm : Form
 
     private void BuildCardSection()
     {
-        var row = new FlowLayoutPanel
+        var grid = new TableLayoutPanel
         {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Dock = DockStyle.Top,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = true
+            ColumnCount = 2,
+            RowCount = 2,
+            GrowStyle = TableLayoutPanelGrowStyle.FixedSize,
+            Margin = Padding.Empty
         };
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        row.Controls.Add(CreateCard(
+        grid.Controls.Add(CreateCard(
             "Default card",
             "Bordered surface with theme radius and the default body region.",
             showFooter: false,
             showShadow: false,
             showBorder: true,
-            borderRadius: -1));
-        row.Controls.Add(CreateCard(
+            borderRadius: -1), 0, 0);
+        grid.Controls.Add(CreateCard(
             "Header + footer",
             "Header, body and footer are stable child containers that remain Designer-friendly.",
             showFooter: true,
             showShadow: false,
             showBorder: true,
-            borderRadius: -1));
-        row.Controls.Add(CreateCard(
+            borderRadius: -1), 1, 0);
+        grid.Controls.Add(CreateCard(
             "Shadow",
             "The optional shadow is painted directly as lightweight rounded geometry.",
             showFooter: false,
             showShadow: true,
             showBorder: true,
-            borderRadius: -1));
-        row.Controls.Add(CreateCard(
+            borderRadius: -1), 0, 1);
+        grid.Controls.Add(CreateCard(
             "Borderless / custom radius",
             "A custom radius does not mutate theme tokens and the border can be omitted.",
             showFooter: false,
             showShadow: false,
             showBorder: false,
-            borderRadius: 14));
+            borderRadius: 14), 1, 1);
 
-        _cardSection.Controls.Add(row);
+        _cardSection.Controls.Add(grid);
     }
 
     private static BootstrapCard CreateCard(
