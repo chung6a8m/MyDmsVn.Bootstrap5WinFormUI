@@ -56,16 +56,17 @@ public sealed class AccordionDemoFormTests
     }
 
     [Test]
-    public void MainDemoExposesAccordionNavigationCommand()
+    public void MainDemoExposesCollapseAccordionNavigationPage()
     {
         using var form = new MainForm();
         form.CreateControl();
         form.PerformLayout();
 
+        var sidebar = FindControls<BootstrapSidebar>(form).Single();
         Assert.That(
-            FindControls<Button>(form).Any(button => button.Text == "Accordion"),
+            sidebar.Items.Any(item => item.Text == "Collapse / Accordion"),
             Is.True,
-            "Phase 10 needs to be reachable from the main demo command bar.");
+            "Phase 10 needs to remain reachable from the integrated demo navigation.");
     }
 
     private static IEnumerable<T> FindControls<T>(Control root)
