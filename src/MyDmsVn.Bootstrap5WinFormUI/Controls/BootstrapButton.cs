@@ -793,7 +793,7 @@ public class BootstrapButton : Button
         return string.IsNullOrEmpty(_loadingText) ? Text : _loadingText;
     }
 
-    private static void DrawText(Graphics graphics, string? text, Rectangle bounds, Color color)
+    private void DrawText(Graphics graphics, string? text, Rectangle bounds, Color color)
     {
         if (string.IsNullOrEmpty(text) || bounds.IsEmpty)
         {
@@ -803,7 +803,7 @@ public class BootstrapButton : Button
         TextRenderer.DrawText(
             graphics,
             text,
-            SystemFonts.MessageBoxFont,
+            Font,
             bounds,
             color,
             TextFormatFlags.SingleLine |
