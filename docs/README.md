@@ -13,6 +13,7 @@ This directory contains the authoritative development documentation for `MyDmsVn
 7. [TESTING.md](TESTING.md) — automated, UI, DPI, theme, lifecycle, and resource testing strategy.
 8. [CONTRIBUTING.md](CONTRIBUTING.md) — human development workflow and quality gates.
 9. [DECISIONS.md](DECISIONS.md) — architecture decisions that should not be rediscovered in every task.
+10. [PHASE8_HARDENING.md](PHASE8_HARDENING.md) — post-review hardening notes for TextBox keyboard event forwarding and Card decoration-safe layout.
 
 ## About `idea-drafs/`
 
