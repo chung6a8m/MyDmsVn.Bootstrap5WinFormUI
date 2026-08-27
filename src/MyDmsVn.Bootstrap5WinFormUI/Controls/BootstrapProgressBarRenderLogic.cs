@@ -20,7 +20,7 @@ internal static class BootstrapProgressBarRenderLogic
             throw new ArgumentOutOfRangeException(nameof(value), value, "Value must be inside the configured range.");
         }
 
-        return (value - minimum) / (double)(maximum - minimum);
+        return ((double)value - minimum) / ((double)maximum - minimum);
     }
 
     public static int GetPercentage(int minimum, int maximum, int value)
