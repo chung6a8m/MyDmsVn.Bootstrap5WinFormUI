@@ -51,6 +51,10 @@ public class BootstrapButton : Button
             ControlStyles.SupportsTransparentBackColor,
             true);
 
+        // ButtonBase enables Opaque by default. Rounded owner painting leaves pixels outside
+        // the rounded path untouched, so the background layer must run to clear reused buffers.
+        SetStyle(ControlStyles.Opaque, false);
+
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
         FlatAppearance.MouseDownBackColor = Color.Transparent;

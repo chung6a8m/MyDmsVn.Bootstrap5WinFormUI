@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
+using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -30,6 +31,20 @@ public sealed class BootstrapButtonTests
             Assert.That(button.LoadingText, Is.EqualTo(string.Empty));
             Assert.That(button.Selected, Is.False);
             Assert.That(button.TabStop, Is.True);
+        }));
+    }
+
+    [Test]
+    public void CustomPaintingClearsInheritedOpaqueStyleForRoundedCorners()
+    {
+        using var button = new StyleProbeBootstrapButton();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(button.HasStyle(ControlStyles.Opaque), Is.False,
+                "Opaque skips background painting and leaves stale double-buffer pixels outside the rounded path.");
+            Assert.That(button.HasStyle(ControlStyles.SupportsTransparentBackColor), Is.True);
+            Assert.That(button.HasStyle(ControlStyles.OptimizedDoubleBuffer), Is.True);
         }));
     }
 
@@ -198,5 +213,13 @@ public sealed class BootstrapButtonTests
             Assert.That(button.BorderRadius, Is.EqualTo(12));
             Assert.That(button.GetEffectiveCornerRadius(BootstrapThemeMetrics.Default), Is.EqualTo(groupRadius));
         }));
+    }
+
+    private sealed class StyleProbeBootstrapButton : BootstrapButton
+    {
+        public bool HasStyle(ControlStyles style)
+        {
+            return GetStyle(style);
+        }
     }
 }
