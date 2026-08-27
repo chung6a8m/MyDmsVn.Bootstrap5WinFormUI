@@ -14,6 +14,7 @@ This directory contains the authoritative development documentation for `MyDmsVn
 8. [CONTRIBUTING.md](CONTRIBUTING.md) — human development workflow and quality gates.
 9. [DECISIONS.md](DECISIONS.md) — architecture decisions that should not be rediscovered in every task.
 10. [PHASE8_HARDENING.md](PHASE8_HARDENING.md) — post-review hardening notes for TextBox keyboard event forwarding and Card decoration-safe layout.
+11. [PHASE9_BOOTSTRAP_COLLAPSE.md](PHASE9_BOOTSTRAP_COLLAPSE.md) — finalized Collapse contract, height measurement/reversal behavior, tests, and manual verification matrix.
 
 ## About `idea-drafs/`
 

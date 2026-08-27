@@ -17,6 +17,7 @@ public sealed class MainForm : Form
     private readonly Button _buttonDemo = new Button();
     private readonly Button _buttonGroupToolbarDemo = new Button();
     private readonly Button _textBoxCardDemo = new Button();
+    private readonly Button _collapseDemo = new Button();
     private readonly FlowLayoutPanel _commandBar = new FlowLayoutPanel();
     private readonly TableLayoutPanel _palette = new TableLayoutPanel();
     private readonly Label _summary = new Label();
@@ -149,6 +150,16 @@ public sealed class MainForm : Form
             demo.Show(this);
         };
 
+        _collapseDemo.AutoSize = true;
+        _collapseDemo.Margin = new Padding(8, 1, 0, 0);
+        _collapseDemo.Text = "Collapse";
+        _collapseDemo.UseVisualStyleBackColor = false;
+        _collapseDemo.Click += (_, _) =>
+        {
+            var demo = new CollapseDemoForm();
+            demo.Show(this);
+        };
+
         _commandBar.Controls.Add(modeLabel);
         _commandBar.Controls.Add(_themeMode);
         _commandBar.Controls.Add(_reducedMotion);
@@ -159,6 +170,7 @@ public sealed class MainForm : Form
         _commandBar.Controls.Add(_buttonDemo);
         _commandBar.Controls.Add(_buttonGroupToolbarDemo);
         _commandBar.Controls.Add(_textBoxCardDemo);
+        _commandBar.Controls.Add(_collapseDemo);
     }
 
     private void ConfigurePalette()
@@ -239,6 +251,8 @@ public sealed class MainForm : Form
         _buttonGroupToolbarDemo.ForeColor = theme.Colors.Text;
         _textBoxCardDemo.BackColor = theme.Colors.Surface;
         _textBoxCardDemo.ForeColor = theme.Colors.Text;
+        _collapseDemo.BackColor = theme.Colors.Surface;
+        _collapseDemo.ForeColor = theme.Colors.Text;
         _palette.BackColor = theme.Colors.Body;
         _summary.BackColor = theme.Colors.SurfaceSecondary;
         _summary.ForeColor = theme.Colors.Text;
