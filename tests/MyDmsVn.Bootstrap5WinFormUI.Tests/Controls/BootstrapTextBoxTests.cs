@@ -106,11 +106,22 @@ public sealed class BootstrapTextBoxTests
     }
 
     [Test]
-    public void PlaceholderIsVisibleOnlyWhileTextIsEmpty()
+    public void PlaceholderIsMutedAndHidesAsSoonAsEditorReceivesFocus()
     {
         using var input = new BootstrapTextBox { PlaceholderText = "Email address" };
+        var native = input.Controls.OfType<TextBox>().Single();
         var placeholder = input.Controls.OfType<Label>().Single();
 
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(placeholder.Visible, Is.True);
+            Assert.That(placeholder.ForeColor, Is.EqualTo(BootstrapThemeManager.CurrentTheme.Colors.Disabled));
+        }));
+
+        RaiseProtectedControlEvent(native, "OnGotFocus", EventArgs.Empty);
+        Assert.That(placeholder.Visible, Is.False, "The placeholder must stop covering the native editor as soon as focus enters it so the caret is visible immediately.");
+
+        RaiseProtectedControlEvent(native, "OnLostFocus", EventArgs.Empty);
         Assert.That(placeholder.Visible, Is.True);
 
         input.Text = "developer@example.com";
@@ -141,6 +152,37 @@ public sealed class BootstrapTextBoxTests
             Assert.That(input.Text, Is.EqualTo(string.Empty));
             Assert.That(changed, Is.EqualTo(1));
             Assert.That(clearButton.Visible, Is.False);
+        }));
+    }
+
+    [Test]
+    public void ClearButtonUsesIconRendererInsideItsHitTarget()
+    {
+        using var input = new BootstrapTextBox
+        {
+            Size = new Size(260, 32),
+            Text = "query",
+            ShowClearButton = true
+        };
+        var renderer = new RecordingIconRenderer();
+        input.IconRenderer = renderer;
+        input.PerformLayout();
+        var clearButton = input.Controls.OfType<Button>().Single();
+
+        using var bitmap = new Bitmap(clearButton.Width, clearButton.Height);
+        clearButton.DrawToBitmap(bitmap, new Rectangle(Point.Empty, clearButton.Size));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(clearButton.Text, Is.EqualTo(string.Empty), "The clear affordance must not rely on a font glyph that can be clipped by Button text rendering.");
+            Assert.That(input.ClientRectangle.Contains(clearButton.Bounds), Is.True);
+            Assert.That(renderer.RenderCount, Is.GreaterThan(0));
+            Assert.That(renderer.LastDescriptor?.SourceKind, Is.EqualTo(IconSourceKind.FrameworkVector));
+            Assert.That(renderer.LastDescriptor?.Value, Is.EqualTo(FrameworkIconGlyph.Close.ToString()));
+            Assert.That(renderer.LastBounds.Left, Is.GreaterThan(0));
+            Assert.That(renderer.LastBounds.Top, Is.GreaterThan(0));
+            Assert.That(renderer.LastBounds.Right, Is.LessThan(clearButton.ClientSize.Width));
+            Assert.That(renderer.LastBounds.Bottom, Is.LessThan(clearButton.ClientSize.Height));
         }));
     }
 
@@ -204,5 +246,22 @@ public sealed class BootstrapTextBoxTests
         var method = typeof(Control).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.That(method, Is.Not.Null, $"Expected Control.{methodName} to exist.");
         method!.Invoke(control, new object[] { args });
+    }
+
+    private sealed class RecordingIconRenderer : IIconRenderer
+    {
+        public int RenderCount { get; private set; }
+
+        public IconDescriptor? LastDescriptor { get; private set; }
+
+        public Rectangle LastBounds { get; private set; }
+
+        public bool TryRender(Graphics graphics, IconDescriptor descriptor, Rectangle bounds, Color color)
+        {
+            RenderCount++;
+            LastDescriptor = descriptor;
+            LastBounds = bounds;
+            return true;
+        }
     }
 }
