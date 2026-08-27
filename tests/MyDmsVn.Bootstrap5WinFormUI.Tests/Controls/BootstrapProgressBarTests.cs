@@ -37,6 +37,25 @@ public sealed class BootstrapProgressBarTests
     }
 
     [Test]
+    public void AccessibilityObjectReportsCurrentProgressState()
+    {
+        using var progress = new BootstrapProgressBar
+        {
+            Maximum = 120,
+            Minimum = 20,
+            Value = 70
+        };
+
+        Assert.That(progress.AccessibilityObject.Value, Is.EqualTo("50%"));
+
+        progress.Value = 95;
+        Assert.That(progress.AccessibilityObject.Value, Is.EqualTo("75%"));
+
+        progress.Indeterminate = true;
+        Assert.That(progress.AccessibilityObject.Value, Is.EqualTo("Indeterminate"));
+    }
+
+    [Test]
     public void PercentageUsesConfiguredRange()
     {
         using var progress = new BootstrapProgressBar
