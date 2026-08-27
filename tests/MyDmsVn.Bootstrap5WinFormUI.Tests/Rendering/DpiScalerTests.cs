@@ -41,6 +41,8 @@ public sealed class DpiScalerTests
     [TestCase(-96)]
     public void ScaleRejectsInvalidDpi(int dpi)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => DpiScaler.Scale(32, dpi));
+        TestDelegate action = () => DpiScaler.Scale(32, dpi);
+
+        Assert.That(action, Throws.TypeOf<ArgumentOutOfRangeException>());
     }
 }
