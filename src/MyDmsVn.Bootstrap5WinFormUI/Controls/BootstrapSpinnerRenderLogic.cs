@@ -11,37 +11,12 @@ internal static class BootstrapSpinnerRenderLogic
         BootstrapVariant variant,
         Color customColor)
     {
-        if (colors is null)
-        {
-            throw new ArgumentNullException(nameof(colors));
-        }
-
         if (!customColor.IsEmpty)
         {
             return customColor;
         }
 
-        switch (variant)
-        {
-            case BootstrapVariant.Primary:
-                return colors.Primary;
-            case BootstrapVariant.Secondary:
-                return colors.Secondary;
-            case BootstrapVariant.Success:
-                return colors.Success;
-            case BootstrapVariant.Danger:
-                return colors.Danger;
-            case BootstrapVariant.Warning:
-                return colors.Warning;
-            case BootstrapVariant.Info:
-                return colors.Info;
-            case BootstrapVariant.Light:
-                return colors.Light;
-            case BootstrapVariant.Dark:
-                return colors.Dark;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(variant), variant, "Unsupported Bootstrap variant.");
-        }
+        return BootstrapVariantColorResolver.Resolve(colors, variant);
     }
 
     public static int GetLogicalDiameter(BootstrapThemeMetrics metrics, BootstrapSpinnerSize size)
