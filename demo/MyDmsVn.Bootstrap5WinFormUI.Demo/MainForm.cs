@@ -15,6 +15,7 @@ public sealed class MainForm : Form
     private readonly Button _animationDemo = new Button();
     private readonly Button _spinnerDemo = new Button();
     private readonly Button _buttonDemo = new Button();
+    private readonly Button _buttonGroupToolbarDemo = new Button();
     private readonly FlowLayoutPanel _commandBar = new FlowLayoutPanel();
     private readonly TableLayoutPanel _palette = new TableLayoutPanel();
     private readonly Label _summary = new Label();
@@ -127,6 +128,16 @@ public sealed class MainForm : Form
             demo.Show(this);
         };
 
+        _buttonGroupToolbarDemo.AutoSize = true;
+        _buttonGroupToolbarDemo.Margin = new Padding(8, 1, 0, 0);
+        _buttonGroupToolbarDemo.Text = "Groups / Toolbar";
+        _buttonGroupToolbarDemo.UseVisualStyleBackColor = false;
+        _buttonGroupToolbarDemo.Click += (_, _) =>
+        {
+            var demo = new ButtonGroupToolbarDemoForm();
+            demo.Show(this);
+        };
+
         _commandBar.Controls.Add(modeLabel);
         _commandBar.Controls.Add(_themeMode);
         _commandBar.Controls.Add(_reducedMotion);
@@ -135,6 +146,7 @@ public sealed class MainForm : Form
         _commandBar.Controls.Add(_animationDemo);
         _commandBar.Controls.Add(_spinnerDemo);
         _commandBar.Controls.Add(_buttonDemo);
+        _commandBar.Controls.Add(_buttonGroupToolbarDemo);
     }
 
     private void ConfigurePalette()
@@ -211,6 +223,8 @@ public sealed class MainForm : Form
         _spinnerDemo.ForeColor = theme.Colors.Text;
         _buttonDemo.BackColor = theme.Colors.Surface;
         _buttonDemo.ForeColor = theme.Colors.Text;
+        _buttonGroupToolbarDemo.BackColor = theme.Colors.Surface;
+        _buttonGroupToolbarDemo.ForeColor = theme.Colors.Text;
         _palette.BackColor = theme.Colors.Body;
         _summary.BackColor = theme.Colors.SurfaceSecondary;
         _summary.ForeColor = theme.Colors.Text;

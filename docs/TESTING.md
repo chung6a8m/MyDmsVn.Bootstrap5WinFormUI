@@ -60,6 +60,17 @@ Phase 6 covers pure Button rendering/state logic with automated tests for:
 - Disabled colors resolving through disabled/muted theme tokens
 - Uniform radius validation and internal per-corner ButtonGroup override behavior
 
+Phase 7 covers ButtonGroup/Toolbar layout and state policy with automated tests for:
+
+- `None`, `Single`, and `Multiple` selection behavior
+- Horizontal and vertical first/middle/last per-corner assignment
+- Removal restoring a Button's standalone corner behavior
+- Equal-width sizing from the widest preferred Button
+- Toolbar left/center/right positioning
+- Horizontal `SpaceBetween` anchoring of the first and last groups
+- Vertical orientation and DPI-scalable configured group spacing
+- Toolbar isolation from ButtonGroup selection policy
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -81,6 +92,8 @@ Do not rely on arbitrary sleeps to wait for animation. Prefer controllable clock
 Phase 4 owner lifecycle tests instantiate real WinForms `Control` owners on STA threads while keeping animation time and frame delivery manually controlled.
 
 Phase 6 Button control tests run in STA and verify the finalized default contract, loading suppression of `PerformClick()`, and preferred-size stability when loading is toggled even when `LoadingText` differs from normal `Text`.
+
+Phase 7 Group/Toolbar tests run in STA and exercise real `BootstrapButton`, `BootstrapButtonGroup`, and `BootstrapButtonToolbar` controls. Tests call `PerformClick()` for activation semantics and `PerformLayout()` for deterministic connected-corner/equal-size/alignment assertions rather than duplicating the production algorithms in test helpers.
 
 ### 2.3 Demo/manual visual tests
 
@@ -106,6 +119,8 @@ For Phase 3, choose **Icons**. Verify that Segoe MDL2 and framework vector glyph
 For Phase 4, choose **Animation**. Verify finite Start/Stop/Restart, loop Start/Stop/Restart, normalized progress labels, and smooth movement. Start both animations, choose **Hide previews**, leave them hidden briefly, then choose **Show previews**; progress must resume from the retained logical position rather than jump by hidden wall-clock time. Toggle **Reduced motion** and explicitly Start/Restart: the finite animation must immediately reach its final state and the loop must remain at zero without continuous movement. Switch Light/Dark while the diagnostic window is open to confirm the demo continues to render with current theme tokens.
 
 For Phase 6, choose **Button**. Compare all filled and outline variants, Small/Default/Large sizing, left/right framework icons, selected/disabled/custom-radius examples, and hover/pressed/focus feedback. Tab through buttons and activate with Enter/Space. Trigger the async **Save** example and verify the same button cannot be reactivated while loading and that its measured size is unchanged before/after loading. Switch Light/Dark and Reduced motion while the loading example is active; the button and composed spinner must follow the current theme without introducing a Button-owned timer.
+
+For Phase 7, choose **Groups / Toolbar**. Verify a horizontal Single-selection group, vertical Multiple-selection group, EqualWidth connected buttons, explicit outer group radius, a fixed-width horizontal `SpaceBetween` toolbar, and a vertical toolbar. Tab through grouped Buttons and activate them with Enter/Space; focus remains on the child Buttons. Inspect inner seams for square connected corners and a single continuous border, then switch Light/Dark and run the same page at each supported Windows DPI setting. Toolbar actions whose group uses `SelectionMode.None` must not change `Selected` state.
 
 ## 3. DPI matrix
 
@@ -161,6 +176,8 @@ Interactive controls should be exercised in:
 
 Keyboard paths must be tested separately from mouse paths.
 
+For Phase 7, Group and Toolbar themselves are intentionally non-focusable; interaction remains on each `BootstrapButton`. Selection policy is validated through the same Button activation path used by mouse and keyboard input, while Toolbar remains layout-only.
+
 ## 6. Animation matrix
 
 For finite and loop animation, test:
@@ -197,6 +214,8 @@ For Phase 4, the animation object owns its internal frame scheduler and subscrip
 
 For Phase 6, Button owns only its theme subscription, theme-created font, and composed Spinner control. Spinner remains the sole owner of loading animation scheduling. Repeated Button creation/disposal must not leave either Button or Spinner subscribed/running.
 
+For Phase 7, ButtonGroup owns only theme notification plus child Button event subscriptions needed for selection/layout; removal/disposal must detach those handlers and clear internal grouped-corner overrides. Toolbar subscribes only to child Group size/visibility changes for layout and never to Button click/selection events.
+
 ## 8. DataGridView tests
 
 Use realistic scenarios:
@@ -221,6 +240,8 @@ For Designer-oriented controls verify in Visual Studio:
 - Common properties serialize and reopen correctly.
 - Theme defaults render without application startup code.
 - Opening a form containing the control does not run animation indefinitely in the Designer.
+
+For Phase 7, place Group and Toolbar in the Designer, add Buttons/Groups through their normal WinForms `Controls` collections, serialize `Orientation`, `SelectionMode`, `EqualWidth`, `BorderRadius`, `GroupSpacing`, and `Alignment`, then reopen the form and confirm connected layout is restored without application bootstrap code.
 
 ## 10. Build commands
 
