@@ -590,6 +590,8 @@ public class BootstrapSidebar : Panel
                 pair.Value.Collapse();
             }
         }
+
+        RefreshNavigationInteractivity();
     }
 
     private void UpdateItemVisual(BootstrapSidebarItem item)
@@ -608,6 +610,30 @@ public class BootstrapSidebar : Panel
             else
             {
                 collapse.Collapse();
+            }
+        }
+
+        RefreshNavigationInteractivity();
+    }
+
+    private void RefreshNavigationInteractivity()
+    {
+        RefreshNavigationInteractivity(_items, true);
+    }
+
+    private void RefreshNavigationInteractivity(BindingList<BootstrapSidebarItem> items, bool rowsVisible)
+    {
+        foreach (var item in items)
+        {
+            if (_buttons.TryGetValue(item, out var button))
+            {
+                button.TabStop = rowsVisible && item.Enabled;
+            }
+
+            if (item.Items.Count > 0)
+            {
+                var childrenVisible = rowsVisible && _expanded && item.Expanded;
+                RefreshNavigationInteractivity(item.Items, childrenVisible);
             }
         }
     }
@@ -800,6 +826,7 @@ public class BootstrapSidebar : Panel
 
         if (sender is BindingList<BootstrapSidebarItem> collection &&
             e.ListChangedType == ListChangedType.ItemChanged &&
+            e.PropertyDescriptor is not null &&
             e.NewIndex >= 0 &&
             e.NewIndex < collection.Count)
         {
