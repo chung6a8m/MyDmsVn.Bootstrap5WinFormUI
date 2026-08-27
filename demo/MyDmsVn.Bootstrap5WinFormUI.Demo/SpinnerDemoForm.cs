@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -164,7 +164,7 @@ public sealed class SpinnerDemoForm : Form
         {
             Text = text,
             AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            AutoSizeMode = AutoSizeMode.GrowOnly,
             Width = 820,
             Margin = new Padding(0, 0, 0, 12),
             Padding = new Padding(12)
