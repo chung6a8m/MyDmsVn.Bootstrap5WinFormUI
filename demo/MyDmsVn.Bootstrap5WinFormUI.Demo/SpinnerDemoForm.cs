@@ -164,8 +164,9 @@ public sealed class SpinnerDemoForm : Form
         {
             Text = text,
             AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowOnly,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Width = 820,
+            MinimumSize = new Size(820, 0),
             Margin = new Padding(0, 0, 0, 12),
             Padding = new Padding(12)
         };
