@@ -39,7 +39,7 @@ internal static class BootstrapProgressBarRenderLogic
 
         progress = Math.Max(0.0, Math.Min(1.0, progress));
         return (int)Math.Round(
-            startValue + ((targetValue - startValue) * progress),
+            (double)startValue + (((double)targetValue - startValue) * progress),
             MidpointRounding.AwayFromZero);
     }
 
