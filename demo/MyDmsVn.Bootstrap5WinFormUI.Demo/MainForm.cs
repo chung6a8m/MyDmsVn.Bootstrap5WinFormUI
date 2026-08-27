@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -21,7 +20,6 @@ public sealed class MainForm : Form
     private readonly Label _themeLabel = new Label();
     private readonly ComboBox _themeMode = new ComboBox();
     private readonly CheckBox _reducedMotion = new CheckBox();
-    private readonly List<DemoPageDefinition> _pages = new List<DemoPageDefinition>();
     private Form? _currentPage;
     private bool _updatingSelection;
 
@@ -161,10 +159,26 @@ public sealed class MainForm : Form
 
     private void ConfigurePages()
     {
-        AddPage(
+        var themeItem = AddPage(
             "Theme",
             "Semantic colors, typography, metrics, runtime Light/Dark switching, and reduced motion.",
             () => new ThemeDemoForm());
+        themeItem.Expanded = true;
+        AddChildPage(
+            themeItem,
+            "Rendering / DPI",
+            "Shared rendering primitives and virtual 96–192 DPI diagnostics.",
+            () => new RenderingDemoForm());
+        AddChildPage(
+            themeItem,
+            "Icons",
+            "Source-neutral Segoe MDL2 and framework-vector icon diagnostics.",
+            () => new IconDemoForm());
+        AddChildPage(
+            themeItem,
+            "Animation",
+            "Finite and loop animation lifecycle, hide/show, restart, and reduced-motion diagnostics.",
+            () => new AnimationDemoForm());
 
         AddPage(
             "Buttons / Groups / Toolbar",
@@ -213,15 +227,30 @@ public sealed class MainForm : Form
             () => new DataGridDemoForm());
     }
 
-    private void AddPage(string title, string description, Func<Form> createForm)
+    private BootstrapSidebarItem AddPage(string title, string description, Func<Form> createForm)
+    {
+        var item = CreateNavigationItem(title, description, createForm);
+        _navigation.Items.Add(item);
+        return item;
+    }
+
+    private static void AddChildPage(
+        BootstrapSidebarItem parent,
+        string title,
+        string description,
+        Func<Form> createForm)
+    {
+        parent.Items.Add(CreateNavigationItem(title, description, createForm));
+    }
+
+    private static BootstrapSidebarItem CreateNavigationItem(string title, string description, Func<Form> createForm)
     {
         var page = new DemoPageDefinition(title, description, createForm);
-        _pages.Add(page);
-        _navigation.Items.Add(new BootstrapSidebarItem
+        return new BootstrapSidebarItem
         {
             Text = title,
             Tag = page
-        });
+        };
     }
 
     private void ShowPage(DemoPageDefinition page)
