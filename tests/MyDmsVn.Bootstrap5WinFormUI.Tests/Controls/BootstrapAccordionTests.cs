@@ -61,7 +61,7 @@ public sealed class BootstrapAccordionTests
             item.Collapse.ExpandedHeightMode = BootstrapCollapseHeightMode.Fixed;
             item.Collapse.ExpandedHeight = 96;
 
-            item.Header.PerformClickForTest();
+            item.Header.PerformClick();
 
             Assert.Multiple((Action)(() =>
             {
@@ -71,7 +71,7 @@ public sealed class BootstrapAccordionTests
                 Assert.That(item.Header.AnimationProgress, Is.EqualTo(1.0).Within(0.0001));
             }));
 
-            item.Header.PerformClickForTest();
+            item.Header.PerformClick();
 
             Assert.Multiple((Action)(() =>
             {
@@ -285,13 +285,5 @@ public sealed class BootstrapAccordionTests
             _clock.Advance(elapsed);
             _scheduler.FireFrame();
         }
-    }
-}
-
-internal static class BootstrapAccordionHeaderTestExtensions
-{
-    public static void PerformClickForTest(this BootstrapAccordionHeader header)
-    {
-        header.RaiseClickForTest();
     }
 }
