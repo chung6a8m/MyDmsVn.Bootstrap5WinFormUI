@@ -59,12 +59,14 @@ public sealed class ContentLayoutHelperTests
     [Test]
     public void ArrangeHorizontalRejectsNegativeSpacing()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => ContentLayoutHelper.ArrangeHorizontal(
+        TestDelegate action = () => ContentLayoutHelper.ArrangeHorizontal(
             new Rectangle(0, 0, 100, 40),
             Padding.Empty,
             new Size(10, 10),
             new Size(10, 10),
             -1,
-            ContentAlignment.MiddleCenter));
+            ContentAlignment.MiddleCenter);
+
+        Assert.That(action, Throws.TypeOf<ArgumentOutOfRangeException>());
     }
 }
