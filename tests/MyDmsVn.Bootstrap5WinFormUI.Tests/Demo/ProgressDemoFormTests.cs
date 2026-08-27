@@ -6,6 +6,7 @@ using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Demo;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Demo;
@@ -38,6 +39,34 @@ public sealed class ProgressDemoFormTests
             Assert.That(progressBars.Any(progress => !progress.CustomColor.IsEmpty), Is.True);
             Assert.That(progressBars.Any(progress => progress.BorderRadius == 0), Is.True);
         }));
+    }
+
+    [Test]
+    public void ContentRowsUseBodyBackgroundInsteadOfToolbarSurface()
+    {
+        var original = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            var theme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+            BootstrapThemeManager.CurrentTheme = theme;
+
+            var demoType = typeof(MainForm).Assembly.GetType("MyDmsVn.Bootstrap5WinFormUI.Demo.ProgressDemoForm");
+            Assert.That(demoType, Is.Not.Null);
+
+            using var form = (Form)Activator.CreateInstance(demoType!)!;
+            form.CreateControl();
+            form.PerformLayout();
+
+            var primary = FindControls<BootstrapProgressBar>(form)
+                .Single(progress => progress.AccessibleName == "Primary progress");
+
+            Assert.That(primary.Parent, Is.Not.Null);
+            Assert.That(primary.Parent!.BackColor.ToArgb(), Is.EqualTo(theme.Colors.Body.ToArgb()));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = original;
+        }
     }
 
     [Test]
