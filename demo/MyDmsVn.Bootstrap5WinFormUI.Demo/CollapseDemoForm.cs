@@ -172,11 +172,14 @@ public sealed class CollapseDemoForm : Form
 
     private void AddVariableRow(string text)
     {
+        var theme = BootstrapThemeManager.CurrentTheme;
         _variableContent.Controls.Add(new Label
         {
             AutoSize = true,
             Text = text,
-            Margin = new Padding(0, 3, 0, 3)
+            Margin = new Padding(0, 3, 0, 3),
+            BackColor = theme.Colors.SurfaceSecondary,
+            ForeColor = theme.Colors.Text
         });
     }
 
