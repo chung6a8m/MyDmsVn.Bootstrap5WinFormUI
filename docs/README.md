@@ -18,6 +18,7 @@ This directory contains the authoritative development documentation for `MyDmsVn
 12. [PHASE11_BOOTSTRAP_PROGRESS_BAR.md](PHASE11_BOOTSTRAP_PROGRESS_BAR.md) — finalized ProgressBar range, formatting, animation, indeterminate, lifecycle, tests, and manual verification contract.
 13. [PHASE12_BOOTSTRAP_SIDEBAR.md](PHASE12_BOOTSTRAP_SIDEBAR.md) — finalized Sidebar navigation, nested Collapse, keyboard/focus, animation, accessibility, tests, and manual verification contract.
 14. [PHASE13_BOOTSTRAP_DATA_GRID_VIEW.md](PHASE13_BOOTSTRAP_DATA_GRID_VIEW.md) — finalized DataGridView theming, native-behavior boundary, empty/loading states, tests, demo, and large-row manual performance gate.
+15. [PHASE14_INTEGRATED_DEMO.md](PHASE14_INTEGRATED_DEMO.md) — integrated application shell, required navigation pages, retained foundation diagnostics, lifecycle, automated checks, and manual verification matrix.
 
 ## About `idea-drafs/`
 
