@@ -24,23 +24,38 @@ Do not create `AnimationTime`, `TransitionDuration`, and `Duration` aliases for 
 
 Responsibility: display ongoing work without owning business/task state.
 
-Expected concepts:
+Phase 5 finalizes the public concepts as:
 
 ```text
-Type: Border | Grow
-SpinnerSize: Small | Default | Large
-Variant
-CustomColor
-AnimationDuration
-Spinning
+BootstrapSpinnerType: Border | Grow
+BootstrapSpinnerSize: Small | Default | Large
+BootstrapVariant: Primary | Secondary | Success | Danger | Warning | Info | Light | Dark
+
+BootstrapSpinner.Type
+BootstrapSpinner.SpinnerSize
+BootstrapSpinner.Variant
+BootstrapSpinner.CustomColor
+BootstrapSpinner.AnimationDuration
+BootstrapSpinner.Spinning
+BootstrapSpinner.Start()
+BootstrapSpinner.Stop()
 ```
 
-Rules:
+Behavior:
 
-- Uses `BootstrapLoopAnimation`.
-- Stops/releases animation appropriately when hidden or disposed.
-- Is not focusable by default.
-- Supports accessible description when used independently.
+- `Border` renders a rotating arc; `Grow` renders a pulsing filled circle.
+- `CustomColor = Color.Empty` uses the current theme color selected by `Variant`; any non-empty custom color overrides the semantic variant.
+- Small/default/large logical diameters reuse existing theme metrics (`SpacingLG`, `SpacingXL`, and `ControlHeight`) and are scaled through `DpiScaler`.
+- The default animation cycle is 750 ms. `AnimationDuration` must be greater than zero.
+- `Spinning` defaults to `true`; `Start()` and `Stop()` are the canonical run-control methods.
+- Animation is driven exclusively by `BootstrapLoopAnimation`; Spinner does not own a WinForms timer or a second scheduling engine.
+- Hiding the control pauses shared loop scheduling and showing it resumes from retained logical progress through the animation owner lifecycle. Disposal releases the animation and theme subscription.
+- Runtime theme changes update semantic colors and sizing. They also recreate the loop animation so a changed reduced-motion preference takes effect immediately.
+- With reduced motion enabled, an active spinner remains on a stable visible frame without continuously scheduling animation frames.
+- The control is double-buffered, non-focusable by default, transparent-background capable, and exposes an accessibility role/description suitable for an activity indicator.
+- Designer construction requires no application bootstrap; animation starts only after a runtime handle exists.
+
+Manual verification: launch the demo and choose **Spinner**. Compare Border/Grow, all three sizes, all semantic variants, and the custom-color examples; use **Start all** / **Stop all**, switch Light/Dark, toggle Reduced motion, resize the window, and validate the page under the supported Windows DPI matrix.
 
 ## BootstrapButton
 
