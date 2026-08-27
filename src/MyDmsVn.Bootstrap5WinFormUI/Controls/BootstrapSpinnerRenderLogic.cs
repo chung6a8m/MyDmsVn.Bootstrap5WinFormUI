@@ -11,6 +11,11 @@ internal static class BootstrapSpinnerRenderLogic
         BootstrapVariant variant,
         Color customColor)
     {
+        if (colors is null)
+        {
+            throw new ArgumentNullException(nameof(colors));
+        }
+
         if (!customColor.IsEmpty)
         {
             return customColor;
