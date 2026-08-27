@@ -79,8 +79,8 @@ public sealed class MainForm : Form
         _renderingDemo.UseVisualStyleBackColor = false;
         _renderingDemo.Click += (_, _) =>
         {
-            using var demo = new RenderingDemoForm();
-            demo.ShowDialog(this);
+            var demo = new RenderingDemoForm();
+            demo.Show(this);
         };
 
         _commandBar.Controls.Add(modeLabel);
