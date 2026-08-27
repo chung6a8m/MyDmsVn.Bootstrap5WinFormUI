@@ -19,6 +19,7 @@ public sealed class MainForm : Form
     private readonly Button _textBoxCardDemo = new Button();
     private readonly Button _collapseDemo = new Button();
     private readonly Button _accordionDemo = new Button();
+    private readonly Button _progressDemo = new Button();
     private readonly FlowLayoutPanel _commandBar = new FlowLayoutPanel();
     private readonly TableLayoutPanel _palette = new TableLayoutPanel();
     private readonly Label _summary = new Label();
@@ -171,6 +172,16 @@ public sealed class MainForm : Form
             demo.Show(this);
         };
 
+        _progressDemo.AutoSize = true;
+        _progressDemo.Margin = new Padding(8, 1, 0, 0);
+        _progressDemo.Text = "Progress";
+        _progressDemo.UseVisualStyleBackColor = false;
+        _progressDemo.Click += (_, _) =>
+        {
+            var demo = new ProgressDemoForm();
+            demo.Show(this);
+        };
+
         _commandBar.Controls.Add(modeLabel);
         _commandBar.Controls.Add(_themeMode);
         _commandBar.Controls.Add(_reducedMotion);
@@ -183,6 +194,7 @@ public sealed class MainForm : Form
         _commandBar.Controls.Add(_textBoxCardDemo);
         _commandBar.Controls.Add(_collapseDemo);
         _commandBar.Controls.Add(_accordionDemo);
+        _commandBar.Controls.Add(_progressDemo);
     }
 
     private void ConfigurePalette()
@@ -267,6 +279,8 @@ public sealed class MainForm : Form
         _collapseDemo.ForeColor = theme.Colors.Text;
         _accordionDemo.BackColor = theme.Colors.Surface;
         _accordionDemo.ForeColor = theme.Colors.Text;
+        _progressDemo.BackColor = theme.Colors.Surface;
+        _progressDemo.ForeColor = theme.Colors.Text;
         _palette.BackColor = theme.Colors.Body;
         _summary.BackColor = theme.Colors.SurfaceSecondary;
         _summary.ForeColor = theme.Colors.Text;
