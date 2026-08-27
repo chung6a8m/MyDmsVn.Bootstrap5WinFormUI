@@ -57,11 +57,15 @@ public sealed class BootstrapSidebarAnimatedLayoutTests
             AssertRowsVisible(sidebar, "initial expanded state");
 
             sidebar.Collapse();
-            PumpMessagesUntil(() => sidebar.Width == sidebar.CollapsedWidth, TimeSpan.FromSeconds(2));
+            PumpMessagesUntil(
+                () => sidebar.Width == sidebar.CollapsedWidth && NestedTransitionsCompleted(sidebar),
+                TimeSpan.FromSeconds(2));
             AssertRowsVisible(sidebar, "after animated collapse");
 
             sidebar.Expand();
-            PumpMessagesUntil(() => sidebar.Width == sidebar.ExpandedWidth, TimeSpan.FromSeconds(2));
+            PumpMessagesUntil(
+                () => sidebar.Width == sidebar.ExpandedWidth && NestedTransitionsCompleted(sidebar),
+                TimeSpan.FromSeconds(2));
             AssertRowsVisible(sidebar, "after animated re-expand");
             Assert.That(FindButton(sidebar, home).Text, Is.EqualTo("Home"));
         }
@@ -69,6 +73,11 @@ public sealed class BootstrapSidebarAnimatedLayoutTests
         {
             BootstrapThemeManager.CurrentTheme = originalTheme;
         }
+    }
+
+    private static bool NestedTransitionsCompleted(Control root)
+    {
+        return Descendants(root).OfType<BootstrapCollapse>().All(collapse => !collapse.IsAnimating);
     }
 
     private static void AssertRowsVisible(BootstrapSidebar sidebar, string state)
