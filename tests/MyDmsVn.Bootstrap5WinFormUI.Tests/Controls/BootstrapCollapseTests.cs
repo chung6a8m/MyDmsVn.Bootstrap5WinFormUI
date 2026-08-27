@@ -120,6 +120,44 @@ public sealed class BootstrapCollapseTests
     }
 
     [Test]
+    public void AutoHeightUsesOnlyPaddingWhenAllChildrenAreHidden()
+    {
+        var original = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(
+                BootstrapThemeMode.Light,
+                reducedMotion: true);
+
+            using var collapse = new BootstrapCollapse
+            {
+                Width = 260,
+                Padding = new Padding(8),
+                ExpandedHeightMode = BootstrapCollapseHeightMode.Auto
+            };
+            using var content = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 48,
+                Margin = Padding.Empty
+            };
+
+            collapse.Controls.Add(content);
+            collapse.PerformLayout();
+            Assert.That(collapse.Height, Is.GreaterThanOrEqualTo(64));
+
+            content.Visible = false;
+            collapse.PerformLayout();
+
+            Assert.That(collapse.Height, Is.EqualTo(collapse.Padding.Vertical));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = original;
+        }
+    }
+
+    [Test]
     public void FixedExpandedHeightChangeUpdatesStableExpandedControl()
     {
         var original = BootstrapThemeManager.CurrentTheme;
