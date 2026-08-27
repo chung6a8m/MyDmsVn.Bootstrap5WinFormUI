@@ -59,29 +59,44 @@ Manual verification: launch the demo and choose **Spinner**. Compare Border/Grow
 
 ## BootstrapButton
 
-Responsibility: themed command surface with standard button semantics.
+Responsibility: themed command surface with standard native WinForms button semantics.
 
-Expected concepts:
+Phase 6 finalizes the public concepts as:
 
 ```text
-Variant
-Outline
-ButtonSize
-Icon
-IconPosition
-BorderRadius
-Loading
-LoadingText
-Selected
+BootstrapButtonSize: Small | Default | Large
+BootstrapIconPosition: Left | Right
+BootstrapVariant: Primary | Secondary | Success | Danger | Warning | Info | Light | Dark
+
+BootstrapButton.Variant
+BootstrapButton.Outline
+BootstrapButton.ButtonSize
+BootstrapButton.Icon
+BootstrapButton.IconPosition
+BootstrapButton.IconRenderer
+BootstrapButton.BorderRadius
+BootstrapButton.Loading
+BootstrapButton.LoadingText
+BootstrapButton.Selected
 ```
 
-Rules:
+Behavior:
 
-- Entire client area is clickable.
-- Enter/Space behavior follows normal button expectations.
-- Loading suppresses click interaction and preserves visual size.
-- Loading reuses Spinner infrastructure.
-- Per-corner radii are supported internally/publicly as needed by ButtonGroup without making grouping depend on painting hacks.
+- `BootstrapButton` derives from the native WinForms `Button`, preserving normal command, focus, Enter/Space, and `PerformClick()` semantics when not loading.
+- The entire normal-state client area is clickable; hover, pressed, focus, disabled, and selected states are custom-painted from theme tokens.
+- Filled and outline presentations support all semantic `BootstrapVariant` values. Semantic color resolution is shared with Spinner instead of duplicated in each control.
+- Small/default/large heights and padding/radius choices reuse `BootstrapThemeMetrics` and scale through `DpiScaler`.
+- `Icon` is a source-neutral `IconDescriptor`. `IconRenderer` defaults to the built-in Segoe MDL2/framework-vector renderer and can be replaced with a renderer that includes SVG or application-defined providers. The Button never branches on icon source kind.
+- `BorderRadius = -1` uses the current theme radius for `ButtonSize`; non-negative values specify an explicit uniform logical radius.
+- ButtonGroup support is prepared through an internal per-corner `CornerRadius` override. Grouping can therefore apply first/middle/last corner geometry without replacing Button painting or mutating the public uniform radius.
+- `Selected` is a visual state only. A standalone Button does not toggle it automatically; ButtonGroup owns selection policy in Phase 7.
+- `Loading` suppresses click activation without mutating the caller-owned `Enabled` value. It replaces normal content with a framework `BootstrapSpinner` plus `LoadingText` (or the normal `Text` when `LoadingText` is empty).
+- Loading animation is owned by the composed `BootstrapSpinner`; Button does not create a timer or animation engine.
+- Preferred size reserves both normal and loading presentations, so toggling `Loading` does not change the preferred/AutoSize footprint.
+- Runtime theme changes update colors, metrics, typography, focus rendering, and the loading spinner through the existing theme lifecycle. Disposal releases the Button theme subscription and owned theme font; the child Spinner releases its own animation/theme resources.
+- Designer construction requires no application bootstrap. The loading spinner is non-focusable and does not animate unless loading is active at runtime.
+
+Manual verification: launch the demo and choose **Button**. Compare filled/outline variants, Small/Default/Large sizing, left/right icons, selected/disabled/custom-radius states, mouse hover/press, Tab focus, Enter/Space activation, and the async loading simulation. Confirm repeat activation is suppressed while loading, size remains unchanged, Light/Dark switches repaint live, Reduced motion produces a stable spinner frame, and the page remains usable across the supported Windows DPI matrix.
 
 ## BootstrapButtonGroup
 
