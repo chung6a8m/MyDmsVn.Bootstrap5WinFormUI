@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -50,6 +51,57 @@ public sealed class BootstrapTextBoxTests
             Assert.That(native.ReadOnly, Is.True);
             Assert.That(native.UseSystemPasswordChar, Is.True);
             Assert.That(native.TabStop, Is.False, "The BootstrapTextBox owns the single tab stop and forwards focus to the native editor.");
+        }));
+    }
+
+    [Test]
+    public void NativeEditorKeyboardEventsAreForwardedThroughPublicControl()
+    {
+        using var input = new BootstrapTextBox();
+        var native = input.Controls.OfType<TextBox>().Single();
+        var keyDownCount = 0;
+        var keyPressCount = 0;
+        var keyUpCount = 0;
+        var previewKeyDownCount = 0;
+
+        input.KeyDown += (_, e) =>
+        {
+            keyDownCount++;
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        };
+        input.KeyPress += (_, e) =>
+        {
+            keyPressCount++;
+            e.Handled = true;
+        };
+        input.KeyUp += (_, _) => keyUpCount++;
+        input.PreviewKeyDown += (_, e) =>
+        {
+            previewKeyDownCount++;
+            e.IsInputKey = true;
+        };
+
+        var keyDown = new KeyEventArgs(Keys.Enter);
+        var keyPress = new KeyPressEventArgs('x');
+        var keyUp = new KeyEventArgs(Keys.Enter);
+        var previewKeyDown = new PreviewKeyDownEventArgs(Keys.Tab);
+
+        RaiseProtectedControlEvent(native, "OnKeyDown", keyDown);
+        RaiseProtectedControlEvent(native, "OnKeyPress", keyPress);
+        RaiseProtectedControlEvent(native, "OnKeyUp", keyUp);
+        RaiseProtectedControlEvent(native, "OnPreviewKeyDown", previewKeyDown);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(keyDownCount, Is.EqualTo(1));
+            Assert.That(keyPressCount, Is.EqualTo(1));
+            Assert.That(keyUpCount, Is.EqualTo(1));
+            Assert.That(previewKeyDownCount, Is.EqualTo(1));
+            Assert.That(keyDown.Handled, Is.True);
+            Assert.That(keyDown.SuppressKeyPress, Is.True);
+            Assert.That(keyPress.Handled, Is.True);
+            Assert.That(previewKeyDown.IsInputKey, Is.True);
         }));
     }
 
@@ -145,5 +197,12 @@ public sealed class BootstrapTextBoxTests
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() => input.BorderRadius = -2));
         Assert.DoesNotThrow((Action)(() => input.BorderRadius = -1));
         Assert.DoesNotThrow((Action)(() => input.BorderRadius = 0));
+    }
+
+    private static void RaiseProtectedControlEvent(Control control, string methodName, EventArgs args)
+    {
+        var method = typeof(Control).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null, $"Expected Control.{methodName} to exist.");
+        method!.Invoke(control, new object[] { args });
     }
 }
