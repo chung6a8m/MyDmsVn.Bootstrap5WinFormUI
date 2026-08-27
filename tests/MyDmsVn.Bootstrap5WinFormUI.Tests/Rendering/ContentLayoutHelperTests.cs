@@ -59,7 +59,7 @@ public sealed class ContentLayoutHelperTests
     [Test]
     public void ArrangeHorizontalRejectsNegativeSpacing()
     {
-        TestDelegate action = () => ContentLayoutHelper.ArrangeHorizontal(
+        Action action = () => ContentLayoutHelper.ArrangeHorizontal(
             new Rectangle(0, 0, 100, 40),
             Padding.Empty,
             new Size(10, 10),
