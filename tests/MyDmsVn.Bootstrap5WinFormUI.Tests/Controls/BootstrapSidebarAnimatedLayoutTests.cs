@@ -82,6 +82,8 @@ public sealed class BootstrapSidebarAnimatedLayoutTests
             Assert.That(host.Visible, Is.True, $"Navigation host became hidden {state}.");
             Assert.That(host.Height, Is.GreaterThan(0), $"Navigation host collapsed to zero height {state}.");
             Assert.That(host.Width, Is.GreaterThan(1), $"Navigation host collapsed to unusable width {state}. Bounds={host.Bounds}, min={host.MinimumSize}, max={host.MaximumSize}.");
+            Assert.That(host.Left, Is.EqualTo(0), $"Navigation host moved horizontally out of the sidebar {state}. Bounds={host.Bounds}; AutoScrollPosition={sidebar.AutoScrollPosition}.");
+            Assert.That(host.Top, Is.EqualTo(0), $"Navigation host moved vertically out of the sidebar {state}. Bounds={host.Bounds}; AutoScrollPosition={sidebar.AutoScrollPosition}.");
             Assert.That(rootButtons, Is.Not.Empty, $"Navigation rows disappeared {state}.");
             Assert.That(rootButtons.All(button => button.Visible), Is.True, $"A root navigation row became hidden {state}.");
             Assert.That(
