@@ -109,6 +109,32 @@ public sealed class BootstrapCardTests
     }
 
     [Test]
+    public void EmptyPaddingStillKeepsSectionsInsideRoundedSurfaceAndShadow()
+    {
+        using var card = new BootstrapCard
+        {
+            Size = new Size(240, 140),
+            Padding = Padding.Empty,
+            BorderRadius = 24,
+            ShowBorder = true,
+            ShowShadow = true
+        };
+
+        card.PerformLayout();
+        var display = card.DisplayRectangle;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(display.Left, Is.GreaterThan(0));
+            Assert.That(display.Top, Is.GreaterThan(0));
+            Assert.That(display.Right, Is.LessThan(card.ClientSize.Width));
+            Assert.That(display.Bottom, Is.LessThan(card.ClientSize.Height));
+            Assert.That(card.Body.Bounds, Is.EqualTo(display));
+            Assert.That(card.Padding, Is.EqualTo(Padding.Empty), "Decoration safety must not rewrite caller-owned Padding.");
+        }));
+    }
+
+    [Test]
     public void BorderRadiusRejectsValuesBelowThemeSentinel()
     {
         using var card = new BootstrapCard();
