@@ -452,7 +452,9 @@ public class BootstrapCollapse : Panel
 
         if (!hasVisibleContent)
         {
-            return Math.Max(Padding.Vertical, _lastAutoExpandedHeight);
+            return Controls.Count == 0
+                ? Math.Max(Padding.Vertical, _lastAutoExpandedHeight)
+                : Padding.Vertical;
         }
 
         return Math.Max(Padding.Vertical, contentBottom + Padding.Bottom);
