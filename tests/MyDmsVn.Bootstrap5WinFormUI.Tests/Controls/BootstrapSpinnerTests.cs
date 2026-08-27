@@ -16,7 +16,7 @@ public sealed class BootstrapSpinnerTests
     {
         using var spinner = new BootstrapSpinner();
 
-        Assert.Multiple(() =>
+        Assert.Multiple((TestDelegate)(() =>
         {
             Assert.That(spinner.Type, Is.EqualTo(BootstrapSpinnerType.Border));
             Assert.That(spinner.SpinnerSize, Is.EqualTo(BootstrapSpinnerSize.Default));
@@ -25,7 +25,7 @@ public sealed class BootstrapSpinnerTests
             Assert.That(spinner.AnimationDuration, Is.EqualTo(TimeSpan.FromMilliseconds(750)));
             Assert.That(spinner.Spinning, Is.True);
             Assert.That(spinner.TabStop, Is.False);
-        });
+        }));
     }
 
     [Test]
@@ -45,8 +45,8 @@ public sealed class BootstrapSpinnerTests
     {
         using var spinner = new BootstrapSpinner();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => spinner.AnimationDuration = TimeSpan.Zero);
-        Assert.Throws<ArgumentOutOfRangeException>(() => spinner.AnimationDuration = TimeSpan.FromMilliseconds(-1));
+        Assert.Throws<ArgumentOutOfRangeException>((TestDelegate)(() => spinner.AnimationDuration = TimeSpan.Zero));
+        Assert.Throws<ArgumentOutOfRangeException>((TestDelegate)(() => spinner.AnimationDuration = TimeSpan.FromMilliseconds(-1)));
     }
 
     [Test]
@@ -54,7 +54,7 @@ public sealed class BootstrapSpinnerTests
     {
         var colors = BootstrapThemeColors.CreateDefault(BootstrapThemeMode.Light);
 
-        Assert.Multiple(() =>
+        Assert.Multiple((TestDelegate)(() =>
         {
             Assert.That(BootstrapSpinnerRenderLogic.ResolveColor(colors, BootstrapVariant.Primary, Color.Empty), Is.EqualTo(colors.Primary));
             Assert.That(BootstrapSpinnerRenderLogic.ResolveColor(colors, BootstrapVariant.Secondary, Color.Empty), Is.EqualTo(colors.Secondary));
@@ -64,7 +64,7 @@ public sealed class BootstrapSpinnerTests
             Assert.That(BootstrapSpinnerRenderLogic.ResolveColor(colors, BootstrapVariant.Info, Color.Empty), Is.EqualTo(colors.Info));
             Assert.That(BootstrapSpinnerRenderLogic.ResolveColor(colors, BootstrapVariant.Light, Color.Empty), Is.EqualTo(colors.Light));
             Assert.That(BootstrapSpinnerRenderLogic.ResolveColor(colors, BootstrapVariant.Dark, Color.Empty), Is.EqualTo(colors.Dark));
-        });
+        }));
     }
 
     [Test]
@@ -83,12 +83,12 @@ public sealed class BootstrapSpinnerTests
     {
         var metrics = BootstrapThemeMetrics.Default;
 
-        Assert.Multiple(() =>
+        Assert.Multiple((TestDelegate)(() =>
         {
             Assert.That(BootstrapSpinnerRenderLogic.GetLogicalDiameter(metrics, BootstrapSpinnerSize.Small), Is.EqualTo(metrics.SpacingLG));
             Assert.That(BootstrapSpinnerRenderLogic.GetLogicalDiameter(metrics, BootstrapSpinnerSize.Default), Is.EqualTo(metrics.SpacingXL));
             Assert.That(BootstrapSpinnerRenderLogic.GetLogicalDiameter(metrics, BootstrapSpinnerSize.Large), Is.EqualTo(metrics.ControlHeight));
-        });
+        }));
     }
 
     [Test]
@@ -98,12 +98,12 @@ public sealed class BootstrapSpinnerTests
         var middle = BootstrapSpinnerRenderLogic.GetGrowScale(0.5);
         var end = BootstrapSpinnerRenderLogic.GetGrowScale(1.0);
 
-        Assert.Multiple(() =>
+        Assert.Multiple((TestDelegate)(() =>
         {
             Assert.That(zero, Is.GreaterThan(0.0));
             Assert.That(zero, Is.LessThan(1.0));
             Assert.That(middle, Is.EqualTo(1.0).Within(0.000001));
             Assert.That(end, Is.EqualTo(zero).Within(0.000001));
-        });
+        }));
     }
 }
