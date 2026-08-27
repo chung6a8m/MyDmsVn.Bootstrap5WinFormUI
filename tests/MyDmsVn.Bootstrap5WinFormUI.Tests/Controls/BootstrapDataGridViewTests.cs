@@ -95,7 +95,8 @@ public sealed class BootstrapDataGridViewTests
         {
             AutoGenerateColumns = false,
             AllowUserToAddRows = false,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            BindingContext = new BindingContext()
         };
         var table = new DataTable();
         table.Columns.Add("Name", typeof(string));
