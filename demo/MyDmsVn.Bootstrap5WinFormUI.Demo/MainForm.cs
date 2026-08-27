@@ -2,49 +2,52 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
 public sealed class MainForm : Form
 {
+    private readonly BootstrapSidebar _navigation = new BootstrapSidebar();
+    private readonly Panel _workspace = new Panel();
+    private readonly TableLayoutPanel _header = new TableLayoutPanel();
+    private readonly TableLayoutPanel _titleBlock = new TableLayoutPanel();
+    private readonly FlowLayoutPanel _settings = new FlowLayoutPanel();
+    private readonly Panel _contentHost = new Panel();
+    private readonly Button _navigationToggle = new Button();
+    private readonly Label _pageTitle = new Label();
+    private readonly Label _pageDescription = new Label();
+    private readonly Label _themeLabel = new Label();
     private readonly ComboBox _themeMode = new ComboBox();
     private readonly CheckBox _reducedMotion = new CheckBox();
-    private readonly Button _renderingDemo = new Button();
-    private readonly Button _iconDemo = new Button();
-    private readonly Button _animationDemo = new Button();
-    private readonly Button _spinnerDemo = new Button();
-    private readonly Button _buttonDemo = new Button();
-    private readonly Button _buttonGroupToolbarDemo = new Button();
-    private readonly Button _textBoxCardDemo = new Button();
-    private readonly Button _collapseDemo = new Button();
-    private readonly Button _accordionDemo = new Button();
-    private readonly Button _progressDemo = new Button();
-    private readonly Button _sidebarDemo = new Button();
-    private readonly Button _dataGridDemo = new Button();
-    private readonly FlowLayoutPanel _commandBar = new FlowLayoutPanel();
-    private readonly TableLayoutPanel _palette = new TableLayoutPanel();
-    private readonly Label _summary = new Label();
+    private readonly List<DemoPageDefinition> _pages = new List<DemoPageDefinition>();
+    private Form? _currentPage;
     private bool _updatingSelection;
 
     public MainForm()
     {
-        Text = "MyDmsVn.Bootstrap5WinFormUI — Foundation Demo";
+        Text = "MyDmsVn.Bootstrap5WinFormUI — Integrated Demo";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(960, 680);
-        MinimumSize = new Size(720, 520);
+        ClientSize = new Size(1280, 800);
+        MinimumSize = new Size(900, 600);
 
-        ConfigureCommandBar();
-        ConfigurePalette();
-        ConfigureSummary();
+        ConfigureWorkspace();
+        ConfigureHeader();
+        ConfigureNavigation();
+        ConfigurePages();
 
-        Controls.Add(_palette);
-        Controls.Add(_summary);
-        Controls.Add(_commandBar);
+        Controls.Add(_workspace);
+        Controls.Add(_navigation);
 
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         SyncSelection(BootstrapThemeManager.CurrentTheme);
         ApplyTheme(BootstrapThemeManager.CurrentTheme);
+
+        if (_navigation.Items.Count > 0)
+        {
+            _navigation.SelectedItem = _navigation.Items[0];
+        }
     }
 
     protected override void Dispose(bool disposing)
@@ -57,188 +60,198 @@ public sealed class MainForm : Form
         base.Dispose(disposing);
     }
 
-    private void ConfigureCommandBar()
+    private void ConfigureWorkspace()
     {
-        _commandBar.Dock = DockStyle.Top;
-        _commandBar.AutoSize = true;
-        _commandBar.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        _commandBar.FlowDirection = FlowDirection.LeftToRight;
-        _commandBar.WrapContents = true;
-        _commandBar.Padding = new Padding(12, 10, 12, 10);
+        _workspace.Dock = DockStyle.Fill;
+        _contentHost.Dock = DockStyle.Fill;
+        _contentHost.Padding = Padding.Empty;
 
-        var modeLabel = new Label
-        {
-            AutoSize = true,
-            Margin = new Padding(0, 6, 6, 0),
-            Text = "Theme"
-        };
+        _workspace.Controls.Add(_contentHost);
+        _workspace.Controls.Add(_header);
+    }
+
+    private void ConfigureHeader()
+    {
+        _header.Dock = DockStyle.Top;
+        _header.Height = 82;
+        _header.Padding = new Padding(12, 10, 12, 8);
+        _header.ColumnCount = 3;
+        _header.RowCount = 1;
+        _header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        _header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        _header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        _navigationToggle.AutoSize = true;
+        _navigationToggle.Text = "Menu";
+        _navigationToggle.Margin = new Padding(0, 8, 12, 8);
+        _navigationToggle.UseVisualStyleBackColor = false;
+        _navigationToggle.AccessibleName = "Toggle demo navigation";
+        _navigationToggle.Click += (_, _) => _navigation.Toggle();
+
+        _titleBlock.Dock = DockStyle.Fill;
+        _titleBlock.Margin = Padding.Empty;
+        _titleBlock.ColumnCount = 1;
+        _titleBlock.RowCount = 2;
+        _titleBlock.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _titleBlock.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
+        _titleBlock.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
+
+        _pageTitle.Dock = DockStyle.Fill;
+        _pageTitle.AutoEllipsis = true;
+        _pageTitle.TextAlign = ContentAlignment.BottomLeft;
+        _pageTitle.AccessibleName = "Current demo page title";
+        _pageTitle.Font = new Font(_pageTitle.Font, FontStyle.Bold);
+
+        _pageDescription.Dock = DockStyle.Fill;
+        _pageDescription.AutoEllipsis = true;
+        _pageDescription.TextAlign = ContentAlignment.TopLeft;
+        _pageDescription.AccessibleName = "Current demo page description";
+
+        _titleBlock.Controls.Add(_pageTitle, 0, 0);
+        _titleBlock.Controls.Add(_pageDescription, 0, 1);
+
+        _settings.AutoSize = true;
+        _settings.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _settings.Dock = DockStyle.Fill;
+        _settings.FlowDirection = FlowDirection.LeftToRight;
+        _settings.WrapContents = false;
+        _settings.Margin = Padding.Empty;
+        _settings.Padding = Padding.Empty;
+
+        _themeLabel.AutoSize = true;
+        _themeLabel.Text = "Theme";
+        _themeLabel.Margin = new Padding(0, 14, 6, 0);
 
         _themeMode.DropDownStyle = ComboBoxStyle.DropDownList;
-        _themeMode.Width = 120;
+        _themeMode.Width = 112;
+        _themeMode.Margin = new Padding(0, 8, 0, 0);
         _themeMode.Items.Add("Light");
         _themeMode.Items.Add("Dark");
         _themeMode.SelectedIndexChanged += (_, _) => PublishSelectedTheme();
 
         _reducedMotion.AutoSize = true;
-        _reducedMotion.Margin = new Padding(18, 6, 0, 0);
         _reducedMotion.Text = "Reduced motion";
+        _reducedMotion.Margin = new Padding(16, 13, 0, 0);
         _reducedMotion.CheckedChanged += (_, _) => PublishSelectedTheme();
 
-        _renderingDemo.AutoSize = true;
-        _renderingDemo.Margin = new Padding(18, 1, 0, 0);
-        _renderingDemo.Text = "Rendering / DPI";
-        _renderingDemo.UseVisualStyleBackColor = false;
-        _renderingDemo.Click += (_, _) =>
-        {
-            var demo = new RenderingDemoForm();
-            demo.Show(this);
-        };
+        _settings.Controls.Add(_themeLabel);
+        _settings.Controls.Add(_themeMode);
+        _settings.Controls.Add(_reducedMotion);
 
-        _iconDemo.AutoSize = true;
-        _iconDemo.Margin = new Padding(8, 1, 0, 0);
-        _iconDemo.Text = "Icons";
-        _iconDemo.UseVisualStyleBackColor = false;
-        _iconDemo.Click += (_, _) =>
-        {
-            var demo = new IconDemoForm();
-            demo.Show(this);
-        };
-
-        _animationDemo.AutoSize = true;
-        _animationDemo.Margin = new Padding(8, 1, 0, 0);
-        _animationDemo.Text = "Animation";
-        _animationDemo.UseVisualStyleBackColor = false;
-        _animationDemo.Click += (_, _) =>
-        {
-            var demo = new AnimationDemoForm();
-            demo.Show(this);
-        };
-
-        _spinnerDemo.AutoSize = true;
-        _spinnerDemo.Margin = new Padding(8, 1, 0, 0);
-        _spinnerDemo.Text = "Spinner";
-        _spinnerDemo.UseVisualStyleBackColor = false;
-        _spinnerDemo.Click += (_, _) =>
-        {
-            var demo = new SpinnerDemoForm();
-            demo.Show(this);
-        };
-
-        _buttonDemo.AutoSize = true;
-        _buttonDemo.Margin = new Padding(8, 1, 0, 0);
-        _buttonDemo.Text = "Button";
-        _buttonDemo.UseVisualStyleBackColor = false;
-        _buttonDemo.Click += (_, _) =>
-        {
-            var demo = new ButtonDemoForm();
-            demo.Show(this);
-        };
-
-        _buttonGroupToolbarDemo.AutoSize = true;
-        _buttonGroupToolbarDemo.Margin = new Padding(8, 1, 0, 0);
-        _buttonGroupToolbarDemo.Text = "Groups / Toolbar";
-        _buttonGroupToolbarDemo.UseVisualStyleBackColor = false;
-        _buttonGroupToolbarDemo.Click += (_, _) =>
-        {
-            var demo = new ButtonGroupToolbarDemoForm();
-            demo.Show(this);
-        };
-
-        _textBoxCardDemo.AutoSize = true;
-        _textBoxCardDemo.Margin = new Padding(8, 1, 0, 0);
-        _textBoxCardDemo.Text = "TextBox / Card";
-        _textBoxCardDemo.UseVisualStyleBackColor = false;
-        _textBoxCardDemo.Click += (_, _) =>
-        {
-            var demo = new TextBoxCardDemoForm();
-            demo.Show(this);
-        };
-
-        _collapseDemo.AutoSize = true;
-        _collapseDemo.Margin = new Padding(8, 1, 0, 0);
-        _collapseDemo.Text = "Collapse";
-        _collapseDemo.UseVisualStyleBackColor = false;
-        _collapseDemo.Click += (_, _) =>
-        {
-            var demo = new CollapseDemoForm();
-            demo.Show(this);
-        };
-
-        _accordionDemo.AutoSize = true;
-        _accordionDemo.Margin = new Padding(8, 1, 0, 0);
-        _accordionDemo.Text = "Accordion";
-        _accordionDemo.UseVisualStyleBackColor = false;
-        _accordionDemo.Click += (_, _) =>
-        {
-            var demo = new AccordionDemoForm();
-            demo.Show(this);
-        };
-
-        _progressDemo.AutoSize = true;
-        _progressDemo.Margin = new Padding(8, 1, 0, 0);
-        _progressDemo.Text = "Progress";
-        _progressDemo.UseVisualStyleBackColor = false;
-        _progressDemo.Click += (_, _) =>
-        {
-            var demo = new ProgressDemoForm();
-            demo.Show(this);
-        };
-
-        _sidebarDemo.AutoSize = true;
-        _sidebarDemo.Margin = new Padding(8, 1, 0, 0);
-        _sidebarDemo.Text = "Sidebar";
-        _sidebarDemo.UseVisualStyleBackColor = false;
-        _sidebarDemo.Click += (_, _) =>
-        {
-            var demo = new SidebarDemoForm();
-            demo.Show(this);
-        };
-
-        _dataGridDemo.AutoSize = true;
-        _dataGridDemo.Margin = new Padding(8, 1, 0, 0);
-        _dataGridDemo.Text = "DataGrid";
-        _dataGridDemo.UseVisualStyleBackColor = false;
-        _dataGridDemo.Click += (_, _) =>
-        {
-            var demo = new DataGridDemoForm();
-            demo.Show(this);
-        };
-
-        _commandBar.Controls.Add(modeLabel);
-        _commandBar.Controls.Add(_themeMode);
-        _commandBar.Controls.Add(_reducedMotion);
-        _commandBar.Controls.Add(_renderingDemo);
-        _commandBar.Controls.Add(_iconDemo);
-        _commandBar.Controls.Add(_animationDemo);
-        _commandBar.Controls.Add(_spinnerDemo);
-        _commandBar.Controls.Add(_buttonDemo);
-        _commandBar.Controls.Add(_buttonGroupToolbarDemo);
-        _commandBar.Controls.Add(_textBoxCardDemo);
-        _commandBar.Controls.Add(_collapseDemo);
-        _commandBar.Controls.Add(_accordionDemo);
-        _commandBar.Controls.Add(_progressDemo);
-        _commandBar.Controls.Add(_sidebarDemo);
-        _commandBar.Controls.Add(_dataGridDemo);
+        _header.Controls.Add(_navigationToggle, 0, 0);
+        _header.Controls.Add(_titleBlock, 1, 0);
+        _header.Controls.Add(_settings, 2, 0);
     }
 
-    private void ConfigurePalette()
+    private void ConfigureNavigation()
     {
-        _palette.Dock = DockStyle.Fill;
-        _palette.AutoScroll = true;
-        _palette.Padding = new Padding(12);
-        _palette.ColumnCount = 3;
-        _palette.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
-        _palette.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        _palette.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
+        _navigation.Dock = DockStyle.Left;
+        _navigation.ExpandedWidth = 250;
+        _navigation.CollapsedWidth = 68;
+        _navigation.AccessibleName = "Integrated demo navigation";
+        _navigation.SelectedItemChanged += (_, _) =>
+        {
+            if (_navigation.SelectedItem?.Tag is DemoPageDefinition page)
+            {
+                ShowPage(page);
+            }
+        };
     }
 
-    private void ConfigureSummary()
+    private void ConfigurePages()
     {
-        _summary.Dock = DockStyle.Bottom;
-        _summary.AutoSize = false;
-        _summary.Height = 72;
-        _summary.Padding = new Padding(12, 8, 12, 8);
-        _summary.TextAlign = ContentAlignment.MiddleLeft;
+        AddPage(
+            "Theme",
+            "Semantic colors, typography, metrics, runtime Light/Dark switching, and reduced motion.",
+            () => new ThemeDemoForm());
+
+        AddPage(
+            "Buttons / Groups / Toolbar",
+            "Button variants, loading, connected groups, selection modes, and toolbar layouts.",
+            () => new DemoPageHostForm(
+                new DemoPageSection("Buttons", () => new ButtonDemoForm()),
+                new DemoPageSection("Groups / Toolbar", () => new ButtonGroupToolbarDemoForm())));
+
+        AddPage(
+            "Inputs",
+            "Text input placeholder, validation, icons, clear, disabled, read-only, password, and focus states.",
+            () => new TextBoxCardDemoForm());
+
+        AddPage(
+            "Cards",
+            "Themed surfaces with Header/Body/Footer composition, borders, radius, and shadow states.",
+            () => new TextBoxCardDemoForm());
+
+        AddPage(
+            "Collapse / Accordion",
+            "Variable and fixed collapse content plus keyboard-friendly single/multiple accordion scenarios.",
+            () => new DemoPageHostForm(
+                new DemoPageSection("Collapse", () => new CollapseDemoForm()),
+                new DemoPageSection("Accordion", () => new AccordionDemoForm())));
+
+        AddPage(
+            "Loading / Spinner",
+            "Border/Grow spinners, semantic variants, reduced motion, and Button loading behavior.",
+            () => new DemoPageHostForm(
+                new DemoPageSection("Spinner", () => new SpinnerDemoForm()),
+                new DemoPageSection("Button loading", () => new ButtonDemoForm())));
+
+        AddPage(
+            "Progress",
+            "Determinate, striped, animated, indeterminate, custom-color, and AnimateTo scenarios.",
+            () => new ProgressDemoForm());
+
+        AddPage(
+            "Sidebar",
+            "Expanded/collapsed navigation, selection, icons, badges, disabled items, nested sections, and keyboard use.",
+            () => new SidebarDemoForm());
+
+        AddPage(
+            "DataGrid",
+            "Bound tabular data, empty state, loading overlay, sorting/selection, and 10,000-row manual performance scenario.",
+            () => new DataGridDemoForm());
+    }
+
+    private void AddPage(string title, string description, Func<Form> createForm)
+    {
+        var page = new DemoPageDefinition(title, description, createForm);
+        _pages.Add(page);
+        _navigation.Items.Add(new BootstrapSidebarItem
+        {
+            Text = title,
+            Tag = page
+        });
+    }
+
+    private void ShowPage(DemoPageDefinition page)
+    {
+        _contentHost.SuspendLayout();
+        try
+        {
+            if (_currentPage is not null)
+            {
+                _contentHost.Controls.Remove(_currentPage);
+                _currentPage.Dispose();
+                _currentPage = null;
+            }
+
+            _pageTitle.Text = page.Title;
+            _pageDescription.Text = page.Description;
+
+            var form = page.CreateForm();
+            form.TopLevel = false;
+            form.FormBorderStyle = FormBorderStyle.None;
+            form.Dock = DockStyle.Fill;
+            form.ShowInTaskbar = false;
+            _contentHost.Controls.Add(form);
+            _currentPage = form;
+            form.Show();
+        }
+        finally
+        {
+            _contentHost.ResumeLayout(true);
+        }
     }
 
     private void PublishSelectedTheme()
@@ -279,145 +292,39 @@ public sealed class MainForm : Form
     {
         BackColor = theme.Colors.Body;
         ForeColor = theme.Colors.Text;
-        _commandBar.BackColor = theme.Colors.SurfaceSecondary;
-        _commandBar.ForeColor = theme.Colors.Text;
+        _workspace.BackColor = theme.Colors.Body;
+        _workspace.ForeColor = theme.Colors.Text;
+        _contentHost.BackColor = theme.Colors.Body;
+        _header.BackColor = theme.Colors.SurfaceSecondary;
+        _titleBlock.BackColor = theme.Colors.SurfaceSecondary;
+        _settings.BackColor = theme.Colors.SurfaceSecondary;
+        _pageTitle.BackColor = theme.Colors.SurfaceSecondary;
+        _pageTitle.ForeColor = theme.Colors.Text;
+        _pageDescription.BackColor = theme.Colors.SurfaceSecondary;
+        _pageDescription.ForeColor = theme.Colors.MutedText;
+        _themeLabel.BackColor = theme.Colors.SurfaceSecondary;
+        _themeLabel.ForeColor = theme.Colors.Text;
         _themeMode.BackColor = theme.Colors.Surface;
         _themeMode.ForeColor = theme.Colors.Text;
         _reducedMotion.BackColor = theme.Colors.SurfaceSecondary;
         _reducedMotion.ForeColor = theme.Colors.Text;
-        _renderingDemo.BackColor = theme.Colors.Surface;
-        _renderingDemo.ForeColor = theme.Colors.Text;
-        _iconDemo.BackColor = theme.Colors.Surface;
-        _iconDemo.ForeColor = theme.Colors.Text;
-        _animationDemo.BackColor = theme.Colors.Surface;
-        _animationDemo.ForeColor = theme.Colors.Text;
-        _spinnerDemo.BackColor = theme.Colors.Surface;
-        _spinnerDemo.ForeColor = theme.Colors.Text;
-        _buttonDemo.BackColor = theme.Colors.Surface;
-        _buttonDemo.ForeColor = theme.Colors.Text;
-        _buttonGroupToolbarDemo.BackColor = theme.Colors.Surface;
-        _buttonGroupToolbarDemo.ForeColor = theme.Colors.Text;
-        _textBoxCardDemo.BackColor = theme.Colors.Surface;
-        _textBoxCardDemo.ForeColor = theme.Colors.Text;
-        _collapseDemo.BackColor = theme.Colors.Surface;
-        _collapseDemo.ForeColor = theme.Colors.Text;
-        _accordionDemo.BackColor = theme.Colors.Surface;
-        _accordionDemo.ForeColor = theme.Colors.Text;
-        _progressDemo.BackColor = theme.Colors.Surface;
-        _progressDemo.ForeColor = theme.Colors.Text;
-        _sidebarDemo.BackColor = theme.Colors.Surface;
-        _sidebarDemo.ForeColor = theme.Colors.Text;
-        _dataGridDemo.BackColor = theme.Colors.Surface;
-        _dataGridDemo.ForeColor = theme.Colors.Text;
-        _palette.BackColor = theme.Colors.Body;
-        _summary.BackColor = theme.Colors.SurfaceSecondary;
-        _summary.ForeColor = theme.Colors.Text;
-
-        RebuildPalette(theme);
-
-        var metrics = theme.Metrics;
-        var typography = theme.Typography;
-        _summary.Text =
-            $"{theme.Mode} · Reduced motion: {theme.ReducedMotion} · " +
-            $"Control heights: {metrics.ControlHeightSmall}/{metrics.ControlHeight}/{metrics.ControlHeightLarge}px · " +
-            $"Radius: {metrics.RadiusSmall}/{metrics.Radius}/{metrics.RadiusLarge}px · " +
-            $"Body: {typography.Body.FontFamilyName} {typography.Body.SizeInPoints:0.##}pt";
+        _navigationToggle.BackColor = theme.Colors.Surface;
+        _navigationToggle.ForeColor = theme.Colors.Text;
     }
 
-    private void RebuildPalette(BootstrapTheme theme)
+    private sealed class DemoPageDefinition
     {
-        _palette.SuspendLayout();
-        try
+        public DemoPageDefinition(string title, string description, Func<Form> createForm)
         {
-            while (_palette.Controls.Count > 0)
-            {
-                var control = _palette.Controls[0];
-                _palette.Controls.RemoveAt(0);
-                control.Dispose();
-            }
-
-            _palette.RowStyles.Clear();
-            _palette.RowCount = 0;
-
-            AddHeader(theme);
-
-            var colors = theme.Colors;
-            var tokens = new[]
-            {
-                new KeyValuePair<string, Color>("Primary", colors.Primary),
-                new KeyValuePair<string, Color>("Secondary", colors.Secondary),
-                new KeyValuePair<string, Color>("Success", colors.Success),
-                new KeyValuePair<string, Color>("Danger", colors.Danger),
-                new KeyValuePair<string, Color>("Warning", colors.Warning),
-                new KeyValuePair<string, Color>("Info", colors.Info),
-                new KeyValuePair<string, Color>("Light", colors.Light),
-                new KeyValuePair<string, Color>("Dark", colors.Dark),
-                new KeyValuePair<string, Color>("Body", colors.Body),
-                new KeyValuePair<string, Color>("Surface", colors.Surface),
-                new KeyValuePair<string, Color>("SurfaceSecondary", colors.SurfaceSecondary),
-                new KeyValuePair<string, Color>("Border", colors.Border),
-                new KeyValuePair<string, Color>("Text", colors.Text),
-                new KeyValuePair<string, Color>("MutedText", colors.MutedText),
-                new KeyValuePair<string, Color>("Disabled", colors.Disabled),
-                new KeyValuePair<string, Color>("Focus", colors.Focus),
-                new KeyValuePair<string, Color>("Hover", colors.Hover),
-                new KeyValuePair<string, Color>("Active", colors.Active)
-            };
-
-            foreach (var token in tokens)
-            {
-                AddColorRow(theme, token.Key, token.Value);
-            }
+            Title = title ?? throw new ArgumentNullException(nameof(title));
+            Description = description ?? throw new ArgumentNullException(nameof(description));
+            CreateForm = createForm ?? throw new ArgumentNullException(nameof(createForm));
         }
-        finally
-        {
-            _palette.ResumeLayout(true);
-        }
-    }
 
-    private void AddHeader(BootstrapTheme theme)
-    {
-        var row = _palette.RowCount++;
-        _palette.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        _palette.Controls.Add(CreateLabel("Token", theme, FontStyle.Bold), 0, row);
-        _palette.Controls.Add(CreateLabel("Preview", theme, FontStyle.Bold), 1, row);
-        _palette.Controls.Add(CreateLabel("Value", theme, FontStyle.Bold), 2, row);
-    }
+        public string Title { get; }
 
-    private void AddColorRow(BootstrapTheme theme, string name, Color color)
-    {
-        var row = _palette.RowCount++;
-        _palette.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
+        public string Description { get; }
 
-        _palette.Controls.Add(CreateLabel(name, theme, FontStyle.Regular), 0, row);
-        _palette.Controls.Add(new Panel
-        {
-            Dock = DockStyle.Fill,
-            Margin = new Padding(3, 4, 12, 4),
-            BackColor = color,
-            BorderStyle = BorderStyle.FixedSingle,
-            AccessibleName = $"{name} color preview"
-        }, 1, row);
-        _palette.Controls.Add(CreateLabel(ToHex(color), theme, FontStyle.Regular), 2, row);
-    }
-
-    private static Label CreateLabel(string text, BootstrapTheme theme, FontStyle style)
-    {
-        return new Label
-        {
-            AutoSize = false,
-            Dock = DockStyle.Fill,
-            Margin = new Padding(3, 5, 3, 3),
-            Text = text,
-            TextAlign = ContentAlignment.MiddleLeft,
-            BackColor = theme.Colors.Body,
-            ForeColor = theme.Colors.Text,
-            Font = new Font(theme.Typography.Body.FontFamilyName, theme.Typography.Body.SizeInPoints, style)
-        };
-    }
-
-    private static string ToHex(Color color)
-    {
-        return $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+        public Func<Form> CreateForm { get; }
     }
 }
