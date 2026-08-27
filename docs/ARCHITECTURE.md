@@ -152,6 +152,17 @@ Animations run on the UI thread. Consumers receive normalized progress and inval
 
 The initial implementation should prefer correctness and deterministic disposal. A central scheduler can replace per-animation timers later if profiling shows a real scaling need; controls must still consume the same animation abstraction so that implementation can evolve without API churn.
 
+Phase 4 finalizes this foundation as follows:
+
+- `BootstrapAnimation` is a finite transition exposing `Duration`, `Easing`, normalized eased `Progress`, `IsRunning`, `Start()`, `Stop()`, `Restart()`, `ProgressChanged`, and `Completed`.
+- `BootstrapLoopAnimation` exposes the same run-control concepts without finite completion; its progress wraps once per configured cycle.
+- `BootstrapEasing` provides Linear, quadratic EaseIn, EaseOut, and EaseInOut curves with normalized input/output.
+- A WinForms timer is used only as a UI-thread frame wake-up source. Elapsed time is calculated from a monotonic stopwatch, so progress and total duration do not depend on timer tick count.
+- Internal clock and scheduler contracts keep timing deterministic in tests and allow a future central scheduler without changing consumer APIs.
+- An optional `Control` owner centralizes visibility/disposal handling. Hiding an owner pauses scheduling and preserves logical progress; showing it resumes without counting hidden wall-clock time; disposing it stops further scheduling.
+- Reduced motion is evaluated when a run starts or restarts. Finite animation immediately publishes its final state and completion; loop animation remains at stable zero without continuous scheduling.
+- Phase 4 deliberately does not introduce a central scheduler. Profiling may justify replacing the internal scheduler later, while the public animation API remains stable.
+
 ## 6. Control architecture
 
 ### 6.1 Primitive controls
@@ -201,6 +212,10 @@ Rapid state changes must be deterministic. For example, calling Collapse while a
 
 Reduced motion should shorten or skip nonessential transitions while preserving final state changes.
 
+Finite `Stop()` freezes current progress and `Start()` resumes it; `Restart()` always begins from zero. Natural finite completion stops scheduling before publishing `Completed`, allowing event handlers to stop, restart, or dispose safely. Starting a previously completed finite animation begins a new run from zero.
+
+Loop `Stop()` and `Start()` freeze/resume the current cycle position; `Restart()` returns to zero. Loop animation does not expose a finite completion event.
+
 ## 9. Resource ownership
 
 The owner that creates a disposable resource is responsible for disposing it unless ownership is explicitly transferred.
@@ -208,6 +223,8 @@ The owner that creates a disposable resource is responsible for disposing it unl
 For paint-time resources, prefer scoped `using` lifetime. For cached resources, recreate only when the cache key changes and dispose the previous instance.
 
 Event subscriptions crossing object lifetimes must be explicitly removed.
+
+Animation objects own and deterministically dispose their frame scheduler and owner-lifecycle subscriptions. They never own or dispose the optional WinForms control supplied as lifecycle owner.
 
 ## 10. Designer architecture
 
@@ -222,6 +239,8 @@ Designer-specific code should be isolated and must not leak into runtime renderi
 Invalid public property values should be normalized or rejected consistently. Do not allow negative sizes, invalid Min/Max ranges, or impossible animation duration states to produce painting exceptions.
 
 Recoverable rendering failures should fail gracefully rather than crash the host form. Programmer-contract violations may throw argument exceptions where that improves diagnosis.
+
+Animation durations must be greater than zero. Easing delegates must be non-null, and published eased values are normalized before reaching consumers.
 
 ## 12. Evolution rules
 

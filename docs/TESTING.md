@@ -39,6 +39,19 @@ Phase 3 covers the source-neutral icon foundation with automated tests for:
 - SVG adapter delegation of markup, bounds, and color
 - Framework vector glyph rendering without an external package
 
+Phase 4 covers shared animation logic with deterministic clock/frame-scheduler test doubles rather than wall-clock sleeps. Automated coverage includes:
+
+- Easing boundaries, clamping, representative curve values, and monotonic normalized output
+- Finite initial/intermediate/final progress and completion exactly once per run
+- Finite stop/resume, restart, repeated start/stop, and restart from completed state
+- Loop cycle progress, exact-boundary wrap, multi-cycle modulo, stop/resume, and restart
+- Custom easing output normalization
+- Reduced-motion behavior without unnecessary frame scheduling
+- Optional owner hide/show pause/resume with hidden wall-clock time excluded
+- Optional owner disposal and already-disposed-owner behavior
+- Event-handler reentrancy for restart/disposal
+- Idempotent disposal and post-disposal operation guards
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -56,6 +69,8 @@ Examples:
 - DataGridView style application
 
 Do not rely on arbitrary sleeps to wait for animation. Prefer controllable clocks/timing abstractions where practical or test state/progress deterministically.
+
+Phase 4 owner lifecycle tests instantiate real WinForms `Control` owners on STA threads while keeping animation time and frame delivery manually controlled.
 
 ### 2.3 Demo/manual visual tests
 
@@ -77,6 +92,8 @@ Manual checks include:
 For Phase 2, start the demo and choose **Rendering / DPI**. The preview draws shared rendering primitives at virtual 96/120/144/168/192 DPI so radius normalization, scaled strokes, contrast, and content layout can be compared side by side. Switch Light/Dark while the window is open to verify theme-dependent rendering. The virtual preview is a repeatable diagnostic aid; final DPI verification still requires real Windows scaling.
 
 For Phase 3, choose **Icons**. Verify that Segoe MDL2 and framework vector glyphs use the current theme color, remain centered while resizing, and continue to render after Light/Dark switches. If the Windows font is unavailable, the demo must report the MDL2 source as unavailable instead of failing. SVG adapters are implementation-specific and should add their own visual verification while retaining the common `IIconRenderer` contract.
+
+For Phase 4, choose **Animation**. Verify finite Start/Stop/Restart, loop Start/Stop/Restart, normalized progress labels, and smooth movement. Start both animations, choose **Hide previews**, leave them hidden briefly, then choose **Show previews**; progress must resume from the retained logical position rather than jump by hidden wall-clock time. Toggle **Reduced motion** and explicitly Start/Restart: the finite animation must immediately reach its final state and the loop must remain at zero without continuous movement. Switch Light/Dark while the diagnostic window is open to confirm the demo continues to render with current theme tokens.
 
 ## 3. DPI matrix
 
@@ -143,10 +160,12 @@ For finite and loop animation, test:
 - Hide/show
 - Reduced motion
 - Rapid repeated toggles
-- Reverse direction during an active transition
+- Reverse direction during an active transition when the consuming control supports reversal
 - Final value/state after completion
 
-Animated controls must not continue producing useful work after disposal.
+Shared Phase 4 primitives additionally verify that progress is elapsed-time based rather than tick-count based, stop/resume excludes paused time, completion is emitted exactly once, loop progress wraps predictably, and event callbacks can safely stop/restart/dispose the animation.
+
+Animated controls must not continue producing useful work after disposal. New control-specific timers are prohibited unless an explicit documented exception is approved.
 
 ## 7. Resource/lifecycle checks
 
@@ -161,6 +180,8 @@ Watch for growth in:
 - Cached bitmaps/fonts/paths
 
 Exact zero-allocation rendering is not required. Unbounded growth is unacceptable.
+
+For Phase 4, the animation object owns its internal frame scheduler and subscriptions to the optional lifecycle owner; disposal must release both. The supplied owner control is never owned by the animation object.
 
 ## 8. DataGridView tests
 
@@ -198,6 +219,8 @@ dotnet test -c Release
 ```
 
 Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`.
+
+The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by Phase 4.
 
 ## 11. Definition of done for a component
 
