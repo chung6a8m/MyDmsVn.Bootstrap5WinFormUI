@@ -66,7 +66,7 @@ public sealed class IntegratedDemoApplicationTests
     public void ThemeAndReducedMotionControlsRemainAvailableOnEveryPage()
     {
         using var form = new MainForm();
-        form.CreateControl();
+        form.Show();
         form.PerformLayout();
 
         var sidebar = FindControls<BootstrapSidebar>(form).Single();
