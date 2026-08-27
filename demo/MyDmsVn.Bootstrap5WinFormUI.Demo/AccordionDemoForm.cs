@@ -201,11 +201,12 @@ public sealed class AccordionDemoForm : Form
 
     private static Label CreateSectionLabel(string text)
     {
+        var typography = BootstrapThemeManager.CurrentTheme.Typography.Label;
         return new Label
         {
             AutoSize = true,
             Text = text,
-            Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold),
+            Font = new Font(typography.FontFamilyName, typography.SizeInPoints, FontStyle.Bold),
             Margin = new Padding(0, 4, 0, 6)
         };
     }
