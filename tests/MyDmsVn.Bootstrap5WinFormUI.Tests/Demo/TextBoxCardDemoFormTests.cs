@@ -43,6 +43,32 @@ public sealed class TextBoxCardDemoFormTests
         }));
     }
 
+    [Test]
+    public void CardCompositionLaysOutAllFourCardsInTwoVisibleRows()
+    {
+        using var form = new TextBoxCardDemoForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var cards = FindControls<BootstrapCard>(form).ToArray();
+        Assert.That(cards, Has.Length.EqualTo(4));
+        Assert.That(cards.Select(card => card.Parent).Distinct().Count(), Is.EqualTo(1));
+
+        var layout = cards[0].Parent;
+        Assert.That(layout, Is.TypeOf<TableLayoutPanel>(), "The demo needs deterministic two-row sizing instead of auto-wrapping a docked FlowLayoutPanel.");
+
+        var table = (TableLayoutPanel)layout!;
+        table.PerformLayout();
+        var occupiedRows = cards.Select(table.GetRow).Distinct().OrderBy(row => row).ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(table.RowCount, Is.EqualTo(2));
+            Assert.That(occupiedRows, Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(cards.All(card => card.Bottom <= table.DisplayRectangle.Bottom), Is.True, "Every demo card must fit inside the layout's measured height.");
+        }));
+    }
+
     private static IEnumerable<T> FindControls<T>(Control root)
         where T : Control
     {
