@@ -19,6 +19,34 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore MyDmsVn.Bootstrap5WinFormUI.sln
+
+      - name: Diagnostic build core net48
+        shell: pwsh
+        run: dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -c Release -f net48 --no-restore
+
+      - name: Diagnostic build tests net48
+        shell: pwsh
+        run: dotnet build tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net48 --no-restore
+
+      - name: Diagnostic build demo net48
+        shell: pwsh
+        run: dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.Demo.csproj -c Release -f net48 --no-restore
+
+      - name: Diagnostic build core net8.0-windows
+        shell: pwsh
+        run: dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -c Release -f net8.0-windows --no-restore
+
+      - name: Diagnostic build tests net8.0-windows
+        shell: pwsh
+        run: dotnet build tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --no-restore
+
+      - name: Diagnostic build demo net8.0-windows
+        shell: pwsh
+        run: dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.Demo.csproj -c Release -f net8.0-windows --no-restore
+
       - name: Build both target frameworks
         shell: pwsh
         run: ./build.ps1 -Configuration Release
