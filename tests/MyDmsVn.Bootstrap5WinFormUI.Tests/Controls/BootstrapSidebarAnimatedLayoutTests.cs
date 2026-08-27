@@ -85,12 +85,17 @@ public sealed class BootstrapSidebarAnimatedLayoutTests
         var host = sidebar.Controls.OfType<FlowLayoutPanel>().Single();
         var rootButtons = host.Controls.OfType<BootstrapButton>().ToArray();
         var widths = string.Join("; ", rootButtons.Select(button => $"{button.Text}:{button.Width}"));
+        var minimumRowHeight = host.Padding.Vertical + rootButtons.Sum(button => button.Height + button.Margin.Vertical);
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(host.Visible, Is.True, $"Navigation host became hidden {state}.");
             Assert.That(host.Height, Is.GreaterThan(0), $"Navigation host collapsed to zero height {state}.");
             Assert.That(host.Width, Is.GreaterThan(1), $"Navigation host collapsed to unusable width {state}. Bounds={host.Bounds}, min={host.MinimumSize}, max={host.MaximumSize}.");
+            Assert.That(
+                host.MinimumSize.Height,
+                Is.GreaterThanOrEqualTo(minimumRowHeight),
+                $"Navigation host no longer protects the height of its always-visible rows {state}. Bounds={host.Bounds}, min={host.MinimumSize}; required row height={minimumRowHeight}.");
             Assert.That(host.Left, Is.EqualTo(0), $"Navigation host moved horizontally out of the sidebar {state}. Bounds={host.Bounds}; AutoScrollPosition={sidebar.AutoScrollPosition}.");
             Assert.That(host.Top, Is.EqualTo(0), $"Navigation host moved vertically out of the sidebar {state}. Bounds={host.Bounds}; AutoScrollPosition={sidebar.AutoScrollPosition}.");
             Assert.That(rootButtons, Is.Not.Empty, $"Navigation rows disappeared {state}.");
