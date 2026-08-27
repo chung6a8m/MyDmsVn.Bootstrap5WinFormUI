@@ -27,9 +27,24 @@ jobs:
         shell: pwsh
         run: dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -c Release -f net48 --no-restore
 
-      - name: Diagnostic build tests net48
+      - name: Capture test net48 compile error
+        id: test48
         shell: pwsh
-        run: dotnet build tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net48 --no-restore
+        run: |
+          $output = & dotnet build tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net48 --no-restore 2>&1 | Out-String
+          $exitCode = $LASTEXITCODE
+          Write-Host $output
+          $errorLine = ($output -split "`r?`n" | Where-Object { $_ -match ': error (CS|NU|MSB)\d+' } | Select-Object -First 1)
+          if (-not $errorLine) { $errorLine = "no-compiler-error-line" }
+          $errorCode = if ($errorLine -match 'error ((?:CS|NU|MSB)\d+)') { $Matches[1] } else { "unknown" }
+          "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
+          "error_code=$errorCode" >> $env:GITHUB_OUTPUT
+          if ($exitCode -eq 0) { "failed=false" >> $env:GITHUB_OUTPUT } else { "failed=true" >> $env:GITHUB_OUTPUT }
+
+      - name: "Captured net48 test error: ${{ steps.test48.outputs.error_code }}"
+        if: steps.test48.outputs.failed == 'true'
+        shell: pwsh
+        run: exit 1
 
       - name: Diagnostic build demo net48
         shell: pwsh
