@@ -81,16 +81,17 @@ public sealed class SidebarDemoFormTests
     }
 
     [Test]
-    public void MainDemoExposesSidebarNavigationCommand()
+    public void MainDemoUsesSidebarForIntegratedNavigation()
     {
         using var form = new MainForm();
         form.CreateControl();
         form.PerformLayout();
 
+        var sidebar = FindControls<BootstrapSidebar>(form).Single(control => control.AccessibleName == "Integrated demo navigation");
         Assert.That(
-            FindControls<Button>(form).Any(button => button.Text == "Sidebar"),
+            sidebar.Items.Any(item => item.Text == "Sidebar"),
             Is.True,
-            "Phase 12 needs to be reachable from the main demo command bar.");
+            "Phase 12 needs to remain reachable from the integrated demo navigation.");
     }
 
     private static IEnumerable<BootstrapSidebarItem> Flatten(IEnumerable<BootstrapSidebarItem> items)
