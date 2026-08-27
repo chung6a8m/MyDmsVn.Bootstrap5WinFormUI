@@ -104,6 +104,23 @@ public sealed class BootstrapAnimationTests
     }
 
     [Test]
+    public void StopAtElapsedDurationDoesNotReportCompletion()
+    {
+        using var animation = CreateAnimation(out var clock, out var scheduler);
+        var completed = 0;
+        animation.Completed += (_, _) => completed++;
+
+        animation.Start();
+        clock.Advance(TimeSpan.FromSeconds(1));
+        animation.Stop();
+
+        Assert.That(animation.Progress, Is.EqualTo(1.0));
+        Assert.That(animation.IsRunning, Is.False);
+        Assert.That(scheduler.IsRunning, Is.False);
+        Assert.That(completed, Is.Zero);
+    }
+
+    [Test]
     public void RepeatedStartAndStopAreIdempotent()
     {
         using var animation = CreateAnimation(out _, out var scheduler);
