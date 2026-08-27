@@ -125,16 +125,16 @@ internal sealed class ThemeDemoForm : Form
     {
         var row = _palette.RowCount++;
         _palette.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        _palette.Controls.Add(CreateLabel("Token", theme, true), 0, row);
-        _palette.Controls.Add(CreateLabel("Preview", theme, true), 1, row);
-        _palette.Controls.Add(CreateLabel("Value", theme, true), 2, row);
+        _palette.Controls.Add(CreateLabel("Token", theme), 0, row);
+        _palette.Controls.Add(CreateLabel("Preview", theme), 1, row);
+        _palette.Controls.Add(CreateLabel("Value", theme), 2, row);
     }
 
     private void AddColorRow(BootstrapTheme theme, string name, Color color)
     {
         var row = _palette.RowCount++;
         _palette.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
-        _palette.Controls.Add(CreateLabel(name, theme, false), 0, row);
+        _palette.Controls.Add(CreateLabel(name, theme), 0, row);
         _palette.Controls.Add(new Panel
         {
             Dock = DockStyle.Fill,
@@ -143,12 +143,12 @@ internal sealed class ThemeDemoForm : Form
             BorderStyle = BorderStyle.FixedSingle,
             AccessibleName = $"{name} color preview"
         }, 1, row);
-        _palette.Controls.Add(CreateLabel(ToHex(color), theme, false), 2, row);
+        _palette.Controls.Add(CreateLabel(ToHex(color), theme), 2, row);
     }
 
-    private static Label CreateLabel(string text, BootstrapTheme theme, bool bold)
+    private static Label CreateLabel(string text, BootstrapTheme theme)
     {
-        var label = new Label
+        return new Label
         {
             AutoSize = false,
             Dock = DockStyle.Fill,
@@ -158,13 +158,6 @@ internal sealed class ThemeDemoForm : Form
             BackColor = theme.Colors.Body,
             ForeColor = theme.Colors.Text
         };
-
-        if (bold)
-        {
-            label.Font = new Font(label.Font, FontStyle.Bold);
-        }
-
-        return label;
     }
 
     private static string ToHex(Color color)
