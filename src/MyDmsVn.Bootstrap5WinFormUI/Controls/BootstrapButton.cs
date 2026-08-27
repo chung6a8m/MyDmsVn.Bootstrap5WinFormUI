@@ -482,16 +482,7 @@ public class BootstrapButton : Button
     protected override void OnPaint(PaintEventArgs pevent)
     {
         var theme = BootstrapThemeManager.CurrentTheme;
-        var visualState = _pressed
-            ? BootstrapButtonVisualState.Pressed
-            : (_hovered ? BootstrapButtonVisualState.Hover : BootstrapButtonVisualState.Normal);
-        var palette = BootstrapButtonRenderLogic.ResolvePalette(
-            theme.Colors,
-            _variant,
-            _outline,
-            Enabled,
-            _selected,
-            visualState);
+        var palette = ResolveCurrentPalette(theme);
 
         var graphics = pevent.Graphics;
         var previousSmoothingMode = graphics.SmoothingMode;
@@ -547,6 +538,25 @@ public class BootstrapButton : Button
             _groupCornerRadius = value;
             Invalidate();
         }
+    }
+
+    internal BootstrapButtonPalette ResolveCurrentPalette(BootstrapTheme theme)
+    {
+        if (theme is null)
+        {
+            throw new ArgumentNullException(nameof(theme));
+        }
+
+        var visualState = _pressed
+            ? BootstrapButtonVisualState.Pressed
+            : (_hovered ? BootstrapButtonVisualState.Hover : BootstrapButtonVisualState.Normal);
+        return BootstrapButtonRenderLogic.ResolvePalette(
+            theme.Colors,
+            _variant,
+            _outline,
+            Enabled,
+            _selected,
+            visualState);
     }
 
     internal CornerRadius GetEffectiveCornerRadius(BootstrapThemeMetrics metrics)
