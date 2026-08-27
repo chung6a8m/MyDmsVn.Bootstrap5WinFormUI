@@ -1,3 +1,4 @@
+using System;
 using System.Drawing;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
@@ -12,7 +13,7 @@ public sealed class BootstrapThemeTests
     {
         var theme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
 
-        Assert.Multiple((TestDelegate)(() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(theme.Mode, Is.EqualTo(BootstrapThemeMode.Light));
             Assert.That(theme.Colors.Primary, Is.EqualTo(Color.FromArgb(0x0D, 0x6E, 0xFD)));
@@ -32,7 +33,7 @@ public sealed class BootstrapThemeTests
         var light = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
         var dark = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
 
-        Assert.Multiple((TestDelegate)(() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(dark.Mode, Is.EqualTo(BootstrapThemeMode.Dark));
             Assert.That(dark.Colors.Body, Is.EqualTo(Color.FromArgb(0x21, 0x25, 0x29)));
@@ -49,7 +50,7 @@ public sealed class BootstrapThemeTests
     {
         var metrics = BootstrapThemeMetrics.Default;
 
-        Assert.Multiple((TestDelegate)(() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(metrics.ControlHeightSmall, Is.EqualTo(28));
             Assert.That(metrics.ControlHeight, Is.EqualTo(32));
@@ -72,7 +73,7 @@ public sealed class BootstrapThemeTests
     {
         var typography = BootstrapThemeTypography.Default;
 
-        Assert.Multiple((TestDelegate)(() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(typography.Body.FontFamilyName, Is.EqualTo("Segoe UI"));
             Assert.That(typography.Body.SizeInPoints, Is.EqualTo(9f));

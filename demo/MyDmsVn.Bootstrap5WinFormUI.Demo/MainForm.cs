@@ -244,7 +244,7 @@ public sealed class MainForm : Form
             TextAlign = ContentAlignment.MiddleLeft,
             BackColor = theme.Colors.Body,
             ForeColor = theme.Colors.Text,
-            Font = new Font(SystemFonts.MessageBoxFont.FontFamily, SystemFonts.MessageBoxFont.Size, style)
+            Font = new Font(theme.Typography.Body.FontFamilyName, theme.Typography.Body.SizeInPoints, style)
         };
     }
 

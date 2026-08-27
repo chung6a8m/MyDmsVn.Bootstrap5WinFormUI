@@ -26,7 +26,7 @@ public sealed class NumericUtilTests
     [Test]
     public void ClampThrowsWhenMinimumExceedsMaximum()
     {
-        TestDelegate action = () => NumericUtil.Clamp(5, 10, 0);
+        Action action = () => NumericUtil.Clamp(5, 10, 0);
 
         Assert.That(action, Throws.TypeOf<ArgumentException>());
     }

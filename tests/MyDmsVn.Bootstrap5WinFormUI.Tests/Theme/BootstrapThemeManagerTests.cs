@@ -43,7 +43,7 @@ public sealed class BootstrapThemeManagerTests
             BootstrapThemeManager.ThemeChanged -= handler;
         }
 
-        Assert.Multiple((TestDelegate)(() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(observed, Is.Not.Null);
             Assert.That(observed!.OldTheme, Is.SameAs(oldTheme));
@@ -75,7 +75,7 @@ public sealed class BootstrapThemeManagerTests
     [Test]
     public void SettingNullThemeIsRejected()
     {
-        TestDelegate action = () => BootstrapThemeManager.CurrentTheme = null!;
+        Action action = () => BootstrapThemeManager.CurrentTheme = null!;
 
         Assert.That(action, Throws.TypeOf<ArgumentNullException>());
     }
