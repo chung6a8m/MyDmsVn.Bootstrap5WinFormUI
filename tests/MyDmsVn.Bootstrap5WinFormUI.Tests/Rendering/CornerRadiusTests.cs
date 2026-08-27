@@ -22,7 +22,7 @@ public sealed class CornerRadiusTests
     [Test]
     public void ConstructorRejectsNegativeRadius()
     {
-        TestDelegate action = () => new CornerRadius(4f, -1f, 4f, 4f);
+        Action action = () => new CornerRadius(4f, -1f, 4f, 4f);
 
         Assert.That(action, Throws.TypeOf<ArgumentOutOfRangeException>());
     }
