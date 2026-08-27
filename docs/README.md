@@ -15,6 +15,7 @@ This directory contains the authoritative development documentation for `MyDmsVn
 9. [DECISIONS.md](DECISIONS.md) — architecture decisions that should not be rediscovered in every task.
 10. [PHASE8_HARDENING.md](PHASE8_HARDENING.md) — post-review hardening notes for TextBox keyboard event forwarding and Card decoration-safe layout.
 11. [PHASE9_BOOTSTRAP_COLLAPSE.md](PHASE9_BOOTSTRAP_COLLAPSE.md) — finalized Collapse contract, height measurement/reversal behavior, tests, and manual verification matrix.
+12. [PHASE11_BOOTSTRAP_PROGRESS_BAR.md](PHASE11_BOOTSTRAP_PROGRESS_BAR.md) — finalized ProgressBar range, formatting, animation, indeterminate, lifecycle, tests, and manual verification contract.
 
 ## About `idea-drafs/`
 
