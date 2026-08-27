@@ -40,7 +40,7 @@ public sealed class AccordionDemoFormTests
     public void DynamicDemoCommandAddsAnotherFlushAccordionItem()
     {
         using var form = new AccordionDemoForm();
-        form.CreateControl();
+        form.Show();
         form.PerformLayout();
 
         var target = FindControls<BootstrapAccordion>(form)
