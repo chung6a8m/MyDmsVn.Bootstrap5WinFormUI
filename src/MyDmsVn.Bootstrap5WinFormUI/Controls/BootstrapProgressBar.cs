@@ -85,6 +85,7 @@ public class BootstrapProgressBar : Control
                 _value = _minimum;
             }
 
+            NotifyAccessibilityValueChanged();
             Invalidate();
         }
     }
@@ -115,6 +116,7 @@ public class BootstrapProgressBar : Control
                 _value = _maximum;
             }
 
+            NotifyAccessibilityValueChanged();
             Invalidate();
         }
     }
@@ -341,6 +343,7 @@ public class BootstrapProgressBar : Control
 
             _indeterminate = value;
             UpdateLoopAnimation();
+            NotifyAccessibilityValueChanged();
             Invalidate();
         }
     }
@@ -366,6 +369,12 @@ public class BootstrapProgressBar : Control
         }
 
         StartValueAnimation(value);
+    }
+
+    /// <inheritdoc />
+    protected override AccessibleObject CreateAccessibilityInstance()
+    {
+        return new BootstrapProgressBarAccessibleObject(this);
     }
 
     /// <inheritdoc />
@@ -714,7 +723,16 @@ public class BootstrapProgressBar : Control
         }
 
         _value = value;
+        NotifyAccessibilityValueChanged();
         Invalidate();
+    }
+
+    private void NotifyAccessibilityValueChanged()
+    {
+        if (IsHandleCreated)
+        {
+            AccessibilityNotifyClients(AccessibleEvents.ValueChange, -1);
+        }
     }
 
     private void ValidateValue(int value, string parameterName)
@@ -758,5 +776,22 @@ public class BootstrapProgressBar : Control
     private bool IsInDesignMode()
     {
         return DesignMode || LicenseManager.UsageMode == LicenseUsageMode.Designtime;
+    }
+
+    private sealed class BootstrapProgressBarAccessibleObject : Control.ControlAccessibleObject
+    {
+        private readonly BootstrapProgressBar _owner;
+
+        public BootstrapProgressBarAccessibleObject(BootstrapProgressBar owner)
+            : base(owner)
+        {
+            _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+        }
+
+        public override string? Value
+        {
+            get => _owner.Indeterminate ? "Indeterminate" : $"{_owner.Percentage}%";
+            set { }
+        }
     }
 }
