@@ -55,6 +55,19 @@ public sealed class AccordionDemoFormTests
         Assert.That(target.Items.Count, Is.EqualTo(before + 1));
     }
 
+    [Test]
+    public void MainDemoExposesAccordionNavigationCommand()
+    {
+        using var form = new MainForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        Assert.That(
+            FindControls<Button>(form).Any(button => button.Text == "Accordion"),
+            Is.True,
+            "Phase 10 needs to be reachable from the main demo command bar.");
+    }
+
     private static IEnumerable<T> FindControls<T>(Control root)
         where T : Control
     {
