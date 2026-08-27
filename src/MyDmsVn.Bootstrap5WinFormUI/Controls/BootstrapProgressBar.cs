@@ -654,16 +654,14 @@ public class BootstrapProgressBar : Control
             using var stripeBrush = new SolidBrush(stripeColor);
             var start = fillBounds.Left - fillBounds.Height - stripeSpan + offset;
             var end = fillBounds.Right + fillBounds.Height + stripeSpan;
+            var points = new PointF[4];
 
             for (var x = start; x < end; x += stripeSpan)
             {
-                var points = new[]
-                {
-                    new PointF(x, fillBounds.Bottom),
-                    new PointF(x + stripeWidth, fillBounds.Bottom),
-                    new PointF(x + stripeWidth + fillBounds.Height, fillBounds.Top),
-                    new PointF(x + fillBounds.Height, fillBounds.Top)
-                };
+                points[0] = new PointF(x, fillBounds.Bottom);
+                points[1] = new PointF(x + stripeWidth, fillBounds.Bottom);
+                points[2] = new PointF(x + stripeWidth + fillBounds.Height, fillBounds.Top);
+                points[3] = new PointF(x + fillBounds.Height, fillBounds.Top);
                 graphics.FillPolygon(stripeBrush, points);
             }
         }
