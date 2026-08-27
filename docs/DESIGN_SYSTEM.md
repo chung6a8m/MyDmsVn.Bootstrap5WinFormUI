@@ -205,3 +205,41 @@ graphics.FillPath(brush, path);
 The foundation deliberately does not expose a reflection-based double-buffer toggle or create a base-control hierarchy in Phase 2. Concrete custom-painted controls should use normal protected WinForms buffering styles (`DoubleBuffered` / `SetStyle`) in their own construction path. A shared control base or lifecycle helper should be introduced only when later controls demonstrate real repeated behavior that cannot be cleanly expressed with standard WinForms APIs.
 
 The demo application's **Rendering / DPI** window renders the same foundation geometry at virtual 96/120/144/168/192 DPI (100/125/150/175/200%) and responds to runtime theme changes. This gives a repeatable visual verification path, but it does not replace testing the application under actual Windows display-scaling settings.
+
+## 17. Phase 3 icon API
+
+Phase 3 adds source-neutral icon infrastructure under `MyDmsVn.Bootstrap5WinFormUI.Icons`:
+
+- `IconDescriptor` describes the source and source-specific value without exposing renderer implementation details to controls.
+- `IconSourceKind` distinguishes Segoe MDL2, SVG, framework vector, and optional/external sources.
+- `IIconProvider` handles one source family; `IIconRenderer` is the control-facing rendering contract.
+- `BootstrapIconRenderer` dispatches a descriptor to registered providers in order and returns `false` when no provider can render it.
+- `SegoeMdl2IconProvider` renders Windows Segoe MDL2 Assets glyphs and fails gracefully when the expected font is unavailable.
+- `FrameworkVectorIconProvider` renders small framework-owned structural glyphs such as chevrons, check, close, plus, and minus without an external package.
+- `SvgIconProvider` delegates SVG markup to an `ISvgIconRenderer` supplied by the application or an optional adapter package. The core assembly intentionally does not choose or reference an SVG library.
+
+Controls should render through `IIconRenderer` rather than branch on source kind:
+
+```csharp
+var renderer = BootstrapIconRenderer.CreateDefault();
+var icon = IconDescriptor.SegoeMdl2('\uE713');
+
+renderer.TryRender(graphics, icon, iconBounds, theme.Colors.Text);
+```
+
+To add SVG support, compose the provider with a compatible renderer adapter:
+
+```csharp
+var renderer = new BootstrapIconRenderer(new IIconProvider[]
+{
+    new SegoeMdl2IconProvider(),
+    new FrameworkVectorIconProvider(),
+    new SvgIconProvider(mySvgRenderer)
+});
+```
+
+`ISvgIconRenderer` is intentionally small: an adapter receives SVG markup, a target rectangle, and a requested foreground color. The adapter owns any SVG-library-specific parsing, caching, recoloring, and disposal policy. If a chosen SVG library cannot support both target frameworks, it belongs in an optional adapter assembly rather than the core package.
+
+FontAwesome.Sharp follows the same optional-integration rule. An optional adapter can implement `IIconProvider`, accept descriptors created with `IconDescriptor.External("FontAwesome.Sharp", iconName)`, resolve `iconName` to the package's icon type, and render it. Only that adapter package references FontAwesome.Sharp; `MyDmsVn.Bootstrap5WinFormUI` remains dependency-free from FontAwesome.Sharp.
+
+The demo application's **Icons** window renders Segoe MDL2 and framework vector descriptors through the same `IIconRenderer` path. Switch Light/Dark while the window is open and resize it to verify source-neutral color/alignment behavior. SVG adapter behavior is covered through the provider contract and automated delegation tests; applications should visually validate their chosen SVG adapter separately.

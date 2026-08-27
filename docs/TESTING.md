@@ -31,6 +31,14 @@ Phase 2 specifically covers the pure rendering foundation with automated tests f
 - sRGB luminance, contrast ratio, foreground selection, and blending
 - Shared horizontal content alignment and spacing behavior
 
+Phase 3 covers the source-neutral icon foundation with automated tests for:
+
+- Descriptor factory/source metadata
+- Invalid external-source metadata rejection
+- Ordered provider dispatch and unsupported-source fallback
+- SVG adapter delegation of markup, bounds, and color
+- Framework vector glyph rendering without an external package
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -67,6 +75,8 @@ Manual checks include:
 - Rapid resize
 
 For Phase 2, start the demo and choose **Rendering / DPI**. The preview draws shared rendering primitives at virtual 96/120/144/168/192 DPI so radius normalization, scaled strokes, contrast, and content layout can be compared side by side. Switch Light/Dark while the window is open to verify theme-dependent rendering. The virtual preview is a repeatable diagnostic aid; final DPI verification still requires real Windows scaling.
+
+For Phase 3, choose **Icons**. Verify that Segoe MDL2 and framework vector glyphs use the current theme color, remain centered while resizing, and continue to render after Light/Dark switches. If the Windows font is unavailable, the demo must report the MDL2 source as unavailable instead of failing. SVG adapters are implementation-specific and should add their own visual verification while retaining the common `IIconRenderer` contract.
 
 ## 3. DPI matrix
 

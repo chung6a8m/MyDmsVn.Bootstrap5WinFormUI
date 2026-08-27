@@ -11,6 +11,7 @@ public sealed class MainForm : Form
     private readonly ComboBox _themeMode = new ComboBox();
     private readonly CheckBox _reducedMotion = new CheckBox();
     private readonly Button _renderingDemo = new Button();
+    private readonly Button _iconDemo = new Button();
     private readonly FlowLayoutPanel _commandBar = new FlowLayoutPanel();
     private readonly TableLayoutPanel _palette = new TableLayoutPanel();
     private readonly Label _summary = new Label();
@@ -83,10 +84,21 @@ public sealed class MainForm : Form
             demo.Show(this);
         };
 
+        _iconDemo.AutoSize = true;
+        _iconDemo.Margin = new Padding(8, 1, 0, 0);
+        _iconDemo.Text = "Icons";
+        _iconDemo.UseVisualStyleBackColor = false;
+        _iconDemo.Click += (_, _) =>
+        {
+            var demo = new IconDemoForm();
+            demo.Show(this);
+        };
+
         _commandBar.Controls.Add(modeLabel);
         _commandBar.Controls.Add(_themeMode);
         _commandBar.Controls.Add(_reducedMotion);
         _commandBar.Controls.Add(_renderingDemo);
+        _commandBar.Controls.Add(_iconDemo);
     }
 
     private void ConfigurePalette()
@@ -155,6 +167,8 @@ public sealed class MainForm : Form
         _reducedMotion.ForeColor = theme.Colors.Text;
         _renderingDemo.BackColor = theme.Colors.Surface;
         _renderingDemo.ForeColor = theme.Colors.Text;
+        _iconDemo.BackColor = theme.Colors.Surface;
+        _iconDemo.ForeColor = theme.Colors.Text;
         _palette.BackColor = theme.Colors.Body;
         _summary.BackColor = theme.Colors.SurfaceSecondary;
         _summary.ForeColor = theme.Colors.Text;
