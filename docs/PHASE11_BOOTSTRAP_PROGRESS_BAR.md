@@ -38,7 +38,7 @@ AnimationDuration = 600 ms
 Indeterminate = false
 ```
 
-The control is non-focusable by default and exposes `AccessibleRole.ProgressBar`.
+The control is non-focusable by default and exposes `AccessibleRole.ProgressBar`. Its accessibility value reports the current determinate percentage (for example, `50%`) and reports `Indeterminate` while indeterminate mode is active. Value/state changes notify accessibility clients through the WinForms value-change event.
 
 ## Range and percentage behavior
 
@@ -46,7 +46,7 @@ The control is non-focusable by default and exposes `AccessibleRole.ProgressBar`
 
 Changing a valid endpoint keeps the control state valid by moving the existing `Value` into the new range when necessary. Direct assignment to `Value`, and targets supplied to `AnimateTo`, must already be inside the current range and are rejected otherwise.
 
-`Percentage` is the current value normalized to the configured range and rounded to the nearest whole percent. Range arithmetic is performed without 32-bit subtraction overflow, so the complete `int` range remains valid.
+`Percentage` is the current value normalized to the configured range and rounded to the nearest whole percent. Range and interpolation arithmetic are performed without 32-bit subtraction overflow, so the complete `int` range remains valid for both direct percentage calculation and `AnimateTo` transitions.
 
 ## Color, track, radius, and DPI
 
@@ -81,7 +81,7 @@ Indeterminate mode does not render percentage text because the visual segment do
 
 `Striped = true` adds diagonal stripes inside the current fill. Static stripes require no animation.
 
-`Striped = true` plus `Animated = true` uses `BootstrapLoopAnimation` for stripe motion. The control creates no WinForms timer of its own.
+`Striped = true` plus `Animated = true` uses `BootstrapLoopAnimation` for stripe motion. The control creates no WinForms timer of its own. Stripe painting reuses one four-point polygon buffer per paint operation instead of allocating a new point array for every stripe/frame.
 
 With Reduced motion enabled, shared loop animation does not continuously schedule frames, leaving a stable striped presentation.
 
@@ -116,9 +116,9 @@ Destroying the WinForms handle releases active Progress-owned animation objects.
 Phase 11 tests cover:
 
 - required public API presence;
-- defaults and accessibility role;
+- defaults, accessibility role, determinate accessibility value, and indeterminate accessibility state;
 - custom Min/Max/Value percentage calculation;
-- full signed `int` range without overflow;
+- full signed `int` range without overflow in percentage and interpolation logic;
 - endpoint validation and value normalization after valid range changes;
 - direct Value and `AnimateTo` target validation;
 - radius, variant, duration, and text-format validation;
@@ -126,6 +126,7 @@ Phase 11 tests cover:
 - logical `AnimateTo` behavior in indeterminate mode;
 - theme track painting and CustomColor precedence;
 - demo coverage for every semantic variant, custom color, text formatting, square radius, static stripes, animated stripes, indeterminate mode, and interactive `AnimateTo` commands;
+- demo content/background theme separation;
 - main-demo navigation to the Progress page.
 
 ## Demo and manual verification
