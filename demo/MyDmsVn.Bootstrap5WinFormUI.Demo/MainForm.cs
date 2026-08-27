@@ -16,6 +16,7 @@ public sealed class MainForm : Form
     private readonly Button _spinnerDemo = new Button();
     private readonly Button _buttonDemo = new Button();
     private readonly Button _buttonGroupToolbarDemo = new Button();
+    private readonly Button _textBoxCardDemo = new Button();
     private readonly FlowLayoutPanel _commandBar = new FlowLayoutPanel();
     private readonly TableLayoutPanel _palette = new TableLayoutPanel();
     private readonly Label _summary = new Label();
@@ -57,7 +58,7 @@ public sealed class MainForm : Form
         _commandBar.AutoSize = true;
         _commandBar.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         _commandBar.FlowDirection = FlowDirection.LeftToRight;
-        _commandBar.WrapContents = false;
+        _commandBar.WrapContents = true;
         _commandBar.Padding = new Padding(12, 10, 12, 10);
 
         var modeLabel = new Label
@@ -138,6 +139,16 @@ public sealed class MainForm : Form
             demo.Show(this);
         };
 
+        _textBoxCardDemo.AutoSize = true;
+        _textBoxCardDemo.Margin = new Padding(8, 1, 0, 0);
+        _textBoxCardDemo.Text = "TextBox / Card";
+        _textBoxCardDemo.UseVisualStyleBackColor = false;
+        _textBoxCardDemo.Click += (_, _) =>
+        {
+            var demo = new TextBoxCardDemoForm();
+            demo.Show(this);
+        };
+
         _commandBar.Controls.Add(modeLabel);
         _commandBar.Controls.Add(_themeMode);
         _commandBar.Controls.Add(_reducedMotion);
@@ -147,6 +158,7 @@ public sealed class MainForm : Form
         _commandBar.Controls.Add(_spinnerDemo);
         _commandBar.Controls.Add(_buttonDemo);
         _commandBar.Controls.Add(_buttonGroupToolbarDemo);
+        _commandBar.Controls.Add(_textBoxCardDemo);
     }
 
     private void ConfigurePalette()
@@ -225,6 +237,8 @@ public sealed class MainForm : Form
         _buttonDemo.ForeColor = theme.Colors.Text;
         _buttonGroupToolbarDemo.BackColor = theme.Colors.Surface;
         _buttonGroupToolbarDemo.ForeColor = theme.Colors.Text;
+        _textBoxCardDemo.BackColor = theme.Colors.Surface;
+        _textBoxCardDemo.ForeColor = theme.Colors.Text;
         _palette.BackColor = theme.Colors.Body;
         _summary.BackColor = theme.Colors.SurfaceSecondary;
         _summary.ForeColor = theme.Colors.Text;
