@@ -234,19 +234,7 @@ internal sealed class BootstrapSidebarItemButton : BootstrapButton
 
     private Color ResolveForeground(BootstrapTheme theme)
     {
-        if (!Enabled)
-        {
-            return theme.Colors.MutedText;
-        }
-
-        if (!Selected)
-        {
-            return theme.Colors.Text;
-        }
-
-        var semantic = BootstrapVariantColorResolver.Resolve(theme.Colors, Variant);
-        var selectedBackground = ColorUtil.Blend(theme.Colors.Dark, semantic, 0.18f);
-        return ColorUtil.GetContrastingTextColor(selectedBackground, theme.Colors.Light, theme.Colors.Dark);
+        return ResolveCurrentPalette(theme).Foreground;
     }
 
     private void PaintBadge(Graphics graphics, Rectangle bounds, BootstrapTheme theme, int dpi)
