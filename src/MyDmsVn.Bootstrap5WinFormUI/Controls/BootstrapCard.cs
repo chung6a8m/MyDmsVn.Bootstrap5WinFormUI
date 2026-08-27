@@ -14,6 +14,8 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 [DefaultProperty(nameof(Body))]
 public class BootstrapCard : ContainerControl
 {
+    private const float RoundedCornerSafeInsetFactor = 0.29289322f;
+
     private readonly Panel _header = new Panel();
     private readonly Panel _body = new Panel();
     private readonly Panel _footer = new Panel();
@@ -90,6 +92,22 @@ public class BootstrapCard : ContainerControl
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Content)]
     public Panel Footer => _footer;
 
+    /// <inheritdoc />
+    public override Rectangle DisplayRectangle
+    {
+        get
+        {
+            var decorationInsets = GetDecorationInsets();
+            var left = Math.Max(Padding.Left, decorationInsets.Left);
+            var top = Math.Max(Padding.Top, decorationInsets.Top);
+            var right = Math.Max(Padding.Right, decorationInsets.Right);
+            var bottom = Math.Max(Padding.Bottom, decorationInsets.Bottom);
+            var width = Math.Max(0, ClientSize.Width - left - right);
+            var height = Math.Max(0, ClientSize.Height - top - bottom);
+            return new Rectangle(left, top, width, height);
+        }
+    }
+
     /// <summary>
     /// Gets or sets whether the card paints a themed border.
     /// </summary>
@@ -107,6 +125,7 @@ public class BootstrapCard : ContainerControl
             }
 
             _showBorder = value;
+            PerformLayout();
             Invalidate();
         }
     }
@@ -128,6 +147,7 @@ public class BootstrapCard : ContainerControl
             }
 
             _showShadow = value;
+            PerformLayout();
             Invalidate();
         }
     }
@@ -154,6 +174,7 @@ public class BootstrapCard : ContainerControl
             }
 
             _borderRadius = value;
+            PerformLayout();
             Invalidate();
         }
     }
@@ -293,5 +314,27 @@ public class BootstrapCard : ContainerControl
         {
             _settingThemePadding = false;
         }
+    }
+
+    private Padding GetDecorationInsets()
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var borderWidth = Math.Max(1f, DpiScaler.Scale((float)theme.Metrics.BorderWidth, dpi));
+        var logicalRadius = _borderRadius >= 0 ? _borderRadius : theme.Metrics.Radius;
+        var radius = Math.Max(0f, DpiScaler.Scale((float)logicalRadius, dpi));
+        var paintedBorderWidth = _showBorder ? borderWidth : 0f;
+        var innerRadius = Math.Max(0f, radius - paintedBorderWidth);
+        var roundedInset = paintedBorderWidth + (innerRadius * RoundedCornerSafeInsetFactor);
+        var edgeInset = (int)Math.Ceiling(Math.Max(borderWidth / 2f, roundedInset));
+        var shadowInset = _showShadow
+            ? (int)Math.Ceiling(Math.Max(1f, DpiScaler.Scale(3f, dpi)))
+            : 0;
+
+        return new Padding(
+            edgeInset,
+            edgeInset,
+            edgeInset + shadowInset,
+            edgeInset + shadowInset);
     }
 }
