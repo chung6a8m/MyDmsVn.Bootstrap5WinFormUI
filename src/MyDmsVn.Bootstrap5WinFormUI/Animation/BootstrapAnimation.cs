@@ -113,7 +113,7 @@ public sealed class BootstrapAnimation : IDisposable
     }
 
     /// <summary>
-    /// Stops frame scheduling and freezes the current run at its current progress.
+    /// Stops frame scheduling and freezes the current run at its current progress without reporting completion.
     /// </summary>
     public void Stop()
     {
@@ -224,12 +224,6 @@ public sealed class BootstrapAnimation : IDisposable
         _baseRawProgress = rawProgress;
         _resumeWhenVisible = resumeWhenVisible && rawProgress < 1.0;
         PublishProgress(rawProgress);
-
-        if (!_disposed && rawProgress >= 1.0 && _rawProgress >= 1.0)
-        {
-            _resumeWhenVisible = false;
-            Completed?.Invoke(this, EventArgs.Empty);
-        }
     }
 
     private void CompleteFromRunningState()
