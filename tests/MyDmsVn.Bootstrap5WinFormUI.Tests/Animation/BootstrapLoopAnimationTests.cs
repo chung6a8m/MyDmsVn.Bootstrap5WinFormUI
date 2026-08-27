@@ -13,8 +13,11 @@ public sealed class BootstrapLoopAnimationTests
     [Test]
     public void ConstructorRejectsNonPositiveDuration()
     {
-        Assert.That(() => new BootstrapLoopAnimation(TimeSpan.Zero), Throws.TypeOf<ArgumentOutOfRangeException>());
-        Assert.That(() => new BootstrapLoopAnimation(TimeSpan.FromMilliseconds(-1)), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Action zeroDuration = () => { using var animation = new BootstrapLoopAnimation(TimeSpan.Zero); };
+        Action negativeDuration = () => { using var animation = new BootstrapLoopAnimation(TimeSpan.FromMilliseconds(-1)); };
+
+        Assert.That(zeroDuration, Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(negativeDuration, Throws.TypeOf<ArgumentOutOfRangeException>());
     }
 
     [Test]
@@ -180,8 +183,9 @@ public sealed class BootstrapLoopAnimationTests
 
         animation.Start();
         clock.Advance(TimeSpan.FromMilliseconds(100));
+        Action fireFrame = scheduler.FireFrame;
 
-        Assert.DoesNotThrow(() => scheduler.FireFrame());
+        Assert.DoesNotThrow(fireFrame);
         Assert.That(animation.IsRunning, Is.False);
         animation.Dispose();
     }
@@ -191,11 +195,15 @@ public sealed class BootstrapLoopAnimationTests
     {
         var animation = CreateAnimation(out _, out _);
         animation.Dispose();
-        Assert.DoesNotThrow(animation.Dispose);
+        Action dispose = animation.Dispose;
+        Action start = animation.Start;
+        Action stop = animation.Stop;
+        Action restart = animation.Restart;
 
-        Assert.That(animation.Start, Throws.TypeOf<ObjectDisposedException>());
-        Assert.That(animation.Stop, Throws.TypeOf<ObjectDisposedException>());
-        Assert.That(animation.Restart, Throws.TypeOf<ObjectDisposedException>());
+        Assert.DoesNotThrow(dispose);
+        Assert.That(start, Throws.TypeOf<ObjectDisposedException>());
+        Assert.That(stop, Throws.TypeOf<ObjectDisposedException>());
+        Assert.That(restart, Throws.TypeOf<ObjectDisposedException>());
     }
 
     private static BootstrapLoopAnimation CreateAnimation(
