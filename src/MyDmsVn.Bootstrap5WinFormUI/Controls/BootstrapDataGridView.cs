@@ -307,6 +307,12 @@ public class BootstrapDataGridView : DataGridView
     private void ApplyThemeFont()
     {
         var token = BootstrapThemeManager.CurrentTheme.Typography.Body;
+        if (ThemeFontMatches(token))
+        {
+            _loadingLabel.Font = Font;
+            return;
+        }
+
         var nextFont = new Font(token.FontFamilyName, token.SizeInPoints, token.Style);
         var previous = _themeFont;
         _themeFont = nextFont;
@@ -322,6 +328,14 @@ public class BootstrapDataGridView : DataGridView
 
         previous?.Dispose();
         _loadingLabel.Font = Font;
+    }
+
+    private bool ThemeFontMatches(BootstrapFontToken token)
+    {
+        return _themeFont is not null &&
+            string.Equals(_themeFont.Name, token.FontFamilyName, StringComparison.OrdinalIgnoreCase) &&
+            Math.Abs(_themeFont.SizeInPoints - token.SizeInPoints) < 0.01f &&
+            _themeFont.Style == token.Style;
     }
 
     private void DisposeThemeFont()
