@@ -71,6 +71,14 @@ Phase 7 covers ButtonGroup/Toolbar layout and state policy with automated tests 
 - Vertical orientation and DPI-scalable configured group spacing
 - Toolbar isolation from ButtonGroup selection policy
 
+Phase 8 covers TextBox/Card presentation logic with automated tests for:
+
+- Neutral/focused/valid/invalid/disabled TextBox border-token resolution
+- Border-radius sentinel validation for both controls
+- TextBox icon slots reserving native-editor width
+- Card double-buffered custom-painting styles
+- Theme-default Card padding and caller-owned custom padding behavior
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -94,6 +102,15 @@ Phase 4 owner lifecycle tests instantiate real WinForms `Control` owners on STA 
 Phase 6 Button control tests run in STA and verify the finalized default contract, loading suppression of `PerformClick()`, and preferred-size stability when loading is toggled even when `LoadingText` differs from normal `Text`.
 
 Phase 7 Group/Toolbar tests run in STA and exercise real `BootstrapButton`, `BootstrapButtonGroup`, and `BootstrapButtonToolbar` controls. Tests call `PerformClick()` for activation semantics and `PerformLayout()` for deterministic connected-corner/equal-size/alignment assertions rather than duplicating the production algorithms in test helpers.
+
+Phase 8 TextBox/Card tests run in STA and verify:
+
+- `BootstrapTextBox` contains exactly one native borderless `TextBox` editor and keeps that editor out of the tab sequence while the composed control owns the public tab stop.
+- `Text`, `ReadOnly`, and `UseSystemPasswordChar` forward to the native editor.
+- Placeholder visibility follows the actual text value without becoming editor content.
+- The clear affordance uses the normal native `TextChanged` path and disappears when no editable text remains.
+- Runtime theme changes update Card region colors and preserve explicit custom Card padding.
+- Header/Body/Footer are stable child containers suitable for Designer serialization.
 
 ### 2.3 Demo/manual visual tests
 
@@ -122,6 +139,8 @@ For Phase 6, choose **Button**. Compare all filled and outline variants, Small/D
 
 For Phase 7, choose **Groups / Toolbar**. Verify a horizontal Single-selection group, vertical Multiple-selection group, EqualWidth connected buttons, explicit outer group radius, a fixed-width horizontal `SpaceBetween` toolbar, and a vertical toolbar. Tab through grouped Buttons and activate them with Enter/Space; focus remains on the child Buttons. Inspect inner seams for square connected corners and a single continuous border, then switch Light/Dark and run the same page at each supported Windows DPI setting. Toolbar actions whose group uses `SelectionMode.None` must not change `Selected` state.
 
+For Phase 8, choose **TextBox / Card**. Verify placeholder behavior, leading/trailing icons, clear button, valid/invalid borders, native read-only/password/disabled behavior, Tab focus, selection/copy/paste, and live Light/Dark switching. Compare default, Header/Body/Footer, shadow, and borderless/custom-radius cards. Resize repeatedly and run the page at 100/125/150/175/200% Windows scaling; editor text must remain vertically usable, icon slots must stay aligned, Card corners must not clip, and the lightweight shadow must not leave stale pixels.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -145,6 +164,8 @@ Verify:
 - DataGridView headers/rows remain aligned.
 
 The Phase 2 Rendering/DPI demo covers the geometry calculations at all five scale factors. Run the demo under each corresponding Windows display-scaling setting as components are added and during hardening; do not treat the virtual matrix as proof of OS-level DPI behavior.
+
+For Phase 8 specifically, verify the native TextBox caret/text baseline remains centered and usable after DPI changes, leading/trailing/clear slots remain inside the rounded input, and Card theme-default padding scales without overwriting application-set custom padding.
 
 ## 4. Theme matrix
 
@@ -177,6 +198,8 @@ Interactive controls should be exercised in:
 Keyboard paths must be tested separately from mouse paths.
 
 For Phase 7, Group and Toolbar themselves are intentionally non-focusable; interaction remains on each `BootstrapButton`. Selection policy is validated through the same Button activation path used by mouse and keyboard input, while Toolbar remains layout-only.
+
+For Phase 8, `BootstrapTextBox` owns one public tab stop and forwards focus to its native editor. Test Tab entry, Shift+Tab exit, pointer clicks on the border/placeholder, keyboard text selection, clipboard commands, clear-button behavior, read-only copy behavior, and password masking. `BootstrapCard` is a non-focusable container; focus order belongs to controls placed in Header/Body/Footer.
 
 ## 6. Animation matrix
 
@@ -216,6 +239,8 @@ For Phase 6, Button owns only its theme subscription, theme-created font, and co
 
 For Phase 7, ButtonGroup owns only theme notification plus child Button event subscriptions needed for selection/layout; removal/disposal must detach those handlers and clear internal grouped-corner overrides. Toolbar subscribes only to child Group size/visibility changes for layout and never to Button click/selection events.
 
+For Phase 8, TextBox and Card own only theme subscriptions plus TextBox's theme-created font. They must unsubscribe/dispose deterministically. Card shadow painting must not retain bitmaps, paths, brushes, or pens between frames; all temporary GDI objects remain scoped to painting.
+
 ## 8. DataGridView tests
 
 Use realistic scenarios:
@@ -242,6 +267,8 @@ For Designer-oriented controls verify in Visual Studio:
 - Opening a form containing the control does not run animation indefinitely in the Designer.
 
 For Phase 7, place Group and Toolbar in the Designer, add Buttons/Groups through their normal WinForms `Controls` collections, serialize `Orientation`, `SelectionMode`, `EqualWidth`, `BorderRadius`, `GroupSpacing`, and `Alignment`, then reopen the form and confirm connected layout is restored without application bootstrap code.
+
+For Phase 8, place TextBox and Card in the Designer without theme bootstrap code. Serialize placeholder/validation/icons/clear/read-only/password/radius settings as applicable. Add controls into `Header`, `Body`, and `Footer`, toggle Header/Footer visibility, set custom Card padding/border/shadow/radius, save and reopen the form, and confirm the region contents and public property values are preserved.
 
 ## 10. Build commands
 
