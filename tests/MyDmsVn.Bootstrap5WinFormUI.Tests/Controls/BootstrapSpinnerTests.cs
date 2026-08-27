@@ -79,6 +79,13 @@ public sealed class BootstrapSpinnerTests
     }
 
     [Test]
+    public void ResolveColorRejectsNullThemeEvenWithCustomColor()
+    {
+        Assert.Throws<ArgumentNullException>((Action)(() =>
+            BootstrapSpinnerRenderLogic.ResolveColor(null!, BootstrapVariant.Primary, Color.Magenta)));
+    }
+
+    [Test]
     public void LogicalDiameterUsesExistingThemeMetrics()
     {
         var metrics = BootstrapThemeMetrics.Default;
