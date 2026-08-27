@@ -100,38 +100,60 @@ Manual verification: launch the demo and choose **Button**. Compare filled/outli
 
 ## BootstrapButtonGroup
 
-Responsibility: group Buttons and own connected-border plus selection behavior.
+Responsibility: compose `BootstrapButton` instances into a connected horizontal or vertical control and own selection policy.
 
-Expected concepts:
+Phase 7 finalizes the public concepts as:
 
 ```text
-Orientation
-SelectionMode: None | Single | Multiple
-EqualWidth
-BorderRadius
-SelectedIndex/selection query API as appropriate
+BootstrapButtonSelectionMode: None | Single | Multiple
+
+BootstrapButtonGroup.Orientation
+BootstrapButtonGroup.SelectionMode
+BootstrapButtonGroup.EqualWidth
+BootstrapButtonGroup.BorderRadius
+BootstrapButtonGroup.SelectedButtons
+BootstrapButtonGroup.SelectionChanged
 ```
 
-Rules:
+Behavior:
 
-- Contains `BootstrapButton` instances.
-- Does not duplicate button rendering.
-- Applies first/middle/last corner rules.
+- The group lays out visible `BootstrapButton` children horizontally by default or vertically when `Orientation = Vertical`.
+- It does not duplicate Button painting. Connected geometry is applied through the Button's internal per-corner radius override, leaving only the first/last outer corners rounded and middle seams square.
+- Adjacent buttons overlap by the current DPI-scaled border width so a connected seam is painted once rather than separated by a gap.
+- `BorderRadius = -1` preserves each outer button's configured/theme radius. A non-negative value applies one explicit logical outer radius for the whole group without mutating `BootstrapButton.BorderRadius`.
+- `SelectionMode = None` never changes child `Selected` state. `Single` selects the activated button and clears the others. `Multiple` toggles only the activated button.
+- Selection is activation-driven and therefore inherits Button suppression rules: disabled/loading buttons do not activate the group selection policy.
+- `SelectedButtons` returns a snapshot of currently selected children; `SelectionChanged` is raised when the group policy changes selected state.
+- `EqualWidth = true` uses the widest preferred button width for every visible child. The group otherwise keeps each button's preferred width.
+- The control is auto-sized by default, non-focusable itself, and leaves Tab/focus/Enter/Space behavior on the child Buttons.
+- Runtime theme or DPI changes recompute seam overlap and outer radii; removing a Button clears its internal grouping-radius override so it returns to standalone rendering.
+
+Manual verification: launch the demo and choose **Groups / Toolbar**. Exercise horizontal Single selection, vertical Multiple selection, EqualWidth, explicit group radius, keyboard activation on child buttons, Light/Dark switching, and the supported Windows DPI matrix. Connected seams should remain continuous without duplicated rounded inner corners.
 
 ## BootstrapButtonToolbar
 
-Responsibility: lay out multiple ButtonGroups.
+Responsibility: arrange multiple `BootstrapButtonGroup` controls without participating in Button selection.
 
-Expected concepts:
+Phase 7 finalizes the public concepts as:
 
 ```text
-Orientation
-GroupSpacing
-Alignment: Left | Center | Right | SpaceBetween
-AutoSize behavior
+BootstrapToolbarAlignment: Left | Center | Right | SpaceBetween
+
+BootstrapButtonToolbar.Orientation
+BootstrapButtonToolbar.GroupSpacing
+BootstrapButtonToolbar.Alignment
 ```
 
-Rule: selection belongs to ButtonGroup, never Toolbar.
+Behavior:
+
+- The toolbar lays out visible ButtonGroups horizontally by default or vertically when requested.
+- `GroupSpacing` is a non-negative logical-pixel value and scales through `DpiScaler`; the default is 8.
+- `Left`, `Center`, and `Right` position the combined groups on the toolbar main axis. In vertical orientation, Left/Right mean leading/trailing on that axis.
+- `SpaceBetween` anchors the first and last groups to opposite main-axis edges when sufficient space exists, distributes the remaining space between groups, and falls back to configured spacing when space is constrained.
+- Auto-sized toolbars use natural group sizes plus configured spacing. A fixed-size toolbar can therefore use Center/Right/SpaceBetween meaningfully for desktop command bars.
+- Toolbar never subscribes to child Button activation and never changes `Selected`; selection remains entirely a ButtonGroup responsibility.
+
+Manual verification: in **Groups / Toolbar**, compare the fixed-width `SpaceBetween` command bar and vertical toolbar, resize the demo, switch Light/Dark, and verify toolbar actions never toggle selection when their group uses `SelectionMode.None`.
 
 ## BootstrapTextBox
 
