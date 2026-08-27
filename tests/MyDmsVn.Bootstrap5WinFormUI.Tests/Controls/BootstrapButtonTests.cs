@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Threading;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
@@ -44,6 +45,46 @@ public sealed class BootstrapButtonTests
         button.PerformClick();
 
         Assert.That(clickCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void LoadingUsesComposedBootstrapSpinner()
+    {
+        using var button = new BootstrapButton();
+        var spinner = button.Controls.OfType<BootstrapSpinner>().Single();
+
+        button.Loading = true;
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(spinner.Visible, Is.True);
+            Assert.That(spinner.Spinning, Is.True);
+        }));
+
+        button.Loading = false;
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(spinner.Visible, Is.False);
+            Assert.That(spinner.Spinning, Is.False);
+        }));
+    }
+
+    [Test]
+    public void LoadingDoesNotMutateEnabledOrSelectedState()
+    {
+        using var button = new BootstrapButton
+        {
+            Enabled = true,
+            Selected = true
+        };
+
+        button.Loading = true;
+        button.Loading = false;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(button.Enabled, Is.True);
+            Assert.That(button.Selected, Is.True);
+        }));
     }
 
     [Test]
