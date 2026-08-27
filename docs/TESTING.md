@@ -52,6 +52,14 @@ Phase 4 covers shared animation logic with deterministic clock/frame-scheduler t
 - Event-handler reentrancy for restart/disposal
 - Idempotent disposal and post-disposal operation guards
 
+Phase 6 covers pure Button rendering/state logic with automated tests for:
+
+- Small/default/large height selection from theme metrics
+- Filled and outline semantic palette resolution
+- Selected outline state becoming a filled active presentation
+- Disabled colors resolving through disabled/muted theme tokens
+- Uniform radius validation and internal per-corner ButtonGroup override behavior
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -71,6 +79,8 @@ Examples:
 Do not rely on arbitrary sleeps to wait for animation. Prefer controllable clocks/timing abstractions where practical or test state/progress deterministically.
 
 Phase 4 owner lifecycle tests instantiate real WinForms `Control` owners on STA threads while keeping animation time and frame delivery manually controlled.
+
+Phase 6 Button control tests run in STA and verify the finalized default contract, loading suppression of `PerformClick()`, and preferred-size stability when loading is toggled even when `LoadingText` differs from normal `Text`.
 
 ### 2.3 Demo/manual visual tests
 
@@ -94,6 +104,8 @@ For Phase 2, start the demo and choose **Rendering / DPI**. The preview draws sh
 For Phase 3, choose **Icons**. Verify that Segoe MDL2 and framework vector glyphs use the current theme color, remain centered while resizing, and continue to render after Light/Dark switches. If the Windows font is unavailable, the demo must report the MDL2 source as unavailable instead of failing. SVG adapters are implementation-specific and should add their own visual verification while retaining the common `IIconRenderer` contract.
 
 For Phase 4, choose **Animation**. Verify finite Start/Stop/Restart, loop Start/Stop/Restart, normalized progress labels, and smooth movement. Start both animations, choose **Hide previews**, leave them hidden briefly, then choose **Show previews**; progress must resume from the retained logical position rather than jump by hidden wall-clock time. Toggle **Reduced motion** and explicitly Start/Restart: the finite animation must immediately reach its final state and the loop must remain at zero without continuous movement. Switch Light/Dark while the diagnostic window is open to confirm the demo continues to render with current theme tokens.
+
+For Phase 6, choose **Button**. Compare all filled and outline variants, Small/Default/Large sizing, left/right framework icons, selected/disabled/custom-radius examples, and hover/pressed/focus feedback. Tab through buttons and activate with Enter/Space. Trigger the async **Save** example and verify the same button cannot be reactivated while loading and that its measured size is unchanged before/after loading. Switch Light/Dark and Reduced motion while the loading example is active; the button and composed spinner must follow the current theme without introducing a Button-owned timer.
 
 ## 3. DPI matrix
 
@@ -183,6 +195,8 @@ Exact zero-allocation rendering is not required. Unbounded growth is unacceptabl
 
 For Phase 4, the animation object owns its internal frame scheduler and subscriptions to the optional lifecycle owner; disposal must release both. The supplied owner control is never owned by the animation object.
 
+For Phase 6, Button owns only its theme subscription, theme-created font, and composed Spinner control. Spinner remains the sole owner of loading animation scheduling. Repeated Button creation/disposal must not leave either Button or Spinner subscribed/running.
+
 ## 8. DataGridView tests
 
 Use realistic scenarios:
@@ -220,7 +234,7 @@ dotnet test -c Release
 
 Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`.
 
-The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by Phase 4.
+The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by implemented phases.
 
 ## 11. Definition of done for a component
 
