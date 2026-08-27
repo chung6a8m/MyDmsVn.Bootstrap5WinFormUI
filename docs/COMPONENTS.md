@@ -124,7 +124,7 @@ Behavior:
 - `SelectionMode = None` never changes child `Selected` state. `Single` selects the activated button and clears the others. `Multiple` toggles only the activated button.
 - Selection is activation-driven and therefore inherits Button suppression rules: disabled/loading buttons do not activate the group selection policy.
 - `SelectedButtons` returns a snapshot of currently selected children; `SelectionChanged` is raised when the group policy changes selected state.
-- `EqualWidth = true` uses the widest preferred button width for every visible child. The group otherwise keeps each button's preferred width.
+- `EqualWidth = true` uses the widest preferred button width for every visible child. Vertical groups always use the widest preferred width so connected left/right edges stay aligned.
 - The control is auto-sized by default, non-focusable itself, and leaves Tab/focus/Enter/Space behavior on the child Buttons.
 - Runtime theme or DPI changes recompute seam overlap and outer radii; removing a Button clears its internal grouping-radius override so it returns to standalone rendering.
 
@@ -157,40 +157,68 @@ Manual verification: in **Groups / Toolbar**, compare the fixed-width `SpaceBetw
 
 ## BootstrapTextBox
 
-Responsibility: modern themed text input while preserving standard WinForms text editing behavior.
+Responsibility: modern themed text input while preserving native WinForms editing semantics.
 
-Expected concepts:
+Phase 8 finalizes the public concepts as:
 
 ```text
-PlaceholderText
-ValidationState
-Icon / leading icon
-TrailingIcon
-ShowClearButton
-ReadOnly
-UseSystemPasswordChar or equivalent
-BorderRadius
+BootstrapValidationState: None | Valid | Invalid
+
+BootstrapTextBox.PlaceholderText
+BootstrapTextBox.ValidationState
+BootstrapTextBox.Icon
+BootstrapTextBox.TrailingIcon
+BootstrapTextBox.IconRenderer
+BootstrapTextBox.ShowClearButton
+BootstrapTextBox.ReadOnly
+BootstrapTextBox.UseSystemPasswordChar
+BootstrapTextBox.BorderRadius
+BootstrapTextBox.Clear()
+BootstrapTextBox.SelectAll()
 ```
 
-Implementation should prefer composition around a real `TextBox` when custom border/focus rendering is needed, rather than reimplementing text editing.
+Behavior:
+
+- The control composes a real borderless WinForms `TextBox`; selection, clipboard, IME, caret, read-only, and password behavior stay with the native editor instead of being reimplemented.
+- `BootstrapTextBox` owns the single public tab stop and forwards focus to the native editor. Focus state is therefore painted around the whole themed surface while the inner editor remains out of the tab sequence.
+- `PlaceholderText` is shown only while the native editor is empty. It is a presentation overlay, never stored as the actual `Text` value.
+- `ValidationState = Valid` uses the current theme success color; `Invalid` uses danger; neutral focus uses the theme focus token; disabled state uses the disabled token.
+- `Icon` and `TrailingIcon` use the same source-neutral `IconDescriptor` / `IIconRenderer` infrastructure as Button. Icon slots reserve editor width and scale through `DpiScaler`.
+- `ShowClearButton` presents a clear affordance only while non-read-only, enabled text exists. Clearing uses the native editor's normal `TextChanged` path.
+- Read-only and disabled states use the secondary surface and appropriate text tokens without changing the caller-owned text value.
+- `BorderRadius = -1` uses the current theme radius; non-negative values specify an explicit uniform logical radius.
+- Runtime theme changes update typography, surface, text, placeholder, border, icon, and validation colors. DPI changes recompute border, icon, padding, and layout geometry.
+- Designer construction requires no application bootstrap. Theme subscriptions and theme-owned font resources are released during disposal.
+
+Manual verification: launch the demo and choose **TextBox / Card**. Exercise placeholder, leading/trailing icons, clear, valid/invalid, read-only, password, and disabled examples. Tab into inputs, type/select/copy text, verify focus/validation border priority, switch Light/Dark, and repeat at each supported Windows DPI setting.
 
 ## BootstrapCard
 
-Responsibility: reusable surface/container.
+Responsibility: reusable themed surface/container with lightweight composition regions.
 
-Expected concepts:
+Phase 8 finalizes the public concepts as:
 
 ```text
-Header
-Body
-Footer
-BorderRadius
-ShowBorder
-ShowShadow
-Padding
+BootstrapCard.Header
+BootstrapCard.Body
+BootstrapCard.Footer
+BootstrapCard.BorderRadius
+BootstrapCard.ShowBorder
+BootstrapCard.ShowShadow
+BootstrapCard.Padding
 ```
 
-Header/Body/Footer may be exposed as child containers or a simple composition model. Preserve Designer usability.
+Behavior:
+
+- `Header`, `Body`, and `Footer` are stable `Panel` instances exposed with `DesignerSerializationVisibility.Content`. Header/Footer are hidden by default; Body fills the available content area.
+- The Card paints one rounded themed surface and optional border itself. Child regions reuse the current surface color rather than introducing nested decorative controls.
+- `Padding` defaults to the current theme `SpacingMD` token and scales through `DpiScaler`. Once an application explicitly sets Padding, later theme changes do not overwrite that caller-owned value.
+- `BorderRadius = -1` uses the current theme radius; non-negative values specify an explicit uniform logical radius.
+- `ShowShadow` paints lightweight rounded shadow geometry directly during Card painting; it does not allocate or retain shadow bitmaps.
+- Runtime theme changes update surface, border, foreground, and all three region colors. DPI changes recompute theme-default padding and geometry.
+- The Card is double-buffered, non-focusable itself, parameterless/designer-safe, and releases its theme subscription during disposal.
+
+Manual verification: in **TextBox / Card**, compare the default bordered card, Header/Body/Footer composition, shadow card, and borderless custom-radius card. Resize the window, switch Light/Dark, inspect corners/shadow clipping, add controls to each region in the Designer, save/reopen, and repeat at the supported Windows DPI settings.
 
 ## BootstrapCollapse
 
