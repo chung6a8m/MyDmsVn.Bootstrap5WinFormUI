@@ -67,6 +67,25 @@ public sealed class BootstrapSidebarReviewRegressionTests
     }
 
     [Test]
+    public void ReplacingRootBindingListItemRebuildsVisualTreeAndClearsForeignSelection()
+    {
+        using var sidebar = new BootstrapSidebar();
+        var original = new BootstrapSidebarItem { Text = "Original" };
+        sidebar.Items.Add(original);
+        sidebar.SelectedItem = original;
+
+        var replacement = new BootstrapSidebarItem { Text = "Replacement" };
+        sidebar.Items[0] = replacement;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(sidebar.SelectedItem, Is.Null);
+            Assert.That(FindButtons(sidebar).Any(button => ReferenceEquals(button.Tag, original)), Is.False);
+            Assert.That(FindButtons(sidebar).Any(button => ReferenceEquals(button.Tag, replacement)), Is.True);
+        }));
+    }
+
+    [Test]
     public void ReplacingNestedBindingListItemRebuildsVisualTreeAndSubscriptions()
     {
         using var sidebar = new BootstrapSidebar();
