@@ -333,11 +333,11 @@ public sealed class ProgressDemoForm : Form
             button.ForeColor = theme.Colors.Text;
         }
 
-        ApplyThemeToChildren(_toolbar, theme);
-        ApplyThemeToChildren(_content, theme);
+        ApplyThemeToChildren(_toolbar, theme, theme.Colors.SurfaceSecondary);
+        ApplyThemeToChildren(_content, theme, theme.Colors.Body);
     }
 
-    private static void ApplyThemeToChildren(Control root, BootstrapTheme theme)
+    private static void ApplyThemeToChildren(Control root, BootstrapTheme theme, Color background)
     {
         foreach (Control child in root.Controls)
         {
@@ -346,15 +346,13 @@ public sealed class ProgressDemoForm : Form
                 child.ForeColor = theme.Colors.Text;
                 if (child is GroupBox || child is FlowLayoutPanel || child is Label)
                 {
-                    child.BackColor = child.Parent == root && root is FlowLayoutPanel && root.Dock == DockStyle.Top
-                        ? theme.Colors.SurfaceSecondary
-                        : theme.Colors.Body;
+                    child.BackColor = background;
                 }
             }
 
             if (child.HasChildren)
             {
-                ApplyThemeToChildren(child, theme);
+                ApplyThemeToChildren(child, theme, background);
             }
         }
     }
