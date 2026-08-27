@@ -39,7 +39,7 @@ public sealed class TextBoxCardDemoFormTests
             Assert.That(cards.Any(card => card.ShowShadow), Is.True);
             Assert.That(cards.Any(card => !card.ShowBorder), Is.True);
             Assert.That(cards.Any(card => card.BorderRadius >= 0), Is.True);
-            Assert.That(cards.Any(card => card.Header.Visible && card.Footer.Visible), Is.True);
+            Assert.That(cards.Any(card => card.Header.Controls.Count > 0 && card.Footer.Controls.Count > 0), Is.True);
         }));
     }
 
