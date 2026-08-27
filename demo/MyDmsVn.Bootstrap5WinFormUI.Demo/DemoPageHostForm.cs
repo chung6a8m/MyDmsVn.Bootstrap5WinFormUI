@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -22,7 +21,6 @@ internal sealed class DemoPageSection
 internal sealed class DemoPageHostForm : Form
 {
     private readonly TabControl _tabs = new TabControl();
-    private readonly List<Form> _embeddedForms = new List<Form>();
 
     public DemoPageHostForm(params DemoPageSection[] sections)
     {
@@ -77,7 +75,6 @@ internal sealed class DemoPageHostForm : Form
 
         var form = section.CreateForm();
         EmbedForm(page, form);
-        _embeddedForms.Add(form);
     }
 
     private static void EmbedForm(Control host, Form form)
@@ -124,14 +121,19 @@ internal sealed class DemoPageHostForm : Form
         var foreground = selected ? theme.Colors.Text : theme.Colors.MutedText;
 
         using (var backgroundBrush = new SolidBrush(background))
-        using (var foregroundBrush = new SolidBrush(foreground))
         {
             e.Graphics.FillRectangle(backgroundBrush, e.Bounds);
-            var text = _tabs.TabPages[e.Index].Text;
-            var textSize = e.Graphics.MeasureString(text, Font);
-            var x = e.Bounds.Left + Math.Max(4f, (e.Bounds.Width - textSize.Width) / 2f);
-            var y = e.Bounds.Top + Math.Max(2f, (e.Bounds.Height - textSize.Height) / 2f);
-            e.Graphics.DrawString(text, Font, foregroundBrush, x, y);
         }
+
+        TextRenderer.DrawText(
+            e.Graphics,
+            _tabs.TabPages[e.Index].Text,
+            _tabs.Font,
+            e.Bounds,
+            foreground,
+            TextFormatFlags.HorizontalCenter |
+            TextFormatFlags.VerticalCenter |
+            TextFormatFlags.EndEllipsis |
+            TextFormatFlags.NoPrefix);
     }
 }
