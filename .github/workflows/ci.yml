@@ -19,49 +19,6 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Restore
-        shell: pwsh
-        run: dotnet restore MyDmsVn.Bootstrap5WinFormUI.sln
-
-      - name: Diagnostic build core net48
-        shell: pwsh
-        run: dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -c Release -f net48 --no-restore
-
-      - name: Capture test net48 compile error
-        id: test48
-        shell: pwsh
-        run: |
-          $output = & dotnet build tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net48 --no-restore 2>&1 | Out-String
-          $exitCode = $LASTEXITCODE
-          Write-Host $output
-          $errorLine = ($output -split "`r?`n" | Where-Object { $_ -match ': error (CS|NU|MSB)\d+' } | Select-Object -First 1)
-          if (-not $errorLine) { $errorLine = "no-compiler-error-line" }
-          $errorCode = if ($errorLine -match 'error ((?:CS|NU|MSB)\d+)') { $Matches[1] } else { "unknown" }
-          "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
-          "error_code=$errorCode" >> $env:GITHUB_OUTPUT
-          if ($exitCode -eq 0) { "failed=false" >> $env:GITHUB_OUTPUT } else { "failed=true" >> $env:GITHUB_OUTPUT }
-
-      - name: "Captured net48 test error: ${{ steps.test48.outputs.error_code }}"
-        if: steps.test48.outputs.failed == 'true'
-        shell: pwsh
-        run: exit 1
-
-      - name: Diagnostic build demo net48
-        shell: pwsh
-        run: dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.Demo.csproj -c Release -f net48 --no-restore
-
-      - name: Diagnostic build core net8.0-windows
-        shell: pwsh
-        run: dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -c Release -f net8.0-windows --no-restore
-
-      - name: Diagnostic build tests net8.0-windows
-        shell: pwsh
-        run: dotnet build tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --no-restore
-
-      - name: Diagnostic build demo net8.0-windows
-        shell: pwsh
-        run: dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.Demo.csproj -c Release -f net8.0-windows --no-restore
-
       - name: Build both target frameworks
         shell: pwsh
         run: ./build.ps1 -Configuration Release

@@ -152,3 +152,25 @@ Inputs should support at least neutral, valid/success, warning when needed, and 
 ## 14. Designer defaults
 
 A control dropped from the Toolbox should have a sensible visible size and should render safely with the default theme without requiring code in `Program.Main` or `Form.Load`.
+
+## 15. Phase 1 theme API
+
+Phase 1 implements the design system as immutable token objects under `MyDmsVn.Bootstrap5WinFormUI.Theme`:
+
+- `BootstrapTheme` groups mode, colors, metrics, typography, and the reduced-motion preference.
+- `BootstrapThemeColors` owns semantic and application-surface colors; Light and Dark are separate palettes.
+- `BootstrapThemeMetrics` owns unscaled 100%-DPI sizing, radius, border, and spacing values.
+- `BootstrapThemeTypography` owns typography roles through `BootstrapFontToken` descriptors. Tokens describe font family, point size, and style; they do not own disposable GDI `Font` instances.
+- `BootstrapThemeManager` provides a safe Light default and publishes `ThemeChanged` whenever the application assigns a different theme instance.
+
+Create and switch the application theme through the manager:
+
+```csharp
+var theme = BootstrapTheme.CreateDefault(
+    BootstrapThemeMode.Dark,
+    reducedMotion: true);
+
+BootstrapThemeManager.CurrentTheme = theme;
+```
+
+Controls introduced in later phases must read semantic values from `BootstrapThemeManager.CurrentTheme`, subscribe to `ThemeChanged` only for the lifetime in which they need notifications, and unsubscribe deterministically when disposed. Reduced motion is part of the theme so animation infrastructure can consume one application-level preference without introducing a second settings channel.
