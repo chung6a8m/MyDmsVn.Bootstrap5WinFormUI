@@ -43,13 +43,13 @@ public sealed class BootstrapThemeManagerTests
             BootstrapThemeManager.ThemeChanged -= handler;
         }
 
-        Assert.Multiple(() =>
+        Assert.Multiple((TestDelegate)(() =>
         {
             Assert.That(observed, Is.Not.Null);
             Assert.That(observed!.OldTheme, Is.SameAs(oldTheme));
             Assert.That(observed.NewTheme, Is.SameAs(newTheme));
             Assert.That(BootstrapThemeManager.CurrentTheme, Is.SameAs(newTheme));
-        });
+        }));
     }
 
     [Test]
@@ -75,8 +75,8 @@ public sealed class BootstrapThemeManagerTests
     [Test]
     public void SettingNullThemeIsRejected()
     {
-        Assert.That(
-            () => BootstrapThemeManager.CurrentTheme = null!,
-            Throws.TypeOf<ArgumentNullException>());
+        TestDelegate action = () => BootstrapThemeManager.CurrentTheme = null!;
+
+        Assert.That(action, Throws.TypeOf<ArgumentNullException>());
     }
 }

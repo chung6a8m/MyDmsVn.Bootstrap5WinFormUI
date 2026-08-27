@@ -12,7 +12,7 @@ public sealed class BootstrapThemeTests
     {
         var theme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
 
-        Assert.Multiple(() =>
+        Assert.Multiple((TestDelegate)(() =>
         {
             Assert.That(theme.Mode, Is.EqualTo(BootstrapThemeMode.Light));
             Assert.That(theme.Colors.Primary, Is.EqualTo(Color.FromArgb(0x0D, 0x6E, 0xFD)));
@@ -23,7 +23,7 @@ public sealed class BootstrapThemeTests
             Assert.That(theme.Colors.Info, Is.EqualTo(Color.FromArgb(0x0D, 0xCA, 0xF0)));
             Assert.That(theme.Colors.Light, Is.EqualTo(Color.FromArgb(0xF8, 0xF9, 0xFA)));
             Assert.That(theme.Colors.Dark, Is.EqualTo(Color.FromArgb(0x21, 0x25, 0x29)));
-        });
+        }));
     }
 
     [Test]
@@ -32,7 +32,7 @@ public sealed class BootstrapThemeTests
         var light = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
         var dark = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
 
-        Assert.Multiple(() =>
+        Assert.Multiple((TestDelegate)(() =>
         {
             Assert.That(dark.Mode, Is.EqualTo(BootstrapThemeMode.Dark));
             Assert.That(dark.Colors.Body, Is.EqualTo(Color.FromArgb(0x21, 0x25, 0x29)));
@@ -41,7 +41,7 @@ public sealed class BootstrapThemeTests
             Assert.That(dark.Colors.Primary, Is.EqualTo(Color.FromArgb(0x6E, 0xA8, 0xFE)));
             Assert.That(dark.Colors.Body, Is.Not.EqualTo(light.Colors.Body));
             Assert.That(dark.Colors.Border, Is.Not.EqualTo(light.Colors.Border));
-        });
+        }));
     }
 
     [Test]
@@ -49,7 +49,7 @@ public sealed class BootstrapThemeTests
     {
         var metrics = BootstrapThemeMetrics.Default;
 
-        Assert.Multiple(() =>
+        Assert.Multiple((TestDelegate)(() =>
         {
             Assert.That(metrics.ControlHeightSmall, Is.EqualTo(28));
             Assert.That(metrics.ControlHeight, Is.EqualTo(32));
@@ -64,7 +64,7 @@ public sealed class BootstrapThemeTests
             Assert.That(metrics.SpacingMD, Is.EqualTo(12));
             Assert.That(metrics.SpacingLG, Is.EqualTo(16));
             Assert.That(metrics.SpacingXL, Is.EqualTo(24));
-        });
+        }));
     }
 
     [Test]
@@ -72,7 +72,7 @@ public sealed class BootstrapThemeTests
     {
         var typography = BootstrapThemeTypography.Default;
 
-        Assert.Multiple(() =>
+        Assert.Multiple((TestDelegate)(() =>
         {
             Assert.That(typography.Body.FontFamilyName, Is.EqualTo("Segoe UI"));
             Assert.That(typography.Body.SizeInPoints, Is.EqualTo(9f));
@@ -80,7 +80,7 @@ public sealed class BootstrapThemeTests
             Assert.That(typography.Label.Style, Is.EqualTo(FontStyle.Bold));
             Assert.That(typography.HeadingSmall.SizeInPoints, Is.GreaterThan(typography.Body.SizeInPoints));
             Assert.That(typography.HeadingMedium.SizeInPoints, Is.GreaterThan(typography.HeadingSmall.SizeInPoints));
-        });
+        }));
     }
 
     [Test]
