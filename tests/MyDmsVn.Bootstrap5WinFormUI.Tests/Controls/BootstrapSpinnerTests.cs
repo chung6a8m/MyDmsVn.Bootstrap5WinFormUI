@@ -16,7 +16,7 @@ public sealed class BootstrapSpinnerTests
     {
         using var spinner = new BootstrapSpinner();
 
-        Assert.Multiple((TestDelegate)(() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(spinner.Type, Is.EqualTo(BootstrapSpinnerType.Border));
             Assert.That(spinner.SpinnerSize, Is.EqualTo(BootstrapSpinnerSize.Default));
@@ -45,8 +45,8 @@ public sealed class BootstrapSpinnerTests
     {
         using var spinner = new BootstrapSpinner();
 
-        Assert.Throws<ArgumentOutOfRangeException>((TestDelegate)(() => spinner.AnimationDuration = TimeSpan.Zero));
-        Assert.Throws<ArgumentOutOfRangeException>((TestDelegate)(() => spinner.AnimationDuration = TimeSpan.FromMilliseconds(-1)));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => spinner.AnimationDuration = TimeSpan.Zero));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => spinner.AnimationDuration = TimeSpan.FromMilliseconds(-1)));
     }
 
     [Test]
@@ -54,7 +54,7 @@ public sealed class BootstrapSpinnerTests
     {
         var colors = BootstrapThemeColors.CreateDefault(BootstrapThemeMode.Light);
 
-        Assert.Multiple((TestDelegate)(() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(BootstrapSpinnerRenderLogic.ResolveColor(colors, BootstrapVariant.Primary, Color.Empty), Is.EqualTo(colors.Primary));
             Assert.That(BootstrapSpinnerRenderLogic.ResolveColor(colors, BootstrapVariant.Secondary, Color.Empty), Is.EqualTo(colors.Secondary));
@@ -83,7 +83,7 @@ public sealed class BootstrapSpinnerTests
     {
         var metrics = BootstrapThemeMetrics.Default;
 
-        Assert.Multiple((TestDelegate)(() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(BootstrapSpinnerRenderLogic.GetLogicalDiameter(metrics, BootstrapSpinnerSize.Small), Is.EqualTo(metrics.SpacingLG));
             Assert.That(BootstrapSpinnerRenderLogic.GetLogicalDiameter(metrics, BootstrapSpinnerSize.Default), Is.EqualTo(metrics.SpacingXL));
@@ -98,7 +98,7 @@ public sealed class BootstrapSpinnerTests
         var middle = BootstrapSpinnerRenderLogic.GetGrowScale(0.5);
         var end = BootstrapSpinnerRenderLogic.GetGrowScale(1.0);
 
-        Assert.Multiple((TestDelegate)(() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(zero, Is.GreaterThan(0.0));
             Assert.That(zero, Is.LessThan(1.0));
