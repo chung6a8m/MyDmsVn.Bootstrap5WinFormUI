@@ -50,6 +50,19 @@ public sealed class BootstrapProgressBarTests
     }
 
     [Test]
+    public void PercentageSupportsFullIntegerRangeWithoutOverflow()
+    {
+        using var progress = new BootstrapProgressBar
+        {
+            Minimum = int.MinValue,
+            Maximum = int.MaxValue,
+            Value = 0
+        };
+
+        Assert.That(progress.Percentage, Is.EqualTo(50));
+    }
+
+    [Test]
     public void DirectValueOutsideRangeIsRejected()
     {
         using var progress = new BootstrapProgressBar();
