@@ -17,6 +17,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 public class BootstrapTextBox : UserControl
 {
     private static readonly IIconRenderer DefaultIconRenderer = BootstrapIconRenderer.CreateDefault();
+    private static readonly IconDescriptor ClearIcon = IconDescriptor.Framework(FrameworkIconGlyph.Close);
 
     private readonly TextBox _editor = new TextBox();
     private readonly Label _placeholder = new Label();
@@ -27,6 +28,7 @@ public class BootstrapTextBox : UserControl
     private IconDescriptor? _trailingIcon;
     private IIconRenderer _iconRenderer = DefaultIconRenderer;
     private bool _showClearButton;
+    private bool _editorHasFocus;
     private int _borderRadius = -1;
     private bool _themeSubscribed;
     private bool _settingThemeFont;
@@ -56,8 +58,8 @@ public class BootstrapTextBox : UserControl
         _editor.TabStop = false;
         _editor.Margin = Padding.Empty;
         _editor.TextChanged += OnEditorTextChanged;
-        _editor.GotFocus += OnEditorFocusChanged;
-        _editor.LostFocus += OnEditorFocusChanged;
+        _editor.GotFocus += OnEditorGotFocus;
+        _editor.LostFocus += OnEditorLostFocus;
         _editor.KeyDown += OnEditorKeyDown;
         _editor.KeyPress += OnEditorKeyPress;
         _editor.KeyUp += OnEditorKeyUp;
@@ -77,10 +79,11 @@ public class BootstrapTextBox : UserControl
         _clearButton.FlatAppearance.MouseDownBackColor = Color.Transparent;
         _clearButton.FlatAppearance.MouseOverBackColor = Color.Transparent;
         _clearButton.UseVisualStyleBackColor = false;
-        _clearButton.Text = "×";
+        _clearButton.Text = string.Empty;
         _clearButton.Visible = false;
         _clearButton.AccessibleName = "Clear text";
         _clearButton.AccessibleDescription = "Clears the current text value.";
+        _clearButton.Paint += OnClearButtonPaint;
         _clearButton.Click += (_, _) =>
         {
             _editor.Clear();
@@ -215,6 +218,7 @@ public class BootstrapTextBox : UserControl
         set
         {
             _iconRenderer = value ?? throw new ArgumentNullException(nameof(value));
+            _clearButton.Invalidate();
             Invalidate();
         }
     }
@@ -443,8 +447,17 @@ public class BootstrapTextBox : UserControl
         OnTextChanged(e);
     }
 
-    private void OnEditorFocusChanged(object? sender, EventArgs e)
+    private void OnEditorGotFocus(object? sender, EventArgs e)
     {
+        _editorHasFocus = true;
+        UpdatePlaceholderVisibility();
+        Invalidate();
+    }
+
+    private void OnEditorLostFocus(object? sender, EventArgs e)
+    {
+        _editorHasFocus = false;
+        UpdatePlaceholderVisibility();
         Invalidate();
     }
 
@@ -466,6 +479,20 @@ public class BootstrapTextBox : UserControl
     private void OnEditorPreviewKeyDown(object? sender, PreviewKeyDownEventArgs e)
     {
         OnPreviewKeyDown(e);
+    }
+
+    private void OnClearButtonPaint(object? sender, PaintEventArgs e)
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var inset = Math.Max(2, DpiScaler.Scale(theme.Metrics.SpacingXS, dpi));
+        var bounds = Rectangle.Inflate(_clearButton.ClientRectangle, -inset, -inset);
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+
+        _iconRenderer.TryRender(e.Graphics, ClearIcon, bounds, _clearButton.ForeColor);
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
@@ -494,9 +521,10 @@ public class BootstrapTextBox : UserControl
         _editor.BackColor = surface;
         _editor.ForeColor = foreground;
         _placeholder.BackColor = surface;
-        _placeholder.ForeColor = colors.MutedText;
+        _placeholder.ForeColor = colors.Disabled;
         _clearButton.BackColor = surface;
         _clearButton.ForeColor = colors.MutedText;
+        _clearButton.Invalidate();
     }
 
     private void ApplyThemeFont()
@@ -544,7 +572,7 @@ public class BootstrapTextBox : UserControl
     private void UpdatePlaceholderVisibility()
     {
         _placeholder.Text = _placeholderText;
-        _placeholder.Visible = _editor.TextLength == 0 && _placeholderText.Length > 0;
+        _placeholder.Visible = !_editorHasFocus && _editor.TextLength == 0 && _placeholderText.Length > 0;
         if (_placeholder.Visible)
         {
             _placeholder.BringToFront();
