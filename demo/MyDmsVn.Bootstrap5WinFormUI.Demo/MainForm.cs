@@ -20,6 +20,7 @@ public sealed class MainForm : Form
     private readonly Button _collapseDemo = new Button();
     private readonly Button _accordionDemo = new Button();
     private readonly Button _progressDemo = new Button();
+    private readonly Button _sidebarDemo = new Button();
     private readonly FlowLayoutPanel _commandBar = new FlowLayoutPanel();
     private readonly TableLayoutPanel _palette = new TableLayoutPanel();
     private readonly Label _summary = new Label();
@@ -182,6 +183,16 @@ public sealed class MainForm : Form
             demo.Show(this);
         };
 
+        _sidebarDemo.AutoSize = true;
+        _sidebarDemo.Margin = new Padding(8, 1, 0, 0);
+        _sidebarDemo.Text = "Sidebar";
+        _sidebarDemo.UseVisualStyleBackColor = false;
+        _sidebarDemo.Click += (_, _) =>
+        {
+            var demo = new SidebarDemoForm();
+            demo.Show(this);
+        };
+
         _commandBar.Controls.Add(modeLabel);
         _commandBar.Controls.Add(_themeMode);
         _commandBar.Controls.Add(_reducedMotion);
@@ -195,6 +206,7 @@ public sealed class MainForm : Form
         _commandBar.Controls.Add(_collapseDemo);
         _commandBar.Controls.Add(_accordionDemo);
         _commandBar.Controls.Add(_progressDemo);
+        _commandBar.Controls.Add(_sidebarDemo);
     }
 
     private void ConfigurePalette()
@@ -281,6 +293,8 @@ public sealed class MainForm : Form
         _accordionDemo.ForeColor = theme.Colors.Text;
         _progressDemo.BackColor = theme.Colors.Surface;
         _progressDemo.ForeColor = theme.Colors.Text;
+        _sidebarDemo.BackColor = theme.Colors.Surface;
+        _sidebarDemo.ForeColor = theme.Colors.Text;
         _palette.BackColor = theme.Colors.Body;
         _summary.BackColor = theme.Colors.SurfaceSecondary;
         _summary.ForeColor = theme.Colors.Text;
