@@ -341,22 +341,32 @@ Rules:
 
 ## BootstrapDataGridView
 
-Responsibility: retain DataGridView capabilities while applying framework visual language.
+Responsibility: retain native WinForms `DataGridView` behavior while applying the framework visual language and lightweight presentation states.
 
-Expected capabilities:
+Phase 13 finalizes the public concepts as:
 
-- Header style
-- Body/alternate-row style
-- Selected row style
-- Theme-aware grid/borders
-- Empty state
-- Optional loading overlay
+```text
+BootstrapDataGridView : DataGridView
 
-Rules:
+BootstrapDataGridView.EmptyStateText
+BootstrapDataGridView.Loading
+BootstrapDataGridView.LoadingText
+```
 
-- Do not hide or replace standard data-binding APIs.
-- Avoid per-cell allocations in hot paint paths.
-- Loading overlay reuses Spinner.
+Behavior:
+
+- `BootstrapDataGridView` derives directly from `DataGridView`; binding, columns, sorting, editing, selection, virtual mode, and other native APIs remain caller-owned and are not wrapped or replaced.
+- `EmptyStateText` defaults to `"No data to display."`; `Loading` defaults to `false`; `LoadingText` defaults to `"Loading..."`. Text properties normalize `null` to an empty string.
+- Header, normal row, alternating row, selected row/cell, grid-line, foreground, and background styles are mapped from the current theme. `EnableHeadersVisualStyles` is disabled so native visual styles cannot override framework header colors.
+- Runtime Light/Dark changes update the existing grid presentation in place without rebinding data. The control owns theme-derived font instances until a caller explicitly assigns `Font`, after which caller font ownership is preserved.
+- When there are no real data rows, the control paints `EmptyStateText` once in the grid client area. The native new-row placeholder does not count as data.
+- Empty-state rendering is grid-level; the implementation does not install per-cell painting solely for framework decoration and avoids per-cell allocations in the hot path.
+- `Loading = true` shows a lightweight overlay containing the existing `BootstrapSpinner` plus `LoadingText`. It does not replace `DataSource`, change columns, or mutate the caller-owned `Enabled` value.
+- Loading animation, theme changes, reduced-motion behavior, and timer ownership stay with the composed Spinner; DataGridView does not create a second animation engine.
+- Empty-state insets and loading-overlay spacing scale through `DpiScaler`. Parent-DPI changes recompute presentation layout.
+- Theme subscriptions and theme-owned font resources are released during disposal; child controls dispose through normal WinForms ownership.
+
+Manual verification: launch the demo and choose **DataGrid**. Exercise the sample binding, empty state, `10,000`-row scenario, and loading overlay; scroll, sort, select, resize/reorder columns, switch Light/Dark while the window is open, and repeat across the supported Windows DPI matrix. Large-row smoothness remains a manual visual performance gate.
 
 ## Deferred components
 
