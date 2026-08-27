@@ -14,6 +14,8 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 [DefaultProperty(nameof(Body))]
 public class BootstrapCard : ContainerControl
 {
+    // A rectangular child whose corner starts this fraction of the radius inward is inside
+    // the rounded corner's 45-degree tangent point: 1 - (1 / sqrt(2)).
     private const float RoundedCornerSafeInsetFactor = 0.29289322f;
 
     private readonly Panel _header = new Panel();
@@ -97,14 +99,19 @@ public class BootstrapCard : ContainerControl
     {
         get
         {
+            var displayRectangle = base.DisplayRectangle;
             var decorationInsets = GetDecorationInsets();
-            var left = Math.Max(Padding.Left, decorationInsets.Left);
-            var top = Math.Max(Padding.Top, decorationInsets.Top);
-            var right = Math.Max(Padding.Right, decorationInsets.Right);
-            var bottom = Math.Max(Padding.Bottom, decorationInsets.Bottom);
-            var width = Math.Max(0, ClientSize.Width - left - right);
-            var height = Math.Max(0, ClientSize.Height - top - bottom);
-            return new Rectangle(left, top, width, height);
+            var leftExtra = Math.Max(0, decorationInsets.Left - Padding.Left);
+            var topExtra = Math.Max(0, decorationInsets.Top - Padding.Top);
+            var rightExtra = Math.Max(0, decorationInsets.Right - Padding.Right);
+            var bottomExtra = Math.Max(0, decorationInsets.Bottom - Padding.Bottom);
+            var width = Math.Max(0, displayRectangle.Width - leftExtra - rightExtra);
+            var height = Math.Max(0, displayRectangle.Height - topExtra - bottomExtra);
+            return new Rectangle(
+                displayRectangle.Left + leftExtra,
+                displayRectangle.Top + topExtra,
+                width,
+                height);
         }
     }
 
