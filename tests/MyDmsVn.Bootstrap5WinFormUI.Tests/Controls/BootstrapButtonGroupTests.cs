@@ -148,6 +148,28 @@ public sealed class BootstrapButtonGroupTests
     }
 
     [Test]
+    public void VerticalGroupAlwaysUsesTheWidestPreferredButtonWidth()
+    {
+        using var group = new BootstrapButtonGroup
+        {
+            Orientation = Orientation.Vertical,
+            EqualWidth = false
+        };
+        using var shortButton = new BootstrapButton { Text = "A" };
+        using var longButton = new BootstrapButton { Text = "A much longer action" };
+        group.Controls.Add(shortButton);
+        group.Controls.Add(longButton);
+
+        group.PerformLayout();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(shortButton.Width, Is.EqualTo(longButton.Width));
+            Assert.That(shortButton.Width, Is.EqualTo(longButton.GetPreferredSize(Size.Empty).Width));
+        }));
+    }
+
+    [Test]
     public void EqualWidthUsesTheWidestPreferredButton()
     {
         using var group = new BootstrapButtonGroup

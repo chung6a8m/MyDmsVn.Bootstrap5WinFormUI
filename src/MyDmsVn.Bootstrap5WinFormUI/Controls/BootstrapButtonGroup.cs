@@ -99,10 +99,11 @@ public class BootstrapButtonGroup : Panel
     }
 
     /// <summary>
-    /// Gets or sets whether every visible button uses the widest preferred button width.
+    /// Gets or sets whether every visible button in a horizontal group uses the widest preferred button width.
+    /// Vertical groups always use the widest preferred button width so both connected edges stay aligned.
     /// </summary>
     [Category("Layout")]
-    [Description("Makes every visible button use the widest preferred button width.")]
+    [Description("Makes horizontal buttons equal width. Vertical groups are always stretched to the widest preferred button width.")]
     [DefaultValue(false)]
     public bool EqualWidth
     {
@@ -198,7 +199,7 @@ public class BootstrapButtonGroup : Panel
         {
             for (var i = 0; i < sizes.Count; i++)
             {
-                width = Math.Max(width, _equalWidth ? widest : sizes[i].Width);
+                width = Math.Max(width, sizes[i].Width);
                 height += sizes[i].Height;
             }
 
@@ -331,8 +332,7 @@ public class BootstrapButtonGroup : Panel
             var y = contentTop;
             for (var i = 0; i < buttons.Count; i++)
             {
-                var width = _equalWidth ? widest : sizes[i].Width;
-                buttons[i].SetBounds(contentLeft, y, width, sizes[i].Height);
+                buttons[i].SetBounds(contentLeft, y, widest, sizes[i].Height);
                 y += sizes[i].Height - overlap;
             }
         }
