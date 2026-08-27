@@ -57,16 +57,17 @@ public sealed class DataGridDemoFormTests
     }
 
     [Test]
-    public void MainDemoExposesDataGridCommand()
+    public void MainDemoExposesDataGridNavigationPage()
     {
         using var form = new MainForm();
         form.CreateControl();
         form.PerformLayout();
 
+        var sidebar = FindControls<BootstrapSidebar>(form).Single();
         Assert.That(
-            FindControls<Button>(form).Any(button => button.Text == "DataGrid"),
+            sidebar.Items.Any(item => item.Text == "DataGrid"),
             Is.True,
-            "Phase 13 needs to be reachable from the main demo command bar.");
+            "Phase 13 needs to remain reachable from the integrated demo navigation.");
     }
 
     private static IEnumerable<T> FindControls<T>(Control root)

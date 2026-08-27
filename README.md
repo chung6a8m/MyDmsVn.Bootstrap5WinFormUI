@@ -15,7 +15,7 @@ The project translates the visual language and component ideas of Bootstrap 5 in
 
 ## Target frameworks
 
-The library is intended to multi-target:
+The library multi-targets:
 
 ```xml
 <TargetFrameworks>net48;net8.0-windows</TargetFrameworks>
@@ -32,7 +32,7 @@ All product code uses the root namespace:
 MyDmsVn.Bootstrap5WinFormUI
 ```
 
-Suggested child namespaces include:
+Primary child namespaces include:
 
 ```text
 MyDmsVn.Bootstrap5WinFormUI.Theme
@@ -43,13 +43,14 @@ MyDmsVn.Bootstrap5WinFormUI.Controls
 MyDmsVn.Bootstrap5WinFormUI.Compatibility
 ```
 
-## Planned core components
+## Implemented foundation components
 
 - Theme system and Bootstrap-inspired palette
-- Shared animation primitives
-- Icon abstraction with SVG, Segoe MDL2 Assets, and optional FontAwesome.Sharp integration
-- `BootstrapButton`
+- Shared rendering and DPI helpers
+- Shared finite/loop animation primitives
+- Source-neutral icon abstraction
 - `BootstrapSpinner`
+- `BootstrapButton`
 - `BootstrapButtonGroup`
 - `BootstrapButtonToolbar`
 - `BootstrapTextBox`
@@ -60,6 +61,14 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapProgressBar`
 - `BootstrapSidebar`
 - `BootstrapDataGridView`
+
+## Integrated demo
+
+The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Cards, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, and DataGrid. Light/Dark switching and Reduced motion remain available while navigating.
+
+Earlier Rendering / DPI, Icons, and Animation diagnostics remain available below the Theme navigation item.
+
+See [Phase 14 — Integrated Demo Application](docs/PHASE14_INTEGRATED_DEMO.md) for the navigation contract and manual verification matrix.
 
 ## Documentation
 
@@ -79,7 +88,9 @@ The primary sources of truth are:
 
 ## Status
 
-The repository is currently in the architecture and foundation stage. The files under `idea-drafs/` are historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
+Phases 0–14 of the foundation development plan are implemented through the integrated demo application. Phase 15 is the next planned gate and focuses on hardening and public API review before release preparation.
+
+The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 
 ## Guiding principle
 
