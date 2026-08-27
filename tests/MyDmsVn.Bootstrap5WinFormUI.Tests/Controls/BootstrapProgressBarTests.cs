@@ -87,8 +87,8 @@ public sealed class BootstrapProgressBarTests
         using var progress = new BootstrapProgressBar();
 
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() => progress.BorderRadius = -2));
-        Assert.DoesNotThrow((TestDelegate)(() => progress.BorderRadius = -1));
-        Assert.DoesNotThrow((TestDelegate)(() => progress.BorderRadius = 0));
+        Assert.DoesNotThrow((Action)(() => progress.BorderRadius = -1));
+        Assert.DoesNotThrow((Action)(() => progress.BorderRadius = 0));
     }
 
     [Test]
