@@ -10,6 +10,7 @@ public sealed class MainForm : Form
 {
     private readonly ComboBox _themeMode = new ComboBox();
     private readonly CheckBox _reducedMotion = new CheckBox();
+    private readonly Button _renderingDemo = new Button();
     private readonly FlowLayoutPanel _commandBar = new FlowLayoutPanel();
     private readonly TableLayoutPanel _palette = new TableLayoutPanel();
     private readonly Label _summary = new Label();
@@ -17,7 +18,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "MyDmsVn.Bootstrap5WinFormUI — Theme Demo";
+        Text = "MyDmsVn.Bootstrap5WinFormUI — Foundation Demo";
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(960, 680);
         MinimumSize = new Size(720, 520);
@@ -72,9 +73,20 @@ public sealed class MainForm : Form
         _reducedMotion.Text = "Reduced motion";
         _reducedMotion.CheckedChanged += (_, _) => PublishSelectedTheme();
 
+        _renderingDemo.AutoSize = true;
+        _renderingDemo.Margin = new Padding(18, 1, 0, 0);
+        _renderingDemo.Text = "Rendering / DPI";
+        _renderingDemo.UseVisualStyleBackColor = false;
+        _renderingDemo.Click += (_, _) =>
+        {
+            using var demo = new RenderingDemoForm();
+            demo.ShowDialog(this);
+        };
+
         _commandBar.Controls.Add(modeLabel);
         _commandBar.Controls.Add(_themeMode);
         _commandBar.Controls.Add(_reducedMotion);
+        _commandBar.Controls.Add(_renderingDemo);
     }
 
     private void ConfigurePalette()
@@ -141,6 +153,8 @@ public sealed class MainForm : Form
         _themeMode.ForeColor = theme.Colors.Text;
         _reducedMotion.BackColor = theme.Colors.SurfaceSecondary;
         _reducedMotion.ForeColor = theme.Colors.Text;
+        _renderingDemo.BackColor = theme.Colors.Surface;
+        _renderingDemo.ForeColor = theme.Colors.Text;
         _palette.BackColor = theme.Colors.Body;
         _summary.BackColor = theme.Colors.SurfaceSecondary;
         _summary.ForeColor = theme.Colors.Text;
