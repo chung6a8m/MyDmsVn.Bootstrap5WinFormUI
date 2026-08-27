@@ -58,6 +58,10 @@ public class BootstrapTextBox : UserControl
         _editor.TextChanged += OnEditorTextChanged;
         _editor.GotFocus += OnEditorFocusChanged;
         _editor.LostFocus += OnEditorFocusChanged;
+        _editor.KeyDown += OnEditorKeyDown;
+        _editor.KeyPress += OnEditorKeyPress;
+        _editor.KeyUp += OnEditorKeyUp;
+        _editor.PreviewKeyDown += OnEditorPreviewKeyDown;
 
         _placeholder.AutoSize = false;
         _placeholder.TabStop = false;
@@ -442,6 +446,26 @@ public class BootstrapTextBox : UserControl
     private void OnEditorFocusChanged(object? sender, EventArgs e)
     {
         Invalidate();
+    }
+
+    private void OnEditorKeyDown(object? sender, KeyEventArgs e)
+    {
+        OnKeyDown(e);
+    }
+
+    private void OnEditorKeyPress(object? sender, KeyPressEventArgs e)
+    {
+        OnKeyPress(e);
+    }
+
+    private void OnEditorKeyUp(object? sender, KeyEventArgs e)
+    {
+        OnKeyUp(e);
+    }
+
+    private void OnEditorPreviewKeyDown(object? sender, PreviewKeyDownEventArgs e)
+    {
+        OnPreviewKeyDown(e);
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
