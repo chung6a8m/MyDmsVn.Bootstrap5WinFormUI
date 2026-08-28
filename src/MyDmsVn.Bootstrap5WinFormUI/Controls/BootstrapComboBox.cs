@@ -17,6 +17,8 @@ public class BootstrapComboBox : ComboBox
 {
     private const int WmPaint = 0x000F;
     private const int WmNcPaint = 0x0085;
+    private const int WmPrint = 0x0317;
+    private const int WmPrintClient = 0x0318;
     private static readonly IIconRenderer DefaultIconRenderer = BootstrapIconRenderer.CreateDefault();
 
     private BootstrapValidationState _validationState = BootstrapValidationState.None;
@@ -173,9 +175,22 @@ public class BootstrapComboBox : ComboBox
     {
         base.WndProc(ref m);
 
-        if ((m.Msg == WmPaint || m.Msg == WmNcPaint) && IsHandleCreated && !IsDisposed)
+        if (!IsHandleCreated || IsDisposed)
         {
-            DrawShellBorder();
+            return;
+        }
+
+        if (m.Msg == WmPaint || m.Msg == WmNcPaint)
+        {
+            using var graphics = Graphics.FromHwnd(Handle);
+            DrawShellBorder(graphics);
+            return;
+        }
+
+        if ((m.Msg == WmPrint || m.Msg == WmPrintClient) && m.WParam != IntPtr.Zero)
+        {
+            using var graphics = Graphics.FromHdc(m.WParam);
+            DrawShellBorder(graphics);
         }
     }
 
@@ -272,7 +287,7 @@ public class BootstrapComboBox : ComboBox
         return Text ?? string.Empty;
     }
 
-    private void DrawShellBorder()
+    private void DrawShellBorder(Graphics graphics)
     {
         var bounds = ClientRectangle;
         if (bounds.Width <= 0 || bounds.Height <= 0)
@@ -305,7 +320,6 @@ public class BootstrapComboBox : ComboBox
             return;
         }
 
-        using var graphics = Graphics.FromHwnd(Handle);
         var oldSmoothingMode = graphics.SmoothingMode;
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         try
@@ -411,12 +425,7 @@ public class BootstrapComboBox : ComboBox
         var nextHeight = Math.Max(1, metrics.ItemHeight);
         if (ItemHeight != nextHeight)
         {
-            var previousHeight = Height;
             ItemHeight = nextHeight;
-            if (Height != previousHeight)
-            {
-                Parent?.PerformLayout(this, nameof(Height));
-            }
         }
     }
 
