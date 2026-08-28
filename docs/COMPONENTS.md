@@ -368,8 +368,47 @@ Behavior:
 
 Manual verification: launch the demo and choose **DataGrid**. Exercise the sample binding, empty state, `10,000`-row scenario, and loading overlay; scroll, sort, select, resize/reorder columns, switch Light/Dark while the window is open, and repeat across the supported Windows DPI matrix. Large-row smoothness remains a manual visual performance gate.
 
+## BootstrapPagination
+
+Responsibility: provide Bootstrap-inspired page navigation while leaving data retrieval, slicing, binding, and virtualization entirely application-owned.
+
+The finalized public concepts are:
+
+```text
+BootstrapPagination : Panel
+
+BootstrapPagination.TotalItems
+BootstrapPagination.PageSize
+BootstrapPagination.CurrentPage
+BootstrapPagination.TotalPages
+BootstrapPagination.MaxVisiblePages
+BootstrapPagination.ShowFirstLast
+BootstrapPagination.ShowPreviousNext
+BootstrapPagination.ButtonSize
+BootstrapPagination.Variant
+BootstrapPagination.BorderRadius
+BootstrapPagination.PageChanged
+```
+
+Behavior:
+
+- The control owns exactly one horizontal `BootstrapButtonGroup` with `SelectionMode = None` and dynamically composes existing `BootstrapButton` children. It does not duplicate Button or ButtonGroup painting.
+- `TotalItems` defaults to `0`, `PageSize` to `20`, `CurrentPage` to `1`, and `TotalPages` is always at least `1`. The page count uses overflow-safe ceiling division.
+- `TotalItems` rejects negative values; `PageSize` rejects values below `1`; `MaxVisiblePages` defaults to `5` and rejects values below `5`; direct `CurrentPage` assignments outside `1..TotalPages` throw.
+- When reducing `TotalItems` or changing `PageSize` makes the current page invalid, `CurrentPage` clamps to the new last page and `PageChanged` is raised exactly once. Range changes that keep the current page valid do not raise `PageChanged`.
+- Numeric-page layout is computed by an internal pure helper. Large ranges always include page `1`, the current page, and the last page, with disabled/non-focusable ellipses inserted only where pages are omitted.
+- With `MaxVisiblePages = 5`, representative windows are `1 2 3 4 5`, `1 2 3 4 … 20`, `1 … 9 10 11 … 20`, and `1 … 17 18 19 20` for the documented boundary/middle scenarios.
+- First/Previous and Next/Last are disabled at their respective boundaries. The active numeric page remains enabled, focusable, and uses `Selected = true`; activating the already-current page is a no-op.
+- `ButtonSize` and `Variant` update existing child buttons in place. `BorderRadius = -1` preserves theme/button radii through the owned group; non-negative values are forwarded to `BootstrapButtonGroup.BorderRadius`.
+- `ShowFirstLast` and `ShowPreviousNext` independently control the directional navigation sets. Paging-structure changes rebuild the button collection; removed dynamic controls are deterministically disposed.
+- The Pagination container is non-focusable and exposes `AccessibleRole.Grouping` with default description `"Pagination navigation."`. Child buttons use semantic accessible names such as `First page`, `Previous page`, `Page N`, `Current page N`, `Next page`, and `Last page`.
+- The control owns no timer, animation engine, theme subscription, data-source API, or DataGridView-specific coupling. Runtime theme/DPI behavior flows through the existing ButtonGroup/Button controls.
+- Designer construction is parameterless and requires no application bootstrap. `TotalPages` is read-only and not designer-serialized.
+
+Manual verification: launch the integrated demo and choose **Pagination**. Compare no-ellipsis, middle-window, boundary, zero-item, Small/Default/Large, and navigation-visibility scenarios. Exercise every navigation button with mouse and keyboard, switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% Windows scaling. In the DataGrid scenario, verify the application reacts to `PageChanged` and slices/binds ten rows per page while Pagination itself never owns the table or grid data source.
+
 ## Deferred components
 
-Alert, Badge, Toast, Tooltip, Dialog/Modal, Dropdown, Tabs, Pagination, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
+Alert, Badge, Toast, Tooltip, Dialog/Modal, Dropdown, Tabs, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
 
 Before adding one, document which existing foundation pieces it reuses.

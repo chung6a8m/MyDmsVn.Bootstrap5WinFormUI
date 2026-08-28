@@ -61,14 +61,17 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapProgressBar`
 - `BootstrapSidebar`
 - `BootstrapDataGridView`
+- `BootstrapPagination`
 
 ## Integrated demo
 
-The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Cards, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, and DataGrid. Light/Dark switching and Reduced motion remain available while navigating.
+The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Cards, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, and Pagination. Light/Dark switching and Reduced motion remain available while navigating.
+
+The Pagination page demonstrates bounded numeric windows, ellipses, navigation visibility, size variants, boundary/zero-item states, and application-owned DataGrid paging. `BootstrapPagination` itself does not own or slice a data source.
 
 Earlier Rendering / DPI, Icons, and Animation diagnostics remain available below the Theme navigation item.
 
-See [Phase 14 — Integrated Demo Application](docs/PHASE14_INTEGRATED_DEMO.md) for the navigation contract and manual verification matrix.
+See [Phase 14 — Integrated Demo Application](docs/PHASE14_INTEGRATED_DEMO.md) for the original navigation contract and manual verification matrix, and [Component contracts](docs/COMPONENTS.md) for the Pagination behavior.
 
 ## Release candidate
 
@@ -87,6 +90,8 @@ See [Release process](docs/RELEASING.md), [v1 public API baseline](docs/PUBLIC_A
 ## Hardening status
 
 Phase 15 adds foundation-wide hardening gates for the 100–200% logical DPI matrix, runtime theme-switch stress, rapid state reversal, static-event lifetime cleanup, optional icon dependency boundaries, prototype API aliases, and XML documentation completeness. The core library treats compiler warnings as errors on both target frameworks.
+
+Pagination extends that hardened surface without adding a new timer, theme subscription, rendering stack, data-source abstraction, or package dependency. It composes the existing `BootstrapButtonGroup` and `BootstrapButton` controls.
 
 See [Phase 15 — Hardening and API review](docs/PHASE15_HARDENING_AND_API_REVIEW.md) for the audit findings and the real-Windows/manual checks carried into release validation.
 
@@ -110,7 +115,7 @@ The primary sources of truth are:
 
 ## Status
 
-Phases 0–16 of the foundation development plan are implemented through release preparation. The current package line is `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
+Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination` is now implemented as the first documented compatible control addition on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
 
 The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 

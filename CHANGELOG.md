@@ -2,6 +2,18 @@
 
 All notable release-facing changes to this project are documented here.
 
+## [Unreleased]
+
+### Added
+
+- `BootstrapPagination`, a data-source-agnostic composite page-navigation control built from the existing `BootstrapButtonGroup` and `BootstrapButton` controls.
+- Bounded numeric page windows with ellipses, First/Previous/Next/Last navigation, Small/Default/Large button sizing, semantic variants, and connected outer-radius forwarding.
+- Integrated Pagination demo including caller-owned `BootstrapDataGridView` page slicing through `PageChanged`.
+
+### Changed
+
+- Reviewed and intentionally updated the proposed v1 public API fingerprint to include only the new exported `BootstrapPagination` surface; Pagination layout helper types remain internal and `AssemblyVersion` remains `1.0.0.0`.
+
 ## [1.0.0-rc.1] - 2026-08-28
 
 ### Added
