@@ -177,6 +177,30 @@ public sealed class BootstrapTabControlTests
     }
 
     [Test]
+    public void HotTrackControlsWhetherInactiveHeadersUseCustomHoverPalette()
+    {
+        using var tabs = new BootstrapTabControl { TabStyle = BootstrapTabStyle.Pills };
+        tabs.TabPages.Add(new TabPage("Selected"));
+        tabs.TabPages.Add(new TabPage(string.Empty));
+        tabs.SelectedIndex = 0;
+
+        SetPrivateField(tabs, "_hoveredIndex", 1);
+        var colors = BootstrapThemeManager.CurrentTheme.Colors;
+
+        tabs.HotTrack = false;
+        var withoutHotTrack = DrawInactiveHeaderCenterPixel(tabs, 1);
+
+        tabs.HotTrack = true;
+        var withHotTrack = DrawInactiveHeaderCenterPixel(tabs, 1);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(withoutHotTrack, Is.EqualTo(colors.Surface));
+            Assert.That(withHotTrack, Is.EqualTo(colors.Hover));
+        }));
+    }
+
+    [Test]
     public void FillUsesOneUniformFixedHeaderWidthAndRetainsNativePageOrder()
     {
         using var tabs = new BootstrapTabControl
@@ -210,6 +234,46 @@ public sealed class BootstrapTabControlTests
         page.Text = "A much longer native tab title used to verify deterministic fixed sizing";
 
         Assert.That(tabs.ItemSize.Width, Is.GreaterThan(initialWidth));
+    }
+
+    [Test]
+    public void NonFillWidthRefreshesWhenNativeImageStateChangesAfterPagesAreAdded()
+    {
+        using var host = new Form { ClientSize = new Size(640, 240) };
+        using var images = new ImageList { ImageSize = new Size(32, 16) };
+        using var image = new Bitmap(32, 16);
+        images.Images.Add("wide", image);
+
+        using var tabs = new BootstrapTabControl { Bounds = new Rectangle(10, 10, 560, 180) };
+        var page = new TabPage("Icon") { ImageKey = "wide" };
+        tabs.TabPages.Add(page);
+        tabs.TabPages.Add(new TabPage("Peer"));
+        host.Controls.Add(tabs);
+        host.CreateControl();
+        tabs.CreateControl();
+        _ = tabs.Handle;
+
+        var withoutImages = tabs.ItemSize.Width;
+
+        tabs.ImageList = images;
+        DrawControl(tabs);
+        var byKey = tabs.ItemSize.Width;
+
+        page.ImageKey = string.Empty;
+        page.ImageIndex = -1;
+        DrawControl(tabs);
+        var withoutPageImage = tabs.ItemSize.Width;
+
+        page.ImageIndex = 0;
+        DrawControl(tabs);
+        var byIndex = tabs.ItemSize.Width;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(byKey, Is.GreaterThan(withoutImages));
+            Assert.That(withoutPageImage, Is.EqualTo(withoutImages));
+            Assert.That(byIndex, Is.EqualTo(byKey));
+        }));
     }
 
     [Test]
@@ -363,5 +427,30 @@ public sealed class BootstrapTabControlTests
         Assert.That(eventField, Is.Not.Null);
         var handler = eventField!.GetValue(null) as Delegate;
         return handler?.GetInvocationList().Length ?? 0;
+    }
+
+    private static void SetPrivateField(BootstrapTabControl tabs, string name, object value)
+    {
+        var field = typeof(BootstrapTabControl).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null);
+        field!.SetValue(tabs, value);
+    }
+
+    private static Color DrawInactiveHeaderCenterPixel(BootstrapTabControl tabs, int index)
+    {
+        var method = typeof(BootstrapTabControl).GetMethod("OnDrawTabItem", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null);
+
+        using var bitmap = new Bitmap(120, 32);
+        using var graphics = Graphics.FromImage(bitmap);
+        var args = new DrawItemEventArgs(graphics, tabs.Font, new Rectangle(0, 0, 120, 32), index, DrawItemState.None);
+        method!.Invoke(tabs, new object?[] { tabs, args });
+        return bitmap.GetPixel(60, 16);
+    }
+
+    private static void DrawControl(Control control)
+    {
+        using var bitmap = new Bitmap(control.Width, control.Height);
+        control.DrawToBitmap(bitmap, control.ClientRectangle);
     }
 }
