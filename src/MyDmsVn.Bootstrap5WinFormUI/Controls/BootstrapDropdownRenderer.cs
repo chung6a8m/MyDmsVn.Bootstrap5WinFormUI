@@ -208,8 +208,10 @@ internal sealed class BootstrapDropdownRenderer : ToolStripRenderer
         e.Graphics.DrawLine(pen, metrics.SeparatorInset, y, right, y);
     }
 
-    private static int GetDpi(ToolStrip toolStrip)
+    private static int GetDpi(ToolStrip? toolStrip)
     {
-        return toolStrip.DeviceDpi > 0 ? toolStrip.DeviceDpi : DpiScaler.DefaultDpi;
+        return toolStrip is not null && toolStrip.DeviceDpi > 0
+            ? toolStrip.DeviceDpi
+            : DpiScaler.DefaultDpi;
     }
 }
