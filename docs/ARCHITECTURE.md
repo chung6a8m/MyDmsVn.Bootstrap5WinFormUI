@@ -74,6 +74,7 @@ Control-specific child namespaces may be introduced if the namespace remains dis
 
  TextBox -----+
  NumericBox --+---- native NumericUpDown + Theme / Rendering
+ ComboBox ----+---- native ComboBox + Theme / Rendering / Icons
  Card --------+---- shared Theme / Rendering / Icons
  Progress ----+---- Animation / LoopAnimation
  Sidebar -----+---- Button / Collapse / Icons
@@ -84,6 +85,8 @@ Control-specific child namespaces may be introduced if the namespace remains dis
 The diagram shows conceptual dependencies, not necessarily direct assembly references for every line.
 
 `BootstrapNumericBox` deliberately depends only on the native WinForms `NumericUpDown` plus the existing Theme/Rendering foundation. It has no dependency on Tabs, ComboBox, Dropdown, custom popup infrastructure, or a framework-owned numeric parser. Later advanced-input controls may share the integrated demo page but not hidden implementation dependencies.
+
+`BootstrapComboBox` is likewise shallow: it derives directly from native WinForms `ComboBox` and depends only on the existing Theme, Rendering, DPI, and source-neutral Icons infrastructure. It does **not** depend on `BootstrapNumericBox`, `BootstrapDropdown`, a custom popup host, or a framework item/binding model. Stage 7 `BootstrapDropdown` is a separate component and is not an implementation dependency of ComboBox.
 
 ## 5. Foundation responsibilities
 
@@ -173,13 +176,17 @@ Phase 4 finalizes this foundation as follows:
 
 ### 6.1 Primitive controls
 
-Primitive controls own one interaction/rendering concept, for example Button, Spinner, TextBox, NumericBox, Card, Collapse, or ProgressBar.
+Primitive controls own one interaction/rendering concept, for example Button, Spinner, TextBox, NumericBox, ComboBox, Card, Collapse, or ProgressBar.
 
 They may use shared foundation layers but must not duplicate them.
 
 `BootstrapNumericBox` is a composition primitive: the wrapper owns exactly one borderless native `NumericUpDown`, while the native editor remains the source of truth for numeric value, range normalization/rejection, increment, decimal places, thousands formatting, typed editing, spin buttons, Up/Down keys, and wheel behavior. The wrapper owns only the Bootstrap shell, validation/focus priority, DPI-scaled layout, one public tab stop, theme-aware font/color lifecycle, and forwarding of the native `ValueChanged` event.
 
 This architecture intentionally avoids custom numeric parsing, a second value/range state model, a second spin implementation, custom popup/editor infrastructure, or a separate input-event pipeline.
+
+`BootstrapComboBox` uses inheritance rather than composition because the native `ComboBox` already owns the complete public data/selection/edit/drop-down contract. Native `Items`, `DataSource`, `DisplayMember`, `ValueMember`, `SelectedIndex`, `SelectedItem`, `SelectedValue`, text editing, autocomplete, focus/keyboard behavior, `DropDown` / `DropDownClosed`, and selection events remain authoritative inherited behavior. The framework owns `OwnerDrawFixed` item/closed-selection presentation, validation/focus shell border, theme/DPI metrics, theme-owned font lifecycle, and optional `LeadingIcon` rendering through the existing `IIconRenderer`.
+
+The ComboBox editable native child, arrow button, hit-testing, and popup chrome remain WinForms/OS-owned. The shell is a conservative post-native-paint border overlay; no child-window replacement, private-field reflection, global hook, window region, custom `Form`, `ToolStripDropDown`, or `ListBox` host is introduced. `BorderRadius` therefore describes best-effort framework-controlled shell geometry only and does not promise rounded native popup chrome.
 
 ### 6.2 Composite controls
 
@@ -221,6 +228,8 @@ Pagination is an example of composition avoiding redundant theme ownership: the 
 
 NumericBox subscribes once to `BootstrapThemeManager.ThemeChanged` because the wrapper paints its own shell and owns a theme-created font. Runtime changes recompute the shell/native-editor palette and replace only the framework-owned font. Disposal removes that static subscription; once a caller assigns `Font`, caller font ownership is preserved.
 
+ComboBox follows the same deterministic ownership rule: it subscribes once for shell/item palette and theme-created font updates, reapplies owner-draw metrics after DPI/font/handle changes, and never recreates or rebinds native item/selection state merely because the theme changed. Disposal removes the static subscription; caller-assigned fonts remain caller-owned.
+
 ## 8. Animation lifecycle
 
 A consumer starts animation only when it can render useful frames. On hide/dispose, it pauses/stops or releases the animation according to component semantics.
@@ -233,7 +242,7 @@ Finite `Stop()` freezes current progress and `Start()` resumes it; `Restart()` a
 
 Loop `Stop()` and `Start()` freeze/resume the current cycle position; `Restart()` returns to zero. Loop animation does not expose a finite completion event.
 
-Pagination and NumericBox are non-animated and must not introduce scheduling solely for state or focus changes.
+Pagination, NumericBox, and ComboBox are non-animated and must not introduce scheduling solely for state, validation, focus, or drop-down changes.
 
 ## 9. Resource ownership
 
@@ -249,6 +258,8 @@ Pagination owns its internal ButtonGroup and dynamically-created Button children
 
 NumericBox owns its native `NumericUpDown` through normal WinForms containment and owns only framework-created theme fonts. It detaches editor/theme event handlers on disposal and never disposes a caller-assigned font.
 
+ComboBox owns no application items, `DataSource`, binding manager, popup window, native child window, or caller font. Paint-time `Brush`, `Pen`, `GraphicsPath`, and `Graphics` instances are scoped and disposed immediately; the only cross-lifetime resource is its framework-created theme font plus the deterministic theme subscription.
+
 ## 10. Designer architecture
 
 The framework must not require a service locator, DI container, or application bootstrap merely to instantiate a control in the Designer.
@@ -260,6 +271,8 @@ Designer-specific code should be isolated and must not leak into runtime renderi
 Pagination follows the same rule: its parameterless constructor creates a valid page-one state and internal ButtonGroup without requiring theme or application initialization.
 
 NumericBox follows the same rule: its parameterless constructor creates the one native editor with native default range/value/increment settings. Only the wrapper's documented properties are designer-facing; the private native child is an implementation detail and must not appear in generated Designer code.
+
+ComboBox also has a safe parameterless constructor. The inherited native collection/binding/selection properties remain designer/runtime APIs; framework-specific designer-facing state is limited to validation, radius, and optional leading icon. `IconRenderer` is intentionally hidden from Designer serialization and defaults to the existing source-neutral renderer.
 
 ## 11. Error handling philosophy
 
@@ -273,10 +286,12 @@ Pagination rejects negative `TotalItems`, non-positive `PageSize`, `MaxVisiblePa
 
 NumericBox deliberately preserves native `NumericUpDown` range/error behavior: direct `Value` assignments outside the current native range throw the native `ArgumentOutOfRangeException`, and range-property mutations use native normalization semantics. Framework-only `ValidationState` rejects undefined enum values and `BorderRadius` rejects values below the `-1` theme sentinel before state mutation.
 
+ComboBox deliberately preserves native `ComboBox` exceptions/restrictions for item, binding, style, and autocomplete APIs rather than translating them. Framework-only `ValidationState` rejects undefined enum values, `BorderRadius` rejects values below the `-1` theme sentinel, and `IconRenderer` rejects `null` before state mutation.
+
 ## 12. Evolution rules
 
 Before the first stable release, public APIs may change deliberately to improve consistency. Every such change must update `docs/COMPONENTS.md`, relevant examples, and `docs/DECISIONS.md` when architectural.
 
 After a stable compatibility baseline is declared, breaking public changes require an explicit compatibility policy.
 
-The Pagination and NumericBox API additions change the proposed v1 release-candidate fingerprint intentionally. Their exported surfaces are reviewed before updating the approved fingerprint, while helper/layout types remain internal and `AssemblyVersion` stays `1.0.0.0`.
+The Pagination, NumericBox, and ComboBox API additions change the proposed v1 release-candidate fingerprint intentionally. Their exported surfaces are reviewed before updating the approved fingerprint, while helper/layout types remain internal and `AssemblyVersion` stays `1.0.0.0`.
