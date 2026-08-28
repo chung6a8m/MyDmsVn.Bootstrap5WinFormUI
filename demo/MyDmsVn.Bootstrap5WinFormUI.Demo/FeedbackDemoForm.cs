@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -26,9 +27,24 @@ public sealed class FeedbackDemoForm : Form
     private readonly List<BootstrapAlert> _dismissibleAlerts = new List<BootstrapAlert>();
     private readonly Label _dismissStatus = new Label();
     private readonly Button _restoreAlertsButton = new Button();
+    private readonly IContainer _components;
+    private readonly BootstrapTooltip _defaultTooltip;
+    private readonly BootstrapTooltip _semanticTooltip;
+    private readonly BootstrapTooltip _customTooltip;
 
     public FeedbackDemoForm()
     {
+        _components = new Container();
+        _defaultTooltip = new BootstrapTooltip(_components);
+        _semanticTooltip = new BootstrapTooltip(_components)
+        {
+            Variant = BootstrapVariant.Info
+        };
+        _customTooltip = new BootstrapTooltip(_components)
+        {
+            CustomColor = Color.FromArgb(111, 66, 193)
+        };
+
         Text = "Feedback Components Demo";
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(900, 720);
@@ -41,6 +57,7 @@ public sealed class FeedbackDemoForm : Form
         AddSemanticVariantsSection();
         AddShapeAndStateSection();
         AddAlertsSection();
+        AddTooltipsSection();
         AddDpiGuidanceSection();
 
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
@@ -52,6 +69,7 @@ public sealed class FeedbackDemoForm : Form
         if (disposing)
         {
             BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+            _components.Dispose();
         }
 
         base.Dispose(disposing);
@@ -214,6 +232,89 @@ public sealed class FeedbackDemoForm : Form
         _content.Controls.Add(group);
     }
 
+    private void AddTooltipsSection()
+    {
+        var group = CreateGroup("Tooltips — native association, themes, multiple targets, and timing");
+        var stack = CreateVerticalStack();
+        var targets = CreateBadgeRow();
+
+        var defaultTarget = CreateTooltipTarget("Default dark", "Default tooltip target");
+        var secondDefaultTarget = CreateTooltipTarget("Same instance", "Second default tooltip target");
+        var semanticTarget = CreateTooltipTarget("Info variant", "Semantic tooltip target");
+        var customTarget = CreateTooltipTarget("Custom color", "Custom tooltip target");
+        var multilineTarget = CreateTooltipTarget("Multiline", "Multiline tooltip target");
+        var longTarget = CreateTooltipTarget("Long text", "Long tooltip target");
+
+        _defaultTooltip.SetToolTip(defaultTarget, "Default BootstrapTooltip using the Dark semantic variant.");
+        _defaultTooltip.SetToolTip(secondDefaultTarget, "The same BootstrapTooltip instance serves this second control.");
+        _semanticTooltip.SetToolTip(semanticTarget, "Semantic Info tooltip resolved from the current theme.");
+        _customTooltip.SetToolTip(customTarget, "Custom purple background with contrast-selected foreground text.");
+        _defaultTooltip.SetToolTip(multilineTarget, "First explicit line.\r\nSecond explicit line; BootstrapTooltip does not auto-wrap.");
+        _defaultTooltip.SetToolTip(
+            longTarget,
+            "This deliberately long tooltip caption demonstrates native positioning with owner-drawn presentation while preserving the complete single-line caption without framework auto-wrap policy.");
+
+        targets.Controls.Add(defaultTarget);
+        targets.Controls.Add(secondDefaultTarget);
+        targets.Controls.Add(semanticTarget);
+        targets.Controls.Add(customTarget);
+        targets.Controls.Add(multilineTarget);
+        targets.Controls.Add(longTarget);
+        stack.Controls.Add(targets);
+
+        var timingLabel = new Label
+        {
+            AutoSize = true,
+            Text = "Live native timing/state forwarding for the default tooltip:",
+            Margin = new Padding(3, 6, 3, 3)
+        };
+        stack.Controls.Add(timingLabel);
+        stack.Controls.Add(CreateTooltipTimingRow());
+
+        group.Controls.Add(stack);
+        _content.Controls.Add(group);
+    }
+
+    private FlowLayoutPanel CreateTooltipTimingRow()
+    {
+        var row = CreateBadgeRow();
+        var initialDelay = CreateTimingEditor("Initial", "Tooltip InitialDelay", _defaultTooltip.InitialDelay, 0, 60000);
+        var reshowDelay = CreateTimingEditor("Reshow", "Tooltip ReshowDelay", _defaultTooltip.ReshowDelay, 0, 60000);
+        var autoPopDelay = CreateTimingEditor("Auto-pop", "Tooltip AutoPopDelay", _defaultTooltip.AutoPopDelay, 1, 60000);
+        var active = new CheckBox
+        {
+            AutoSize = true,
+            Text = "Active",
+            Checked = _defaultTooltip.Active,
+            AccessibleName = "Tooltip Active",
+            Margin = new Padding(12, 7, 3, 3)
+        };
+        var showAlways = new CheckBox
+        {
+            AutoSize = true,
+            Text = "Show always",
+            Checked = _defaultTooltip.ShowAlways,
+            AccessibleName = "Tooltip ShowAlways",
+            Margin = new Padding(8, 7, 3, 3)
+        };
+
+        initialDelay.ValueChanged += (_, _) => _defaultTooltip.InitialDelay = (int)initialDelay.Value;
+        reshowDelay.ValueChanged += (_, _) => _defaultTooltip.ReshowDelay = (int)reshowDelay.Value;
+        autoPopDelay.ValueChanged += (_, _) => _defaultTooltip.AutoPopDelay = (int)autoPopDelay.Value;
+        active.CheckedChanged += (_, _) => _defaultTooltip.Active = active.Checked;
+        showAlways.CheckedChanged += (_, _) => _defaultTooltip.ShowAlways = showAlways.Checked;
+
+        row.Controls.Add(CreateTimingLabel("Initial (ms)"));
+        row.Controls.Add(initialDelay);
+        row.Controls.Add(CreateTimingLabel("Reshow (ms)"));
+        row.Controls.Add(reshowDelay);
+        row.Controls.Add(CreateTimingLabel("Auto-pop (ms)"));
+        row.Controls.Add(autoPopDelay);
+        row.Controls.Add(active);
+        row.Controls.Add(showAlways);
+        return row;
+    }
+
     private void ConfigureDismissControls()
     {
         _restoreAlertsButton.AutoSize = true;
@@ -274,11 +375,48 @@ public sealed class FeedbackDemoForm : Form
         {
             AutoSize = true,
             MaximumSize = new Size(800, 0),
-            Text = "Use the integrated demo's Light/Dark switch while this page is open. Repeat this page at Windows display scaling 100%, 125%, 150%, 175%, and 200% to verify Badge padding plus Alert borders, multiline text, icons, close focus, and rounded geometry.",
+            Text = "Use the integrated demo's Light/Dark switch while this page is open. Repeat this page at Windows display scaling 100%, 125%, 150%, 175%, and 200% to verify Badge padding, Alert borders/text/icons/close focus, and Tooltip padding/border/radius/text alignment while native popup positioning remains intact.",
             Margin = new Padding(3, 4, 3, 8)
         };
         group.Controls.Add(note);
         _content.Controls.Add(group);
+    }
+
+    private static Button CreateTooltipTarget(string text, string accessibleName)
+    {
+        return new Button
+        {
+            AutoSize = true,
+            Text = text,
+            AccessibleName = accessibleName,
+            Margin = new Padding(3, 3, 6, 3),
+            UseVisualStyleBackColor = true
+        };
+    }
+
+    private static NumericUpDown CreateTimingEditor(string label, string accessibleName, int value, int minimum, int maximum)
+    {
+        return new NumericUpDown
+        {
+            AccessibleName = accessibleName,
+            Minimum = minimum,
+            Maximum = maximum,
+            Value = Math.Max(minimum, Math.Min(maximum, value)),
+            Width = 72,
+            Margin = new Padding(0, 3, 8, 3),
+            ThousandsSeparator = false,
+            Tag = label
+        };
+    }
+
+    private static Label CreateTimingLabel(string text)
+    {
+        return new Label
+        {
+            AutoSize = true,
+            Text = text,
+            Margin = new Padding(3, 7, 4, 3)
+        };
     }
 
     private static GroupBox CreateGroup(string text)
