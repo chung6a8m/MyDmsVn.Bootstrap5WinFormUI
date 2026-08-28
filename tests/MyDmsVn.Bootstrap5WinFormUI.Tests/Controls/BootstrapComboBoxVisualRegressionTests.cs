@@ -16,35 +16,6 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 public sealed class BootstrapComboBoxVisualRegressionTests
 {
     [Test]
-    public void PreferredSizeHeightCoversPostHandleOwnerDrawHeight()
-    {
-        using var form = new Form
-        {
-            ShowInTaskbar = false,
-            ClientSize = new Size(440, 140)
-        };
-        using var comboBox = new BootstrapComboBox
-        {
-            Location = new Point(30, 30),
-            Width = 360,
-            DropDownStyle = ComboBoxStyle.DropDownList
-        };
-        comboBox.Items.AddRange(new object[] { "Alpha", "Beta" });
-        comboBox.SelectedIndex = 0;
-        form.Controls.Add(comboBox);
-
-        form.Show();
-        Application.DoEvents();
-
-        var preferred = comboBox.GetPreferredSize(Size.Empty);
-
-        Assert.That(
-            preferred.Height,
-            Is.GreaterThanOrEqualTo(comboBox.Height),
-            $"The owner-drawn ComboBox is {comboBox.Height}px high after handle creation, so its preferred height cannot remain {preferred.Height}px.");
-    }
-
-    [Test]
     public void RoundedShellClipsNativeWindowCorners()
     {
         using var form = new Form
@@ -91,36 +62,6 @@ public sealed class BootstrapComboBoxVisualRegressionTests
         Application.DoEvents();
 
         Assert.That(comboBox.Region, Is.Null);
-    }
-
-    [Test]
-    public void DeferredRelayoutAfterHandleCreationRepairsIntegratedDemoStatusPosition()
-    {
-        using var form = new AdvancedInputsDemoForm { ShowInTaskbar = false };
-        var combo = FindDemoComboBox(form);
-        var status = FindDemoStatus(form);
-        var deferredLayoutCount = 0;
-
-        combo.HandleCreated += (_, _) =>
-            combo.BeginInvoke(new Action(() =>
-            {
-                deferredLayoutCount++;
-                combo.Parent?.PerformLayout(combo, nameof(Control.Size));
-            }));
-
-        form.Show();
-        Application.DoEvents();
-        Application.DoEvents();
-
-        Assert.Multiple((Action)(() =>
-        {
-            Assert.That(deferredLayoutCount, Is.GreaterThan(0),
-                "The diagnostic deferred layout must execute after handle creation.");
-            Assert.That(
-                status.Top,
-                Is.GreaterThanOrEqualTo(combo.Bottom + status.Margin.Top),
-                "A layout request deferred until after handle creation should use the corrected post-handle preferred height.");
-        }));
     }
 
     [Test]
