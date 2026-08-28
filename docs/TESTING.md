@@ -89,6 +89,15 @@ BootstrapPagination pure tests cover:
 - No duplicate numeric page entries
 - Rejection of invalid total-page/current-page/max-visible inputs by the internal helper
 
+BootstrapBadge Stage 1 pure tests cover:
+
+- All semantic variants resolving through `BootstrapVariantColorResolver`
+- Custom color overriding semantic color while retaining contrast-based foreground selection
+- Disabled presentation using muted foreground and a softened surface
+- Empty, short, and long text preferred-size calculations
+- `SpacingSM`/`SpacingXS` padding at logical DPI 96/120/144/168/192
+- Pill half-height radius plus theme-default and explicit logical-radius scaling
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -136,6 +145,15 @@ BootstrapPagination STA tests verify:
 - Repeated state/visibility/style changes without duplicate child controls or event multiplication
 - Preferred-size containment of the owned connected group
 
+BootstrapBadge Stage 1 STA tests verify:
+
+- Designer-safe defaults: empty text, `AutoSize = true`, `TabStop = false`, Primary variant, empty custom color, non-pill shape, theme-radius sentinel, and `AccessibleRole.StaticText`
+- Null text normalization and preferred width tracking content length
+- Rejection of `BorderRadius < -1` and undefined variants
+- Double-buffered custom-paint styles and non-selectable behavior
+- Runtime Light/Dark changes leave the active theme font usable
+- Theme subscriptions detach on disposal, framework-created fonts are released, and caller-owned fonts remain caller-owned
+
 ### 2.3 Demo/manual visual tests
 
 A demo application is required because not all rendering quality is productively asserted with pixels.
@@ -167,6 +185,8 @@ For Phase 8, choose **TextBox / Card**. Verify placeholder behavior, leading/tra
 
 For Pagination, choose **Pagination** in the integrated demo. Verify the small-range, middle-window, boundary, zero-item, Small/Default/Large, and directional-navigation visibility scenarios. Use mouse and keyboard to activate First/Previous/numeric/Next/Last controls, confirm the active page stays focusable/selected, and confirm ellipses are skipped by the tab sequence. Exercise the DataGrid example and verify the application owns the source table and ten-row slicing in response to `PageChanged`. Switch Light/Dark, resize repeatedly, and repeat under the supported real-Windows DPI matrix.
 
+For BootstrapBadge Stage 1, choose **Feedback** in the integrated demo. Compare all eight semantic variants, default/pill geometry, custom color, disabled state, explicit square radius, and long-text AutoSize behavior. Switch Light/Dark while the page remains open, resize repeatedly, and repeat at 100/125/150/175/200% real Windows display scaling. Verify text remains unclipped, the compact padding scales consistently, the pill stays half-height rounded, and long labels expand without becoming focusable.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -189,12 +209,15 @@ Verify:
 - Accordion/Collapse measured heights remain correct.
 - DataGridView headers/rows remain aligned.
 - Pagination connected seams, ellipses, and current-page focus visuals remain aligned.
+- Badge compact padding, preferred size, and pill/theme/explicit radii remain aligned with text.
 
 The Phase 2 Rendering/DPI demo covers the geometry calculations at all five scale factors. Run the demo under each corresponding Windows display-scaling setting as components are added and during hardening; do not treat the virtual matrix as proof of OS-level DPI behavior.
 
 For Phase 8 specifically, verify the native TextBox caret/text baseline remains centered and usable after DPI changes, leading/trailing/clear slots remain inside the rounded input, and Card theme-default padding scales without overwriting application-set custom padding.
 
 Pagination does not own a DPI-specific renderer; its real-Windows DPI check verifies that composed ButtonGroup/Button preferred sizes, connected seams, accessible navigation, and wrapping-free AutoSize behavior remain correct together.
+
+Badge pure tests cover logical scaling through 96/120/144/168/192 DPI. The Feedback page remains the manual OS-level DPI gate because `DeviceDpi`, text rendering, and physical display scaling are WinForms/Windows behaviors rather than pure arithmetic alone.
 
 ## 4. Theme matrix
 
@@ -213,6 +236,8 @@ Disposed control after a theme switch
 A disposed control must not be kept alive by the theme manager.
 
 Pagination itself does not subscribe to the theme manager. Theme-matrix verification confirms its composed ButtonGroup/Button children continue to react through their existing lifecycle without introducing a duplicate Pagination subscription.
+
+Badge owns one direct theme subscription because it custom-paints semantic presentation and owns a theme-created font. Tests verify runtime theme changes keep that font usable and disposal removes the subscription without disposing caller-owned fonts.
 
 ## 5. Interaction matrix
 
@@ -234,6 +259,8 @@ For Phase 8, `BootstrapTextBox` owns one public tab stop and forwards focus to i
 
 For Pagination, the container and owned ButtonGroup are intentionally non-focusable; enabled child Buttons own Tab/Enter/Space behavior. Boundary navigation and ellipses are disabled, while the selected current-page button remains enabled/focusable and activation is a no-op. Setting `Enabled = false` on the Pagination container must prevent child activation without mutating `CurrentPage`.
 
+Badge is intentionally outside the interactive focus/keyboard matrix: it is a non-focusable `StaticText`-style indicator with no click, toggle, or business-count semantics. Its enabled/disabled presentation is still covered.
+
 ## 6. Animation matrix
 
 For finite and loop animation, test:
@@ -253,6 +280,8 @@ Shared Phase 4 primitives additionally verify that progress is elapsed-time base
 Animated controls must not continue producing useful work after disposal. New control-specific timers are prohibited unless an explicit documented exception is approved.
 
 Pagination is explicitly outside the animation matrix: page-state and navigation changes are immediate and it must not introduce a timer or animation owner.
+
+Badge is also outside the animation matrix and owns no timer or animation primitive.
 
 ## 7. Resource/lifecycle checks
 
@@ -277,6 +306,8 @@ For Phase 7, ButtonGroup owns only theme notification plus child Button event su
 For Phase 8, TextBox and Card own only theme subscriptions plus TextBox's theme-created font. They must unsubscribe/dispose deterministically. Card shadow painting must not retain bitmaps, paths, brushes, or pens between frames; all temporary GDI objects remain scoped to painting.
 
 For Pagination, rebuilding the paging structure must dispose every removed dynamic Button after detaching its click handler. Repeated current-page/max-visible/navigation-visibility changes must not duplicate controls or handlers. Disposing Pagination releases the owned ButtonGroup and its current Buttons through normal WinForms ownership. Pagination owns no timer, custom GDI cache, or direct theme subscription.
+
+For Badge, every paint-time path/brush is scoped. The control owns one theme subscription and one framework-created theme font while theme typography remains authoritative. Reassigning `Font` transfers font choice to the caller without transferring disposal ownership; Badge disposal releases only its own font/subscription and owns no timer or retained GDI path/bitmap cache.
 
 ## 8. DataGridView tests
 
@@ -311,6 +342,8 @@ For Phase 8, place TextBox and Card in the Designer without theme bootstrap code
 
 For Pagination, place the control in the Designer without theme bootstrap code. Verify `TotalItems`, `PageSize`, `CurrentPage`, `MaxVisiblePages`, `ShowFirstLast`, `ShowPreviousNext`, `ButtonSize`, `Variant`, and `BorderRadius` serialize/reopen correctly; `TotalPages` remains read-only/non-serialized; no runtime timer or application data dependency is created by design-time instantiation.
 
+For Badge, place the control in the Designer without theme bootstrap code. Verify `Text`, `Variant`, `CustomColor`, `Pill`, and `BorderRadius` serialize/reopen as normal WinForms properties, AutoSize remains usable, and construction does not require DI, application startup, or a running timer.
+
 ## 10. Build commands
 
 Once the solution exists, the project should support explicit target verification similar to:
@@ -325,7 +358,7 @@ Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`
 
 The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by implemented phases.
 
-Pagination also participates in the Phase 16 public/protected API fingerprint gate. Adding it must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
+Pagination and Badge participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
 
 ## 11. Definition of done for a component
 
