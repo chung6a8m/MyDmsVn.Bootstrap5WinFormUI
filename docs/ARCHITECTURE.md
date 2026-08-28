@@ -75,6 +75,7 @@ Control-specific child namespaces may be introduced if the namespace remains dis
  TextBox -----+
  NumericBox --+---- native NumericUpDown + Theme / Rendering
  ComboBox ----+---- native ComboBox + Theme / Rendering / Icons
+ Dropdown ----+---- BootstrapButton target + native ToolStripDropDownMenu
  Card --------+---- shared Theme / Rendering / Icons
  Progress ----+---- Animation / LoopAnimation
  Sidebar -----+---- Button / Collapse / Icons
@@ -87,6 +88,8 @@ The diagram shows conceptual dependencies, not necessarily direct assembly refer
 `BootstrapNumericBox` deliberately depends only on the native WinForms `NumericUpDown` plus the existing Theme/Rendering foundation. It has no dependency on Tabs, ComboBox, Dropdown, custom popup infrastructure, or a framework-owned numeric parser. Later advanced-input controls may share the integrated demo page but not hidden implementation dependencies.
 
 `BootstrapComboBox` is likewise shallow: it derives directly from native WinForms `ComboBox` and depends only on the existing Theme, Rendering, DPI, and source-neutral Icons infrastructure. It does **not** depend on `BootstrapNumericBox`, `BootstrapDropdown`, a custom popup host, or a framework item/binding model. Stage 7 `BootstrapDropdown` is a separate component and is not an implementation dependency of ComboBox.
+
+`BootstrapDropdown` is a native command-popup composition. It depends on a caller-owned `BootstrapButton` only as target/anchor and as the source of `IIconRenderer`; it owns exactly one native `ToolStripDropDownMenu` plus one internal `BootstrapDropdownRenderer`. It does not replace ComboBox popup behavior, create a custom top-level form, install global hooks, or introduce a second message loop.
 
 ## 5. Foundation responsibilities
 
@@ -203,6 +206,20 @@ Composite controls should not reach into private rendering internals of primitiv
 
 Pagination intentionally has no direct dependency on `BootstrapDataGridView` or any other data control. Applications retain responsibility for querying, slicing, virtualizing, and binding data after `PageChanged`. Pagination also has no custom painting, timer, animation engine, or direct theme subscription; appearance and DPI/theme response flow through the composed ButtonGroup/Button controls.
 
+### 6.3 Native command-popup composition
+
+`BootstrapDropdown` is a non-visual `Component`, not a replacement Button and not a custom popup window. The caller owns `Target : BootstrapButton` and every `BootstrapDropdownItem` model. The component owns the native popup infrastructure and never disposes the target or public item models.
+
+The public `Items` collection is authoritative. Every effective `Show()` destroys the previous native snapshot and rebuilds short-lived `ToolStripMenuItem` / `ToolStripSeparator` instances from current model values. This snapshot-per-open boundary deliberately avoids live collection synchronization and avoids leaking native menu objects into the public API. Mutable `Text`, `Icon`, `Enabled`, `Checked`, and `Tag` values therefore apply coherently on the next opening.
+
+Native `ToolStripDropDownMenu` remains authoritative for focus, Up/Down/Home/End/Enter/Escape behavior, mouse hit-testing, AutoClose, outside-click/focus-loss dismissal, message-loop integration, and working-area placement. Framework code only attaches/detaches the target Click/Disposed events, maps a native activation back to one enabled command model, forwards actual native `Opened` / `Closed` transitions, and owns presentation/resources.
+
+The internal `BootstrapDropdownRenderer` resolves palette and metrics from the shared Theme/Rendering/DPI foundation. `Variant` influences selected/checked accent only; neutral surface/text/border remain theme tokens. `MinimumWidth` is a logical 96-DPI floor and native content measurement may exceed it. Optional menu icons are rasterized through `Target.IconRenderer` at the target's current DPI and theme text color. Generated bitmaps and native snapshot rows are component-owned resources and are disposed on refresh/rebuild/disposal.
+
+Runtime theme changes do not rebuild caller state. If the popup is open, the component re-resolves presentation, regenerates owned icon bitmaps, and invalidates the native popup; when closed, the next snapshot naturally uses the current theme. Disposal removes the static theme subscription, target wiring, native event handlers, native items/images, renderer owner, and popup owner chain deterministically.
+
+Stage 7 intentionally excludes submenus, split-button semantics, automatic checked-state toggling, custom popup forms, global input hooks, custom screen-edge placement, timers, animation, and a live item-binding engine. Those capabilities require separate future design rather than being inferred from native implementation details.
+
 ## 7. Theme lifecycle
 
 Target behavior:
@@ -230,6 +247,8 @@ NumericBox subscribes once to `BootstrapThemeManager.ThemeChanged` because the w
 
 ComboBox follows the same deterministic ownership rule: it subscribes once for shell/item palette and theme-created font updates, reapplies owner-draw metrics after DPI/font/handle changes, and never recreates or rebinds native item/selection state merely because the theme changed. Disposal removes the static subscription; caller-assigned fonts remain caller-owned.
 
+Dropdown subscribes once because an open native popup can outlive the target click that created its current snapshot. Theme changes while open regenerate only framework-owned menu images and invalidate/reapply token presentation. A closed Dropdown has no native rows to synchronize; its next opening resolves the current theme. Disposal removes the static subscription.
+
 ## 8. Animation lifecycle
 
 A consumer starts animation only when it can render useful frames. On hide/dispose, it pauses/stops or releases the animation according to component semantics.
@@ -242,7 +261,7 @@ Finite `Stop()` freezes current progress and `Start()` resumes it; `Restart()` a
 
 Loop `Stop()` and `Start()` freeze/resume the current cycle position; `Restart()` returns to zero. Loop animation does not expose a finite completion event.
 
-Pagination, NumericBox, and ComboBox are non-animated and must not introduce scheduling solely for state, validation, focus, or drop-down changes.
+Pagination, NumericBox, ComboBox, and Dropdown are non-animated and must not introduce scheduling solely for state, validation, focus, selection, or popup changes.
 
 ## 9. Resource ownership
 
@@ -260,6 +279,8 @@ NumericBox owns its native `NumericUpDown` through normal WinForms containment a
 
 ComboBox owns no application items, `DataSource`, binding manager, popup window, native child window, or caller font. Paint-time `Brush`, `Pen`, `GraphicsPath`, and `Graphics` instances are scoped and disposed immediately; the only cross-lifetime resource is its framework-created theme font plus the deterministic theme subscription.
 
+Dropdown owns its one `ToolStripDropDownMenu`, transient native snapshot items, generated icon bitmaps, native event subscriptions, and theme subscription. It never owns the caller's `BootstrapButton`, `BootstrapDropdownItem` instances, icon descriptors, or icon renderer. Rebuild/theme refresh clears native image references before disposing bitmaps so ToolStrip cannot retain disposed image objects.
+
 ## 10. Designer architecture
 
 The framework must not require a service locator, DI container, or application bootstrap merely to instantiate a control in the Designer.
@@ -273,6 +294,8 @@ Pagination follows the same rule: its parameterless constructor creates a valid 
 NumericBox follows the same rule: its parameterless constructor creates the one native editor with native default range/value/increment settings. Only the wrapper's documented properties are designer-facing; the private native child is an implementation detail and must not appear in generated Designer code.
 
 ComboBox also has a safe parameterless constructor. The inherited native collection/binding/selection properties remain designer/runtime APIs; framework-specific designer-facing state is limited to validation, radius, and optional leading icon. `IconRenderer` is intentionally hidden from Designer serialization and defaults to the existing source-neutral renderer.
+
+Dropdown has a safe parameterless constructor, stable content-serialized `Items`, and nullable `Target`. Creating it at design time requires neither a live form handle nor application bootstrap. The native popup is private and is not designer-serialized.
 
 ## 11. Error handling philosophy
 
@@ -288,10 +311,12 @@ NumericBox deliberately preserves native `NumericUpDown` range/error behavior: d
 
 ComboBox deliberately preserves native `ComboBox` exceptions/restrictions for item, binding, style, and autocomplete APIs rather than translating them. Framework-only `ValidationState` rejects undefined enum values, `BorderRadius` rejects values below the `-1` theme sentinel, and `IconRenderer` rejects `null` before state mutation.
 
+Dropdown rejects undefined `BootstrapVariant` values and negative logical `MinimumWidth`. `Show()` throws only when no `Target` is assigned; with an assigned target it is a no-op when already open, empty, disabled, loading, or disposed. `Close()` is idempotent. Disabled commands and separators never dispatch model `Click`, and framework activation never mutates `Checked`.
+
 ## 12. Evolution rules
 
 Before the first stable release, public APIs may change deliberately to improve consistency. Every such change must update `docs/COMPONENTS.md`, relevant examples, and `docs/DECISIONS.md` when architectural.
 
 After a stable compatibility baseline is declared, breaking public changes require an explicit compatibility policy.
 
-The Pagination, NumericBox, and ComboBox API additions change the proposed v1 release-candidate fingerprint intentionally. Their exported surfaces are reviewed before updating the approved fingerprint, while helper/layout types remain internal and `AssemblyVersion` stays `1.0.0.0`.
+The Pagination, NumericBox, ComboBox, and Dropdown API additions change the proposed v1 release-candidate fingerprint intentionally. Their exported surfaces are reviewed before updating the approved fingerprint, while helper/layout/renderer types remain internal and `AssemblyVersion` stays `1.0.0.0`.
