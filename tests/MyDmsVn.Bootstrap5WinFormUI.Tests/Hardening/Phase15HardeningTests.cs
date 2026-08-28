@@ -121,6 +121,18 @@ public sealed class Phase15HardeningTests
     }
 
     [Test]
+    public void CollapseControlLifecycleHooksIgnoreNullEventPayloads()
+    {
+        using var collapse = new CollapseControlEventProbe();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.DoesNotThrow((Action)(() => collapse.RaiseControlAdded(null)));
+            Assert.DoesNotThrow((Action)(() => collapse.RaiseControlRemoved(null)));
+        }));
+    }
+
+    [Test]
     public void CoreAssemblyDoesNotReferenceOptionalIconPackages()
     {
         var referenceNames = typeof(BootstrapTheme).Assembly
@@ -163,5 +175,18 @@ public sealed class Phase15HardeningTests
         Assert.That(eventField, Is.Not.Null, "ThemeChanged must remain an ordinary static event so lifetime can be audited.");
         var handler = eventField!.GetValue(null) as Delegate;
         return handler?.GetInvocationList().Length ?? 0;
+    }
+
+    private sealed class CollapseControlEventProbe : BootstrapCollapse
+    {
+        public void RaiseControlAdded(Control? control)
+        {
+            base.OnControlAdded(new ControlEventArgs(control!));
+        }
+
+        public void RaiseControlRemoved(Control? control)
+        {
+            base.OnControlRemoved(new ControlEventArgs(control!));
+        }
     }
 }
