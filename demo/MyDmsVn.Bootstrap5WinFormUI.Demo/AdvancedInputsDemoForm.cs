@@ -306,13 +306,10 @@ public sealed class AdvancedInputsDemoForm : Form
             grid.RowCount++;
         }
 
-        var cell = new FlowLayoutPanel
+        var cell = new ScenarioCellPanel
         {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
             Margin = new Padding(6, 6, 18, 10),
+            Size = new Size(410, status is null ? 68 : 88),
             MinimumSize = new Size(410, status is null ? 68 : 88)
         };
         var label = new Label
@@ -326,13 +323,7 @@ public sealed class AdvancedInputsDemoForm : Form
         input.Margin = Padding.Empty;
         input.AccessibleName = $"{caption} {accessibleKind}";
 
-        cell.Controls.Add(label);
-        cell.Controls.Add(input);
-        if (status is not null)
-        {
-            cell.Controls.Add(status);
-        }
-
+        cell.SetScenarioControls(label, input, status);
         grid.Controls.Add(cell, column, row);
     }
 
@@ -368,6 +359,107 @@ public sealed class AdvancedInputsDemoForm : Form
             }
 
             ApplyStandardTextColor(child, color);
+        }
+    }
+
+    private sealed class ScenarioCellPanel : Panel
+    {
+        private Label? _caption;
+        private Control? _input;
+        private Control? _status;
+        private bool _layingOut;
+
+        public void SetScenarioControls(Label caption, Control input, Control? status)
+        {
+            _caption = caption;
+            _input = input;
+            _status = status;
+
+            Controls.Add(caption);
+            Controls.Add(input);
+            if (status is not null)
+            {
+                Controls.Add(status);
+            }
+
+            caption.SizeChanged += OnChildSizeChanged;
+            input.SizeChanged += OnChildSizeChanged;
+            if (status is not null)
+            {
+                status.SizeChanged += OnChildSizeChanged;
+            }
+
+            PerformLayout();
+        }
+
+        protected override void OnLayout(LayoutEventArgs levent)
+        {
+            base.OnLayout(levent);
+            LayoutScenario();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_caption is not null)
+                {
+                    _caption.SizeChanged -= OnChildSizeChanged;
+                }
+
+                if (_input is not null)
+                {
+                    _input.SizeChanged -= OnChildSizeChanged;
+                }
+
+                if (_status is not null)
+                {
+                    _status.SizeChanged -= OnChildSizeChanged;
+                }
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private void OnChildSizeChanged(object? sender, EventArgs e)
+        {
+            LayoutScenario();
+        }
+
+        private void LayoutScenario()
+        {
+            if (_layingOut || _caption is null || _input is null)
+            {
+                return;
+            }
+
+            _layingOut = true;
+            try
+            {
+                var y = Padding.Top + _caption.Margin.Top;
+                _caption.Location = new Point(Padding.Left + _caption.Margin.Left, y);
+                y = _caption.Bottom + _caption.Margin.Bottom + _input.Margin.Top;
+
+                _input.Location = new Point(Padding.Left + _input.Margin.Left, y);
+                y = _input.Bottom + _input.Margin.Bottom;
+
+                if (_status is not null)
+                {
+                    y += _status.Margin.Top;
+                    _status.Location = new Point(Padding.Left + _status.Margin.Left, y);
+                    y = _status.Bottom + _status.Margin.Bottom;
+                }
+
+                var requiredHeight = y + Padding.Bottom;
+                if (Height < requiredHeight)
+                {
+                    Height = requiredHeight;
+                }
+            }
+            finally
+            {
+                _layingOut = false;
+            }
         }
     }
 
