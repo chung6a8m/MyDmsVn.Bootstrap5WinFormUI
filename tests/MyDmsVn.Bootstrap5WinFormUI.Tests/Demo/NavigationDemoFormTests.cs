@@ -76,7 +76,7 @@ public sealed class NavigationDemoFormTests
             Assert.That(byTargetName["Dropdown long menu"].MinimumWidth, Is.GreaterThan(0));
             Assert.That(byTargetName["Dropdown long menu"].Items.Any(item => item.Text.Length > 50), Is.True);
 
-            Assert.That(byTargetName["Dropdown stress"].Items.Any(item => item.Text.Contains("Toggle Light / Dark", StringComparison.Ordinal)), Is.True);
+            Assert.That(byTargetName["Dropdown stress"].Items.Any(item => item.Text.IndexOf("Toggle Light / Dark", StringComparison.Ordinal) >= 0), Is.True);
             Assert.That(Descendants(form).OfType<Label>().Any(label => label.AccessibleName == "Dropdown manual verification matrix"), Is.True);
         }));
     }
@@ -93,7 +93,7 @@ public sealed class NavigationDemoFormTests
         Assert.Multiple((Action)(() =>
         {
             Assert.That(rootItems.Count(item => item.Text.StartsWith("Navigation", StringComparison.Ordinal)), Is.EqualTo(1));
-            Assert.That(rootItems.Any(item => item.Text.Contains("Dropdown", StringComparison.Ordinal)), Is.False);
+            Assert.That(rootItems.Any(item => item.Text.IndexOf("Dropdown", StringComparison.Ordinal) >= 0), Is.False);
         }));
     }
 
