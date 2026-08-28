@@ -188,21 +188,46 @@ public class BootstrapToastContainer : Panel
             throw new ObjectDisposedException(nameof(BootstrapToastContainer));
         }
 
-        toast.Visible = false;
-        toast.AttachOwner(RequestDismissal, OnToastPreferredHeightChanged);
-        toast.NotifyHostVisibilityChanged(Visible);
-
+        var wasVisible = toast.Visible;
         var entry = new ToastEntry(toast);
-        _entries.Add(entry);
-        Controls.Add(toast);
+        try
+        {
+            toast.Visible = false;
+            Controls.Add(toast);
+            toast.AttachOwner(RequestDismissal, OnToastPreferredHeightChanged);
+            toast.NotifyHostVisibilityChanged(Visible);
+            _entries.Add(entry);
 
-        if (CountOccupiedSlots() < _maximumVisibleToasts)
-        {
-            BeginEnter(entry);
+            if (CountOccupiedSlots() < _maximumVisibleToasts)
+            {
+                BeginEnter(entry);
+            }
+            else
+            {
+                toast.NotifyEnterStarted();
+            }
         }
-        else
+        catch
         {
-            toast.NotifyEnterStarted();
+            CancelEntryTransition(entry);
+            _entries.Remove(entry);
+
+            if (toast.IsOwned)
+            {
+                toast.NotifyRemovedFromOwner();
+            }
+
+            if (!toast.IsDisposed && ReferenceEquals(toast.Parent, this))
+            {
+                Controls.Remove(toast);
+            }
+
+            if (!toast.IsDisposed)
+            {
+                toast.Visible = wasVisible;
+            }
+
+            throw;
         }
     }
 
@@ -361,6 +386,11 @@ public class BootstrapToastContainer : Panel
             entry.State = BootstrapToastHostState.Exiting;
             toast.NotifyExitStarting();
             toast.RaiseDismissedFromOwner();
+            if (_disposing || IsDisposed || toast.IsDisposed || !_entries.Contains(entry))
+            {
+                return;
+            }
+
             RemoveEntryAndDispose(entry);
             return;
         }
@@ -371,6 +401,12 @@ public class BootstrapToastContainer : Panel
         entry.State = BootstrapToastHostState.Exiting;
         toast.NotifyExitStarting();
         toast.RaiseDismissedFromOwner();
+        if (_disposing || IsDisposed || toast.IsDisposed || !_entries.Contains(entry) ||
+            entry.State != BootstrapToastHostState.Exiting)
+        {
+            return;
+        }
+
         BeginExit(entry, start);
     }
 
