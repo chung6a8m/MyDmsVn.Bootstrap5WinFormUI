@@ -5,6 +5,7 @@
     <RootNamespace>MyDmsVn.Bootstrap5WinFormUI</RootNamespace>
     <AssemblyName>MyDmsVn.Bootstrap5WinFormUI</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
   </PropertyGroup>
 </Project>
