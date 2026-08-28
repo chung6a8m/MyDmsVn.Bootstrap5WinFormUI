@@ -21,10 +21,13 @@ All notable release-facing changes to this project are documented here.
 - Integrated Advanced Inputs demo page with integer/default, decimal, thousands-separator, signed-range, valid/invalid, read-only, disabled, and live NumericBox `ValueChanged` scenarios; the page is intentionally reusable by later ComboBox and DatePicker stages.
 - `BootstrapComboBox`, a direct native WinForms `ComboBox` subclass that preserves native items, binding, selection, editable text, autocomplete, keyboard/drop-down behavior, and events while adding fixed-height owner-draw presentation, validation/focus shell rendering, runtime theme/DPI handling, configurable radius, and an optional source-neutral leading icon.
 - Expanded the shared Advanced Inputs demo with unbound and bound ComboBox data, `DisplayMember` / `ValueMember`, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` autocomplete, long-text ellipsis, icon/no-icon, validation, disabled, explicit-radius, and native selection-feedback scenarios without adding a second navigation page.
+- `BootstrapDropdown`, a Bootstrap-inspired command popup that composes a caller-owned `BootstrapButton` with one owned native `ToolStripDropDownMenu`, snapshots text/icon/checked/disabled/separator models at each opening, and keeps native focus, keyboard navigation, AutoClose/outside-click dismissal, and working-area placement authoritative.
+- Dropdown theme/DPI presentation through the shared semantic variant, rendering, icon, and DPI infrastructure, including logical `MinimumWidth`, target `IconRenderer` reuse, runtime open-popup icon refresh, and deterministic native-item/bitmap cleanup without custom popup windows, global hooks, timers, or animation infrastructure.
+- Expanded the shared Navigation / Tabs demo with basic, icon, checked/disabled/separator, long-menu, and stress/theme Dropdown scenarios plus a real-desktop keyboard, outside-click, working-area, multi-monitor, and 100–200% DPI verification matrix; no second Navigation route was added.
 
 ### Changed
 
-- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, `BootstrapTabControl`, `BootstrapNumericBox`, and `BootstrapComboBox` surfaces; all component-specific render/layout helpers remain internal and `AssemblyVersion` remains `1.0.0.0`.
+- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, `BootstrapTabControl`, `BootstrapNumericBox`, `BootstrapComboBox`, and `BootstrapDropdown` model/component surfaces; all Dropdown renderer/palette/metric helpers remain internal and `AssemblyVersion` remains `1.0.0.0`.
 
 ## [1.0.0-rc.1] - 2026-08-28
 
