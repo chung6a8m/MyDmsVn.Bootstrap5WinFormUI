@@ -407,8 +407,37 @@ Behavior:
 
 Manual verification: launch the integrated demo and choose **Pagination**. Compare no-ellipsis, middle-window, boundary, zero-item, Small/Default/Large, and navigation-visibility scenarios. Exercise every navigation button with mouse and keyboard, switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% Windows scaling. In the DataGrid scenario, verify the application reacts to `PageChanged` and slices/binds ten rows per page while Pagination itself never owns the table or grid data source.
 
+## BootstrapBadge
+
+Responsibility: display a compact, auto-sized, non-interactive semantic text indicator without owning click/toggle behavior or notification-count business logic.
+
+Stage 1 of the component-expansion roadmap finalizes the public concepts as:
+
+```text
+BootstrapBadge : Control
+
+BootstrapBadge.Variant
+BootstrapBadge.CustomColor
+BootstrapBadge.Pill
+BootstrapBadge.BorderRadius
+```
+
+Behavior:
+
+- `Text` remains the inherited WinForms content property; the default is empty, `AutoSize = true`, `TabStop = false`, and `AccessibleRole = StaticText`.
+- `Variant` defaults to `Primary`. `CustomColor = Color.Empty` resolves through the existing `BootstrapVariantColorResolver`; a non-empty custom color overrides the semantic variant.
+- Foreground color is selected with the existing `ColorUtil.GetContrastingTextColor` helper instead of assuming fixed white/black text. Disabled presentation uses the current muted text token and a softened semantic/custom surface.
+- Horizontal padding uses `SpacingSM` and vertical padding uses `SpacingXS`, both scaled through `DpiScaler`. Text uses the current theme `Label` typography token.
+- `Pill = true` uses half the rendered physical height as its radius. Otherwise `BorderRadius = -1` uses the current theme radius; non-negative values are explicit logical radii and values below `-1` are rejected.
+- `BootstrapBadgeRenderLogic` and its palette remain internal pure logic for semantic/custom colors, contrast, preferred size, DPI padding, and radius calculation.
+- Painting is double-buffered and uses `RoundedPath` with scoped GDI resources. Badge introduces no timer, animation scheduler, icon model, geometry library, or external dependency.
+- Runtime Light/Dark switches repaint semantic colors and retain a usable theme-owned font. Disposal detaches the theme subscription and disposes only framework-created fonts; a caller-assigned `Font` remains caller-owned.
+- Designer construction is parameterless and requires no application bootstrap.
+
+Manual verification: launch the integrated demo and choose **Feedback**. Compare all eight semantic variants, default and pill geometry, custom color, disabled, explicit square radius, and long-text AutoSize cases. Switch Light/Dark while the page is open, resize the host, and repeat at 100/125/150/175/200% Windows scaling to verify text clipping, padding, and rounded geometry.
+
 ## Deferred components
 
-Alert, Badge, Toast, Tooltip, Dialog/Modal, Dropdown, Tabs, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
+Alert, Toast, Tooltip, Dialog/Modal, Dropdown, Tabs, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
 
 Before adding one, document which existing foundation pieces it reuses.
