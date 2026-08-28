@@ -31,6 +31,42 @@ public sealed class BootstrapNumericBoxInteractionTests
     }
 
     [Test]
+    public void CompositeOwnsSingleTabStopInForwardAndReverseTraversal()
+    {
+        using var form = new Form { ShowInTaskbar = false, Width = 360, Height = 180 };
+        var before = new TextBox { Left = 20, Top = 20, Width = 120, TabIndex = 0 };
+        var input = new BootstrapNumericBox { Left = 20, Top = 55, Width = 180, TabIndex = 1 };
+        var after = new TextBox { Left = 20, Top = 95, Width = 120, TabIndex = 2 };
+        var native = input.Controls.OfType<NumericUpDown>().Single();
+        form.Controls.AddRange(new Control[] { before, input, after });
+        form.Show();
+        Application.DoEvents();
+
+        before.Focus();
+        Application.DoEvents();
+        Assert.That(form.SelectNextControl(before, true, true, true, true), Is.True);
+        Application.DoEvents();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.Focused, Is.True);
+            Assert.That(input.ContainsFocus, Is.True);
+            Assert.That(native.TabStop, Is.False);
+        }));
+
+        Assert.That(form.SelectNextControl(input, true, true, true, true), Is.True);
+        Application.DoEvents();
+        Assert.That(after.Focused, Is.True);
+
+        Assert.That(form.SelectNextControl(after, false, true, true, true), Is.True);
+        Application.DoEvents();
+        Assert.That(native.Focused, Is.True);
+
+        Assert.That(form.SelectNextControl(input, false, true, true, true), Is.True);
+        Application.DoEvents();
+        Assert.That(before.Focused, Is.True);
+    }
+
+    [Test]
     public void ShellMouseDownRedirectsFocusToOwnedNativeEditor()
     {
         using var form = CreateHost(out var input, out var native);
@@ -147,22 +183,35 @@ public sealed class BootstrapNumericBoxInteractionTests
     }
 
     [Test]
-    public void MouseWheelRemainsOwnedByNativeNumericEditor()
+    public void MouseWheelMatchesPlainNativeNumericEditorPolicy()
     {
         using var form = CreateHost(out var input, out var native);
-        input.Minimum = 0m;
-        input.Maximum = 10m;
-        input.Value = 5m;
-        input.Increment = 1m;
-        native.Focus();
+        var reference = new NumericUpDown
+        {
+            Left = 20,
+            Top = 80,
+            Width = 180,
+            BorderStyle = BorderStyle.None,
+            Minimum = 0m,
+            Maximum = 10m,
+            Value = 5m,
+            Increment = 1m
+        };
+        form.Controls.Add(reference);
+        input.Minimum = reference.Minimum;
+        input.Maximum = reference.Maximum;
+        input.Value = reference.Value;
+        input.Increment = reference.Increment;
         Application.DoEvents();
 
+        var wheel = new MouseEventArgs(MouseButtons.None, 0, 0, 0, 120);
+        RaiseProtectedControlEvent(native, "OnMouseWheel", wheel);
         RaiseProtectedControlEvent(
-            native,
+            reference,
             "OnMouseWheel",
             new MouseEventArgs(MouseButtons.None, 0, 0, 0, 120));
 
-        Assert.That(input.Value, Is.Not.EqualTo(5m));
+        Assert.That(input.Value, Is.EqualTo(reference.Value));
     }
 
     private static Form CreateHost(out BootstrapNumericBox input, out NumericUpDown native)
