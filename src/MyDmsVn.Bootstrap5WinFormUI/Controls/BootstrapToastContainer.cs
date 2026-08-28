@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Animation;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -11,12 +12,13 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 internal enum BootstrapToastHostState
 {
     Queued,
+    Entering,
     Visible,
-    Dismissing
+    Exiting
 }
 
 /// <summary>
-/// Hosts, owns, stacks, queues, and disposes <see cref="BootstrapToast"/> notifications.
+/// Hosts, owns, stacks, queues, animates, and disposes <see cref="BootstrapToast"/> notifications.
 /// </summary>
 public class BootstrapToastContainer : Panel
 {
@@ -30,21 +32,49 @@ public class BootstrapToastContainer : Panel
         public BootstrapToast Toast { get; }
 
         public BootstrapToastHostState State { get; set; } = BootstrapToastHostState.Queued;
+
+        public BootstrapAnimation? Transition { get; set; }
+    }
+
+    private sealed class ReflowGeometry
+    {
+        public ReflowGeometry(ToastEntry entry, Rectangle start, Rectangle target)
+        {
+            Entry = entry;
+            Start = start;
+            Target = target;
+        }
+
+        public ToastEntry Entry { get; }
+
+        public Rectangle Start { get; }
+
+        public Rectangle Target { get; }
     }
 
     private readonly List<ToastEntry> _entries = new List<ToastEntry>();
+    private readonly Func<TimeSpan, Func<double, double>, Control, BootstrapAnimation> _animationFactory;
     private BootstrapToastPlacement _placement = BootstrapToastPlacement.TopRight;
     private int _toastSpacing = 8;
     private int _maximumVisibleToasts = 5;
+    private BootstrapAnimation? _reflowAnimation;
     private bool _suppressPromotion;
     private bool _disposing;
-    private bool _reflowing;
+    private bool _reflowingLayout;
 
     /// <summary>
     /// Initializes a designer-safe toast container with top-right placement, eight logical pixels of spacing, and five visible slots.
     /// </summary>
     public BootstrapToastContainer()
+        : this((duration, easing, owner) => new BootstrapAnimation(duration, easing, owner))
     {
+    }
+
+    internal BootstrapToastContainer(
+        Func<TimeSpan, Func<double, double>, Control, BootstrapAnimation> animationFactory)
+    {
+        _animationFactory = animationFactory ?? throw new ArgumentNullException(nameof(animationFactory));
+
         SetStyle(
             ControlStyles.AllPaintingInWmPaint |
             ControlStyles.OptimizedDoubleBuffer |
@@ -52,6 +82,7 @@ public class BootstrapToastContainer : Panel
             true);
 
         TabStop = false;
+        VisibleChanged += OnContainerVisibleChanged;
     }
 
     /// <summary>Gets or sets the corner used to anchor and grow the toast stack.</summary>
@@ -70,7 +101,7 @@ public class BootstrapToastContainer : Panel
             }
 
             _placement = value;
-            ReflowVisibleToasts();
+            StartReflow();
         }
     }
 
@@ -94,7 +125,7 @@ public class BootstrapToastContainer : Panel
             }
 
             _toastSpacing = value;
-            ReflowVisibleToasts();
+            StartReflow();
         }
     }
 
@@ -118,9 +149,9 @@ public class BootstrapToastContainer : Panel
             }
 
             _maximumVisibleToasts = value;
-            ReconcileVisibleCount();
-            ReflowVisibleToasts();
+            ReconcileMaximumVisible();
             PromoteQueuedToasts();
+            StartReflow();
         }
     }
 
@@ -158,20 +189,20 @@ public class BootstrapToastContainer : Panel
 
         toast.Visible = false;
         toast.AttachOwner(RequestDismissal, OnToastPreferredHeightChanged);
+        toast.NotifyHostVisibilityChanged(Visible);
+
         var entry = new ToastEntry(toast);
         _entries.Add(entry);
         Controls.Add(toast);
 
-        if (CountVisibleEntries() < _maximumVisibleToasts)
+        if (CountOccupiedSlots() < _maximumVisibleToasts)
         {
-            Promote(entry);
+            BeginEnter(entry);
         }
         else
         {
             toast.NotifyEnterStarted();
         }
-
-        ReflowVisibleToasts();
     }
 
     /// <summary>
@@ -190,7 +221,7 @@ public class BootstrapToastContainer : Panel
         {
             foreach (var entry in snapshot)
             {
-                if (_entries.Contains(entry) && entry.State != BootstrapToastHostState.Dismissing)
+                if (_entries.Contains(entry) && entry.State != BootstrapToastHostState.Exiting)
                 {
                     RequestDismissal(entry.Toast);
                 }
@@ -200,16 +231,14 @@ public class BootstrapToastContainer : Panel
         {
             _suppressPromotion = false;
         }
-
-        PromoteQueuedToasts();
-        ReflowVisibleToasts();
     }
 
     /// <inheritdoc />
     protected override void OnSizeChanged(EventArgs e)
     {
         base.OnSizeChanged(e);
-        ReflowVisibleToasts();
+        CancelReflow();
+        SnapForHostGeometryChange();
     }
 
     /// <inheritdoc />
@@ -217,7 +246,8 @@ public class BootstrapToastContainer : Panel
     {
         base.OnDpiChangedAfterParent(e);
         RecomputeOwnedHeights();
-        ReflowVisibleToasts();
+        CancelReflow();
+        SnapForHostGeometryChange();
     }
 
     /// <inheritdoc />
@@ -227,9 +257,12 @@ public class BootstrapToastContainer : Panel
         {
             _disposing = true;
             _suppressPromotion = true;
+            VisibleChanged -= OnContainerVisibleChanged;
+            CancelReflow();
 
             foreach (var entry in _entries.ToArray())
             {
+                CancelEntryTransition(entry);
                 var toast = entry.Toast;
                 if (!toast.IsDisposed)
                 {
@@ -245,6 +278,70 @@ public class BootstrapToastContainer : Panel
         base.Dispose(disposing);
     }
 
+    private void BeginEnter(ToastEntry entry)
+    {
+        if (_disposing || entry.Toast.IsDisposed || !_entries.Contains(entry))
+        {
+            return;
+        }
+
+        CancelReflow();
+        CancelEntryTransition(entry);
+        RecomputeHeight(entry.Toast);
+        entry.State = BootstrapToastHostState.Entering;
+        entry.Toast.NotifyEnterStarted();
+        entry.Toast.NotifyHostVisibilityChanged(Visible);
+        entry.Toast.Visible = true;
+
+        var target = GetTargetBounds(entry);
+        var metrics = BootstrapToastLayoutLogic.ResolveMetrics(
+            BootstrapThemeManager.CurrentTheme.Metrics,
+            GetCurrentDpi());
+        var startX = IsLeftPlacement(_placement)
+            ? target.X - metrics.SlideDistance
+            : target.X + metrics.SlideDistance;
+        var start = new Rectangle(startX, target.Y, target.Width, target.Height);
+        entry.Toast.Bounds = start;
+
+        var animation = _animationFactory(
+            TimeSpan.FromMilliseconds(entry.Toast.AnimationDuration),
+            BootstrapEasing.EaseOut,
+            this);
+        entry.Transition = animation;
+
+        animation.ProgressChanged += (_, _) =>
+        {
+            if (_disposing || entry.Toast.IsDisposed || !ReferenceEquals(entry.Transition, animation))
+            {
+                return;
+            }
+
+            var currentTarget = GetTargetBounds(entry);
+            entry.Toast.Bounds = new Rectangle(
+                Lerp(start.X, currentTarget.X, animation.Progress),
+                currentTarget.Y,
+                currentTarget.Width,
+                currentTarget.Height);
+        };
+        animation.Completed += (_, _) => CompleteEnter(entry, animation);
+        animation.Start();
+    }
+
+    private void CompleteEnter(ToastEntry entry, BootstrapAnimation animation)
+    {
+        if (_disposing || entry.Toast.IsDisposed || !ReferenceEquals(entry.Transition, animation))
+        {
+            return;
+        }
+
+        entry.Transition = null;
+        animation.Dispose();
+        entry.State = BootstrapToastHostState.Visible;
+        entry.Toast.Bounds = GetTargetBounds(entry);
+        entry.Toast.NotifyHostVisibilityChanged(Visible);
+        entry.Toast.NotifyEnterCompleted();
+    }
+
     private void RequestDismissal(BootstrapToast toast)
     {
         if (_disposing || toast is null || toast.IsDisposed)
@@ -253,25 +350,84 @@ public class BootstrapToastContainer : Panel
         }
 
         var entry = _entries.FirstOrDefault(candidate => ReferenceEquals(candidate.Toast, toast));
-        if (entry is null || entry.State == BootstrapToastHostState.Dismissing)
+        if (entry is null || entry.State == BootstrapToastHostState.Exiting)
         {
             return;
         }
 
-        entry.State = BootstrapToastHostState.Dismissing;
+        if (entry.State == BootstrapToastHostState.Queued)
+        {
+            entry.State = BootstrapToastHostState.Exiting;
+            toast.NotifyExitStarting();
+            toast.RaiseDismissedFromOwner();
+            RemoveEntryAndDispose(entry);
+            return;
+        }
+
+        CancelReflow();
+        CancelEntryTransition(entry);
+        var start = toast.Bounds;
+        entry.State = BootstrapToastHostState.Exiting;
         toast.NotifyExitStarting();
         toast.RaiseDismissedFromOwner();
+        BeginExit(entry, start);
+    }
+
+    private void BeginExit(ToastEntry entry, Rectangle start)
+    {
+        var metrics = BootstrapToastLayoutLogic.ResolveMetrics(
+            BootstrapThemeManager.CurrentTheme.Metrics,
+            GetCurrentDpi());
+        var endX = IsLeftPlacement(_placement)
+            ? start.X - metrics.SlideDistance
+            : start.X + metrics.SlideDistance;
+
+        var animation = _animationFactory(
+            TimeSpan.FromMilliseconds(entry.Toast.AnimationDuration),
+            BootstrapEasing.EaseIn,
+            this);
+        entry.Transition = animation;
+
+        animation.ProgressChanged += (_, _) =>
+        {
+            if (_disposing || entry.Toast.IsDisposed || !ReferenceEquals(entry.Transition, animation))
+            {
+                return;
+            }
+
+            entry.Toast.Bounds = new Rectangle(
+                Lerp(start.X, endX, animation.Progress),
+                start.Y,
+                start.Width,
+                start.Height);
+        };
+        animation.Completed += (_, _) => CompleteExit(entry, animation);
+        animation.Start();
+    }
+
+    private void CompleteExit(ToastEntry entry, BootstrapAnimation animation)
+    {
+        if (_disposing || !ReferenceEquals(entry.Transition, animation))
+        {
+            return;
+        }
+
+        entry.Transition = null;
+        animation.Dispose();
         RemoveEntryAndDispose(entry);
 
-        if (!_suppressPromotion)
+        if (_suppressPromotion)
         {
-            PromoteQueuedToasts();
-            ReflowVisibleToasts();
+            return;
         }
+
+        PromoteQueuedToasts();
+        StartReflow();
     }
 
     private void RemoveEntryAndDispose(ToastEntry entry)
     {
+        CancelEntryTransition(entry);
         var toast = entry.Toast;
         _entries.Remove(entry);
 
@@ -291,7 +447,7 @@ public class BootstrapToastContainer : Panel
             return;
         }
 
-        while (CountVisibleEntries() < _maximumVisibleToasts)
+        while (CountOccupiedSlots() < _maximumVisibleToasts)
         {
             var next = _entries.FirstOrDefault(entry => entry.State == BootstrapToastHostState.Queued);
             if (next is null)
@@ -299,41 +455,33 @@ public class BootstrapToastContainer : Panel
                 break;
             }
 
-            Promote(next);
+            BeginEnter(next);
         }
     }
 
-    private void Promote(ToastEntry entry)
+    private void ReconcileMaximumVisible()
     {
-        var toast = entry.Toast;
-        if (toast.IsDisposed)
+        CancelReflow();
+        while (CountOccupiedSlots() > _maximumVisibleToasts)
         {
-            _entries.Remove(entry);
-            return;
-        }
+            var candidate = _entries.LastOrDefault(entry =>
+                entry.State == BootstrapToastHostState.Visible ||
+                entry.State == BootstrapToastHostState.Entering);
+            if (candidate is null)
+            {
+                break;
+            }
 
-        RecomputeHeight(toast);
-        entry.State = BootstrapToastHostState.Visible;
-        toast.NotifyEnterStarted();
-        toast.Visible = true;
-        ReflowVisibleToasts();
-        toast.NotifyEnterCompleted();
-    }
-
-    private void ReconcileVisibleCount()
-    {
-        var visible = _entries.Where(entry => entry.State == BootstrapToastHostState.Visible).ToArray();
-        for (var index = _maximumVisibleToasts; index < visible.Length; index++)
-        {
-            visible[index].State = BootstrapToastHostState.Queued;
-            visible[index].Toast.NotifyEnterStarted();
-            visible[index].Toast.Visible = false;
+            CancelEntryTransition(candidate);
+            candidate.State = BootstrapToastHostState.Queued;
+            candidate.Toast.NotifyEnterStarted();
+            candidate.Toast.Visible = false;
         }
     }
 
-    private int CountVisibleEntries()
+    private int CountOccupiedSlots()
     {
-        return _entries.Count(entry => entry.State == BootstrapToastHostState.Visible);
+        return _entries.Count(entry => entry.State != BootstrapToastHostState.Queued);
     }
 
     private void RecomputeOwnedHeights()
@@ -358,61 +506,253 @@ public class BootstrapToastContainer : Panel
 
     private void OnToastPreferredHeightChanged(BootstrapToast toast)
     {
-        if (_disposing || _reflowing || toast.IsDisposed)
+        if (_disposing || _reflowingLayout || toast.IsDisposed)
         {
             return;
         }
 
-        if (!_entries.Any(entry => ReferenceEquals(entry.Toast, toast)))
+        var entry = _entries.FirstOrDefault(candidate => ReferenceEquals(candidate.Toast, toast));
+        if (entry is null)
         {
             return;
         }
 
         RecomputeHeight(toast);
-        ReflowVisibleToasts();
+        if (entry.State == BootstrapToastHostState.Visible)
+        {
+            StartReflow();
+        }
+        else if (entry.State == BootstrapToastHostState.Entering)
+        {
+            SnapForHostGeometryChange();
+        }
     }
 
-    private void ReflowVisibleToasts()
+    private void StartReflow()
     {
-        if (_disposing || IsDisposed || _reflowing)
+        if (_disposing || IsDisposed || _reflowingLayout)
         {
             return;
         }
 
-        var visible = _entries
+        CancelReflow();
+        var targets = CalculateTargetMap();
+        var stable = _entries
             .Where(entry => entry.State == BootstrapToastHostState.Visible && !entry.Toast.IsDisposed)
+            .Select(entry => new ReflowGeometry(entry, entry.Toast.Bounds, targets[entry]))
+            .Where(geometry => geometry.Start != geometry.Target)
             .ToArray();
-        if (visible.Length == 0)
+        if (stable.Length == 0)
         {
+            SnapForHostGeometryChange();
             return;
         }
 
-        _reflowing = true;
-        try
+        var duration = Math.Max(1, stable.Max(geometry => geometry.Entry.Toast.AnimationDuration));
+        var animation = _animationFactory(
+            TimeSpan.FromMilliseconds(duration),
+            BootstrapEasing.EaseInOut,
+            this);
+        _reflowAnimation = animation;
+
+        animation.ProgressChanged += (_, _) =>
         {
-            foreach (var entry in visible)
+            if (_disposing || !ReferenceEquals(_reflowAnimation, animation))
             {
-                RecomputeHeight(entry.Toast);
+                return;
             }
 
-            var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-            var bounds = BootstrapToastLayoutLogic.CalculateStackBounds(
-                ClientRectangle,
-                visible.Select(entry => entry.Toast.Size).ToArray(),
-                _placement,
-                _toastSpacing,
-                _maximumVisibleToasts,
-                dpi);
-
-            for (var index = 0; index < visible.Length && index < bounds.Count; index++)
+            _reflowingLayout = true;
+            try
             {
-                visible[index].Toast.Bounds = bounds[index];
+                foreach (var geometry in stable)
+                {
+                    if (!geometry.Entry.Toast.IsDisposed && geometry.Entry.State == BootstrapToastHostState.Visible)
+                    {
+                        geometry.Entry.Toast.Bounds = Lerp(geometry.Start, geometry.Target, animation.Progress);
+                    }
+                }
+            }
+            finally
+            {
+                _reflowingLayout = false;
+            }
+        };
+        animation.Completed += (_, _) => CompleteReflow(animation, stable);
+        animation.Start();
+    }
+
+    private void CompleteReflow(BootstrapAnimation animation, IReadOnlyList<ReflowGeometry> geometries)
+    {
+        if (_disposing || !ReferenceEquals(_reflowAnimation, animation))
+        {
+            return;
+        }
+
+        _reflowAnimation = null;
+        animation.Dispose();
+        _reflowingLayout = true;
+        try
+        {
+            foreach (var geometry in geometries)
+            {
+                if (!geometry.Entry.Toast.IsDisposed && geometry.Entry.State == BootstrapToastHostState.Visible)
+                {
+                    geometry.Entry.Toast.Bounds = geometry.Target;
+                }
             }
         }
         finally
         {
-            _reflowing = false;
+            _reflowingLayout = false;
         }
+    }
+
+    private void SnapForHostGeometryChange()
+    {
+        if (_disposing || IsDisposed || _reflowingLayout)
+        {
+            return;
+        }
+
+        var targets = CalculateTargetMap();
+        _reflowingLayout = true;
+        try
+        {
+            foreach (var pair in targets)
+            {
+                var entry = pair.Key;
+                var target = pair.Value;
+                if (entry.Toast.IsDisposed || entry.State == BootstrapToastHostState.Exiting)
+                {
+                    continue;
+                }
+
+                if (entry.State == BootstrapToastHostState.Visible)
+                {
+                    entry.Toast.Bounds = target;
+                }
+                else if (entry.State == BootstrapToastHostState.Entering)
+                {
+                    entry.Toast.Bounds = new Rectangle(
+                        entry.Toast.Left,
+                        target.Y,
+                        target.Width,
+                        target.Height);
+                }
+            }
+        }
+        finally
+        {
+            _reflowingLayout = false;
+        }
+    }
+
+    private Dictionary<ToastEntry, Rectangle> CalculateTargetMap()
+    {
+        var active = _entries
+            .Where(entry => entry.State != BootstrapToastHostState.Queued && !entry.Toast.IsDisposed)
+            .ToArray();
+        var result = new Dictionary<ToastEntry, Rectangle>();
+        if (active.Length == 0)
+        {
+            return result;
+        }
+
+        foreach (var entry in active)
+        {
+            if (entry.State != BootstrapToastHostState.Exiting)
+            {
+                RecomputeHeight(entry.Toast);
+            }
+        }
+
+        var bounds = BootstrapToastLayoutLogic.CalculateStackBounds(
+            ClientRectangle,
+            active.Select(entry => entry.Toast.Size).ToArray(),
+            _placement,
+            _toastSpacing,
+            Math.Max(_maximumVisibleToasts, active.Length),
+            GetCurrentDpi());
+        for (var index = 0; index < active.Length && index < bounds.Count; index++)
+        {
+            result[active[index]] = bounds[index];
+        }
+
+        return result;
+    }
+
+    private Rectangle GetTargetBounds(ToastEntry entry)
+    {
+        var targets = CalculateTargetMap();
+        return targets.TryGetValue(entry, out var target) ? target : entry.Toast.Bounds;
+    }
+
+    private void CancelEntryTransition(ToastEntry entry)
+    {
+        var animation = entry.Transition;
+        entry.Transition = null;
+        if (animation is null)
+        {
+            return;
+        }
+
+        animation.Stop();
+        animation.Dispose();
+    }
+
+    private void CancelReflow()
+    {
+        var animation = _reflowAnimation;
+        _reflowAnimation = null;
+        if (animation is null)
+        {
+            return;
+        }
+
+        animation.Stop();
+        animation.Dispose();
+    }
+
+    private void OnContainerVisibleChanged(object? sender, EventArgs e)
+    {
+        if (_disposing)
+        {
+            return;
+        }
+
+        foreach (var entry in _entries)
+        {
+            if (!entry.Toast.IsDisposed)
+            {
+                entry.Toast.NotifyHostVisibilityChanged(Visible);
+            }
+        }
+    }
+
+    private int GetCurrentDpi()
+    {
+        return DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+    }
+
+    private static bool IsLeftPlacement(BootstrapToastPlacement placement)
+    {
+        return placement == BootstrapToastPlacement.TopLeft ||
+               placement == BootstrapToastPlacement.BottomLeft;
+    }
+
+    private static int Lerp(int start, int end, double progress)
+    {
+        return (int)Math.Round(start + ((end - start) * progress), MidpointRounding.AwayFromZero);
+    }
+
+    private static Rectangle Lerp(Rectangle start, Rectangle end, double progress)
+    {
+        return new Rectangle(
+            Lerp(start.X, end.X, progress),
+            Lerp(start.Y, end.Y, progress),
+            Lerp(start.Width, end.Width, progress),
+            Lerp(start.Height, end.Height, progress));
     }
 
     private static void ValidatePlacement(BootstrapToastPlacement placement)
