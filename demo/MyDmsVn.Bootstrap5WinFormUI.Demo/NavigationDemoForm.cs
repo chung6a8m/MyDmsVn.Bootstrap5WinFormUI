@@ -182,13 +182,14 @@ public sealed class NavigationDemoForm : Form
         };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-        panel.Controls.Add(new Label
+        var titleLabel = new Label
         {
             AutoSize = true,
-            Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold),
             Text = title,
             Margin = new Padding(0, 0, 0, 2)
-        }, 0, 0);
+        };
+        titleLabel.Font = new Font(titleLabel.Font, FontStyle.Bold);
+        panel.Controls.Add(titleLabel, 0, 0);
         panel.Controls.Add(new Label
         {
             AutoSize = true,
