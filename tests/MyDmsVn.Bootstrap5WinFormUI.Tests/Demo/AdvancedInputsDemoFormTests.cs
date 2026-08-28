@@ -44,6 +44,7 @@ public sealed class AdvancedInputsDemoFormTests
         form.PerformLayout();
 
         var comboBoxes = FindControls<BootstrapComboBox>(form).ToArray();
+        var labels = FindControls<Label>(form).ToArray();
 
         Assert.Multiple((Action)(() =>
         {
@@ -58,10 +59,16 @@ public sealed class AdvancedInputsDemoFormTests
                 !string.IsNullOrEmpty(box.DisplayMember) &&
                 !string.IsNullOrEmpty(box.ValueMember)), Is.True);
             Assert.That(comboBoxes.Any(box => box.LeadingIcon is not null), Is.True);
+            Assert.That(comboBoxes.Any(box => box.LeadingIcon is null), Is.True);
+            Assert.That(comboBoxes.Any(box => box.Items.Cast<object>().Any(item => (box.GetItemText(item) ?? string.Empty).Length >= 50)), Is.True);
             Assert.That(comboBoxes.Any(box => box.ValidationState == BootstrapValidationState.Valid), Is.True);
             Assert.That(comboBoxes.Any(box => box.ValidationState == BootstrapValidationState.Invalid), Is.True);
             Assert.That(comboBoxes.Any(box => !box.Enabled), Is.True);
             Assert.That(comboBoxes.Any(box => box.BorderRadius == 8), Is.True);
+            Assert.That(labels.Any(label =>
+                label.Text.IndexOf("WinForms", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                label.Text.IndexOf("popup", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                label.Text.IndexOf("OS", StringComparison.OrdinalIgnoreCase) >= 0), Is.True);
         }));
     }
 
