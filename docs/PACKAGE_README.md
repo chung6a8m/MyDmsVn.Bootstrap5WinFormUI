@@ -11,7 +11,9 @@ The library is native WinForms. It does not require a browser, WebView, Bootstra
 
 ## Included foundation controls
 
-`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapTextBox`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, and `BootstrapTabControl`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
+`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, and `BootstrapTabControl`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
+
+`BootstrapNumericBox` is a native-backed numeric input. It owns one borderless WinForms `NumericUpDown` and forwards `Value`, `Minimum`, `Maximum`, `Increment`, `DecimalPlaces`, `ThousandsSeparator`, and `ReadOnly` directly, while the framework owns the themed shell, validation/focus rendering, DPI layout, single public tab stop, and `BorderRadius`. Native range exceptions, spin buttons, Up/Down keys, mouse wheel, parsing, and formatting semantics remain native.
 
 `BootstrapPagination` is a data-source-agnostic composite control. Applications own data retrieval/slicing and react to `PageChanged`; the control owns only page state and navigation presentation.
 
@@ -38,6 +40,21 @@ var saveButton = new BootstrapButton
     Text = "Save",
     Variant = BootstrapVariant.Primary,
     AutoSize = true
+};
+
+var amount = new BootstrapNumericBox
+{
+    Minimum = 0m,
+    Maximum = 1000000m,
+    Increment = 0.25m,
+    DecimalPlaces = 2,
+    ThousandsSeparator = true,
+    Value = 1250.50m,
+    ValidationState = BootstrapValidationState.Valid
+};
+amount.ValueChanged += (_, _) =>
+{
+    // React to the native numeric value change through the wrapper event.
 };
 
 var statusBadge = new BootstrapBadge
@@ -91,7 +108,9 @@ pagination.PageChanged += (_, _) =>
 };
 ```
 
-Runtime Light/Dark switching is handled through `BootstrapThemeManager`. Pagination inherits that behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children; Badge, Alert, and TabControl directly update their semantic presentation and theme-owned fonts through the existing theme lifecycle; Tooltip resolves the current theme only when its native Popup/Draw events execute. None introduces a separate theme service.
+Runtime Light/Dark switching is handled through `BootstrapThemeManager`. NumericBox, Badge, Alert, and TabControl directly update their semantic presentation and theme-owned fonts through the existing theme lifecycle; Pagination inherits theme behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children; Tooltip resolves the current theme only when its native Popup/Draw events execute. None introduces a separate theme service.
+
+The integrated demo exposes NumericBox under **Advanced Inputs**, including integer/default, decimal, thousands, signed-range, valid/invalid, read-only, disabled, and live `ValueChanged` scenarios.
 
 ## Icons
 
@@ -99,7 +118,7 @@ The core package contains source-neutral icon contracts and built-in Segoe MDL2/
 
 ## Release candidate status
 
-`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, and Stage 4 `BootstrapTabControl` were added deliberately on the RC line and the compatibility fingerprint was re-reviewed before approval. The assembly compatibility version remains `1.0.0.0`.
+`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, and Stage 5 `BootstrapNumericBox` were added deliberately on the RC line and the compatibility fingerprint is re-reviewed whenever an exported surface is added. The assembly compatibility version remains `1.0.0.0`.
 
 The package is a release candidate, not an automatic NuGet.org publication.
 

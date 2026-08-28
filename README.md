@@ -54,6 +54,7 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapButtonGroup`
 - `BootstrapButtonToolbar`
 - `BootstrapTextBox`
+- `BootstrapNumericBox`
 - `BootstrapCard`
 - `BootstrapCollapse`
 - `BootstrapAccordion`
@@ -69,7 +70,9 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 
 ## Integrated demo
 
-The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, Pagination, and Navigation / Tabs. Light/Dark switching and Reduced motion remain available while navigating.
+The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Advanced Inputs, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, Pagination, and Navigation / Tabs. Light/Dark switching and Reduced motion remain available while navigating.
+
+The Advanced Inputs page is the shared native-backed input showcase. Stage 5 adds `BootstrapNumericBox` examples for integer/default values, decimal formatting/increments, thousands separators, signed ranges, validation states, read-only behavior, disabled behavior, and live `ValueChanged` feedback. Later ComboBox and DatePicker stages extend the same page rather than creating competing top-level demos.
 
 The Feedback page hosts the component-expansion feedback controls. `BootstrapBadge` covers semantic, pill/custom/disabled, and long-text states; `BootstrapAlert` adds all semantic variants, optional icons, native keyboard-accessible dismissal, multiline/disabled/custom-radius states, and restore cycles; `BootstrapTooltip` adds default Dark, semantic and custom-color owner-drawn popups, explicit multiline/long captions, one Tooltip associated with multiple controls, and live native timing/state forwarding. The page remains the shared runtime Light/Dark and real-Windows 100–200% DPI verification surface.
 
@@ -109,6 +112,8 @@ Tooltip is a thin `Component + IExtenderProvider` wrapper over one owned native 
 
 Tabs remain native-backed: `BootstrapTabControl` derives from WinForms `TabControl`, preserves `TabPage`, `TabPages`, selection/events, focus/keyboard, native images/tooltips, and overflow behavior, and custom-paints only the native header rectangles. Header metrics reuse Theme/DPI/Rendering helpers; the control owns one deterministic theme subscription/theme-created font lifecycle and introduces no timer, animation engine, page wrapper, custom window, or external package.
 
+NumericBox is likewise native-backed: `BootstrapNumericBox` owns one borderless WinForms `NumericUpDown` and forwards value/range/increment/formatting/read-only semantics directly. The wrapper owns the single public tab stop, themed shell, validation/focus presentation, DPI layout, and theme/font lifecycle without replacing native parsing, spin, wheel, or boundary behavior.
+
 See [Phase 15 — Hardening and API review](docs/PHASE15_HARDENING_AND_API_REVIEW.md) for the audit findings and the real-Windows/manual checks carried into release validation.
 
 ## Documentation
@@ -131,7 +136,7 @@ The primary sources of truth are:
 
 ## Status
 
-Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, and Stage 4 `BootstrapTabControl` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
+Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, and Stage 5 `BootstrapNumericBox` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
 
 The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 

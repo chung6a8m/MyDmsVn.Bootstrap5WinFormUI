@@ -17,10 +17,12 @@ All notable release-facing changes to this project are documented here.
 - Expanded the shared Feedback demo with default Dark, semantic Info, custom-color, explicit multiline/long-caption, multiple-control association, and live Tooltip timing/state scenarios.
 - `BootstrapTabControl`, a native-backed WinForms `TabControl` with Bootstrap-inspired Tabs, Pills, and Underline header styles, semantic selected accents, uniform Fill sizing, DPI-scaled header metrics, runtime Light/Dark switching, and deterministic theme/font lifecycle.
 - Integrated Navigation / Tabs demo covering all three header styles, all eight semantic variants, native `TabPage` composition and `SelectedIndexChanged`, Fill sizing, `ImageList`/`ImageKey`/`ImageIndex`, tooltip text, disabled pages, and long labels.
+- `BootstrapNumericBox`, a native-backed numeric input that owns one borderless WinForms `NumericUpDown`, directly forwards value/range/increment/formatting/read-only semantics, and adds Bootstrap-themed validation/focus/radius/DPI presentation with a single wrapper `ValueChanged` path.
+- Integrated Advanced Inputs demo page with integer/default, decimal, thousands-separator, signed-range, valid/invalid, read-only, disabled, and live NumericBox `ValueChanged` scenarios; the page is intentionally reusable by later ComboBox and DatePicker stages.
 
 ### Changed
 
-- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, and `BootstrapTabControl` surfaces; all component-specific render/layout helpers remain internal and `AssemblyVersion` remains `1.0.0.0`.
+- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, `BootstrapTabControl`, and `BootstrapNumericBox` surfaces; all component-specific render/layout helpers remain internal and `AssemblyVersion` remains `1.0.0.0`.
 
 ## [1.0.0-rc.1] - 2026-08-28
 

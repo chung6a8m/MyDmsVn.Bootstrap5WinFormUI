@@ -193,6 +193,11 @@ public sealed class MainForm : Form
             () => new TextBoxCardDemoForm());
 
         AddPage(
+            "Advanced Inputs",
+            "Native-backed NumericBox, ComboBox, and DatePicker scenarios with validation, formatting, keyboard, and DPI checks.",
+            () => new AdvancedInputsDemoForm());
+
+        AddPage(
             "Cards",
             "Themed surfaces with Header/Body/Footer composition, borders, radius, and shadow states.",
             () => new TextBoxCardDemoForm());
