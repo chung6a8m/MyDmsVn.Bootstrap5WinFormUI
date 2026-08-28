@@ -155,6 +155,15 @@ BootstrapDropdown Stage 7 pure tests cover:
 - `BootstrapDropdownItemKind` accepting only `Item` and `Separator`
 - Null text normalization, immutable kind, default enabled/unchecked state, item sender identity for `Click`, and null-safe collection insertion/replacement
 
+BootstrapDatePicker Stage 9 pure tests cover:
+
+- Native `DateTimePicker` default/range/format/custom-format/checkbox characterization without framework assumptions about locale-specific rendered strings
+- Disabled/valid/invalid/focused/neutral border palette priority through the established TextBox validation model
+- Enabled/disabled surface and foreground selection from the current theme
+- Validation-state/radius rejection plus null-theme and invalid-DPI guards before usable output
+- DPI scaling at logical 96/120/144/168/192 for `SpacingXS`, border/focus widths, and theme/explicit radius
+- Native-picker bounds containment for normal, narrow, tiny, empty, and malformed clients without negative rectangles
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -327,6 +336,19 @@ For BootstrapComboBox Stage 6, stay on **Advanced Inputs**. Verify unbound items
 
 For BootstrapDropdown Stage 7, use the **Navigation / Tabs** page and the basic/icon/state/long/stress dropdown scenarios. Verify target mouse and Enter/Space activation; native Up/Down/Home/End navigation; item Enter activation; Escape and outside-click dismissal; checked, disabled, separator, long-text and empty-collection behavior; and item `Click` mutation reflected on the next opening. Switch Light/Dark while the popup is open and between openings. Open near bottom/right working-area edges and on a secondary monitor when available to confirm native placement remains authoritative. Repeat at 100/125/150/175/200% real Windows scaling and run repeated open/close/theme-switch cycles while checking focus restoration, stale artifacts, duplicate events, and GDI/image exceptions. No custom submenu, split-button, arbitrary-content, rounded-popup-host, placement, or animation behavior is expected in Stage 7.
 
+BootstrapDatePicker Stage 9 STA tests verify:
+
+- Designer-safe/native defaults, `DefaultProperty(Value)`, `DefaultEvent(ValueChanged)`, `AccessibleRole.DropList`, and the exact planned public framework member surface
+- Exactly one owned native `DateTimePicker`, wrapper-owned single tab stop, native child `TabStop = false`, and intentionally internal `ShowUpDown = false`
+- Direct forwarding/parity for value, range, `DateTimePickerFormat`, custom format, optional checkbox state, native exceptions, range-driven changes, and effective `ValueChanged` event counts
+- Wrapper focus redirection plus exactly-once native KeyDown/KeyPress/KeyUp/PreviewKeyDown forwarding without a second keyboard/date model
+- Native DropDown/CloseUp calendar transitions remaining available on the owned picker, culture-sensitive native text parity, and no custom calendar/popup/parser surface
+- Runtime Light/Dark shell/font updates while preserving native state; caller-owned font preservation; theme subscription/framework-font cleanup; repeated lifecycle stress
+- Draw/layout smoke for neutral/valid/invalid/disabled/explicit-radius states and pure layout parity without painting over native content
+- Advanced Inputs demo coverage for Long/Short/Time, custom date/date-time, optional unchecked checkbox, constrained range, validation, disabled, explicit radius, live `ValueChanged`, and native-calendar ownership guidance
+
+Manual BootstrapDatePicker verification remains required on real Windows for calendar popup behavior, locale-sensitive text/formatting, keyboard/focus traversal, and physical DPI rendering because those surfaces are owned by WinForms/Windows rather than the framework shell.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -377,6 +399,8 @@ ComboBox pure tests cover 96/120/144/168/192 logical item/icon/padding/border/fo
 
 Dropdown pure tests cover 96/120/144/168/192 logical item padding, icon size, separator inset, border width, and target-relative minimum-width scaling. The Navigation page remains the OS-level gate for actual `ToolStripDropDownMenu` `DeviceDpi`, item/text/check geometry, monitor-edge placement, focus restoration, and native keyboard/AutoClose behavior.
 
+DatePicker pure tests cover 96/120/144/168/192 logical shell padding, border/focus widths, radius, and native-picker containment. The Advanced Inputs page remains the OS-level gate for actual `DeviceDpi`, localized native text, checkbox/dropdown affordance, native calendar popup geometry/navigation, focus cues, and physical shell-border rendering; the framework does not replace or normalize the popup.
+
 ## 4. Theme matrix
 
 Every in-scope control must be checked under:
@@ -408,6 +432,8 @@ NumericBox owns one direct theme subscription because its wrapper custom-paints 
 ComboBox owns one direct theme subscription because it owner-draws item presentation, paints the shell border, and owns a theme-created Body font. Tests verify runtime Light/Dark changes preserve `Items`/`DataSource`, selected item/value/index, DropDown mode, and autocomplete configuration; disposal returns the static theme-handler count to baseline without disposing caller-owned fonts or renderers.
 
 Dropdown owns one direct theme subscription because an already-open native popup must refresh semantic renderer state and generated icon bitmaps after a runtime theme switch. Theme-matrix tests verify the same public item models remain authoritative, generated images are replaced/disposed rather than retained, and component disposal removes the subscription without disposing the caller-owned target, item models, descriptors, or target `IconRenderer`.
+
+DatePicker owns one direct theme subscription because its wrapper paints the shell and owns a theme-created `Body` font. Theme-matrix tests verify the same native-backed instance preserves value/range/format/custom-format/checkbox state while palette/font/layout update, and disposal returns the static theme-handler count to baseline without disposing caller-owned fonts.
 
 ## 5. Interaction matrix
 
@@ -631,3 +657,4 @@ Manual Feedback-page verification must cover both Light and Dark themes, normal 
 Stage 8 participates in the Phase 16 public/protected API fingerprint gate. The gate must first fail against the prior approved hash, the reconstructed export must be reviewed for only `BootstrapToastPlacement`, `BootstrapToast`, and `BootstrapToastContainer`, and only then may the fingerprint be updated. Palette/layout/timer/ownership/animation test seams remain internal/private and `AssemblyVersion` remains `1.0.0.0`.
 
 Both `net48` and `net8.0-windows` must pass the focused Toast/Feedback/demo suite, shared Animation/Alert regressions, and the complete test suite before Stage 8 is considered complete.
+
