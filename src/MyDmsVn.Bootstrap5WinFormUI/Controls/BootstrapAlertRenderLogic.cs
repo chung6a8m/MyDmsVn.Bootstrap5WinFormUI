@@ -5,25 +5,6 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
-internal readonly struct BootstrapAlertPalette
-{
-    public BootstrapAlertPalette(Color surface, Color border, Color foreground, Color focus)
-    {
-        Surface = surface;
-        Border = border;
-        Foreground = foreground;
-        Focus = focus;
-    }
-
-    public Color Surface { get; }
-
-    public Color Border { get; }
-
-    public Color Foreground { get; }
-
-    public Color Focus { get; }
-}
-
 internal readonly struct BootstrapAlertMetrics
 {
     public BootstrapAlertMetrics(
@@ -47,19 +28,12 @@ internal readonly struct BootstrapAlertMetrics
     }
 
     public int HorizontalPadding { get; }
-
     public int VerticalPadding { get; }
-
     public int ContentSpacing { get; }
-
     public int IconSize { get; }
-
     public int CloseButtonSize { get; }
-
     public int BorderWidth { get; }
-
     public int FocusBorderWidth { get; }
-
     public int Radius { get; }
 }
 
@@ -82,63 +56,26 @@ internal readonly struct BootstrapAlertLayout
     }
 
     public Rectangle SurfaceBounds { get; }
-
     public Rectangle ContentBounds { get; }
-
     public Rectangle IconBounds { get; }
-
     public Rectangle TextBounds { get; }
-
     public Rectangle CloseBounds { get; }
-
     public CornerRadius CornerRadius { get; }
 }
 
 internal static class BootstrapAlertRenderLogic
 {
-    private const float SurfaceSemanticAmount = 0.12f;
-    private const float BorderSemanticAmount = 0.45f;
-    private const float ForegroundSemanticAmount = 0.72f;
-    private const double MinimumTextContrast = 4.5d;
-
     public static void ValidateVariant(BootstrapVariant variant)
     {
-        if (variant < BootstrapVariant.Primary || variant > BootstrapVariant.Dark)
-        {
-            throw new ArgumentOutOfRangeException(nameof(variant), variant, "Unsupported Bootstrap variant.");
-        }
+        BootstrapFeedbackRenderLogic.ValidateVariant(variant);
     }
 
-    public static BootstrapAlertPalette ResolvePalette(
+    public static BootstrapFeedbackPalette ResolvePalette(
         BootstrapThemeColors colors,
         BootstrapVariant variant,
         bool enabled)
     {
-        if (colors is null)
-        {
-            throw new ArgumentNullException(nameof(colors));
-        }
-
-        ValidateVariant(variant);
-
-        if (!enabled)
-        {
-            return new BootstrapAlertPalette(
-                colors.SurfaceSecondary,
-                colors.Border,
-                colors.MutedText,
-                colors.Disabled);
-        }
-
-        var semantic = BootstrapVariantColorResolver.Resolve(colors, variant);
-        var surface = ColorUtil.Blend(semantic, colors.Surface, SurfaceSemanticAmount);
-        var border = ColorUtil.Blend(semantic, colors.Border, BorderSemanticAmount);
-        var foregroundCandidate = ColorUtil.Blend(semantic, colors.Text, ForegroundSemanticAmount);
-        var foreground = ColorUtil.GetContrastRatio(foregroundCandidate, surface) >= MinimumTextContrast
-            ? foregroundCandidate
-            : colors.Text;
-
-        return new BootstrapAlertPalette(surface, border, foreground, colors.Focus);
+        return BootstrapFeedbackRenderLogic.ResolvePalette(colors, variant, enabled);
     }
 
     public static BootstrapAlertMetrics ResolveMetrics(
