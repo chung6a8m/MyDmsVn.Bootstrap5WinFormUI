@@ -658,8 +658,73 @@ Behavior:
 
 Manual verification: choose **Navigation / Tabs** in the integrated demo and exercise the Dropdown basic/icon/state/long/stress scenarios. Verify target mouse and Enter/Space activation, Up/Down/Home/End plus item Enter, Escape/outside-click dismissal, checked/disabled/separator policy, runtime item mutation between openings, target replacement/disposal, and repeated Light/Dark switches. Repeat near bottom/right working-area edges, on a secondary monitor when available, and at 100/125/150/175/200% real Windows scaling. Repeated open/close/theme-switch cycles must not leave stale images, duplicate events, or disposed-GDI exceptions.
 
+## BootstrapToast and BootstrapToastContainer
+
+Responsibility: provide transient Bootstrap-inspired application feedback while keeping notification placement explicit in the application's WinForms control tree and making ownership/lifetime deterministic.
+
+Stage 8 of the component-expansion roadmap finalizes the public concepts as:
+
+```text
+BootstrapToastPlacement: TopLeft | TopRight | BottomLeft | BottomRight
+
+BootstrapToast : UserControl
+BootstrapToast.Title
+BootstrapToast.Text
+BootstrapToast.Variant
+BootstrapToast.Icon
+BootstrapToast.IconRenderer
+BootstrapToast.Dismissible
+BootstrapToast.AutoHide
+BootstrapToast.AutoHideDelay
+BootstrapToast.AnimationDuration
+BootstrapToast.Dismissed
+BootstrapToast.Dismiss()
+
+BootstrapToastContainer : Panel
+BootstrapToastContainer.Placement
+BootstrapToastContainer.ToastSpacing
+BootstrapToastContainer.MaximumVisibleToasts
+BootstrapToastContainer.ShowToast(BootstrapToast)
+BootstrapToastContainer.DismissAll()
+```
+
+Behavior:
+
+- `BootstrapToast` is a caller-configured feedback surface. `Title` and inherited `Text` default to empty strings; `Variant = Primary`; `Icon = null`; `IconRenderer` is non-null; `Dismissible = true`; `AutoHide = true`; `AutoHideDelay = 5000`; `AnimationDuration = 200`; `TabStop = false`; `AccessibleRole = Alert`. `AutoHideDelay` and `AnimationDuration` must be greater than zero and undefined variants are rejected before mutation.
+- Toast and Alert share the existing feedback palette/layout rules rather than maintaining competing semantic-color formulas. Toast adds title/body composition and transition/lifetime state, but does not introduce a second feedback color system.
+- `Dismissible = true` exposes one private native close button. The Toast itself stays outside the tab sequence; the native close affordance remains keyboard/accessibility capable. Programmatic `Dismiss()` is the canonical dismissal request even when the Toast is not user-dismissible.
+- `BootstrapToastContainer` is placed by the application like any other WinForms `Panel`; Stage 8 does not create a global/static notification service, overlay manager, hidden application singleton, or framework-owned top-level `Form`.
+- `Placement` supports all four corners. `ToastSpacing` is a non-negative logical value and `MaximumVisibleToasts` is at least one. Layout uses a pure stack calculation with DPI-scaled spacing/padding and no arbitrary absolute-screen positioning.
+- `ShowToast(toast)` is the ownership boundary. Before a successful call, the caller owns the Toast and may configure or dispose it. After a successful call, ownership transfers to the container, including queued Toasts. The caller must not dispose, reparent, remove from `Controls`, or manually toggle `Visible`; the container deterministically disposes an owned Toast after dismissal completes or when the container itself is disposed.
+- The container owns one FIFO queue and never displays more than `MaximumVisibleToasts`. Queued Toasts remain hidden and do not start enter animation or auto-hide time. When a visible Toast finishes dismissal, the next queued Toast is promoted in insertion order unless a `DismissAll()` snapshot is being drained.
+- `Dismissed` is raised exactly once when logical dismissal is accepted. For container-owned Toasts, that event happens before exit animation and disposal complete. Repeated dismissal requests, stale auto-hide ticks, and direct hidden-state transitions do not produce duplicate events.
+- Enter and exit use the shared finite `BootstrapAnimation` infrastructure. Each Toast has at most one active transition; the container uses at most one survivor-reflow animation. Dismissal during enter reverses from the current visual position without jumping. Completed exit removes/disposes the Toast and promotes queued work; stale animation callbacks are ignored through generation/cancellation guards.
+- `AnimationDuration` is a logical millisecond duration for Toast enter/exit/reflow transitions. Runtime reduced-motion mode completes those transitions synchronously instead of scheduling frame work; it does not change `AutoHideDelay` or cause auto-hide to fire immediately.
+- Auto-hide countdown starts only after a Toast's enter transition has completed and only while the owning host is active/visible. Changing `AutoHide` or `AutoHideDelay` while a currently visible Toast is eligible restarts/cancels the countdown according to the new value. Queued Toasts never consume lifetime. Stale ticks from a replaced/cancelled timer generation are ignored.
+- Hiding the container pauses transition scheduling through the shared animation owner lifecycle and suspends Toast lifetime work. Showing the host resumes from retained state rather than charging hidden wall-clock time. Disposal cancels timers/animations, detaches ownership callbacks, and disposes all active/queued Toasts exactly once.
+- Runtime Light/Dark switches update Toast presentation in place without resetting queue position, enter/exit progress, or an active auto-hide lifetime. Caller-assigned fonts/renderers/descriptors remain caller-owned; framework-created theme fonts and private children follow normal owned-resource cleanup.
+
+Package-facing usage:
+
+```csharp
+var toast = new BootstrapToast
+{
+    Title = "Saved",
+    Text = "Changes were saved successfully.",
+    Variant = BootstrapVariant.Success,
+    AutoHide = true,
+    AutoHideDelay = 5000
+};
+
+toastContainer.ShowToast(toast); // ownership transfers here
+```
+
+After the final line, use the Toast/container API to request dismissal rather than manually destroying or reparenting the instance.
+
+Manual verification: choose **Feedback** in the integrated demo. Exercise manual and auto-hide Toasts, title/body/icon/multiline/disabled states, Burst 8 with `MaximumVisibleToasts = 3`, `DismissAll()`, all four placements, rapid show-then-dismiss, and Stress 100. Repeat with Light/Dark and Reduced motion, resize while Toasts are active, hide/show the host, switch theme during auto-hide, and repeat at 100/125/150/175/200% real Windows scaling. For resource soak, repeat stress/dismiss cycles and inspect process USER/GDI handles for unbounded growth.
+
 ## Deferred components
 
-Toast, Dialog/Modal, Skeleton, DatePicker, and others are not part of the initial foundation contract.
+Dialog/Modal, Skeleton, DatePicker, and others are not part of the initial foundation contract.
 
 Before adding one, document which existing foundation pieces it reuses.
