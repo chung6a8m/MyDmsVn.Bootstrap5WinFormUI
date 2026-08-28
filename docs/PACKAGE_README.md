@@ -15,7 +15,7 @@ The library is native WinForms. It does not require a browser, WebView, Bootstra
 
 `BootstrapPagination` is a data-source-agnostic composite control. Applications own data retrieval/slicing and react to `PageChanged`; the control owns only page state and navigation presentation.
 
-`BootstrapBadge` is a compact, auto-sized, non-interactive text indicator. `Variant` selects an existing semantic color; `CustomColor` can override it; `Pill` selects half-height pill geometry; `BorderRadius = -1` uses the current theme radius.
+`BootstrapBadge` is a compact, auto-sized, non-interactive text indicator. `Variant` selects an existing semantic color; `CustomColor` accepts `Color.Empty` or a fully opaque override; `Pill` selects half-height pill geometry; `BorderRadius = -1` uses the current theme radius.
 
 ## Minimal example
 
