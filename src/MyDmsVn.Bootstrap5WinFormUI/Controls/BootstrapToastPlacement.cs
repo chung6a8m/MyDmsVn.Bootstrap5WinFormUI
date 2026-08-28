@@ -1,7 +1,7 @@
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 /// <summary>
-/// Defines the corner in which a <see cref="BootstrapToastContainer"/> stacks owned toast notifications.
+/// Defines the corner in which the toast container stacks owned toast notifications.
 /// </summary>
 public enum BootstrapToastPlacement
 {
