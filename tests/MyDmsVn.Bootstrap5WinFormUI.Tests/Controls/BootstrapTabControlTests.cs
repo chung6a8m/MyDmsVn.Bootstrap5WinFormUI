@@ -63,7 +63,9 @@ public sealed class BootstrapTabControlTests
     {
         var type = typeof(BootstrapTabControl);
         var publicDeclared = type.GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
-            .Where(member => member.MemberType is MemberTypes.Constructor or MemberTypes.Event or MemberTypes.Property or MemberTypes.Method)
+            .Where(member =>
+                member.MemberType is MemberTypes.Constructor or MemberTypes.Event or MemberTypes.Property ||
+                member is MethodInfo method && !method.IsSpecialName)
             .Select(member => member.Name)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(name => name, StringComparer.Ordinal)
@@ -90,15 +92,19 @@ public sealed class BootstrapTabControlTests
     [Test]
     public void NativeTabPagesRemainTheCompositionSurfaceAndSelectionEventRemainsNative()
     {
+        using var host = new Form();
         using var tabs = new BootstrapTabControl();
         var first = new TabPage("General");
         var second = new TabPage("Advanced");
-        var eventCount = 0;
-        tabs.SelectedIndexChanged += (_, _) => eventCount++;
-
         tabs.TabPages.Add(first);
         tabs.TabPages.Add(second);
-        eventCount = 0;
+        host.Controls.Add(tabs);
+        host.CreateControl();
+        tabs.CreateControl();
+        _ = tabs.Handle;
+
+        var eventCount = 0;
+        tabs.SelectedIndexChanged += (_, _) => eventCount++;
         tabs.SelectedTab = second;
 
         Assert.Multiple((Action)(() =>
