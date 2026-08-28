@@ -154,18 +154,6 @@ public class BootstrapComboBox : ComboBox
     }
 
     /// <inheritdoc />
-    public override Size GetPreferredSize(Size proposedSize)
-    {
-        var preferred = base.GetPreferredSize(proposedSize);
-        if (IsDisposed)
-        {
-            return preferred;
-        }
-
-        return new Size(preferred.Width, Math.Max(preferred.Height, Height));
-    }
-
-    /// <inheritdoc />
     protected override void OnDrawItem(DrawItemEventArgs e)
     {
         DrawBootstrapItem(e);
@@ -421,7 +409,7 @@ public class BootstrapComboBox : ComboBox
 
     private void ApplyOwnerDrawMetrics()
     {
-        if (IsDisposed || !IsHandleCreated)
+        if (IsDisposed)
         {
             return;
         }
@@ -431,7 +419,6 @@ public class BootstrapComboBox : ComboBox
         if (ItemHeight != nextHeight)
         {
             ItemHeight = nextHeight;
-            Parent?.PerformLayout(this, nameof(ItemHeight));
         }
     }
 
