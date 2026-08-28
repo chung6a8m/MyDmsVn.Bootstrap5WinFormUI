@@ -59,9 +59,9 @@ public sealed class FeedbackDemoToastTests
             Application.DoEvents();
 
             var host = FindControls<BootstrapToastContainer>(form).Single();
-            var buttons = FindControls<Button>(form).ToDictionary(
-                button => button.AccessibleName ?? string.Empty,
-                StringComparer.Ordinal);
+            var buttons = FindControls<Button>(form)
+                .Where(button => !string.IsNullOrEmpty(button.AccessibleName))
+                .ToDictionary(button => button.AccessibleName!, StringComparer.Ordinal);
 
             buttons["Show manual Toast"].PerformClick();
             buttons["Show icon multiline Toast"].PerformClick();
@@ -108,7 +108,8 @@ public sealed class FeedbackDemoToastTests
         {
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light, reducedMotion: true);
             using var form = new FeedbackDemoForm();
-            form.CreateControl();
+            form.Show();
+            Application.DoEvents();
             var host = FindControls<BootstrapToastContainer>(form).Single();
             var cycle = FindControls<Button>(form).Single(button => button.AccessibleName == "Cycle Toast placement");
 
@@ -116,6 +117,7 @@ public sealed class FeedbackDemoToastTests
             for (var index = 0; index < 4; index++)
             {
                 cycle.PerformClick();
+                Application.DoEvents();
                 observed.Add(host.Placement);
             }
 
@@ -142,11 +144,13 @@ public sealed class FeedbackDemoToastTests
         {
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light, reducedMotion: true);
             using var form = new FeedbackDemoForm();
-            form.CreateControl();
+            form.Show();
+            Application.DoEvents();
             var host = FindControls<BootstrapToastContainer>(form).Single();
             var manual = FindControls<Button>(form).Single(button => button.AccessibleName == "Show manual Toast");
 
             manual.PerformClick();
+            Application.DoEvents();
             var toast = host.Controls.OfType<BootstrapToast>().Single();
 
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark, reducedMotion: true);
