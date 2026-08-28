@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -70,6 +71,60 @@ public sealed class FeedbackDemoFormTests
     }
 
     [Test]
+    public void FeedbackDemoCoversStage3TooltipMatrixAndLiveTiming()
+    {
+        using var form = new FeedbackDemoForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var tooltips = GetTooltipComponents(form);
+        Assert.That(tooltips.Length, Is.GreaterThanOrEqualTo(3), "Stage 3 requires default, semantic, and custom Tooltip examples.");
+
+        var buttons = FindControls<Button>(form).ToArray();
+        var defaultTarget = buttons.Single(button => button.AccessibleName == "Default tooltip target");
+        var secondDefaultTarget = buttons.Single(button => button.AccessibleName == "Second default tooltip target");
+        var semanticTarget = buttons.Single(button => button.AccessibleName == "Semantic tooltip target");
+        var customTarget = buttons.Single(button => button.AccessibleName == "Custom tooltip target");
+        var multilineTarget = buttons.Single(button => button.AccessibleName == "Multiline tooltip target");
+        var longTarget = buttons.Single(button => button.AccessibleName == "Long tooltip target");
+
+        var defaultTooltip = tooltips.Single(tooltip => !string.IsNullOrEmpty(tooltip.GetToolTip(defaultTarget)));
+        var semanticTooltip = tooltips.Single(tooltip => !string.IsNullOrEmpty(tooltip.GetToolTip(semanticTarget)));
+        var customTooltip = tooltips.Single(tooltip => !string.IsNullOrEmpty(tooltip.GetToolTip(customTarget)));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(defaultTooltip.Variant, Is.EqualTo(BootstrapVariant.Dark));
+            Assert.That(defaultTooltip.CustomColor, Is.EqualTo(Color.Empty));
+            Assert.That(defaultTooltip.GetToolTip(secondDefaultTarget), Is.Not.Empty, "One Tooltip instance should serve multiple controls.");
+            Assert.That(semanticTooltip.Variant, Is.Not.EqualTo(BootstrapVariant.Dark));
+            Assert.That(semanticTooltip.CustomColor, Is.EqualTo(Color.Empty));
+            Assert.That(customTooltip.CustomColor, Is.Not.EqualTo(Color.Empty));
+            Assert.That(tooltips.Any(tooltip => tooltip.GetToolTip(multilineTarget).Contains("\n")), Is.True);
+            Assert.That(tooltips.Any(tooltip => tooltip.GetToolTip(longTarget).Length >= 70), Is.True);
+        }));
+
+        var timingEditors = FindControls<NumericUpDown>(form).ToDictionary(editor => editor.AccessibleName ?? string.Empty, StringComparer.Ordinal);
+        var active = FindControls<CheckBox>(form).Single(checkBox => checkBox.AccessibleName == "Tooltip Active");
+        var showAlways = FindControls<CheckBox>(form).Single(checkBox => checkBox.AccessibleName == "Tooltip ShowAlways");
+
+        timingEditors["Tooltip InitialDelay"].Value = 275;
+        timingEditors["Tooltip ReshowDelay"].Value = 80;
+        timingEditors["Tooltip AutoPopDelay"].Value = 4250;
+        active.Checked = false;
+        showAlways.Checked = true;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(defaultTooltip.InitialDelay, Is.EqualTo(275));
+            Assert.That(defaultTooltip.ReshowDelay, Is.EqualTo(80));
+            Assert.That(defaultTooltip.AutoPopDelay, Is.EqualTo(4250));
+            Assert.That(defaultTooltip.Active, Is.False);
+            Assert.That(defaultTooltip.ShowAlways, Is.True);
+        }));
+    }
+
+    [Test]
     public void FeedbackDemoDismissAndRestoreReusesExistingAlerts()
     {
         using var form = new FeedbackDemoForm();
@@ -96,7 +151,7 @@ public sealed class FeedbackDemoFormTests
     }
 
     [Test]
-    public void FeedbackDemoBadgesAndAlertsRemainUsableAcrossRuntimeThemeSwitch()
+    public void FeedbackDemoBadgesAlertsAndTooltipsRemainUsableAcrossRuntimeThemeSwitch()
     {
         var original = BootstrapThemeManager.CurrentTheme;
         try
@@ -107,6 +162,7 @@ public sealed class FeedbackDemoFormTests
             form.PerformLayout();
             var badges = FindControls<BootstrapBadge>(form).ToArray();
             var alerts = FindControls<BootstrapAlert>(form).ToArray();
+            var tooltips = GetTooltipComponents(form);
 
             BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
 
@@ -121,12 +177,45 @@ public sealed class FeedbackDemoFormTests
                 {
                     Assert.DoesNotThrow((Action)(() => alert.PerformLayout()));
                 }
+
+                Assert.That(tooltips, Is.Not.Empty);
+                Assert.That(tooltips.All(tooltip => tooltip.Active), Is.True);
             }));
         }
         finally
         {
             BootstrapThemeManager.CurrentTheme = original;
         }
+    }
+
+    [Test]
+    public void FeedbackDemoOwnsAndDisposesTooltipComponents()
+    {
+        var form = new FeedbackDemoForm();
+        var tooltips = GetTooltipComponents(form);
+        Assert.That(tooltips, Is.Not.Empty);
+        var disposeCounts = tooltips.ToDictionary(tooltip => tooltip, _ => 0);
+
+        foreach (var tooltip in tooltips)
+        {
+            tooltip.Disposed += (_, _) => disposeCounts[tooltip]++;
+        }
+
+        form.Dispose();
+        form.Dispose();
+
+        Assert.That(disposeCounts.Values, Is.All.EqualTo(1));
+    }
+
+    private static BootstrapTooltip[] GetTooltipComponents(FeedbackDemoForm form)
+    {
+        return typeof(FeedbackDemoForm)
+            .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Where(field => field.FieldType == typeof(BootstrapTooltip))
+            .Select(field => (BootstrapTooltip?)field.GetValue(form))
+            .Where(tooltip => tooltip is not null)
+            .Cast<BootstrapTooltip>()
+            .ToArray();
     }
 
     private static IEnumerable<T> FindControls<T>(Control root)
