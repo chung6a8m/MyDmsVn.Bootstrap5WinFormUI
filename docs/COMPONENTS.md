@@ -470,8 +470,47 @@ Behavior:
 
 Manual verification: choose **Feedback** in the integrated demo. Compare all eight variants plus icon, dismissible, multiline, disabled, and explicit-radius examples. Dismiss with mouse and keyboard, restore the same instances repeatedly, switch Light/Dark while the page remains open, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling. Confirm text/icon/close alignment, focus visibility, rounded borders, and absence of stale rendering.
 
+## BootstrapTooltip
+
+Responsibility: provide Bootstrap-inspired tooltip presentation while preserving the native WinForms `ToolTip` association, popup-placement, delay, and lifecycle model.
+
+Stage 3 of the component-expansion roadmap finalizes the public concepts as:
+
+```text
+BootstrapTooltip : Component, IExtenderProvider
+
+BootstrapTooltip.Variant
+BootstrapTooltip.CustomColor
+BootstrapTooltip.BorderRadius
+BootstrapTooltip.ContentPadding
+BootstrapTooltip.InitialDelay
+BootstrapTooltip.ReshowDelay
+BootstrapTooltip.AutoPopDelay
+BootstrapTooltip.Active
+BootstrapTooltip.ShowAlways
+BootstrapTooltip.CanExtend(object)
+BootstrapTooltip.SetToolTip(Control, string)
+BootstrapTooltip.GetToolTip(Control)
+```
+
+Behavior:
+
+- `BootstrapTooltip` owns exactly one native WinForms `ToolTip`; it does not subclass `ToolTip`, create a custom popup `Form`, introduce overlay/queue infrastructure, or implement a second scheduling model.
+- The wrapper is an extender provider through `[ProvideProperty("ToolTip", typeof(Control))]`. `CanExtend` accepts WinForms `Control` instances, while `SetToolTip`/`GetToolTip` delegate association storage to the native ToolTip as the single source of truth. Empty captions remove the native association and explicit newline characters are preserved.
+- The parameterless constructor is designer-safe. `BootstrapTooltip(IContainer)` adds only the wrapper to the supplied container; the inner native ToolTip remains privately owned and is disposed exactly once by the wrapper.
+- The native ToolTip is configured internally with `OwnerDraw = true` and `IsBalloon = false`. Those implementation details, the native ToolTip itself, Popup/Draw events, `Show`/`Hide`, animation/fading/title/icon APIs, and other unplanned native surface are not re-exposed.
+- `Variant` defaults to `Dark`; undefined enum values are rejected. `CustomColor = Color.Empty` uses the semantic variant while any non-empty custom color overrides the background. Foreground is selected through `ColorUtil.GetContrastingTextColor`, and the border uses the current theme `Border` token.
+- `BorderRadius = -1` uses the current theme radius; non-negative values are explicit logical radii. `ContentPadding` defaults to logical `SpacingSM` horizontal / `SpacingXS` vertical (8/4/8/4 with default metrics). Negative padding edges and radius values below `-1` are rejected before state mutation.
+- `InitialDelay`, `ReshowDelay`, `AutoPopDelay`, `Active`, and `ShowAlways` forward directly to the native ToolTip rather than maintaining mirror state.
+- Popup measurement and Draw rendering resolve `BootstrapThemeManager.CurrentTheme` at event time instead of subscribing to `ThemeChanged`. Text uses the current `Typography.BodySmall`; temporary fonts and all GDI resources are scoped to the event.
+- `BootstrapTooltipRenderLogic`, `BootstrapTooltipPalette`, and `BootstrapTooltipRenderMetrics` remain internal pure helpers. They reuse `BootstrapVariantColorResolver`, `ColorUtil`, `DpiScaler`, `RoundedPath`, and `CornerRadius`; popup sizing and text-bounds calculations clamp malformed/tiny geometry without negative sizes.
+- Content padding, border width, and radius scale from the associated control's `DeviceDpi`, falling back to 96 DPI when necessary. The framework does not impose automatic word wrapping: owner-drawn measurement/rendering uses `TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding`, while explicit newlines remain supported.
+- Disposal detaches the owned native Popup/Draw handlers, disposes the native ToolTip idempotently, and adds no static theme subscription or other process-lifetime root.
+
+Manual verification: stay on **Feedback** and hover the default Dark, same-instance second target, semantic Info, custom-color, multiline, and long-caption examples. Change Initial/Reshow/Auto-pop delays and Active/Show always live. Switch Light/Dark while the page stays open and repeat at 100/125/150/175/200% real Windows scaling. Confirm native popup positioning/timing remains intact, explicit newlines render, long captions are not framework-wrapped, padding/border/radius scale cleanly, and the same Tooltip can serve multiple controls.
+
 ## Deferred components
 
-Toast, Tooltip, Dialog/Modal, Dropdown, Tabs, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
+Toast, Dialog/Modal, Dropdown, Tabs, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
 
 Before adding one, document which existing foundation pieces it reuses.
