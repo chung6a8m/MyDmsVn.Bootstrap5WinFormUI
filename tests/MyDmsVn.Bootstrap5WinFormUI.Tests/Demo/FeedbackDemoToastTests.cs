@@ -59,13 +59,11 @@ public sealed class FeedbackDemoToastTests
             Application.DoEvents();
 
             var host = FindControls<BootstrapToastContainer>(form).Single();
-            var buttons = FindControls<Button>(form)
-                .Where(button => !string.IsNullOrEmpty(button.AccessibleName))
-                .ToDictionary(button => button.AccessibleName!, StringComparer.Ordinal);
+            Button Action(string name) => FindControls<Button>(form).Single(button => button.AccessibleName == name);
 
-            buttons["Show manual Toast"].PerformClick();
-            buttons["Show icon multiline Toast"].PerformClick();
-            buttons["Show disabled Toast"].PerformClick();
+            Action("Show manual Toast").PerformClick();
+            Action("Show icon multiline Toast").PerformClick();
+            Action("Show disabled Toast").PerformClick();
             Application.DoEvents();
 
             var examples = host.Controls.OfType<BootstrapToast>().ToArray();
@@ -77,11 +75,11 @@ public sealed class FeedbackDemoToastTests
                 Assert.That(examples.Count(toast => toast.Visible), Is.EqualTo(3));
             }));
 
-            buttons["Dismiss all Toasts"].PerformClick();
+            Action("Dismiss all Toasts").PerformClick();
             Application.DoEvents();
             Assert.That(host.Controls.OfType<BootstrapToast>(), Is.Empty);
 
-            buttons["Burst 8 Toasts"].PerformClick();
+            Action("Burst 8 Toasts").PerformClick();
             Application.DoEvents();
             var burst = host.Controls.OfType<BootstrapToast>().ToArray();
             Assert.Multiple((Action)(() =>
