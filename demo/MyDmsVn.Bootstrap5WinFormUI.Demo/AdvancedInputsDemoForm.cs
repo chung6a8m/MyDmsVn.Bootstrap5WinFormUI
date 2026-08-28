@@ -306,15 +306,23 @@ public sealed class AdvancedInputsDemoForm : Form
             grid.RowCount++;
         }
 
-        var cell = new FlowLayoutPanel
+        var cell = new TableLayoutPanel
         {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
+            ColumnCount = 1,
+            RowCount = status is null ? 2 : 3,
             Margin = new Padding(6, 6, 18, 10),
             MinimumSize = new Size(410, status is null ? 68 : 88)
         };
+        cell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        cell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        cell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        if (status is not null)
+        {
+            cell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        }
+
         var label = new Label
         {
             AutoSize = true,
@@ -326,11 +334,11 @@ public sealed class AdvancedInputsDemoForm : Form
         input.Margin = Padding.Empty;
         input.AccessibleName = $"{caption} {accessibleKind}";
 
-        cell.Controls.Add(label);
-        cell.Controls.Add(input);
+        cell.Controls.Add(label, 0, 0);
+        cell.Controls.Add(input, 0, 1);
         if (status is not null)
         {
-            cell.Controls.Add(status);
+            cell.Controls.Add(status, 0, 2);
         }
 
         grid.Controls.Add(cell, column, row);
