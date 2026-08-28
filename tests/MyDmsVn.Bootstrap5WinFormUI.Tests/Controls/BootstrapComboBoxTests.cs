@@ -41,7 +41,8 @@ public sealed class BootstrapComboBoxTests
             new LookupItem(10, "Ten"),
             new LookupItem(20, "Twenty")
         };
-        using var comboBox = new ComboBox
+        using var form = new Form { ShowInTaskbar = false };
+        var comboBox = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDown,
             AutoCompleteMode = AutoCompleteMode.SuggestAppend,
@@ -50,8 +51,12 @@ public sealed class BootstrapComboBoxTests
             ValueMember = nameof(LookupItem.Id),
             DataSource = source
         };
+        form.Controls.Add(comboBox);
+        form.Show();
+        Application.DoEvents();
 
         comboBox.SelectedValue = 20;
+        Application.DoEvents();
 
         Assert.Multiple((Action)(() =>
         {
