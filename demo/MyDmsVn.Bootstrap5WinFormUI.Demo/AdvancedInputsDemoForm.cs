@@ -12,21 +12,25 @@ public sealed class AdvancedInputsDemoForm : Form
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
     private readonly GroupBox _numericSection = new GroupBox();
     private readonly GroupBox _comboSection = new GroupBox();
+    private readonly GroupBox _dateSection = new GroupBox();
     private readonly Label _integerStatus = new Label();
     private readonly Label _comboStatus = new Label();
     private readonly Label _comboNote = new Label();
+    private readonly Label _dateStatus = new Label();
+    private readonly Label _dateNote = new Label();
 
     public AdvancedInputsDemoForm()
     {
         Text = "Advanced Inputs Demo";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(980, 760);
+        ClientSize = new Size(980, 820);
         MinimumSize = new Size(760, 560);
         AutoScaleMode = AutoScaleMode.Dpi;
 
         ConfigureContent();
         BuildNumericSection();
         BuildComboSection();
+        BuildDateSection();
         Controls.Add(_content);
 
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
@@ -65,8 +69,16 @@ public sealed class AdvancedInputsDemoForm : Form
         _comboSection.Margin = new Padding(0, 0, 0, 12);
         _comboSection.Padding = new Padding(12);
 
+        _dateSection.Text = "DatePicker scenarios";
+        _dateSection.AutoSize = true;
+        _dateSection.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _dateSection.MinimumSize = new Size(920, 0);
+        _dateSection.Margin = new Padding(0, 0, 0, 12);
+        _dateSection.Padding = new Padding(12);
+
         _content.Controls.Add(_numericSection);
         _content.Controls.Add(_comboSection);
+        _content.Controls.Add(_dateSection);
     }
 
     private void BuildNumericSection()
@@ -238,22 +250,97 @@ public sealed class AdvancedInputsDemoForm : Form
         _comboNote.Dock = DockStyle.Top;
         _comboNote.Text = "Native ownership note: WinForms/OS still owns the editable child, arrow button, hit-testing, and popup chrome. The popup may remain square or OS-themed.";
 
-        var stack = new TableLayoutPanel
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Dock = DockStyle.Top,
-            ColumnCount = 1,
-            RowCount = 2,
-            Margin = Padding.Empty
-        };
-        stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        stack.Controls.Add(grid, 0, 0);
-        stack.Controls.Add(_comboNote, 0, 1);
-
+        var stack = CreateSectionStack(grid, _comboNote);
         _comboSection.Controls.Add(stack);
+    }
+
+    private void BuildDateSection()
+    {
+        var grid = CreateScenarioGrid();
+        var sample = new DateTime(2026, 8, 28, 10, 30, 0);
+
+        var longDate = new BootstrapDatePicker
+        {
+            Value = sample,
+            Format = DateTimePickerFormat.Long
+        };
+        _dateStatus.AutoSize = true;
+        _dateStatus.Text = $"ValueChanged: {longDate.Value:yyyy-MM-dd HH:mm}";
+        _dateStatus.Margin = new Padding(0, 5, 0, 0);
+        longDate.ValueChanged += (_, _) => _dateStatus.Text = $"ValueChanged: {longDate.Value:yyyy-MM-dd HH:mm}";
+        AddDateCell(grid, "Long / native locale", longDate, _dateStatus);
+
+        AddDateCell(grid, "Short", new BootstrapDatePicker
+        {
+            Value = sample,
+            Format = DateTimePickerFormat.Short
+        });
+
+        AddDateCell(grid, "Time", new BootstrapDatePicker
+        {
+            Value = sample,
+            Format = DateTimePickerFormat.Time
+        });
+
+        AddDateCell(grid, "Custom date", new BootstrapDatePicker
+        {
+            Value = sample,
+            Format = DateTimePickerFormat.Custom,
+            CustomFormat = "yyyy-MM-dd"
+        });
+
+        AddDateCell(grid, "Custom date + time", new BootstrapDatePicker
+        {
+            Value = sample,
+            Format = DateTimePickerFormat.Custom,
+            CustomFormat = "yyyy-MM-dd HH:mm"
+        });
+
+        AddDateCell(grid, "Optional / unchecked", new BootstrapDatePicker
+        {
+            Value = sample,
+            ShowCheckBox = true,
+            Checked = false
+        });
+
+        AddDateCell(grid, "Range constrained", new BootstrapDatePicker
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31),
+            Value = sample
+        });
+
+        AddDateCell(grid, "Valid", new BootstrapDatePicker
+        {
+            Value = sample,
+            ValidationState = BootstrapValidationState.Valid
+        });
+
+        AddDateCell(grid, "Invalid", new BootstrapDatePicker
+        {
+            Value = sample,
+            ValidationState = BootstrapValidationState.Invalid
+        });
+
+        AddDateCell(grid, "Disabled", new BootstrapDatePicker
+        {
+            Value = sample,
+            Enabled = false
+        });
+
+        AddDateCell(grid, "Explicit radius", new BootstrapDatePicker
+        {
+            Value = sample,
+            BorderRadius = 8
+        });
+
+        _dateNote.AutoSize = true;
+        _dateNote.MaximumSize = new Size(860, 0);
+        _dateNote.Margin = new Padding(6, 0, 6, 8);
+        _dateNote.Dock = DockStyle.Top;
+        _dateNote.Text = "Native ownership note: WinForms/OS owns the DateTimePicker calendar popup, localized rendering, calendar navigation, and native keyboard behavior. Stage 9 intentionally does not expose ShowUpDown or replace the popup.";
+
+        _dateSection.Controls.Add(CreateSectionStack(grid, _dateNote));
     }
 
     private static TableLayoutPanel CreateScenarioGrid()
@@ -272,6 +359,25 @@ public sealed class AdvancedInputsDemoForm : Form
         return grid;
     }
 
+    private static TableLayoutPanel CreateSectionStack(Control content, Control note)
+    {
+        var stack = new TableLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Dock = DockStyle.Top,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty
+        };
+        stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stack.Controls.Add(content, 0, 0);
+        stack.Controls.Add(note, 0, 1);
+        return stack;
+    }
+
     private static void AddNumericCell(
         TableLayoutPanel grid,
         string caption,
@@ -288,6 +394,15 @@ public sealed class AdvancedInputsDemoForm : Form
         Control? status = null)
     {
         AddScenarioCell(grid, caption, input, "combo box", status);
+    }
+
+    private static void AddDateCell(
+        TableLayoutPanel grid,
+        string caption,
+        BootstrapDatePicker input,
+        Control? status = null)
+    {
+        AddScenarioCell(grid, caption, input, "date picker", status);
     }
 
     private static void AddScenarioCell(
@@ -342,11 +457,16 @@ public sealed class AdvancedInputsDemoForm : Form
         _numericSection.ForeColor = theme.Colors.Text;
         _comboSection.BackColor = theme.Colors.Body;
         _comboSection.ForeColor = theme.Colors.Text;
+        _dateSection.BackColor = theme.Colors.Body;
+        _dateSection.ForeColor = theme.Colors.Text;
         ApplyStandardTextColor(_numericSection, theme.Colors.Text);
         ApplyStandardTextColor(_comboSection, theme.Colors.Text);
+        ApplyStandardTextColor(_dateSection, theme.Colors.Text);
         _integerStatus.ForeColor = theme.Colors.MutedText;
         _comboStatus.ForeColor = theme.Colors.MutedText;
         _comboNote.ForeColor = theme.Colors.MutedText;
+        _dateStatus.ForeColor = theme.Colors.MutedText;
+        _dateNote.ForeColor = theme.Colors.MutedText;
     }
 
     private static void ApplyStandardTextColor(Control root, Color color)
