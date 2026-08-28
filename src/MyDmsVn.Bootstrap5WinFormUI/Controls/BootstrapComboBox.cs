@@ -17,8 +17,6 @@ public class BootstrapComboBox : ComboBox
 {
     private const int WmPaint = 0x000F;
     private const int WmNcPaint = 0x0085;
-    private const int WmPrint = 0x0317;
-    private const int WmPrintClient = 0x0318;
     private static readonly IIconRenderer DefaultIconRenderer = BootstrapIconRenderer.CreateDefault();
 
     private BootstrapValidationState _validationState = BootstrapValidationState.None;
@@ -28,6 +26,8 @@ public class BootstrapComboBox : ComboBox
     private bool _themeSubscribed;
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
+    private bool _settingShellRegion;
+    private bool _manageShellRegion = true;
     private Font? _themeFont;
 
     /// <summary>
@@ -46,6 +46,8 @@ public class BootstrapComboBox : ComboBox
         LostFocus += OnComboBoxPresentationChanged;
         DropDown += OnComboBoxPresentationChanged;
         DropDownClosed += OnComboBoxPresentationChanged;
+        SizeChanged += OnComboBoxSizeChanged;
+        RegionChanged += OnComboBoxRegionChanged;
 
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         _themeSubscribed = true;
@@ -99,6 +101,7 @@ public class BootstrapComboBox : ComboBox
             }
 
             _borderRadius = value;
+            ApplyShellRegion();
             Invalidate();
         }
     }
@@ -168,6 +171,7 @@ public class BootstrapComboBox : ComboBox
 
         ApplyThemePresentation();
         ApplyOwnerDrawMetrics();
+        ApplyShellRegion();
     }
 
     /// <inheritdoc />
@@ -175,22 +179,9 @@ public class BootstrapComboBox : ComboBox
     {
         base.WndProc(ref m);
 
-        if (!IsHandleCreated || IsDisposed)
+        if ((m.Msg == WmPaint || m.Msg == WmNcPaint) && IsHandleCreated && !IsDisposed)
         {
-            return;
-        }
-
-        if (m.Msg == WmPaint || m.Msg == WmNcPaint)
-        {
-            using var graphics = Graphics.FromHwnd(Handle);
-            DrawShellBorder(graphics);
-            return;
-        }
-
-        if ((m.Msg == WmPrint || m.Msg == WmPrintClient) && m.WParam != IntPtr.Zero)
-        {
-            using var graphics = Graphics.FromHdc(m.WParam);
-            DrawShellBorder(graphics);
+            DrawShellBorder();
         }
     }
 
@@ -212,6 +203,8 @@ public class BootstrapComboBox : ComboBox
             LostFocus -= OnComboBoxPresentationChanged;
             DropDown -= OnComboBoxPresentationChanged;
             DropDownClosed -= OnComboBoxPresentationChanged;
+            SizeChanged -= OnComboBoxSizeChanged;
+            RegionChanged -= OnComboBoxRegionChanged;
 
             DisposeThemeFont();
         }
@@ -287,7 +280,7 @@ public class BootstrapComboBox : ComboBox
         return Text ?? string.Empty;
     }
 
-    private void DrawShellBorder(Graphics graphics)
+    private void DrawShellBorder()
     {
         var bounds = ClientRectangle;
         if (bounds.Width <= 0 || bounds.Height <= 0)
@@ -320,19 +313,12 @@ public class BootstrapComboBox : ComboBox
             return;
         }
 
+        using var graphics = Graphics.FromHwnd(Handle);
         var oldSmoothingMode = graphics.SmoothingMode;
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         try
         {
             using var path = RoundedPath.Create(borderBounds, new CornerRadius(metrics.Radius));
-            if (metrics.Radius > 0f)
-            {
-                using var exterior = new Region(bounds);
-                exterior.Exclude(path);
-                using var exteriorBrush = new SolidBrush(ResolveOuterBackgroundColor(theme));
-                graphics.FillRegion(exteriorBrush, exterior);
-            }
-
             using var pen = new Pen(palette.Border, borderWidth);
             graphics.DrawPath(pen, path);
         }
@@ -340,20 +326,6 @@ public class BootstrapComboBox : ComboBox
         {
             graphics.SmoothingMode = oldSmoothingMode;
         }
-    }
-
-    private Color ResolveOuterBackgroundColor(BootstrapTheme theme)
-    {
-        for (Control? ancestor = Parent; ancestor is not null; ancestor = ancestor.Parent)
-        {
-            var color = ancestor.BackColor;
-            if (color.A == byte.MaxValue)
-            {
-                return color;
-            }
-        }
-
-        return theme.Colors.Body;
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
@@ -370,6 +342,7 @@ public class BootstrapComboBox : ComboBox
 
         ApplyThemePresentation();
         ApplyOwnerDrawMetrics();
+        ApplyShellRegion();
         Invalidate();
     }
 
@@ -388,6 +361,7 @@ public class BootstrapComboBox : ComboBox
     private void OnComboBoxDpiChangedAfterParent(object? sender, EventArgs e)
     {
         ApplyOwnerDrawMetrics();
+        ApplyShellRegion();
         Invalidate();
     }
 
@@ -395,6 +369,19 @@ public class BootstrapComboBox : ComboBox
     {
         ApplyThemePresentation();
         Invalidate();
+    }
+
+    private void OnComboBoxSizeChanged(object? sender, EventArgs e)
+    {
+        ApplyShellRegion();
+    }
+
+    private void OnComboBoxRegionChanged(object? sender, EventArgs e)
+    {
+        if (!_settingShellRegion)
+        {
+            _manageShellRegion = false;
+        }
     }
 
     private void ApplyThemePresentation()
@@ -426,6 +413,43 @@ public class BootstrapComboBox : ComboBox
         if (ItemHeight != nextHeight)
         {
             ItemHeight = nextHeight;
+            Parent?.PerformLayout(this, nameof(ItemHeight));
+        }
+    }
+
+    private void ApplyShellRegion()
+    {
+        if (!_manageShellRegion || IsDisposed || !IsHandleCreated || Width <= 0 || Height <= 0)
+        {
+            return;
+        }
+
+        var metrics = ResolveMetrics(BootstrapThemeManager.CurrentTheme);
+        Region? nextRegion = null;
+        try
+        {
+            if (metrics.Radius > 0f)
+            {
+                using var path = RoundedPath.Create(
+                    new RectangleF(0f, 0f, Width, Height),
+                    new CornerRadius(metrics.Radius));
+                nextRegion = new Region(path);
+            }
+
+            _settingShellRegion = true;
+            try
+            {
+                Region = nextRegion;
+                nextRegion = null;
+            }
+            finally
+            {
+                _settingShellRegion = false;
+            }
+        }
+        finally
+        {
+            nextRegion?.Dispose();
         }
     }
 
