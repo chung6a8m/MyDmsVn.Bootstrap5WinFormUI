@@ -610,8 +610,56 @@ Behavior:
 
 Manual verification: choose **Navigation / Tabs** in the integrated demo. Exercise Tabs/Pills/Underline with mouse, Tab/arrow/Ctrl+Tab keyboard paths, Fill on/off, all eight variants, native ImageList/ImageKey/ImageIndex, tooltip text, disabled pages, long labels, and live `SelectedIndexChanged` status. Switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling. Confirm headers stay aligned/unclipped, focus remains visible, selection/page identity remains native, and native overflow controls remain usable when headers exceed available width.
 
+## BootstrapDropdown
+
+Responsibility: provide a Bootstrap-inspired command dropdown while delegating popup behavior to native WinForms `ToolStripDropDownMenu` semantics.
+
+Stage 7 of the component-expansion roadmap finalizes the public concepts as:
+
+```text
+BootstrapDropdownItemKind: Item | Separator
+
+BootstrapDropdownItem
+BootstrapDropdownItem.Kind
+BootstrapDropdownItem.Text
+BootstrapDropdownItem.Icon
+BootstrapDropdownItem.Enabled
+BootstrapDropdownItem.Checked
+BootstrapDropdownItem.Tag
+BootstrapDropdownItem.Click
+
+BootstrapDropdownItemCollection : Collection<BootstrapDropdownItem>
+
+BootstrapDropdown : Component
+BootstrapDropdown.Target
+BootstrapDropdown.Items
+BootstrapDropdown.Variant
+BootstrapDropdown.MinimumWidth
+BootstrapDropdown.Opened
+BootstrapDropdown.Closed
+BootstrapDropdown.Show()
+BootstrapDropdown.Close()
+```
+
+Behavior:
+
+- `BootstrapDropdown` is a non-visual component that owns exactly one native `ToolStripDropDownMenu` and one internal `BootstrapDropdownRenderer`. The caller owns the `BootstrapButton` assigned to `Target` and every public `BootstrapDropdownItem` model.
+- `BootstrapDropdownItemKind` has exactly `Item` and `Separator`. `Kind` is immutable after construction and invalid enum values are rejected. Normal item construction defaults to empty text, `Enabled = true`, `Checked = false`, `Icon = null`, and `Tag = null`; `Text` normalizes `null` to an empty string.
+- `Items` is one stable `BootstrapDropdownItemCollection`. It preserves order and rejects null insertions/replacements; the collection has no live change-notification or popup-binding engine.
+- Each successful `Show()` rebuilds a short-lived native item snapshot from the current public model. Changes made while the menu is closed are therefore reflected on the next opening; the framework does not keep a second synchronized command model while the popup is open.
+- `Target` defaults to `null`; `Variant` defaults to `Primary`; `MinimumWidth` defaults to `0`. A negative `MinimumWidth` or undefined `Variant` is rejected. `Show()` without a target is an explicit error, while empty items, a disabled target, a loading target, or a disposed target produce no popup transition.
+- Target activation toggles the native popup only while the target is enabled and not loading. Replacing or disposing the target closes any open popup and detaches the old handlers. Dropdown never disposes a caller-owned target.
+- Enabled normal-item activation raises that model item's `Click` exactly once. Disabled items and separators do not activate. `Checked` is presentation state only and is copied into the native snapshot with `CheckOnClick = false`; the framework never auto-toggles the model. Application code may update `Checked` in `Click`, and the next `Show()` reflects the new state.
+- Native `ToolStripDropDownMenu` remains authoritative for AutoClose, outside-click dismissal, focus/message-loop behavior, Up/Down/Home/End/Enter/Escape navigation, and working-area/screen placement. `Opened` and `Closed` forward real native transitions from the owned popup rather than synthetic component state changes.
+- `Variant` controls semantic accent/check/selection presentation through the internal renderer. `MinimumWidth` is a logical-pixel minimum scaled for the target DPI before each opening; native measurement may still make the menu wider for content.
+- Optional item icons remain source-neutral `IconDescriptor` values. Dropdown renders snapshot bitmaps through the current `Target.IconRenderer`; generated bitmaps are framework-owned and disposed on rebuild, theme refresh, and component disposal. A runtime theme change refreshes renderer/icon presentation for an already-open popup without replacing the public item model.
+- Dropdown deliberately does not expose `BorderRadius`, custom popup chrome, arbitrary hosted controls, submenus, split-button behavior, nested command trees, live synchronization while open, custom placement hooks, a popup `Form`, a second focus/keyboard engine, timer, or animation API. ComboBox and later DatePicker controls retain their own native semantic popup architectures rather than automatically reusing Dropdown.
+- Designer construction is parameterless and requires no application bootstrap. Disposal detaches target/theme/native handlers, disposes generated images and the owned native popup, and never disposes caller-owned item models, icon descriptors/renderers, or target controls.
+
+Manual verification: choose **Navigation / Tabs** in the integrated demo and exercise the Dropdown basic/icon/state/long/stress scenarios. Verify target mouse and Enter/Space activation, Up/Down/Home/End plus item Enter, Escape/outside-click dismissal, checked/disabled/separator policy, runtime item mutation between openings, target replacement/disposal, and repeated Light/Dark switches. Repeat near bottom/right working-area edges, on a secondary monitor when available, and at 100/125/150/175/200% real Windows scaling. Repeated open/close/theme-switch cycles must not leave stale images, duplicate events, or disposed-GDI exceptions.
+
 ## Deferred components
 
-Toast, Dialog/Modal, Dropdown, Skeleton, DatePicker, and others are not part of the initial foundation contract.
+Toast, Dialog/Modal, Skeleton, DatePicker, and others are not part of the initial foundation contract.
 
 Before adding one, document which existing foundation pieces it reuses.
