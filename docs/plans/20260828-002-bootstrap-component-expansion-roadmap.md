@@ -2,44 +2,44 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this roadmap stage-by-stage. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add Badge, Alert, Tooltip, Tabs, NumericBox, ComboBox, Dropdown, Toast, and DatePicker in an order that delivers the smallest and most independent controls first, preserves native WinForms behavior wherever practical, and prevents later controls from inventing duplicate theme/rendering/animation/icon infrastructure.
+**Goal:** Add Badge, Alert, Tooltip, Tabs, NumericBox, ComboBox, Dropdown, Toast, and DatePicker in an order that delivers the most basic and independent controls first, preserves mature native WinForms semantics wherever practical, and prevents later controls from inventing duplicate infrastructure.
 
-**Architecture:** The expansion follows the repository's existing native-first composition model. Visual primitives custom-paint only their Bootstrap presentation, while semantic WinForms controls such as `ToolTip`, `TabControl`, `NumericUpDown`, `ComboBox`, `DateTimePicker`, and `ToolStripDropDown` retain selection/editing/focus/calendar/menu behavior when that behavior is already mature and compatible across `net48` and `net8.0-windows`. New public controls continue to consume Theme, Rendering, Icons, Animation, `BootstrapVariantColorResolver`, and existing controls rather than introducing another foundation layer.
+**Architecture:** Follow the repository's native-first composition model. Small visual primitives custom-paint only their Bootstrap presentation. Controls with mature WinForms semantics delegate selection, editing, numeric parsing, menu navigation, tooltip timing, and calendar behavior to native controls while the framework owns theme, geometry, icons, validation presentation, and lifecycle integration. All new controls consume the existing Theme, Rendering, Icons, Animation, Compatibility, `BootstrapVariant`, and `BootstrapVariantColorResolver` infrastructure.
 
-**Tech Stack:** C#, native Windows Forms, existing Theme / Rendering / Icons / Animation infrastructure, NUnit 4, SDK-style multi-targeting (`net48;net8.0-windows`). No new external package is required by this roadmap.
+**Tech Stack:** C#, native Windows Forms, NUnit 4, existing Theme / Rendering / Icons / Animation infrastructure, SDK-style multi-targeting (`net48;net8.0-windows`). No new external package is required.
 
-**Spec:** User request dated 2026-08-28 plus `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/COMPONENTS.md`, `docs/COMPATIBILITY.md`, `docs/TESTING.md`, `docs/DEVELOPMENT_PLAN.md`, and `docs/PUBLIC_API_BASELINE.md`. Bootstrap 5.3 component behavior is design inspiration only; native WinForms semantics and repository compatibility rules take precedence.
+**Spec:** User request dated 2026-08-28 plus `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/COMPONENTS.md`, `docs/COMPATIBILITY.md`, `docs/TESTING.md`, `docs/DEVELOPMENT_PLAN.md`, and `docs/PUBLIC_API_BASELINE.md`. Bootstrap 5 visual/component behavior is inspiration only; native WinForms semantics and repository compatibility rules take precedence.
 
 ## Global Constraints
 
-- Root namespace remains `MyDmsVn.Bootstrap5WinFormUI`; public controls remain discoverable under `MyDmsVn.Bootstrap5WinFormUI.Controls`.
-- Product code must compile from one shared implementation for both `net48` and `net8.0-windows` wherever practical.
-- Every public/protected API addition changes the frozen v1 API fingerprint and therefore requires explicit review before updating `Phase16PublicApiBaselineTests` and `docs/PUBLIC_API_BASELINE.md`.
+- Root namespace remains `MyDmsVn.Bootstrap5WinFormUI`; public controls remain under `MyDmsVn.Bootstrap5WinFormUI.Controls`.
+- Product code must compile for both `net48` and `net8.0-windows` from one shared implementation wherever practical.
+- Every public/protected API addition changes the frozen v1 API fingerprint and requires explicit review before updating `Phase16PublicApiBaselineTests` and `docs/PUBLIC_API_BASELINE.md`.
 - Do not remove, rename, or change an existing public/protected member as part of this roadmap.
 - Reuse `BootstrapVariant`, `BootstrapVariantColorResolver`, `DpiScaler`, `RoundedPath`, `CornerRadius`, `ColorUtil`, `BootstrapThemeManager`, `IconDescriptor` / `IIconRenderer`, and shared animation primitives where applicable.
-- Do not add a control-specific WinForms timer when `BootstrapAnimation` can represent the behavior. A one-shot semantic delay that is not frame animation, such as toast auto-hide, may use one lifecycle-owned delay mechanism, but it must not become another animation scheduler.
+- Do not create another theme manager, icon model, geometry library, focus engine, or frame-animation scheduler.
 - Prefer mature native WinForms semantics over reimplementing editing, selection, keyboard navigation, menu navigation, numeric parsing, or calendar behavior solely for visual purity.
-- Designer construction must remain safe without application bootstrap, service locators, or DI.
-- Every interactive control must have a keyboard/focus path and an STA test or a documented reason why the native control already owns that path.
-- Every stage must update its demo/manual verification path, `docs/COMPONENTS.md`, `docs/TESTING.md`, README/package-facing docs when the component becomes supported, `CHANGELOG.md`, and the API fingerprint after review.
-- Each stage is independently shippable and must finish both-target build/test gates before the next stage starts.
-- `BootstrapPagination` is intentionally outside this roadmap because it already has `docs/plans/20260828-001-bootstrap-pagination-control.md`.
+- Designer construction must remain safe without application bootstrap, DI, service locators, or initialized global state beyond the framework's existing safe defaults.
+- Every interactive control needs a keyboard/focus path and an STA test or explicit native-behavior characterization.
+- Every stage must add demo/manual coverage and update `docs/COMPONENTS.md`, `docs/TESTING.md`, `README.md`, `docs/PACKAGE_README.md`, `CHANGELOG.md`, and the public API baseline after deliberate review.
+- Each stage is independently shippable. Both target builds and relevant tests must pass before the next stage begins.
+- `BootstrapPagination` is not part of this roadmap because it already has `docs/plans/20260828-001-bootstrap-pagination-control.md`.
 
 ---
 
 ## Ordering Decision
 
-| Order | Component | Classification | New-control dependencies | Why here |
+| Order | Component | Classification | New-control dependencies | Reason |
 | ---: | --- | --- | --- | --- |
-| 1 | `BootstrapBadge` | Primitive visual | None | Smallest non-interactive surface; validates compact semantic-color rendering. |
-| 2 | `BootstrapAlert` | Primitive feedback | Existing Icons; optional close affordance | Still independent; establishes dismissible feedback behavior without overlay hosting. |
-| 3 | `BootstrapTooltip` | Attached component | Native `ToolTip` | Non-interactive and independent when implemented as an owner-drawn native tooltip. |
-| 4 | `BootstrapTabControl` | Native-backed navigation | Native `TabControl` | Independent selection/navigation component; no popup infrastructure required. |
-| 5 | `BootstrapNumericBox` | Native-backed input | Native `NumericUpDown` | Independent input; delegates culture/range/keyboard semantics to WinForms. |
-| 6 | `BootstrapComboBox` | Native-backed input | Native `ComboBox` | Independent but visually/behaviorally broader than NumericBox; preserves binding and selection APIs. |
-| 7 | `BootstrapDropdown` | Interactive popup | Existing Button/Icon + native `ToolStripDropDown` | First command popup; keyboard/menu/focus lifecycle makes it more complex than native-backed inputs. |
-| 8 | `BootstrapToast` | Transient overlay feedback | Alert visual language + Animation | Adds stacking, show/hide transition, auto-hide, host lifecycle, and reduced-motion behavior. |
-| 9 | `BootstrapDatePicker` | Composite/native-backed input | Native `DateTimePicker` + input shell patterns | Most difficult native control to theme safely; deliberately last after input/focus/theme patterns are proven. |
+| 1 | `BootstrapBadge` | Primitive visual | None | Smallest non-interactive semantic surface. |
+| 2 | `BootstrapAlert` | Primitive feedback | Existing Icons | Independent inline feedback; no popup/overlay host. |
+| 3 | `BootstrapTooltip` | Attached component | Native `ToolTip` | Independent, non-interactive, native timing/placement. |
+| 4 | `BootstrapTabControl` | Native-backed navigation | Native `TabControl` | Independent page selection/navigation; no popup subsystem. |
+| 5 | `BootstrapNumericBox` | Native-backed input | Native `NumericUpDown` | Focused, well-bounded input semantics. |
+| 6 | `BootstrapComboBox` | Native-backed input | Native `ComboBox` | Broader binding/dropdown behavior than NumericBox, still independent. |
+| 7 | `BootstrapDropdown` | Command popup | Existing Button/Icon + native `ToolStripDropDown` | Adds popup focus, dismissal, command-item lifecycle. |
+| 8 | `BootstrapToast` | Transient feedback overlay | Alert visual language + Animation | Adds stacking, auto-hide, transitions, ownership. |
+| 9 | `BootstrapDatePicker` | Native-backed composite input | Native `DateTimePicker` + established input-shell patterns | Hardest native control to theme safely; calendar remains OS-owned. |
 
 ### Dependency graph
 
@@ -49,36 +49,34 @@ Theme + Rendering + Icons + Animation + Compatibility
        |
        +--> Badge
        +--> Alert
-       +--> Tooltip (native ToolTip owner-draw)
-       +--> TabControl (native TabControl owner-draw)
-       +--> NumericBox (native NumericUpDown inside themed shell)
-       +--> ComboBox (native ComboBox + owner-drawn items)
-       +--> Dropdown (BootstrapButton/Icon + native ToolStripDropDown)
-       +--> Toast (Alert-like palette + BootstrapAnimation)
-       +--> DatePicker (native DateTimePicker inside themed shell)
+       +--> Tooltip -> native ToolTip
+       +--> TabControl -> native TabControl
+       +--> NumericBox -> native NumericUpDown
+       +--> ComboBox -> native ComboBox
+       +--> Dropdown -> BootstrapButton + native ToolStripDropDown
+       +--> Toast -> BootstrapAnimation + feedback palette rules
+       +--> DatePicker -> native DateTimePicker
 ```
 
-The graph is intentionally shallow. ComboBox must not be implemented by embedding `BootstrapDropdown`, and DatePicker must not be implemented by building a custom calendar from Dropdown. Those controls have mature native semantics that should be retained.
+The graph is intentionally shallow. `BootstrapComboBox` must not be implemented by embedding `BootstrapDropdown`, and `BootstrapDatePicker` must not build a custom calendar from Dropdown. These are distinct semantic controls with mature native behavior.
 
 ---
 
-## Shared File / Demo Strategy
+## Shared Demo Strategy
 
-Create component files directly under the existing flat `Controls` folder to match the current repository rather than introducing a folder/namespace reorganization during feature work.
-
-Shared demo pages should be grouped by purpose instead of adding nine top-level demo windows:
+Group demos by purpose instead of creating nine top-level windows:
 
 - `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/FeedbackDemoForm.cs` — Badge, Alert, Tooltip, Toast.
 - `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/NavigationDemoForm.cs` — Tabs and Dropdown.
 - `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/AdvancedInputsDemoForm.cs` — NumericBox, ComboBox, DatePicker.
 
-Corresponding smoke tests:
+Tests:
 
 - `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/FeedbackDemoFormTests.cs`
 - `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/NavigationDemoFormTests.cs`
 - `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/AdvancedInputsDemoFormTests.cs`
 
-`MainForm.cs` should add a navigation entry when the first control in each group lands; later stages extend that existing page rather than adding duplicate navigation entries.
+`MainForm.cs` adds one navigation entry when the first control of each demo group lands; later stages extend the same page.
 
 ---
 
@@ -86,28 +84,25 @@ Corresponding smoke tests:
 
 ## Contract
 
-`BootstrapBadge` is a compact, non-focusable, auto-sized text indicator. It owns no click behavior and no business state.
-
-Proposed public surface:
+`BootstrapBadge` is a compact, auto-sized, non-focusable text indicator. It owns no click/toggle semantics and no notification-count business logic.
 
 ```csharp
 [DefaultProperty(nameof(Text))]
 public class BootstrapBadge : Control
 {
-    public BootstrapVariant Variant { get; set; }      // default Primary
-    public Color CustomColor { get; set; }             // default Color.Empty
-    public bool Pill { get; set; }                      // default false
-    public int BorderRadius { get; set; }               // default -1
+    public BootstrapVariant Variant { get; set; }      // Primary
+    public Color CustomColor { get; set; }             // Color.Empty
+    public bool Pill { get; set; }                      // false
+    public int BorderRadius { get; set; }               // -1 = theme radius
 }
 ```
 
 Rules:
 
-- Inherited `Text` is the badge content; `AutoSize` defaults to `true` and `TabStop` defaults to `false`.
-- `CustomColor = Color.Empty` resolves through `BootstrapVariantColorResolver`; a non-empty color overrides `Variant`.
-- Foreground must be selected with the existing contrast helper rather than hard-coded white/black.
-- `Pill = true` uses a radius equal to half the rendered height; otherwise `BorderRadius = -1` uses the current theme radius.
-- Badge does not expose `Selected`, `Checked`, `ClickToToggle`, or notification-count semantics.
+- `Text` is inherited content; `AutoSize=true`, `TabStop=false` by default.
+- `CustomColor=Color.Empty` resolves through `BootstrapVariantColorResolver`; non-empty color overrides `Variant`.
+- Foreground uses existing contrast calculation rather than a fixed white/black assumption.
+- `Pill=true` uses half-height radius; otherwise `BorderRadius=-1` uses the theme radius.
 
 ## Files
 
@@ -115,19 +110,18 @@ Rules:
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapBadgeRenderLogic.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapBadgeRenderLogicTests.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapBadgeTests.cs`
-- Create/extend: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/FeedbackDemoForm.cs`
-- Create/extend: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/FeedbackDemoFormTests.cs`
+- Create/extend: Feedback demo/test files.
 
 ## Tasks
 
-- [ ] **1.1 Freeze badge defaults and validation with failing tests.** Verify default `Variant`, empty custom color, `Pill=false`, `BorderRadius=-1`, `AutoSize=true`, `TabStop=false`, designer-safe construction, and rejection of `BorderRadius < -1`.
-- [ ] **1.2 Add pure layout/palette tests.** Cover DPI-scaled horizontal/vertical padding, pill radius, custom radius, empty/non-empty text, semantic variant resolution, custom-color override, and contrast foreground selection.
-- [ ] **1.3 Implement the minimal double-buffered badge.** Reuse theme typography/metrics, `RoundedPath`, `DpiScaler`, `BootstrapVariantColorResolver`, and `ColorUtil`; scope every GDI resource to painting.
-- [ ] **1.4 Add lifecycle/theme tests.** Runtime Light/Dark changes repaint without retaining disposed controls; caller-owned `Font` remains caller-owned following the existing control conventions.
-- [ ] **1.5 Add Feedback demo scenarios.** Show all variants, pill/default shapes, custom color, short/long text, disabled state, Light/Dark, and the DPI matrix.
-- [ ] **1.6 Run both targets and documentation/API gates.** Update component/testing/readme/package/changelog docs, deliberately review the fingerprint change, then commit `feat: add BootstrapBadge`.
+- [ ] **1.1 Write failing contract tests.** Assert defaults, designer-safe construction, text normalization, `AutoSize`, `TabStop`, and rejection of `BorderRadius < -1`.
+- [ ] **1.2 Write failing pure render/layout tests.** Cover semantic/custom colors, contrast foreground, empty/short/long text, DPI-scaled padding, pill radius, and explicit radius.
+- [ ] **1.3 Implement minimal custom painting.** Use current theme typography/metrics, `DpiScaler`, `RoundedPath`, `BootstrapVariantColorResolver`, `ColorUtil`, double buffering, and scoped GDI resources only.
+- [ ] **1.4 Add theme/lifecycle tests.** Runtime Light/Dark repaint works; theme subscriptions and theme-created fonts are released on disposal; caller-owned font remains caller-owned.
+- [ ] **1.5 Add demo cases.** All semantic variants, default/pill, custom color, disabled, long text, runtime theme switching, 100–200% DPI.
+- [ ] **1.6 Run both targets, docs, API baseline, then commit** `feat: add BootstrapBadge`.
 
-**Stage gate:** no Alert work starts until Badge tests pass on both targets and the API addition is intentionally approved.
+**Gate:** Stage 1 must be green before Alert starts.
 
 ---
 
@@ -135,20 +129,18 @@ Rules:
 
 ## Contract
 
-`BootstrapAlert` is an inline feedback surface with optional icon and optional dismiss affordance. The initial control displays one text message; arbitrary rich-content composition is deferred to avoid turning Alert into a second Card.
-
-Proposed public surface:
+`BootstrapAlert` is an inline feedback surface with text, optional icon, and optional dismiss affordance. Rich arbitrary child content is deferred so Alert does not become another Card.
 
 ```csharp
 [DefaultProperty(nameof(Text))]
 [DefaultEvent(nameof(Dismissed))]
 public class BootstrapAlert : UserControl
 {
-    public BootstrapVariant Variant { get; set; }      // default Primary
+    public BootstrapVariant Variant { get; set; }      // Primary
     public IconDescriptor? Icon { get; set; }
     public IIconRenderer IconRenderer { get; set; }
-    public bool Dismissible { get; set; }               // default false
-    public int BorderRadius { get; set; }               // default -1
+    public bool Dismissible { get; set; }               // false
+    public int BorderRadius { get; set; }               // -1
     public event EventHandler? Dismissed;
     public void Dismiss();
 }
@@ -156,11 +148,10 @@ public class BootstrapAlert : UserControl
 
 Rules:
 
-- Alert uses a subtle variant-tinted surface, readable foreground, and a related border/accent derived from current theme colors; do not add nine hard-coded palette tables.
-- Dismissal sets `Visible=false` and raises `Dismissed` once per visible-to-dismissed transition; it does not dispose the control.
-- A dismiss button is an owned child affordance using the existing icon renderer and framework close glyph. It is keyboard-focusable only when `Dismissible=true`.
-- Alert itself is not focusable unless required to expose an accessibility role; focus belongs to the dismiss button.
-- Do not add auto-hide or overlay behavior; those belong to Toast.
+- Derive subtle variant surface/border/foreground from existing theme/color helpers; do not add a separate hard-coded alert palette table.
+- `Dismiss()` changes visible state and raises `Dismissed` exactly once for an effective visible-to-dismissed transition; it does not dispose the Alert.
+- The close affordance uses the existing icon renderer/framework close glyph and is keyboard-focusable only when dismissible.
+- Auto-hide and overlay behavior belong to Toast, not Alert.
 
 ## Files
 
@@ -168,17 +159,16 @@ Rules:
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapAlertRenderLogic.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapAlertRenderLogicTests.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapAlertTests.cs`
-- Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/FeedbackDemoForm.cs`
-- Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/FeedbackDemoFormTests.cs`
+- Modify: Feedback demo/test files.
 
 ## Tasks
 
-- [ ] **2.1 Write failing contract tests.** Cover defaults, icon renderer null rejection, border-radius validation, `Dismissible`, default accessibility metadata, and text normalization.
-- [ ] **2.2 Write failing pure presentation tests.** Cover semantic variant surface/border/foreground derivation, disabled colors, DPI-scaled content/icon/close slots, and no overlap for long text.
-- [ ] **2.3 Implement inline rendering and layout.** Reuse existing theme, rendering and icon infrastructure; do not depend on Badge just because both use variants.
-- [ ] **2.4 Implement deterministic dismissal tests and behavior.** `Dismiss()` when already hidden is a no-op; close-button activation and `Dismiss()` share the same path; no duplicate event is raised.
-- [ ] **2.5 Add Feedback demo cases.** Variants, icon/no-icon, dismissible/non-dismissible, multiline text, disabled, runtime theme switch, keyboard close activation, and DPI checks.
-- [ ] **2.6 Complete docs/API baseline and commit** `feat: add BootstrapAlert`.
+- [ ] **2.1 Write failing contract tests.** Cover defaults, text normalization, radius validation, icon renderer null rejection, dismissible state, accessibility metadata.
+- [ ] **2.2 Write failing pure presentation tests.** Cover surface/border/foreground derivation, disabled presentation, icon/text/close rectangles, multiline measurement, DPI scaling.
+- [ ] **2.3 Implement rendering/layout.** Reuse Theme, Rendering, Icons; do not make Alert depend on Badge merely because both use semantic colors.
+- [ ] **2.4 Implement dismissal tests/behavior.** Close-button activation and `Dismiss()` share one path; repeated dismissal is a no-op; re-show then dismiss produces one new event.
+- [ ] **2.5 Add demo cases.** Icon/no-icon, dismissible/non-dismissible, multiline, all variants, disabled, keyboard close, Light/Dark, DPI.
+- [ ] **2.6 Run both targets, docs, API baseline, then commit** `feat: add BootstrapAlert`.
 
 ---
 
@@ -186,23 +176,43 @@ Rules:
 
 ## Architecture decision
 
-Use the native `System.Windows.Forms.ToolTip` behavior rather than a custom top-level window. `BootstrapTooltip` should inherit from or wrap `ToolTip` and enable `OwnerDraw`; native timing, control association, screen positioning, accessibility integration, and hide/show lifecycle remain authoritative.
+Do **not** inherit from `System.Windows.Forms.ToolTip`. Define `BootstrapTooltip : Component, IExtenderProvider` that owns exactly one native `ToolTip` instance. This avoids relying on target-dependent inheritance/sealing details while preserving the WinForms tooltip timing, association, popup positioning, and owner-draw pipeline.
 
-Explicit placement (Top/Bottom/Left/Right), HTML/rich content, interactive tooltip content, and Popper-like collision APIs are out of scope for the first version. Native placement is the safer cross-target baseline.
+The wrapper implements the designer extender contract itself and forwards each associated control/caption to the owned native `ToolTip`. Explicit Top/Bottom/Left/Right placement, rich HTML, interactive content, and a custom top-level tooltip Form are out of scope.
 
 ## Contract
 
 ```csharp
-public class BootstrapTooltip : ToolTip
+[ProvideProperty("ToolTip", typeof(Control))]
+public class BootstrapTooltip : Component, IExtenderProvider
 {
-    public BootstrapVariant Variant { get; set; }      // default Dark
-    public Color CustomColor { get; set; }             // default Color.Empty
-    public int BorderRadius { get; set; }               // default -1
+    public BootstrapTooltip();
+    public BootstrapTooltip(IContainer container);
+
+    public BootstrapVariant Variant { get; set; }      // Dark
+    public Color CustomColor { get; set; }             // Color.Empty
+    public int BorderRadius { get; set; }               // -1
     public Padding ContentPadding { get; set; }
+
+    public int InitialDelay { get; set; }
+    public int ReshowDelay { get; set; }
+    public int AutoPopDelay { get; set; }
+    public bool Active { get; set; }
+    public bool ShowAlways { get; set; }
+
+    public bool CanExtend(object extendee);
+    public void SetToolTip(Control control, string caption);
+    public string GetToolTip(Control control);
 }
 ```
 
-Inherited `SetToolTip`, `GetToolTip`, `InitialDelay`, `ReshowDelay`, `AutoPopDelay`, `Active`, and `ShowAlways` remain the canonical API; do not duplicate them with Bootstrap-prefixed aliases.
+Rules:
+
+- The inner `ToolTip` is owned and disposed by `BootstrapTooltip`; associated controls are never owned.
+- `CanExtend` accepts WinForms `Control` instances except the component itself/non-controls.
+- Timing/active/show-always properties forward directly to the native instance; do not mirror separate behavioral state.
+- The native tooltip uses `OwnerDraw=true`; its `Popup` determines measured size and `Draw` paints the Bootstrap surface/text.
+- Theme switching changes subsequent owner-draw rendering without recreating user associations.
 
 ## Files
 
@@ -214,12 +224,12 @@ Inherited `SetToolTip`, `GetToolTip`, `InitialDelay`, `ReshowDelay`, `AutoPopDel
 
 ## Tasks
 
-- [ ] **3.1 Prove native extender behavior with failing/characterization tests.** Associate text with multiple controls, replace/remove text, dispose the component, and verify native delay properties remain usable on both target frameworks.
-- [ ] **3.2 Add pure measurement/palette tests.** Text measurement plus padding must produce a positive popup size; semantic/custom color and contrast resolution must be deterministic at 96–192 DPI.
-- [ ] **3.3 Implement owner-drawn popup rendering.** Use `Popup` to set size and `Draw` to paint rounded background/border/text. Do not create a secondary tooltip Form.
-- [ ] **3.4 Add lifecycle/theme tests.** Theme changes affect the next draw; disposal releases theme subscriptions and does not retain associated controls.
-- [ ] **3.5 Add manual scenarios.** Buttons, TextBox, disabled/long-text anchors, multiple delay values, Light/Dark, high DPI, and repeated hover transitions.
-- [ ] **3.6 Complete docs/API baseline and commit** `feat: add BootstrapTooltip`.
+- [ ] **3.1 Write failing extender/forwarding tests.** Verify parameterless and `IContainer` construction, `CanExtend`, `SetToolTip`/`GetToolTip`, replacing/removing captions, multiple controls, native delay forwarding, `Active`, `ShowAlways`, and disposal.
+- [ ] **3.2 Write failing pure measurement/palette tests.** Cover text + padding size, semantic/custom color, contrast foreground, radius, and DPI 96/120/144/168/192.
+- [ ] **3.3 Implement the wrapper and one owned native ToolTip.** Enable `OwnerDraw`, forward public behavioral properties, implement the extender API, and never create a tooltip Form.
+- [ ] **3.4 Implement owner-draw events.** `Popup` uses measured text/padding to size the native popup; `Draw` uses rounded theme/custom background, border, and text with scoped GDI resources.
+- [ ] **3.5 Add lifecycle/theme tests and manual scenarios.** Multiple anchors, long text, disabled anchors where native behavior allows it, timing changes, repeated hover, Light/Dark, DPI, disposal without retained controls.
+- [ ] **3.6 Run both targets, docs, API baseline, then commit** `feat: add BootstrapTooltip`.
 
 ---
 
@@ -227,7 +237,7 @@ Inherited `SetToolTip`, `GetToolTip`, `InitialDelay`, `ReshowDelay`, `AutoPopDel
 
 ## Architecture decision
 
-Implement Tabs as `BootstrapTabControl : TabControl` with owner-drawn tab headers. Preserve the native `TabPages` collection, `SelectedIndex`, `SelectedTab`, keyboard selection, designer support, and page hosting. Do not build a parallel page collection around `BootstrapButtonGroup`.
+Implement Tabs as `BootstrapTabControl : TabControl` using owner-drawn headers. Preserve native `TabPages`, `SelectedIndex`, `SelectedTab`, page hosting, keyboard navigation, and Designer semantics. Do not create a parallel page model around `BootstrapButtonGroup`.
 
 ## Contract
 
@@ -242,19 +252,20 @@ public enum BootstrapTabStyle
 [DefaultEvent(nameof(SelectedIndexChanged))]
 public class BootstrapTabControl : TabControl
 {
-    public BootstrapTabStyle TabStyle { get; set; }    // default Tabs
-    public BootstrapVariant Variant { get; set; }      // default Primary
-    public bool Fill { get; set; }                     // default false
-    public int BorderRadius { get; set; }               // default -1
+    public BootstrapTabStyle TabStyle { get; set; }    // Tabs
+    public BootstrapVariant Variant { get; set; }      // Primary
+    public bool Fill { get; set; }                     // false
+    public int BorderRadius { get; set; }               // -1
 }
 ```
 
 Rules:
 
-- Native `TabPage` remains the page type; no `BootstrapTabPage` is introduced in this stage.
-- Selected state uses `Variant`; inactive tabs use theme surface/text; disabled tab pages render muted and cannot be activated through framework-added mouse logic.
-- Native focus/keyboard behavior remains intact. If custom hit testing is required for disabled pages, it must not regress Ctrl+Tab/arrow behavior.
-- `Fill=true` distributes available header width across visible tabs; no separate `Justified` alias is added until a distinct behavior is required.
+- Native `TabPage` remains the page type; no `BootstrapTabPage` is added.
+- Only headers are framework-painted; page contents remain caller-owned.
+- `Fill=true` distributes header width across available header space.
+- Selected headers use `Variant`; inactive/disabled headers resolve from theme tokens.
+- Native focus and keyboard page selection remain authoritative.
 
 ## Files
 
@@ -267,12 +278,12 @@ Rules:
 
 ## Tasks
 
-- [ ] **4.1 Freeze public defaults and native collection behavior.** Tests must prove normal `TabPages.Add/Remove`, selected-index events, designer-safe construction, and no duplicate page model.
-- [ ] **4.2 Add pure header-layout tests.** Cover tab rectangles, `Fill`, DPI scaling, Tabs/Pills/Underline selected geometry, edge clipping, and minimum usable width.
-- [ ] **4.3 Implement owner-drawn headers only.** Do not custom-paint page contents; `TabPage` remains caller-owned.
-- [ ] **4.4 Add keyboard/focus/disabled-page regression tests.** Tab into the control, switch pages with keyboard, click headers, and verify selection changes exactly once.
-- [ ] **4.5 Add Navigation demo scenarios.** Three styles, fill/non-fill, long labels, disabled page, runtime theme switch, DPI matrix, nested controls retaining focus.
-- [ ] **4.6 Complete docs/API baseline and commit** `feat: add BootstrapTabControl`.
+- [ ] **4.1 Write failing contract/native-behavior tests.** Verify `TabPages.Add/Remove`, normal selected-index events, defaults, Designer construction, and no duplicate page collection.
+- [ ] **4.2 Write failing header-layout tests.** Tabs/Pills/Underline geometry, `Fill`, long labels, minimum width, DPI scaling, selected/disabled palette.
+- [ ] **4.3 Implement owner-drawn headers only.** Do not custom-paint page bodies or intercept selection unless required for presentation correctness.
+- [ ] **4.4 Add STA interaction regressions.** Mouse selection, Tab focus, arrows/Ctrl+Tab behavior supported by native control, one selection event per effective change, disabled-page behavior.
+- [ ] **4.5 Add demo cases.** All styles, fill/non-fill, long labels, disabled page, nested focusable content, Light/Dark, DPI.
+- [ ] **4.6 Run both targets, docs, API baseline, then commit** `feat: add BootstrapTabControl`.
 
 ---
 
@@ -280,9 +291,9 @@ Rules:
 
 ## Architecture decision
 
-Use a `UserControl` shell around one native borderless `NumericUpDown`. The native control remains responsible for decimal parsing, culture, min/max clamping, incrementing, keyboard arrows, mouse wheel, and value events. The Bootstrap shell owns one public tab stop, focus border, rounded surface, validation presentation, and layout.
+Use a `UserControl` shell around exactly one native borderless `NumericUpDown`. The native control owns decimal parsing, culture, min/max/value rules, incrementing, keyboard arrows, mouse wheel, and value events. The shell owns one public tab stop, focus/validation border, rounded surface, theme font, and DPI layout.
 
-Do not reimplement a numeric parser in `BootstrapTextBox` and do not create custom plus/minus buttons in the first version.
+Do not parse numbers through `BootstrapTextBox` and do not create custom +/- buttons in this version.
 
 ## Contract
 
@@ -306,11 +317,10 @@ public class BootstrapNumericBox : UserControl
 
 Rules:
 
-- Inner `NumericUpDown` is the numeric state authority; wrapper properties forward rather than mirror separate state.
-- The shell owns `TabStop`; the native editor is removed from the outer tab sequence just like `BootstrapTextBox`.
-- Minimum/Maximum/Value behavior follows native WinForms exceptions/clamping semantics; do not invent conflicting normalization rules.
-- `ReadOnly` preserves selection/copy and native value display.
-- Hexadecimal mode and custom acceleration collections are deferred unless a concrete application need appears.
+- Inner `NumericUpDown` is the numeric state authority; wrapper properties forward directly.
+- Outer control owns the public tab stop; inner editor remains outside the parent tab sequence, matching the established `BootstrapTextBox` pattern.
+- Native min/max/value validation semantics remain authoritative.
+- Hexadecimal mode and acceleration collections are deferred.
 
 ## Files
 
@@ -322,12 +332,12 @@ Rules:
 
 ## Tasks
 
-- [ ] **5.1 Write native-delegation contract tests.** Verify forwarding for Value/Minimum/Maximum/Increment/DecimalPlaces/ThousandsSeparator/ReadOnly and one `ValueChanged` event for an effective native value change.
-- [ ] **5.2 Add focus/layout/palette tests.** Cover validation-state priority, disabled/read-only surface, DPI-scaled padding/border, and focus ownership.
-- [ ] **5.3 Implement the themed shell around one native NumericUpDown.** Do not parse numeric text in the wrapper.
-- [ ] **5.4 Add STA keyboard tests.** Arrow increment/decrement, Tab entry/exit, direct text edit where native control permits it, disabled/read-only behavior, and mouse-wheel behavior without framework interference.
-- [ ] **5.5 Add Advanced Inputs demo scenarios.** Integer/decimal/currency-like formatting, min/max, increment sizes, invalid/valid presentation, read-only/disabled, Light/Dark, DPI.
-- [ ] **5.6 Complete docs/API baseline and commit** `feat: add BootstrapNumericBox`.
+- [ ] **5.1 Write failing delegation tests.** Value/Minimum/Maximum/Increment/DecimalPlaces/ThousandsSeparator/ReadOnly forwarding and exactly one `ValueChanged` for an effective native change.
+- [ ] **5.2 Write failing shell-render tests.** Focus/validation priority, disabled/read-only colors, radius validation, DPI padding/border, theme font ownership.
+- [ ] **5.3 Implement the shell around one native NumericUpDown.** No duplicate parser/range state.
+- [ ] **5.4 Add STA interaction tests.** Tab entry/exit, Up/Down increments, editable numeric text where native behavior permits, mouse wheel, disabled/read-only, min/max boundaries.
+- [ ] **5.5 Add demo cases.** Integer, decimal, thousands separator, multiple increments, min/max, validation, read-only/disabled, Light/Dark, DPI.
+- [ ] **5.6 Run both targets, docs, API baseline, then commit** `feat: add BootstrapNumericBox`.
 
 ---
 
@@ -335,30 +345,30 @@ Rules:
 
 ## Architecture decision
 
-Subclass native `ComboBox` and preserve its complete selection/binding model. Use owner-drawn list items and a flat themed surface as far as WinForms permits safely. Do not replace the dropdown with `BootstrapDropdown`; a command menu and a data-selection control have different semantics.
+Subclass native `ComboBox` and preserve its selection/binding model. Use owner-drawn list items plus a themed shell as far as WinForms safely permits. Do not replace the dropdown with `BootstrapDropdown`; a command menu and a data-selection control have different semantics.
 
-A fully custom rounded popup, multi-select combo, token/chip mode, search-as-you-type server lookup, and virtualized remote data are explicitly out of scope.
+Multi-select, token/chip mode, remote async lookup, custom popup virtualization, and a fully custom rounded popup are deferred.
 
 ## Contract
 
 ```csharp
 public class BootstrapComboBox : ComboBox
 {
-    public BootstrapValidationState ValidationState { get; set; }
-    public int BorderRadius { get; set; }               // default -1
+    public BootstrapValidationState ValidationState { get; set; } // None
+    public int BorderRadius { get; set; }                          // -1
     public IconDescriptor? LeadingIcon { get; set; }
     public IIconRenderer IconRenderer { get; set; }
 }
 ```
 
-All normal native members remain canonical: `Items`, `DataSource`, `DisplayMember`, `ValueMember`, `SelectedIndex`, `SelectedItem`, `SelectedValue`, `DropDownStyle`, `AutoCompleteMode`, `AutoCompleteSource`, and selection events.
+Native members remain canonical: `Items`, `DataSource`, `DisplayMember`, `ValueMember`, `SelectedIndex`, `SelectedItem`, `SelectedValue`, `DropDownStyle`, `AutoCompleteMode`, `AutoCompleteSource`, and selection events.
 
 Rules:
 
-- `DrawMode` is owned by the Bootstrap implementation; callers customize data through normal text/value APIs, not by replacing the framework renderer.
-- Item painting must handle selected, highlighted, disabled-host, and theme states without per-item retained GDI resources.
-- Native dropdown and binding lifecycle remain untouched.
-- `BorderRadius` affects the control shell where feasible; platform-native dropdown chrome may remain square. Document this limitation rather than replacing native semantics with a custom popup.
+- Framework owns `DrawMode`; callers provide data/text/value through normal ComboBox APIs, not by replacing framework painting.
+- Item paint handles normal/highlighted/selected/disabled-host states without retained per-item GDI resources.
+- Binding/dropdown lifecycle remains native.
+- `BorderRadius` applies where safely controllable; native popup chrome may remain square and must be documented as a limitation rather than replaced with unsupported hacks.
 
 ## Files
 
@@ -370,12 +380,12 @@ Rules:
 
 ## Tasks
 
-- [ ] **6.1 Characterize inherited behavior before custom painting.** Tests cover Items, DataSource binding, DisplayMember/ValueMember, SelectedIndexChanged, DropDownList/DropDown modes, autocomplete properties, and designer-safe construction.
-- [ ] **6.2 Add pure rendering/layout tests.** Leading-icon slot, dropdown-arrow reserve area, focus/validation border color, item text rectangle, DPI scaling, and custom font measurement.
-- [ ] **6.3 Implement owner-drawn item and shell presentation without replacing native selection logic.** Any unavoidable native-chrome limitation must be documented in `docs/COMPONENTS.md` rather than hidden behind platform-specific hacks.
-- [ ] **6.4 Add STA interaction tests.** Open dropdown, keyboard Up/Down/Enter/Escape, type-to-select where native mode supports it, disabled state, data-bound selection, runtime theme switch.
-- [ ] **6.5 Add Advanced Inputs demo cases.** Unbound items, data-bound objects, editable and DropDownList modes, long items, disabled, validation states, Light/Dark, DPI.
-- [ ] **6.6 Complete docs/API baseline and commit** `feat: add BootstrapComboBox`.
+- [ ] **6.1 Characterize inherited semantics with failing/regression tests.** Items, object data binding, DisplayMember/ValueMember, selected state/events, DropDown/DropDownList, autocomplete properties, Designer construction.
+- [ ] **6.2 Write failing render/layout tests.** Leading-icon slot, arrow reserve, focus/validation border, item text rectangle, long text, custom font, DPI.
+- [ ] **6.3 Implement framework painting without replacing native selection/binding logic.** Document unavoidable native-chrome limits.
+- [ ] **6.4 Add STA interaction tests.** Open/close dropdown, Up/Down/Enter/Escape, type-to-select where native mode supports it, data-bound selection, disabled state, runtime theme switch.
+- [ ] **6.5 Add demo cases.** Unbound, bound object list, editable/DropDownList, autocomplete, long items, validation, disabled, Light/Dark, DPI.
+- [ ] **6.6 Run both targets, docs, API baseline, then commit** `feat: add BootstrapComboBox`.
 
 ---
 
@@ -383,9 +393,9 @@ Rules:
 
 ## Architecture decision
 
-Dropdown is a command menu, not a ComboBox. Compose an existing `BootstrapButton` target with a native `ToolStripDropDown`/`ToolStripItem` menu so Windows keyboard navigation, menu focus, dismissal on outside click, nested message-loop behavior, and screen working-area placement remain native.
+Dropdown is a command menu. Compose an existing `BootstrapButton` target with a native `ToolStripDropDown` so Windows menu focus, keyboard navigation, outside-click dismissal, message-loop behavior, and working-area placement remain native. Theme the menu through a framework `ToolStripRenderer`.
 
-Do not create a transparent top-level Form, a second Button renderer, or reuse ComboBox items as command items.
+Do not create a transparent top-level Form and do not reuse ComboBox data items as command items.
 
 ## Contract
 
@@ -427,12 +437,12 @@ public class BootstrapDropdown : Component
 
 Rules:
 
-- `Target` is not owned or disposed by Dropdown. Replacing/disposal detaches handlers.
-- Menu items are rebuilt/synchronized deterministically and removed native items are disposed.
-- Clicking an enabled item raises its `Click` and closes the dropdown; separators and disabled items never activate.
-- Target click toggles the dropdown only while `Target.Enabled` and not `Target.Loading`.
-- Native menu keyboard semantics (Up/Down/Home/End/Enter/Escape) remain authoritative.
-- Submenus, headers, forms, arbitrary hosted controls, split-button behavior, and multi-select menu semantics are deferred.
+- `Target` is caller-owned. Replacement/disposal detaches handlers; Dropdown never disposes the target.
+- Native menu items created by Dropdown are owned/disposed by Dropdown.
+- Enabled item activation raises its model `Click` and closes; disabled items/separators never activate.
+- Target toggles only when enabled and not loading.
+- Up/Down/Home/End/Enter/Escape behavior remains native.
+- Submenus, arbitrary hosted controls, split-button semantics, and multi-select are deferred.
 
 ## Files
 
@@ -446,12 +456,12 @@ Rules:
 
 ## Tasks
 
-- [ ] **7.1 Freeze ownership and collection semantics with failing tests.** Add/remove/clear items, target replacement, target disposal, component disposal, disabled/loading target, and separator behavior.
-- [ ] **7.2 Write native menu interaction tests.** Opening/closing events fire once, target click toggles, enabled item click fires once, disabled/separator items do nothing, outside/Escape closure does not mutate item state.
-- [ ] **7.3 Implement a custom `ToolStripRenderer` using current theme and icon infrastructure.** Keep menu keyboard/message-loop behavior native; theme changes refresh open and future menus without leaking old renderers/resources.
-- [ ] **7.4 Add DPI/working-area manual checks.** Anchor near each screen edge, multi-monitor working areas, 100–200% scaling, long text, icons, checked items, separators.
-- [ ] **7.5 Add Navigation demo cases.** Basic actions, icons, disabled item, checked item, separator, Light/Dark while closed/open, keyboard operation.
-- [ ] **7.6 Complete docs/API baseline and commit** `feat: add BootstrapDropdown`.
+- [ ] **7.1 Write failing ownership/collection tests.** Add/remove/clear, target replacement/disposal, component disposal, disabled/loading target, separator behavior.
+- [ ] **7.2 Write failing native-menu interaction tests.** Open/close events once, target toggle, enabled item click once, disabled/separator no-op, Escape closure without item mutation.
+- [ ] **7.3 Implement ToolStripDropDown composition and renderer.** Reuse current theme/icon infrastructure; removed native items and renderer-owned resources are disposed deterministically.
+- [ ] **7.4 Add theme/DPI/working-area checks.** Runtime Light/Dark, long items, icons, check marks, separators, anchor near screen edges, multi-monitor/manual checks, 100–200% DPI.
+- [ ] **7.5 Add Navigation demo cases.** Basic actions, icons, disabled/checked item, separator, keyboard operation, open/close stress.
+- [ ] **7.6 Run both targets, docs, API baseline, then commit** `feat: add BootstrapDropdown`.
 
 ---
 
@@ -459,9 +469,9 @@ Rules:
 
 ## Architecture decision
 
-Toast is a transient notification surface and should not be modeled as an Alert with `Visible` toggles only. Implement `BootstrapToast` as the visual notification and `BootstrapToastContainer` as the stacking/lifetime owner. The container is a normal WinForms control placed by the application (typically anchored top-right/bottom-right), avoiding an implicit global window or service locator.
+Use two units: `BootstrapToast` is one transient notification, and `BootstrapToastContainer` owns stacking/layout/lifetime. The container is a normal WinForms control placed by the application, avoiding an implicit global window/service locator.
 
-Show/hide motion uses `BootstrapAnimation`; auto-hide timing is a semantic delay owned by each toast/container and must be canceled on hover when configured, hide, removal, or disposal. Reduced motion skips transition frames but preserves auto-hide semantics.
+Show/hide transitions use `BootstrapAnimation`. Auto-hide is not frame animation: each visible auto-hide toast may own one short-lived `System.Windows.Forms.Timer` whose interval equals `AutoHideDelay`; it starts only after the toast is fully shown, stops before invoking dismissal, and is disposed on dismissal/removal/disposal. Reduced motion skips transition frames but keeps auto-hide timing behavior.
 
 ## Contract
 
@@ -482,9 +492,9 @@ public class BootstrapToast : UserControl
     public BootstrapVariant Variant { get; set; }
     public IconDescriptor? Icon { get; set; }
     public IIconRenderer IconRenderer { get; set; }
-    public bool Dismissible { get; set; }
-    public bool AutoHide { get; set; }                  // default true
-    public int AutoHideDelay { get; set; }              // default 5000 ms
+    public bool Dismissible { get; set; }               // true
+    public bool AutoHide { get; set; }                  // true
+    public int AutoHideDelay { get; set; }              // 5000 ms
     public int AnimationDuration { get; set; }
     public event EventHandler? Dismissed;
     public void Dismiss();
@@ -502,12 +512,12 @@ public class BootstrapToastContainer : Panel
 
 Rules:
 
-- Container owns only toasts passed to `ShowToast`; ownership transfer must be explicit in XML docs. Removed/dismissed owned toasts are disposed after the dismissal transition completes.
-- The same toast instance cannot be hosted by two containers simultaneously.
-- `AutoHideDelay <= 0` throws. `AnimationDuration <= 0` follows the shared animation validation rule.
-- Rapid show/dismiss/re-show paths must not create overlapping animation schedulers or duplicate `Dismissed` events.
-- Auto-hide does not use `Thread.Sleep`, `Task.Delay` as a frame scheduler, or a permanent polling timer.
-- Toast does not create its own top-level Form in the first version; applications choose where the container is placed.
+- `ShowToast` explicitly transfers ownership of that toast to the container; XML docs must say this. Removed/dismissed owned toasts are disposed after exit animation completes.
+- One toast instance cannot be hosted by two containers.
+- `AutoHideDelay <= 0` and invalid `AnimationDuration` values throw consistently.
+- Auto-hide timer is semantic delay only; all visual transition frames come from `BootstrapAnimation`.
+- Rapid show/dismiss paths cannot create overlapping animations, stale timers, or duplicate `Dismissed` events.
+- No top-level Toast Form/global notification service in this version.
 
 ## Files
 
@@ -522,14 +532,14 @@ Rules:
 
 ## Tasks
 
-- [ ] **8.1 Write pure stacking/layout tests.** Top/bottom ordering, left/right alignment, DPI spacing, max-visible overflow policy, resize, and empty container.
-- [ ] **8.2 Freeze toast contract and ownership tests.** Defaults, delay validation, one-container ownership, `Dismissed` exactly once, container disposal, and deterministic child disposal.
-- [ ] **8.3 Add deterministic animation tests using existing animation test patterns.** Show, dismiss, reversal while entering, reduced motion, hidden container, disposal during transition, and no work after disposal.
-- [ ] **8.4 Implement auto-hide as a lifecycle-owned semantic delay.** Cancellation/restart rules are explicit: start after fully shown, cancel on dismiss/removal/disposal, and do not let stale callbacks dismiss a reused toast.
-- [ ] **8.5 Implement container stacking and transitions.** Reflow existing toasts using the shared finite animation abstraction when motion is enabled; do not create one independent frame timer per toast.
-- [ ] **8.6 Add Feedback demo scenarios.** Manual show, auto-hide, multiple stacking, maximum-visible behavior, dismiss button, hover/interaction, rapid bursts, Light/Dark, reduced motion, DPI.
-- [ ] **8.7 Run resource stress checks.** Repeatedly create/show/dismiss hundreds of toasts and verify no unbounded timer/event/GDI growth.
-- [ ] **8.8 Complete docs/API baseline and commit** `feat: add BootstrapToast`.
+- [ ] **8.1 Write failing pure stacking tests.** Top/bottom order, left/right alignment, spacing, maximum visible count, resize, empty state, DPI.
+- [ ] **8.2 Write failing ownership/contract tests.** Defaults, validation, one-container rule, transfer-of-ownership behavior, exactly-once dismissal, deterministic child disposal.
+- [ ] **8.3 Write deterministic animation tests following existing animation test patterns.** Enter, exit, dismiss while entering, reduced motion, hidden container, disposal during transition, no scheduling after disposal.
+- [ ] **8.4 Implement auto-hide timer lifecycle.** Create/start only for visible auto-hide state after enter completion; stop before dismissal; dispose and null it on dismissal/removal/disposal; stale ticks must not dismiss a subsequently reused/re-shown toast.
+- [ ] **8.5 Implement container stacking/reflow.** Reuse finite animation for movement/opacity-like visual progress where WinForms rendering permits; no extra frame timer.
+- [ ] **8.6 Add Feedback demo cases.** Manual and auto-hide, burst stacking, max-visible policy, dismiss button, rapid dismiss/show, reduced motion, Light/Dark, DPI.
+- [ ] **8.7 Run resource stress.** Repeatedly create/show/dismiss hundreds of toasts and verify no unbounded timer/event/GDI/USER-handle growth.
+- [ ] **8.8 Run both targets, docs, API baseline, then commit** `feat: add BootstrapToast`.
 
 ---
 
@@ -537,9 +547,9 @@ Rules:
 
 ## Architecture decision
 
-Use a themed `UserControl` shell containing one native `DateTimePicker`. The native picker owns date parsing, locale-aware formatting, keyboard editing, min/max validation, optional checkbox state, and the OS calendar popup. The shell owns the Bootstrap border/focus/validation surface and forwards a deliberately small core API.
+Use a themed `UserControl` shell around exactly one native `DateTimePicker`. Native WinForms owns date parsing, locale-aware formatting, min/max validation, keyboard editing, checkbox state, and the OS calendar popup. The framework owns border/focus/validation surface, font, and DPI layout.
 
-Do not implement a custom calendar grid in this roadmap. Bootstrap itself does not define a native DatePicker widget, and a custom calendar would introduce a separate navigation/accessibility/localization subsystem that should be planned independently if ever required.
+Do not implement a custom calendar in this roadmap. A custom calendar would introduce its own navigation, accessibility, localization, month/year navigation, and popup subsystem and requires a separate plan.
 
 ## Contract
 
@@ -563,12 +573,12 @@ public class BootstrapDatePicker : UserControl
 
 Rules:
 
-- The inner native picker is the value/format authority; wrapper state must not diverge.
-- `CustomFormat` matters only when `Format=Custom`, matching native semantics.
-- `ShowCheckBox`/`Checked` retain native optional-value behavior; do not add a second nullable `DateTime? Value` API in the same release.
-- `MinDate`/`MaxDate`/`Value` validation follows the native control's documented behavior.
-- The OS calendar popup may retain platform-native chrome. The Bootstrap shell must not use unsupported Win32 painting hacks to force popup theming.
-- `ShowUpDown`, time-only picker, range picker, date-range calendar, week numbers, multi-date selection, and custom calendar templates are deferred.
+- Inner native picker is the date/format state authority; wrapper properties forward and do not mirror independent state.
+- `CustomFormat` follows native semantics and matters when `Format=Custom`.
+- `ShowCheckBox`/`Checked` provide native optional-value behavior; do not simultaneously add a second nullable `DateTime? Value` API.
+- Min/max/value validation remains native.
+- OS calendar popup chrome may remain native. Do not use unsupported Win32 painting hacks to force popup theming.
+- `ShowUpDown`, range picker, multi-date selection, week numbers, custom calendar templates are deferred.
 
 ## Files
 
@@ -580,65 +590,66 @@ Rules:
 
 ## Tasks
 
-- [ ] **9.1 Characterize native date behavior on both targets before styling.** Value/min/max changes, custom format, checkbox/checked state, keyboard editing, dropdown open/close, and locale-sensitive display must remain native.
-- [ ] **9.2 Freeze wrapper contract tests.** Forwarded values/events, focus ownership, validation state, border-radius validation, disabled state, designer-safe construction, and no duplicate `ValueChanged` event.
-- [ ] **9.3 Add pure shell layout/palette tests.** Native picker inset, focus/validation border, disabled surface, DPI dimensions, and no clipping at 100–200%.
-- [ ] **9.4 Implement the themed shell without intercepting calendar semantics.** Keep native calendar popup behavior intact and document unavoidable OS-rendered portions.
-- [ ] **9.5 Add STA keyboard/dropdown tests.** Tab focus, arrow/date editing, open calendar, choose date, Escape close, checkbox toggle, min/max boundaries, Light/Dark switch while control is alive.
-- [ ] **9.6 Add Advanced Inputs demo cases.** Short/long/custom formats, min/max, checked/unchecked, validation states, disabled, locale/manual checks, Light/Dark, DPI.
-- [ ] **9.7 Run final cross-control regression.** TextBox/NumericBox/ComboBox/DatePicker tab order, Tooltip attachment, Dropdown nearby, Toast notifications from value changes, and no theme/lifecycle leaks.
-- [ ] **9.8 Complete docs/API baseline and commit** `feat: add BootstrapDatePicker`.
+- [ ] **9.1 Characterize native date behavior on both targets before styling.** Value/min/max, built-in/custom format, checkbox/checked, keyboard editing, dropdown open/close, locale-sensitive display.
+- [ ] **9.2 Write failing wrapper contract tests.** Forwarded state/events, one public focus path, validation state, radius validation, disabled state, Designer construction, no duplicate `ValueChanged`.
+- [ ] **9.3 Write failing shell-layout/palette tests.** Native picker inset, focus/validation border priority, disabled surface, DPI dimensions, font and text clipping.
+- [ ] **9.4 Implement themed shell without intercepting calendar semantics.** Preserve native popup behavior and document OS-rendered portions.
+- [ ] **9.5 Add STA interaction tests.** Tab focus, keyboard date editing, open/select/close calendar, Escape, checkbox toggle, min/max boundaries, runtime theme switch.
+- [ ] **9.6 Add Advanced Inputs demo cases.** Short/long/custom format, min/max, checked/unchecked, validation, disabled, locale manual check, Light/Dark, DPI.
+- [ ] **9.7 Run final cross-control regression.** TextBox/NumericBox/ComboBox/DatePicker tab sequence, Tooltip associations, adjacent Dropdown, Toast triggered from input changes, repeated theme switching/disposal.
+- [ ] **9.8 Run both targets, docs, API baseline, then commit** `feat: add BootstrapDatePicker`.
 
 ---
 
 # Cross-Stage Documentation and API Checklist
 
-Run this after every stage, not only after Stage 9:
+Run after **every** stage:
 
-- [ ] Add/finalize the component contract in `docs/COMPONENTS.md` and remove that component from the deferred list.
-- [ ] Add architecture dependency notes only when a real new dependency exists; do not redraw the architecture for cosmetic reasons.
+- [ ] Finalize that component's contract in `docs/COMPONENTS.md` and remove it from the deferred list.
+- [ ] Update `docs/ARCHITECTURE.md` only when a real new dependency/composition edge has been introduced.
 - [ ] Add automated/manual coverage notes to `docs/TESTING.md`.
-- [ ] Add supported-control mention to `README.md` and `docs/PACKAGE_README.md`.
-- [ ] Add an `Unreleased` changelog entry; do not rewrite `1.0.0-rc.1` history.
-- [ ] Run the API baseline test and inspect the reconstructed exported surface before changing the approved fingerprint.
-- [ ] Update `docs/PUBLIC_API_BASELINE.md` with the newly approved fingerprint and a short reason naming the compatible API addition.
+- [ ] Add the supported component to `README.md` and `docs/PACKAGE_README.md`.
+- [ ] Add an `Unreleased` changelog entry without rewriting `1.0.0-rc.1` history.
+- [ ] Run `Phase16PublicApiBaselineTests.ExportedApiMatchesApprovedV1Baseline` and inspect the reconstructed exported surface before accepting a new fingerprint.
+- [ ] Update `docs/PUBLIC_API_BASELINE.md` with the approved fingerprint and the named compatible API addition.
 - [ ] Run `dotnet build -c Release -f net48`.
 - [ ] Run `dotnet build -c Release -f net8.0-windows`.
-- [ ] Run `dotnet test -c Release` or the repository's `build.ps1` / `test.ps1` sequence as defined by the release docs.
-- [ ] Run the relevant demo page at Light and Dark themes and the 100/125/150/175/200% DPI matrix.
-- [ ] Verify creation/disposal repeatedly and confirm no unbounded GDI handles, USER handles, timers, or event subscriptions.
+- [ ] Run `dotnet test -c Release` or the repository's `build.ps1` + `test.ps1` sequence.
+- [ ] Run the relevant demo under Light/Dark and Windows display scaling at 100%, 125%, 150%, 175%, and 200%.
+- [ ] Repeatedly create/dispose the new component and verify no obvious unbounded GDI handles, USER handles, timers, or event subscriptions.
 
 ---
 
 # Explicitly Deferred Scope
 
-The following ideas should not be pulled into these nine stages without a separate plan because they materially enlarge the public API or introduce a new subsystem:
+Do not pull these into the nine stages without a separate approved plan:
 
 - Rich/HTML Alert or Tooltip content.
-- Interactive tooltips/popovers.
+- Interactive tooltip/popover content.
+- Explicit Popper-like Tooltip placement/collision engine.
 - Nested Dropdown submenus or arbitrary hosted controls.
-- Split-button dropdowns.
+- Split-button Dropdown.
 - Multi-select/tokenized ComboBox.
-- Async/remote ComboBox search.
+- Async/remote ComboBox lookup.
 - Fully custom calendar rendering.
 - Date ranges or multi-date selection.
-- Global/top-level toast notification service that creates its own windows.
-- Persistence of toast history/notification center.
-- Shared public `BootstrapControlSize` migration for existing TextBox/Button controls.
+- Global/top-level Toast service that creates its own windows.
+- Toast notification history/notification center.
+- Broad migration to a new public shared size enum across existing controls.
 
 ---
 
 # Final Completion Gate
 
-The roadmap is complete only when all nine stages have individually passed their stage gates and the final repository satisfies all of the following:
+This roadmap is complete only when:
 
-1. Badge, Alert, Tooltip, Tabs, NumericBox, ComboBox, Dropdown, Toast, and DatePicker all have documented public contracts.
+1. Badge, Alert, Tooltip, Tabs, NumericBox, ComboBox, Dropdown, Toast, and DatePicker each have a finalized documented public contract.
 2. Both target frameworks build and all automated tests pass.
 3. Feedback, Navigation, and Advanced Inputs demo pages expose every new component and relevant interaction state.
 4. Runtime Light/Dark switching works without recreating the application.
 5. Interactive controls preserve keyboard/focus behavior and native semantic behavior where delegated.
-6. DPI verification passes at 100%, 125%, 150%, 175%, and 200%.
-7. No component introduced duplicate theme, icon, rendering, or animation infrastructure.
-8. Public API fingerprint updates were reviewed incrementally rather than accepted once at the end.
+6. Manual DPI verification passes at 100%, 125%, 150%, 175%, and 200%.
+7. No component introduces duplicate Theme, Rendering, Icons, Compatibility, or Animation infrastructure.
+8. Public API fingerprint additions were reviewed incrementally at each stage rather than accepted once at the end.
 9. Resource/lifecycle stress checks show no obvious unbounded GDI, USER, event, or timer growth.
-10. Deferred features remain deferred unless a separate approved plan explicitly adds them.
+10. Deferred features remain deferred until a separate plan explicitly approves them.
