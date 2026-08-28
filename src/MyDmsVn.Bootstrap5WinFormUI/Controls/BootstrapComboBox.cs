@@ -26,8 +26,6 @@ public class BootstrapComboBox : ComboBox
     private bool _themeSubscribed;
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
-    private bool _settingShellRegion;
-    private bool _manageShellRegion = true;
     private Font? _themeFont;
 
     /// <summary>
@@ -46,8 +44,6 @@ public class BootstrapComboBox : ComboBox
         LostFocus += OnComboBoxPresentationChanged;
         DropDown += OnComboBoxPresentationChanged;
         DropDownClosed += OnComboBoxPresentationChanged;
-        SizeChanged += OnComboBoxSizeChanged;
-        RegionChanged += OnComboBoxRegionChanged;
 
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         _themeSubscribed = true;
@@ -101,7 +97,6 @@ public class BootstrapComboBox : ComboBox
             }
 
             _borderRadius = value;
-            ApplyShellRegion();
             Invalidate();
         }
     }
@@ -171,7 +166,6 @@ public class BootstrapComboBox : ComboBox
 
         ApplyThemePresentation();
         ApplyOwnerDrawMetrics();
-        ApplyShellRegion();
     }
 
     /// <inheritdoc />
@@ -203,8 +197,6 @@ public class BootstrapComboBox : ComboBox
             LostFocus -= OnComboBoxPresentationChanged;
             DropDown -= OnComboBoxPresentationChanged;
             DropDownClosed -= OnComboBoxPresentationChanged;
-            SizeChanged -= OnComboBoxSizeChanged;
-            RegionChanged -= OnComboBoxRegionChanged;
 
             DisposeThemeFont();
         }
@@ -342,7 +334,6 @@ public class BootstrapComboBox : ComboBox
 
         ApplyThemePresentation();
         ApplyOwnerDrawMetrics();
-        ApplyShellRegion();
         Invalidate();
     }
 
@@ -361,7 +352,6 @@ public class BootstrapComboBox : ComboBox
     private void OnComboBoxDpiChangedAfterParent(object? sender, EventArgs e)
     {
         ApplyOwnerDrawMetrics();
-        ApplyShellRegion();
         Invalidate();
     }
 
@@ -369,19 +359,6 @@ public class BootstrapComboBox : ComboBox
     {
         ApplyThemePresentation();
         Invalidate();
-    }
-
-    private void OnComboBoxSizeChanged(object? sender, EventArgs e)
-    {
-        ApplyShellRegion();
-    }
-
-    private void OnComboBoxRegionChanged(object? sender, EventArgs e)
-    {
-        if (!_settingShellRegion)
-        {
-            _manageShellRegion = false;
-        }
     }
 
     private void ApplyThemePresentation()
@@ -413,43 +390,6 @@ public class BootstrapComboBox : ComboBox
         if (ItemHeight != nextHeight)
         {
             ItemHeight = nextHeight;
-            Parent?.PerformLayout(this, nameof(ItemHeight));
-        }
-    }
-
-    private void ApplyShellRegion()
-    {
-        if (!_manageShellRegion || IsDisposed || !IsHandleCreated || Width <= 0 || Height <= 0)
-        {
-            return;
-        }
-
-        var metrics = ResolveMetrics(BootstrapThemeManager.CurrentTheme);
-        Region? nextRegion = null;
-        try
-        {
-            if (metrics.Radius > 0f)
-            {
-                using var path = RoundedPath.Create(
-                    new RectangleF(0f, 0f, Width, Height),
-                    new CornerRadius(metrics.Radius));
-                nextRegion = new Region(path);
-            }
-
-            _settingShellRegion = true;
-            try
-            {
-                Region = nextRegion;
-                nextRegion = null;
-            }
-            finally
-            {
-                _settingShellRegion = false;
-            }
-        }
-        finally
-        {
-            nextRegion?.Dispose();
         }
     }
 
