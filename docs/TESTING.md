@@ -150,6 +150,7 @@ BootstrapBadge Stage 1 STA tests verify:
 - Designer-safe defaults: empty text, `AutoSize = true`, `TabStop = false`, Primary variant, empty custom color, non-pill shape, theme-radius sentinel, and `AccessibleRole.StaticText`
 - Null text normalization and preferred width tracking content length
 - Rejection of `BorderRadius < -1` and undefined variants
+- `CustomColor` accepting `Color.Empty`/fully opaque values and rejecting transparent or semi-transparent colors
 - Double-buffered custom-paint styles and non-selectable behavior
 - Runtime Light/Dark changes leave the active theme font usable
 - Theme subscriptions detach on disposal, framework-created fonts are released, and caller-owned fonts remain caller-owned
