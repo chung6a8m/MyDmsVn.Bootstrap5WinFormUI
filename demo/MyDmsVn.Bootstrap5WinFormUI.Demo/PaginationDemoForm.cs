@@ -193,7 +193,7 @@ public sealed class PaginationDemoForm : Form
         var titleLabel = new Label
         {
             AutoSize = true,
-            Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold),
+            Font = new Font(FontFamily.GenericSansSerif, 9f, FontStyle.Bold),
             Text = title,
             Margin = new Padding(0, 0, 0, 2)
         };
