@@ -69,12 +69,15 @@ Control-specific child namespaces may be introduced if the namespace remains dis
    Button.Loading   ButtonGroup     Accordion
                        |              |
                  ButtonToolbar   AccordionHeader
+                       |
+                  Pagination
 
  TextBox -----+
  Card --------+---- shared Theme / Rendering / Icons
  Progress ----+---- Animation / LoopAnimation
  Sidebar -----+---- Button / Collapse / Icons
  DataGrid ----+---- Theme / Spinner (optional loading overlay)
+ Pagination -+---- ButtonGroup / Button only; caller owns data paging
 ```
 
 The diagram shows conceptual dependencies, not necessarily direct assembly references for every line.
@@ -180,8 +183,11 @@ Composite controls assemble primitives:
 - Accordion owns AccordionItems; each item combines a focusable header with Collapse behavior.
 - Sidebar reuses Collapse/animation for expandable sections.
 - DataGridView may compose a Spinner overlay for loading.
+- Pagination owns one horizontal ButtonGroup and dynamically composes Buttons for First/Previous/numeric/ellipsis/Next/Last presentation. A pure internal helper computes the bounded numeric window; the public control owns page state only.
 
 Composite controls should not reach into private rendering internals of primitives.
+
+Pagination intentionally has no direct dependency on `BootstrapDataGridView` or any other data control. Applications retain responsibility for querying, slicing, virtualizing, and binding data after `PageChanged`. Pagination also has no custom painting, timer, animation engine, or direct theme subscription; appearance and DPI/theme response flow through the composed ButtonGroup/Button controls.
 
 ## 7. Theme lifecycle
 
@@ -204,6 +210,8 @@ Application code must not be required to call `RefreshTheme()` on every control.
 
 Designer-created controls must still have a safe default theme when no manager has been configured.
 
+Pagination is an example of composition avoiding redundant theme ownership: the container itself does not subscribe to `BootstrapThemeManager`; its existing ButtonGroup/Button children already participate in the established theme lifecycle.
+
 ## 8. Animation lifecycle
 
 A consumer starts animation only when it can render useful frames. On hide/dispose, it pauses/stops or releases the animation according to component semantics.
@@ -216,6 +224,8 @@ Finite `Stop()` freezes current progress and `Start()` resumes it; `Restart()` a
 
 Loop `Stop()` and `Start()` freeze/resume the current cycle position; `Restart()` returns to zero. Loop animation does not expose a finite completion event.
 
+Pagination is non-animated and must not introduce scheduling solely for page-state changes.
+
 ## 9. Resource ownership
 
 The owner that creates a disposable resource is responsible for disposing it unless ownership is explicitly transferred.
@@ -226,6 +236,8 @@ Event subscriptions crossing object lifetimes must be explicitly removed.
 
 Animation objects own and deterministically dispose their frame scheduler and owner-lifecycle subscriptions. They never own or dispose the optional WinForms control supplied as lifecycle owner.
 
+Pagination owns its internal ButtonGroup and dynamically-created Button children through normal WinForms containment. When a paging-structure change replaces buttons, removed buttons are explicitly detached and disposed. It does not own application data, data controls, timers, or theme-manager subscriptions.
+
 ## 10. Designer architecture
 
 The framework must not require a service locator, DI container, or application bootstrap merely to instantiate a control in the Designer.
@@ -233,6 +245,8 @@ The framework must not require a service locator, DI container, or application b
 Use parameterless constructors with safe defaults. Runtime services should have defaults or be attached lazily.
 
 Designer-specific code should be isolated and must not leak into runtime rendering behavior.
+
+Pagination follows the same rule: its parameterless constructor creates a valid page-one state and internal ButtonGroup without requiring theme or application initialization.
 
 ## 11. Error handling philosophy
 
@@ -242,8 +256,12 @@ Recoverable rendering failures should fail gracefully rather than crash the host
 
 Animation durations must be greater than zero. Easing delegates must be non-null, and published eased values are normalized before reaching consumers.
 
+Pagination rejects negative `TotalItems`, non-positive `PageSize`, `MaxVisiblePages < 5`, and direct `CurrentPage` values outside the current one-based range. When a caller changes `TotalItems` or `PageSize` so that the existing current page becomes invalid, Pagination normalizes that derived state by clamping to the new last page and emits one `PageChanged` event.
+
 ## 12. Evolution rules
 
 Before the first stable release, public APIs may change deliberately to improve consistency. Every such change must update `docs/COMPONENTS.md`, relevant examples, and `docs/DECISIONS.md` when architectural.
 
 After a stable compatibility baseline is declared, breaking public changes require an explicit compatibility policy.
+
+The Pagination API addition changes the proposed v1 release-candidate fingerprint intentionally. Its exported surface is reviewed before updating the approved fingerprint, while helper/layout types remain internal and `AssemblyVersion` stays `1.0.0.0`.
