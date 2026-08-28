@@ -7,5 +7,27 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
+
+    <PackageId>MyDmsVn.Bootstrap5WinFormUI</PackageId>
+    <Title>MyDmsVn.Bootstrap5WinFormUI</Title>
+    <Description>Bootstrap 5-inspired native Windows Forms UI controls for .NET Framework 4.8 and .NET 8 on Windows.</Description>
+    <Authors>chung6a8m</Authors>
+    <PackageProjectUrl>https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>winforms;bootstrap;ui;desktop;net48;net8</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionSuffix>rc.1</VersionSuffix>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\docs\PACKAGE_README.md" Pack="true" PackagePath="\" Link="README.md" />
+  </ItemGroup>
 </Project>

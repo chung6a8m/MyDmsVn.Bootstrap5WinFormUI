@@ -2,12 +2,15 @@
 
 ## 1. Development environment
 
-Recommended environment:
+Supported v1 baseline:
 
 - Windows 10 or Windows 11
-- Visual Studio 2022 with .NET desktop development workload
-- A .NET SDK capable of building the .NET 8 target and SDK-style .NET Framework target
+- Visual Studio 2022 17.8+ with .NET desktop development workload
+- .NET 8 SDK compatible with `global.json`
 - .NET Framework 4.8 targeting pack
+- PowerShell 7 recommended for repository scripts
+
+See `docs/BUILD_ENVIRONMENT.md` for the release toolchain contract.
 
 ## 2. Before starting a change
 
@@ -18,6 +21,7 @@ Read:
 - `docs/COMPONENTS.md` for the affected component
 - `docs/COMPATIBILITY.md`
 - `docs/TESTING.md`
+- `docs/PUBLIC_API_BASELINE.md` for any public/protected API change
 
 Then confirm where the change sits in `docs/DEVELOPMENT_PLAN.md`.
 
@@ -57,11 +61,13 @@ FontAwesome.Sharp must remain optional. Generic SVG rendering may be an adapter 
 
 ## 6. Public API review
 
-Before introducing a public member, compare it with existing naming in `docs/COMPONENTS.md`.
+Before introducing a public or protected member, compare it with existing naming in `docs/COMPONENTS.md` and the v1 baseline in `docs/PUBLIC_API_BASELINE.md`.
 
 Avoid aliases and one-off naming. A property concept shared by components should use the same name unless WinForms itself reserves/conflicts with that name.
 
 When a new public type is required, prefer small enums/value objects over magic strings.
+
+The Phase 16 fingerprint test intentionally fails for additions as well as breaking changes. Never update its approved hash until the API diff has been reviewed and the appropriate Semantic Versioning/documentation decision has been made.
 
 ## 7. Tests first for logic
 
@@ -84,6 +90,8 @@ Check relevant DPI states
 Check create/dispose lifecycle for animated controls
 ```
 
+Release-candidate changes must additionally pass `release.ps1` and the manual matrix in `docs/RELEASING.md` when promotion to stable is intended.
+
 ## 9. Documentation
 
 Update documentation when:
@@ -93,6 +101,7 @@ Update documentation when:
 - A dependency or target-framework rule changes
 - An architecture decision is made
 - A new component is added to scope
+- Package/version/release policy changes
 
 Examples in documentation must use the real namespace `MyDmsVn.Bootstrap5WinFormUI`, never the historical placeholder `YourApp`.
 

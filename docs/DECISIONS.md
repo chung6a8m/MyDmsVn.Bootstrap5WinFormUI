@@ -83,3 +83,19 @@ This file records decisions derived from the historical discussions so they do n
 **Reason:** The drafts contain intermediate architectures, multiple naming variants, code using APIs unavailable on `net48`, and later corrections that supersede earlier snippets.
 
 **Consequence:** Do not normalize prototype code into production merely to match the drafts.
+
+## ADR-012 — v1 API baseline and Semantic Versioning
+
+**Decision:** `1.0.0-rc.1` freezes the Phase 15-reviewed exported/protected API as the proposed v1 compatibility baseline. The v1 line uses `AssemblyVersion` `1.0.0.0`; package versions follow Semantic Versioning.
+
+**Reason:** WinForms consumers may subclass controls and therefore depend on protected members as well as public members. A reflection fingerprint makes any surface change an explicit review event instead of accidental API drift.
+
+**Consequence:** The fingerprint test must be deliberately updated for every API addition/change. After stable `1.0.0`, breaking changes require a new major version.
+
+## ADR-013 — RC artifacts are produced before distribution is automated
+
+**Decision:** CI builds and validates `.nupkg`/`.snupkg` release-candidate artifacts but does not publish them to NuGet.org.
+
+**Reason:** Build reproducibility and package correctness can be automated independently from release-channel credentials and legal/license decisions. The repository currently declares no license.
+
+**Consequence:** Public package publication requires an explicit owner decision on licensing and distribution. Release artifacts, checksums, and manifest remain available for validation without silently changing distribution policy.

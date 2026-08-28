@@ -12,7 +12,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "PENDING";
+    private const string ApprovedV1Fingerprint = "74c6146fcb47e546244cc99c54597c72cf2969a3fed82c43aab42d3f97ec0465";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -26,6 +26,12 @@ public sealed class Phase16PublicApiBaselineTests
             Is.EqualTo(ApprovedV1Fingerprint),
             "Public API baseline changed. Review the exported API deliberately before updating the approved v1 fingerprint.\n" +
             "Actual fingerprint: " + fingerprint + "\n\n" + api);
+    }
+
+    [Test]
+    public void V1CompatibilityAssemblyVersionIsStable()
+    {
+        Assert.That(typeof(BootstrapButton).Assembly.GetName().Version, Is.EqualTo(new Version(1, 0, 0, 0)));
     }
 
     private static string BuildApiSurface(Assembly assembly)
