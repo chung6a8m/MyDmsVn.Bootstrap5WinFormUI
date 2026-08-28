@@ -445,12 +445,18 @@ public class BootstrapNumericBox : UserControl
 
     private void LayoutEditor()
     {
+        var nativePreferredHeight = Math.Max(1, _editor.PreferredHeight);
+        if (ClientSize.Height < nativePreferredHeight)
+        {
+            Height = nativePreferredHeight;
+        }
+
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
         var metrics = BootstrapNumericBoxRenderLogic.ResolveMetrics(theme.Metrics, dpi, _borderRadius);
         _editor.Bounds = BootstrapNumericBoxRenderLogic.CalculateNativeBounds(
             ClientSize,
-            Math.Max(1, _editor.PreferredHeight),
+            nativePreferredHeight,
             metrics);
     }
 }
