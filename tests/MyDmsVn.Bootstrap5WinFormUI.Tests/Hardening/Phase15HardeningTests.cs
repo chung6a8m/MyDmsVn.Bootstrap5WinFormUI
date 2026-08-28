@@ -90,7 +90,7 @@ public sealed class Phase15HardeningTests
         }
 
         Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions));
-        Assert.DoesNotThrow(() => BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark));
+        Assert.DoesNotThrow((Action)(() => BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark)));
     }
 
     [Test]
