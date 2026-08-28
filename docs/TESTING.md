@@ -17,6 +17,7 @@ Prefer ordinary unit tests for logic that does not require a WinForms handle:
 - Easing functions
 - Progress percentage/range calculations
 - Radius/geometry calculations
+- Alert palette, DPI metrics, and layout calculations without WinForms handles
 - Icon descriptor/source selection
 - Selection-state algorithms
 - Pagination numeric-window and ellipsis calculations
@@ -98,6 +99,15 @@ BootstrapBadge Stage 1 pure tests cover:
 - `SpacingSM`/`SpacingXS` padding at logical DPI 96/120/144/168/192
 - Pill half-height radius plus theme-default and explicit logical-radius scaling
 
+BootstrapAlert Stage 2 pure tests cover:
+
+- All eight semantic variants under Light/Dark using one theme-derived surface/border/foreground formula and the 4.5:1 contrast fallback
+- Disabled palette independence from the semantic variant
+- 96/120/144/168/192 DPI scaling for padding, spacing, icon slot, close slot, border/focus widths, and theme/explicit radii
+- Validation of undefined variants, invalid DPI, and invalid radius values before state mutation
+- Exact no-icon/no-dismiss, icon-only, dismiss-only, and icon-plus-dismiss layouts
+- Narrow, empty, and malformed client rectangles clamping to non-negative contained geometry without throwing
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -155,6 +165,17 @@ BootstrapBadge Stage 1 STA tests verify:
 - Runtime Light/Dark changes leave the active theme font usable
 - Theme subscriptions detach on disposal, framework-created fonts are released, and caller-owned fonts remain caller-owned
 
+BootstrapAlert Stage 2 STA tests verify:
+
+- Designer-safe defaults/metadata, inherited `Text` normalization, `DefaultProperty(Text)`, `DefaultEvent(Dismissed)`, `TabStop = false`, and `AccessibleRole.Alert`
+- Exactly one private native dismiss `Button`, correct accessible metadata, and no nested `Panel`, `Label`, or `BootstrapButton`
+- Variant/radius/renderer validation before mutation plus content-icon independence from unrelated state
+- Double-buffered owner painting, deterministic close-button layout, content-icon renderer dispatch, and framework close-glyph dispatch through the configured renderer
+- Light/Dark/variant/disabled/icon/dismissible/multiline/radius paint smoke without exceptions
+- Programmatic and native-button dismissal event counts, direct-visibility non-events, re-show/re-dismiss behavior, disabled programmatic dismissal, and non-disposal
+- Dismissibility-driven native focusability without duplicate children or event handlers
+- Runtime theme palette/font updates in place, caller-owned font preservation, theme-subscription cleanup, framework-owned font disposal, and repeated lifecycle stress
+
 ### 2.3 Demo/manual visual tests
 
 A demo application is required because not all rendering quality is productively asserted with pixels.
@@ -188,6 +209,8 @@ For Pagination, choose **Pagination** in the integrated demo. Verify the small-r
 
 For BootstrapBadge Stage 1, choose **Feedback** in the integrated demo. Compare all eight semantic variants, default/pill geometry, custom color, disabled state, explicit square radius, and long-text AutoSize behavior. Switch Light/Dark while the page remains open, resize repeatedly, and repeat at 100/125/150/175/200% real Windows display scaling. Verify text remains unclipped, the compact padding scales consistently, the pill stays half-height rounded, and long labels expand without becoming focusable.
 
+For BootstrapAlert Stage 2, stay on **Feedback** and compare all eight semantic variants plus icon, dismissible, multiline, disabled, and explicit-radius alerts. Use mouse, Tab/Shift+Tab, Enter, and Space on the native close affordance; verify focus is visible, each effective dismissal raises one event, direct visibility changes do not, and **Restore dismissed alerts** reuses the same instances across repeated cycles. Switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling to inspect text/icon/close alignment and rounded borders.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -211,6 +234,7 @@ Verify:
 - DataGridView headers/rows remain aligned.
 - Pagination connected seams, ellipses, and current-page focus visuals remain aligned.
 - Badge compact padding, preferred size, and pill/theme/explicit radii remain aligned with text.
+- Alert text/icon/close slots, border/focus widths, and theme/explicit radii remain aligned and unclipped.
 
 The Phase 2 Rendering/DPI demo covers the geometry calculations at all five scale factors. Run the demo under each corresponding Windows display-scaling setting as components are added and during hardening; do not treat the virtual matrix as proof of OS-level DPI behavior.
 
@@ -219,6 +243,8 @@ For Phase 8 specifically, verify the native TextBox caret/text baseline remains 
 Pagination does not own a DPI-specific renderer; its real-Windows DPI check verifies that composed ButtonGroup/Button preferred sizes, connected seams, accessible navigation, and wrapping-free AutoSize behavior remain correct together.
 
 Badge pure tests cover logical scaling through 96/120/144/168/192 DPI. The Feedback page remains the manual OS-level DPI gate because `DeviceDpi`, text rendering, and physical display scaling are WinForms/Windows behaviors rather than pure arithmetic alone.
+
+Alert pure tests cover the same 96/120/144/168/192 logical matrix for padding, icon/close reservations, border/focus widths, and radius scaling. The shared Feedback page remains the Alert OS-level gate for `DeviceDpi`, wrapped text, native close-button focus/activation, and physical rounded-border rendering.
 
 ## 4. Theme matrix
 
@@ -239,6 +265,8 @@ A disposed control must not be kept alive by the theme manager.
 Pagination itself does not subscribe to the theme manager. Theme-matrix verification confirms its composed ButtonGroup/Button children continue to react through their existing lifecycle without introducing a duplicate Pagination subscription.
 
 Badge owns one direct theme subscription because it custom-paints semantic presentation and owns a theme-created font. Tests verify runtime theme changes keep that font usable and disposal removes the subscription without disposing caller-owned fonts.
+
+Alert likewise owns one direct theme subscription because it custom-paints its semantic surface and owns a `Typography.Body` font. Theme-matrix tests verify the same Alert instance updates palette/font/layout in place and disposal removes that subscription without disposing caller-owned fonts or icon infrastructure.
 
 ## 5. Interaction matrix
 
@@ -262,6 +290,8 @@ For Pagination, the container and owned ButtonGroup are intentionally non-focusa
 
 Badge is intentionally outside the interactive focus/keyboard matrix: it is a non-focusable `StaticText`-style indicator with no click, toggle, or business-count semantics. Its enabled/disabled presentation is still covered.
 
+Alert itself is also outside the tab sequence. With `Dismissible = true`, exactly one native child Button becomes focusable and owns normal WinForms Tab/Shift+Tab, Enter, Space, accessibility, and disabled interaction behavior. Programmatic `Dismiss()` remains valid while disabled; direct `Visible` changes must not synthesize `Dismissed`.
+
 ## 6. Animation matrix
 
 For finite and loop animation, test:
@@ -283,6 +313,8 @@ Animated controls must not continue producing useful work after disposal. New co
 Pagination is explicitly outside the animation matrix: page-state and navigation changes are immediate and it must not introduce a timer or animation owner.
 
 Badge is also outside the animation matrix and owns no timer or animation primitive.
+
+Alert is outside the animation matrix as well: Stage 2 dismissal is immediate and the component owns no timer, timeout, animation primitive, auto-hide scheduler, or Toast queue behavior.
 
 ## 7. Resource/lifecycle checks
 
@@ -309,6 +341,8 @@ For Phase 8, TextBox and Card own only theme subscriptions plus TextBox's theme-
 For Pagination, rebuilding the paging structure must dispose every removed dynamic Button after detaching its click handler. Repeated current-page/max-visible/navigation-visibility changes must not duplicate controls or handlers. Disposing Pagination releases the owned ButtonGroup and its current Buttons through normal WinForms ownership. Pagination owns no timer, custom GDI cache, or direct theme subscription.
 
 For Badge, every paint-time path/brush is scoped. The control owns one theme subscription and one framework-created theme font while theme typography remains authoritative. Reassigning `Font` transfers font choice to the caller without transferring disposal ownership; Badge disposal releases only its own font/subscription and owns no timer or retained GDI path/bitmap cache.
+
+For Alert, paint-time paths/brushes/pens are scoped; it owns one theme subscription, one framework-created Body font while theme typography is authoritative, and exactly one native dismiss Button. Caller-assigned fonts, icon descriptors, and icon renderers remain caller-owned. Disposal releases only Alert-owned resources/handlers and normal child-control ownership; there is no retained bitmap/path cache, timer, animation object, overlay host, or queue manager.
 
 ## 8. DataGridView tests
 
@@ -345,6 +379,8 @@ For Pagination, place the control in the Designer without theme bootstrap code. 
 
 For Badge, place the control in the Designer without theme bootstrap code. Verify `Text`, `Variant`, `CustomColor`, `Pill`, and `BorderRadius` serialize/reopen as normal WinForms properties, AutoSize remains usable, and construction does not require DI, application startup, or a running timer.
 
+For Alert, place the control in the Designer without theme bootstrap code. Verify `Text`, `Variant`, `Icon`, `Dismissible`, and `BorderRadius` serialize/reopen as normal WinForms properties, `IconRenderer` stays runtime-only/non-serialized, the private close Button is not exposed as a public composition surface, and construction requires no DI, application startup, timer, or popup host.
+
 ## 10. Build commands
 
 Once the solution exists, the project should support explicit target verification similar to:
@@ -359,7 +395,7 @@ Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`
 
 The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by implemented phases.
 
-Pagination and Badge participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
+Pagination, Badge, and Alert participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
 
 ## 11. Definition of done for a component
 

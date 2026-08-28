@@ -11,10 +11,12 @@ All notable release-facing changes to this project are documented here.
 - Integrated Pagination demo including caller-owned `BootstrapDataGridView` page slicing through `PageChanged`.
 - `BootstrapBadge`, a compact auto-sized, non-focusable text indicator with all semantic variants, custom color override, pill/default radius modes, disabled presentation, runtime theme switching, and DPI-scaled layout.
 - Integrated Feedback demo page covering Badge semantic variants, pill/custom/disabled/long-text scenarios, runtime Light/Dark switching, and the real-Windows 100–200% DPI verification path.
+- `BootstrapAlert`, an inline `UserControl` feedback surface with all semantic variants, optional source-neutral icons, one native keyboard-accessible dismiss button, deterministic `Dismiss()` / `Dismissed` behavior, multiline/disabled/custom-radius presentation, runtime Light/Dark switching, and DPI-scaled layout.
+- Expanded the shared Feedback demo with Alert icon/dismissal/multiline/disabled/radius scenarios plus repeated restore cycles without reconstructing alerts.
 
 ### Changed
 
-- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination` and `BootstrapBadge` surfaces; Pagination/Badge render-layout helpers remain internal and `AssemblyVersion` remains `1.0.0.0`.
+- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, and `BootstrapAlert` surfaces; Pagination/Badge/Alert render-layout helpers remain internal and `AssemblyVersion` remains `1.0.0.0`.
 
 ## [1.0.0-rc.1] - 2026-08-28
 
