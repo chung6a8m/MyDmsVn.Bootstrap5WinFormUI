@@ -311,6 +311,14 @@ public class BootstrapComboBox : ComboBox
         try
         {
             using var path = RoundedPath.Create(borderBounds, new CornerRadius(metrics.Radius));
+            if (metrics.Radius > 0f)
+            {
+                using var exterior = new Region(bounds);
+                exterior.Exclude(path);
+                using var exteriorBrush = new SolidBrush(ResolveOuterBackgroundColor(theme));
+                graphics.FillRegion(exteriorBrush, exterior);
+            }
+
             using var pen = new Pen(palette.Border, borderWidth);
             graphics.DrawPath(pen, path);
         }
@@ -318,6 +326,20 @@ public class BootstrapComboBox : ComboBox
         {
             graphics.SmoothingMode = oldSmoothingMode;
         }
+    }
+
+    private Color ResolveOuterBackgroundColor(BootstrapTheme theme)
+    {
+        for (Control? ancestor = Parent; ancestor is not null; ancestor = ancestor.Parent)
+        {
+            var color = ancestor.BackColor;
+            if (color.A == byte.MaxValue)
+            {
+                return color;
+            }
+        }
+
+        return theme.Colors.Body;
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
@@ -389,7 +411,12 @@ public class BootstrapComboBox : ComboBox
         var nextHeight = Math.Max(1, metrics.ItemHeight);
         if (ItemHeight != nextHeight)
         {
+            var previousHeight = Height;
             ItemHeight = nextHeight;
+            if (Height != previousHeight)
+            {
+                Parent?.PerformLayout(this, nameof(Height));
+            }
         }
     }
 
