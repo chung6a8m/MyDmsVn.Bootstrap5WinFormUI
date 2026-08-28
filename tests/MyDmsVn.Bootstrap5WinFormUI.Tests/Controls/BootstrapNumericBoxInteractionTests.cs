@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -64,6 +65,35 @@ public sealed class BootstrapNumericBoxInteractionTests
         Assert.That(form.SelectNextControl(input, false, true, true, true), Is.True);
         Application.DoEvents();
         Assert.That(before.Focused, Is.True);
+    }
+
+    [Test]
+    public void WrapperKeepsNativeEditorInsideShellWhenHeightIsShrunkAndFontGrows()
+    {
+        using var callerFont = new Font("Segoe UI", 24f, FontStyle.Regular);
+        using var form = new Form { ShowInTaskbar = false, Width = 360, Height = 180 };
+        var input = new BootstrapNumericBox
+        {
+            Left = 20,
+            Top = 20,
+            Width = 180,
+            Height = 12,
+            Font = callerFont
+        };
+        var native = input.Controls.OfType<NumericUpDown>().Single();
+        form.Controls.Add(input);
+        form.Show();
+        Application.DoEvents();
+
+        input.Height = 8;
+        input.PerformLayout();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.Height, Is.GreaterThanOrEqualTo(native.PreferredHeight));
+            Assert.That(input.ClientRectangle.Contains(native.Bounds), Is.True);
+        }));
     }
 
     [Test]
@@ -204,8 +234,10 @@ public sealed class BootstrapNumericBoxInteractionTests
         input.Increment = reference.Increment;
         Application.DoEvents();
 
-        var wheel = new MouseEventArgs(MouseButtons.None, 0, 0, 0, 120);
-        RaiseProtectedControlEvent(native, "OnMouseWheel", wheel);
+        RaiseProtectedControlEvent(
+            native,
+            "OnMouseWheel",
+            new MouseEventArgs(MouseButtons.None, 0, 0, 0, 120));
         RaiseProtectedControlEvent(
             reference,
             "OnMouseWheel",
