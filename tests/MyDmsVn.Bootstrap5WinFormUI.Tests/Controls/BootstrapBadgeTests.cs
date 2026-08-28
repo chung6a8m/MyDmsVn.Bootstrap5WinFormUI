@@ -90,6 +90,19 @@ public sealed class BootstrapBadgeTests
     }
 
     [Test]
+    public void CustomColorAcceptsEmptyOrOpaqueAndRejectsAlphaColors()
+    {
+        using var badge = new BootstrapBadge();
+        var opaque = Color.FromArgb(255, 111, 66, 193);
+
+        Assert.DoesNotThrow((Action)(() => badge.CustomColor = Color.Empty));
+        Assert.DoesNotThrow((Action)(() => badge.CustomColor = opaque));
+        Assert.That(badge.CustomColor, Is.EqualTo(opaque));
+        Assert.Throws<ArgumentException>((Action)(() => badge.CustomColor = Color.Transparent));
+        Assert.Throws<ArgumentException>((Action)(() => badge.CustomColor = Color.FromArgb(128, 111, 66, 193))));
+    }
+
+    [Test]
     public void BadgeUsesDoubleBufferedNonSelectableCustomPainting()
     {
         using var badge = new StyleProbeBadge();
