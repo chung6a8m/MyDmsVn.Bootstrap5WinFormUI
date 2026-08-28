@@ -96,7 +96,7 @@ public sealed class SidebarDemoForm : Form
         var title = new Label
         {
             AutoSize = true,
-            Font = new Font(SystemFonts.MessageBoxFont.FontFamily, 16f, FontStyle.Bold),
+            Font = new Font(_content.Font.FontFamily, 16f, FontStyle.Bold),
             Location = new Point(28, 28),
             Text = "Business workspace"
         };
