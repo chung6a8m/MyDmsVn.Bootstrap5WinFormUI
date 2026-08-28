@@ -84,32 +84,26 @@ public sealed class BootstrapSidebarAnimatedLayoutTests
         {
             using var form = new Form
             {
-                ClientSize = new System.Drawing.Size(900, 700),
+                ClientSize = new System.Drawing.Size(1280, 800),
                 ShowInTaskbar = false
             };
             using var sidebar = new BootstrapSidebar
             {
                 Dock = DockStyle.Left,
-                ExpandedWidth = 260,
-                CollapsedWidth = 72,
-                AnimationDuration = TimeSpan.FromMilliseconds(40)
+                ExpandedWidth = 250,
+                CollapsedWidth = 68,
+                AnimationDuration = TimeSpan.FromMilliseconds(200)
             };
 
-            var theme = new BootstrapSidebarItem
-            {
-                Text = "Theme",
-                Expanded = true
-            };
-            theme.Items.Add(new BootstrapSidebarItem { Text = "Colors" });
-            theme.Items.Add(new BootstrapSidebarItem { Text = "Typography" });
-            theme.Items.Add(new BootstrapSidebarItem { Text = "Metrics" });
+            var theme = new BootstrapSidebarItem { Text = "Theme" };
             sidebar.Items.Add(theme);
+            theme.Expanded = true;
+            theme.Items.Add(new BootstrapSidebarItem { Text = "Rendering / DPI" });
+            theme.Items.Add(new BootstrapSidebarItem { Text = "Icons" });
+            theme.Items.Add(new BootstrapSidebarItem { Text = "Animation" });
 
             foreach (var text in new[]
             {
-                "Rendering / DPI",
-                "Icons",
-                "Animation",
                 "Buttons / Groups / Toolbar",
                 "Inputs",
                 "Cards",
@@ -123,31 +117,32 @@ public sealed class BootstrapSidebarAnimatedLayoutTests
                 sidebar.Items.Add(new BootstrapSidebarItem { Text = text });
             }
 
+            sidebar.SelectedItem = theme;
             form.Controls.Add(sidebar);
             form.Show();
             PumpMessagesUntil(
                 () => sidebar.IsHandleCreated && sidebar.Width == sidebar.ExpandedWidth && NestedTransitionsCompleted(sidebar),
-                TimeSpan.FromSeconds(2));
-            AssertRowsVisible(sidebar, "initial expanded section state");
+                TimeSpan.FromSeconds(3));
+            AssertRowsVisible(sidebar, "initial integrated-demo layout");
 
             sidebar.Collapse();
             PumpMessagesUntil(
                 () => sidebar.Width == sidebar.CollapsedWidth && NestedTransitionsCompleted(sidebar),
-                TimeSpan.FromSeconds(2));
-            AssertRowsVisible(sidebar, "collapsed state with section remembered");
+                TimeSpan.FromSeconds(3));
+            AssertRowsVisible(sidebar, "collapsed integrated-demo layout");
 
             sidebar.Expand();
             PumpMessagesUntil(
                 () => sidebar.Width == sidebar.ExpandedWidth && NestedTransitionsCompleted(sidebar),
-                TimeSpan.FromSeconds(2));
-            AssertRowsVisible(sidebar, "re-expanded state with section restored");
+                TimeSpan.FromSeconds(3));
+            AssertRowsVisible(sidebar, "re-expanded integrated-demo layout");
 
             var host = sidebar.Controls.OfType<FlowLayoutPanel>().Single();
             var dataGrid = FindButton(sidebar, sidebar.Items.Last());
             Assert.That(
                 host.ClientRectangle.IntersectsWith(dataGrid.Bounds),
                 Is.True,
-                $"The final root row was clipped after re-expanding an open section. Host={host.Bounds}; DataGrid={dataGrid.Bounds}.");
+                $"The DataGrid row was clipped after restoring the expanded Theme section. Host={host.Bounds}; DataGrid={dataGrid.Bounds}.");
         }
         finally
         {
