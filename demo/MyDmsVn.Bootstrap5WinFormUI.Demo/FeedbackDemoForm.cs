@@ -27,10 +27,12 @@ public sealed class FeedbackDemoForm : Form
     private readonly List<BootstrapAlert> _dismissibleAlerts = new List<BootstrapAlert>();
     private readonly Label _dismissStatus = new Label();
     private readonly Button _restoreAlertsButton = new Button();
+    private readonly BootstrapToastContainer _toastContainer = new BootstrapToastContainer();
     private readonly IContainer _components;
     private readonly BootstrapTooltip _defaultTooltip;
     private readonly BootstrapTooltip _semanticTooltip;
     private readonly BootstrapTooltip _customTooltip;
+    private int _toastSequence;
 
     public FeedbackDemoForm()
     {
@@ -58,6 +60,7 @@ public sealed class FeedbackDemoForm : Form
         AddShapeAndStateSection();
         AddAlertsSection();
         AddTooltipsSection();
+        AddToastsSection();
         AddDpiGuidanceSection();
 
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
@@ -88,7 +91,6 @@ public sealed class FeedbackDemoForm : Form
     {
         var group = CreateGroup("Badge semantic variants");
         var row = CreateBadgeRow();
-
         foreach (var variant in Variants)
         {
             row.Controls.Add(new BootstrapBadge
@@ -107,21 +109,9 @@ public sealed class FeedbackDemoForm : Form
     {
         var group = CreateGroup("Badge shape, custom color, disabled, and content length");
         var stack = CreateVerticalStack();
-
         var shapeRow = CreateBadgeRow();
-        shapeRow.Controls.Add(new BootstrapBadge
-        {
-            Text = "Default",
-            Variant = BootstrapVariant.Primary,
-            AccessibleName = "Default badge"
-        });
-        shapeRow.Controls.Add(new BootstrapBadge
-        {
-            Text = "Pill",
-            Variant = BootstrapVariant.Success,
-            Pill = true,
-            AccessibleName = "Pill badge"
-        });
+        shapeRow.Controls.Add(new BootstrapBadge { Text = "Default", Variant = BootstrapVariant.Primary, AccessibleName = "Default badge" });
+        shapeRow.Controls.Add(new BootstrapBadge { Text = "Pill", Variant = BootstrapVariant.Success, Pill = true, AccessibleName = "Pill badge" });
         shapeRow.Controls.Add(new BootstrapBadge
         {
             Text = "Custom color",
@@ -129,21 +119,8 @@ public sealed class FeedbackDemoForm : Form
             CustomColor = Color.FromArgb(111, 66, 193),
             AccessibleName = "Custom color badge"
         });
-        shapeRow.Controls.Add(new BootstrapBadge
-        {
-            Text = "Disabled",
-            Variant = BootstrapVariant.Secondary,
-            Enabled = false,
-            AccessibleName = "Disabled badge"
-        });
-        shapeRow.Controls.Add(new BootstrapBadge
-        {
-            Text = "Square radius",
-            Variant = BootstrapVariant.Info,
-            BorderRadius = 0,
-            AccessibleName = "Square radius badge"
-        });
-
+        shapeRow.Controls.Add(new BootstrapBadge { Text = "Disabled", Variant = BootstrapVariant.Secondary, Enabled = false, AccessibleName = "Disabled badge" });
+        shapeRow.Controls.Add(new BootstrapBadge { Text = "Square radius", Variant = BootstrapVariant.Info, BorderRadius = 0, AccessibleName = "Square radius badge" });
         var longRow = CreateBadgeRow();
         longRow.Controls.Add(new BootstrapBadge
         {
@@ -151,7 +128,6 @@ public sealed class FeedbackDemoForm : Form
             Variant = BootstrapVariant.Warning,
             AccessibleName = "Long text badge"
         });
-
         stack.Controls.Add(shapeRow);
         stack.Controls.Add(longRow);
         group.Controls.Add(stack);
@@ -162,29 +138,13 @@ public sealed class FeedbackDemoForm : Form
     {
         var group = CreateGroup("Alerts — semantic, icon, dismissal, multiline, and disabled states");
         var stack = CreateVerticalStack();
-
-        stack.Controls.Add(CreateAlert(
-            BootstrapVariant.Primary,
-            "Primary — inline feedback with the default themed radius."));
-        stack.Controls.Add(CreateAlert(
-            BootstrapVariant.Secondary,
-            "Secondary — lower-emphasis application feedback."));
-        stack.Controls.Add(CreateAlert(
-            BootstrapVariant.Success,
-            "Success — changes saved successfully.",
-            IconDescriptor.Framework(FrameworkIconGlyph.Check)));
-
-        var danger = CreateAlert(
-            BootstrapVariant.Danger,
-            "Danger — an operation failed. This example is dismissible.",
-            dismissible: true);
+        stack.Controls.Add(CreateAlert(BootstrapVariant.Primary, "Primary — inline feedback with the default themed radius."));
+        stack.Controls.Add(CreateAlert(BootstrapVariant.Secondary, "Secondary — lower-emphasis application feedback."));
+        stack.Controls.Add(CreateAlert(BootstrapVariant.Success, "Success — changes saved successfully.", IconDescriptor.Framework(FrameworkIconGlyph.Check)));
+        var danger = CreateAlert(BootstrapVariant.Danger, "Danger — an operation failed. This example is dismissible.", dismissible: true);
         WireDismissStatus(danger, "Danger");
         stack.Controls.Add(danger);
-
-        stack.Controls.Add(CreateAlert(
-            BootstrapVariant.Warning,
-            "Warning — the upload has not completed.\r\nCheck the connection and try again."));
-
+        stack.Controls.Add(CreateAlert(BootstrapVariant.Warning, "Warning — the upload has not completed.\r\nCheck the connection and try again."));
         var info = CreateAlert(
             BootstrapVariant.Info,
             "Info — keyboard users can Tab to the close affordance and activate it with Enter or Space.",
@@ -192,24 +152,13 @@ public sealed class FeedbackDemoForm : Form
             dismissible: true);
         WireDismissStatus(info, "Info");
         stack.Controls.Add(info);
-
-        stack.Controls.Add(CreateAlert(
-            BootstrapVariant.Light,
-            "Light — contrast fallback regression example."));
-        stack.Controls.Add(CreateAlert(
-            BootstrapVariant.Dark,
-            "Dark — contrast fallback regression example."));
-
-        var disabled = CreateAlert(
-            BootstrapVariant.Success,
-            "Disabled — neutral disabled palette and no user dismissal.");
+        stack.Controls.Add(CreateAlert(BootstrapVariant.Light, "Light — contrast fallback regression example."));
+        stack.Controls.Add(CreateAlert(BootstrapVariant.Dark, "Dark — contrast fallback regression example."));
+        var disabled = CreateAlert(BootstrapVariant.Success, "Disabled — neutral disabled palette and no user dismissal.");
         disabled.Enabled = false;
         disabled.AccessibleName = "Disabled alert";
         stack.Controls.Add(disabled);
-
-        var square = CreateAlert(
-            BootstrapVariant.Info,
-            "Custom radius — BorderRadius = 0 keeps the surface square.");
+        var square = CreateAlert(BootstrapVariant.Info, "Custom radius — BorderRadius = 0 keeps the surface square.");
         square.BorderRadius = 0;
         square.AccessibleName = "Square radius alert";
         stack.Controls.Add(square);
@@ -227,7 +176,6 @@ public sealed class FeedbackDemoForm : Form
         commandRow.Controls.Add(_restoreAlertsButton);
         commandRow.Controls.Add(_dismissStatus);
         stack.Controls.Add(commandRow);
-
         group.Controls.Add(stack);
         _content.Controls.Add(group);
     }
@@ -237,14 +185,12 @@ public sealed class FeedbackDemoForm : Form
         var group = CreateGroup("Tooltips — native association, themes, multiple targets, and timing");
         var stack = CreateVerticalStack();
         var targets = CreateBadgeRow();
-
         var defaultTarget = CreateTooltipTarget("Default dark", "Default tooltip target");
         var secondDefaultTarget = CreateTooltipTarget("Same instance", "Second default tooltip target");
         var semanticTarget = CreateTooltipTarget("Info variant", "Semantic tooltip target");
         var customTarget = CreateTooltipTarget("Custom color", "Custom tooltip target");
         var multilineTarget = CreateTooltipTarget("Multiline", "Multiline tooltip target");
         var longTarget = CreateTooltipTarget("Long text", "Long tooltip target");
-
         _defaultTooltip.SetToolTip(defaultTarget, "Default BootstrapTooltip using the Dark semantic variant.");
         _defaultTooltip.SetToolTip(secondDefaultTarget, "The same BootstrapTooltip instance serves this second control.");
         _semanticTooltip.SetToolTip(semanticTarget, "Semantic Info tooltip resolved from the current theme.");
@@ -253,7 +199,6 @@ public sealed class FeedbackDemoForm : Form
         _defaultTooltip.SetToolTip(
             longTarget,
             "This deliberately long tooltip caption demonstrates native positioning with owner-drawn presentation while preserving the complete single-line caption without framework auto-wrap policy.");
-
         targets.Controls.Add(defaultTarget);
         targets.Controls.Add(secondDefaultTarget);
         targets.Controls.Add(semanticTarget);
@@ -261,16 +206,65 @@ public sealed class FeedbackDemoForm : Form
         targets.Controls.Add(multilineTarget);
         targets.Controls.Add(longTarget);
         stack.Controls.Add(targets);
-
-        var timingLabel = new Label
+        stack.Controls.Add(new Label
         {
             AutoSize = true,
             Text = "Live native timing/state forwarding for the default tooltip:",
             Margin = new Padding(3, 6, 3, 3)
-        };
-        stack.Controls.Add(timingLabel);
+        });
         stack.Controls.Add(CreateTooltipTimingRow());
+        group.Controls.Add(stack);
+        _content.Controls.Add(group);
+    }
 
+    private void AddToastsSection()
+    {
+        var group = CreateGroup("Toasts — ownership, queueing, placement, auto-hide, and stress");
+        var stack = CreateVerticalStack();
+        var commands = CreateBadgeRow();
+        commands.Controls.Add(CreateActionButton("Show manual Toast", "Show manual Toast", (_, _) =>
+            ShowToast(BootstrapVariant.Success, "Manual", "This Toast remains until dismissed.", autoHide: false)));
+        commands.Controls.Add(CreateActionButton("Show auto-hide Toast", "Show auto-hide Toast", (_, _) =>
+            ShowToast(BootstrapVariant.Info, "Auto-hide", "The semantic delay starts only after the enter transition completes.", autoHide: true)));
+        commands.Controls.Add(CreateActionButton("Icon + multiline", "Show icon multiline Toast", (_, _) =>
+            ShowToast(
+                BootstrapVariant.Warning,
+                "Upload warning",
+                "The upload is still pending.\r\nCheck the connection before retrying.",
+                autoHide: false,
+                IconDescriptor.Framework(FrameworkIconGlyph.Check))));
+        commands.Controls.Add(CreateActionButton("Burst 8", "Burst 8 Toasts", (_, _) => ShowToastBurst(8)));
+        commands.Controls.Add(CreateActionButton("Dismiss All", "Dismiss all Toasts", (_, _) => _toastContainer.DismissAll()));
+        commands.Controls.Add(CreateActionButton("Cycle placement", "Cycle Toast placement", (_, _) => CycleToastPlacement()));
+        commands.Controls.Add(CreateActionButton("Rapid show/dismiss", "Rapid show then dismiss Toast", (_, _) => RapidShowDismiss()));
+        commands.Controls.Add(CreateActionButton("Disabled Toast", "Show disabled Toast", (_, _) => ShowDisabledToast()));
+        commands.Controls.Add(CreateActionButton("Stress 100", "Stress 100 Toasts", (_, _) => ShowToastBurst(100)));
+
+        _toastContainer.AccessibleName = "Toast demo container";
+        _toastContainer.Size = new Size(780, 300);
+        _toastContainer.Margin = new Padding(0, 4, 0, 8);
+        _toastContainer.MaximumVisibleToasts = 3;
+        _toastContainer.ToastSpacing = 8;
+        _toastContainer.Placement = BootstrapToastPlacement.TopRight;
+
+        stack.Controls.Add(commands);
+        stack.Controls.Add(new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(780, 0),
+            AccessibleName = "Toast demo guidance",
+            Text = "MaximumVisibleToasts = 3 so Burst 8 demonstrates FIFO queueing. Reduced motion makes enter/exit/reflow immediate, but AutoHide still waits its semantic delay. The host must be sized for the desired stack; normal Panel clipping is authoritative.",
+            Margin = new Padding(3, 4, 3, 8)
+        });
+        stack.Controls.Add(_toastContainer);
+        stack.Controls.Add(new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(780, 0),
+            AccessibleName = "Toast stress guidance",
+            Text = "Resource stress: note USER/GDI/process handle counts; run repeated Stress 100 + Dismiss All cycles until several hundred Toasts have been created/disposed; return to idle and switch Light/Dark; verify no continually growing timer activity, handle climb, retained visible children, or post-disposal exceptions. Repeat with reduced motion and AutoHide enabled.",
+            Margin = new Padding(3, 4, 3, 8)
+        });
         group.Controls.Add(stack);
         _content.Controls.Add(group);
     }
@@ -297,13 +291,11 @@ public sealed class FeedbackDemoForm : Form
             AccessibleName = "Tooltip ShowAlways",
             Margin = new Padding(8, 7, 3, 3)
         };
-
         initialDelay.ValueChanged += (_, _) => _defaultTooltip.InitialDelay = (int)initialDelay.Value;
         reshowDelay.ValueChanged += (_, _) => _defaultTooltip.ReshowDelay = (int)reshowDelay.Value;
         autoPopDelay.ValueChanged += (_, _) => _defaultTooltip.AutoPopDelay = (int)autoPopDelay.Value;
         active.CheckedChanged += (_, _) => _defaultTooltip.Active = active.Checked;
         showAlways.CheckedChanged += (_, _) => _defaultTooltip.ShowAlways = showAlways.Checked;
-
         row.Controls.Add(CreateTimingLabel("Initial (ms)"));
         row.Controls.Add(initialDelay);
         row.Controls.Add(CreateTimingLabel("Reshow (ms)"));
@@ -327,21 +319,15 @@ public sealed class FeedbackDemoForm : Form
             {
                 alert.Visible = true;
             }
-
             _dismissStatus.Text = "Dismissed alerts restored.";
         };
-
         _dismissStatus.AutoSize = true;
         _dismissStatus.Text = "No alert dismissed yet.";
         _dismissStatus.Margin = new Padding(12, 8, 0, 0);
         _dismissStatus.AccessibleName = "Alert dismissal status";
     }
 
-    private BootstrapAlert CreateAlert(
-        BootstrapVariant variant,
-        string text,
-        IconDescriptor? icon = null,
-        bool dismissible = false)
+    private BootstrapAlert CreateAlert(BootstrapVariant variant, string text, IconDescriptor? icon = null, bool dismissible = false)
     {
         var multiline = text.IndexOf('\n') >= 0;
         var alert = new BootstrapAlert
@@ -354,12 +340,10 @@ public sealed class FeedbackDemoForm : Form
             Dismissible = dismissible,
             AccessibleName = $"{variant} alert"
         };
-
         if (dismissible)
         {
             _dismissibleAlerts.Add(alert);
         }
-
         return alert;
     }
 
@@ -371,15 +355,109 @@ public sealed class FeedbackDemoForm : Form
     private void AddDpiGuidanceSection()
     {
         var group = CreateGroup("Theme and DPI verification");
-        var note = new Label
+        group.Controls.Add(new Label
         {
             AutoSize = true,
             MaximumSize = new Size(800, 0),
-            Text = "Use the integrated demo's Light/Dark switch while this page is open. Repeat this page at Windows display scaling 100%, 125%, 150%, 175%, and 200% to verify Badge padding, Alert borders/text/icons/close focus, and Tooltip padding/border/radius/text alignment while native popup positioning remains intact.",
+            AccessibleName = "Feedback DPI guidance",
+            Text = "Use the integrated demo's Light/Dark switch while this page is open. Repeat at Windows display scaling 100%, 125%, 150%, 175%, and 200%. Verify Badge padding, Alert borders/text/icons/close focus, Tooltip presentation, and Toast title/body/icon/close glyph/stack spacing. Reduced motion should remove Toast movement while leaving AutoHide timing observable.",
             Margin = new Padding(3, 4, 3, 8)
-        };
-        group.Controls.Add(note);
+        });
         _content.Controls.Add(group);
+    }
+
+    private void ShowToast(BootstrapVariant variant, string title, string text, bool autoHide, IconDescriptor? icon = null)
+    {
+        var toast = new BootstrapToast
+        {
+            Width = 320,
+            Title = title,
+            Text = text,
+            Variant = variant,
+            Icon = icon,
+            AutoHide = autoHide,
+            AutoHideDelay = 3000,
+            AccessibleName = $"Demo Toast {++_toastSequence}"
+        };
+        _toastContainer.ShowToast(toast);
+    }
+
+    private void ShowToastBurst(int count)
+    {
+        var variants = new[]
+        {
+            BootstrapVariant.Success,
+            BootstrapVariant.Warning,
+            BootstrapVariant.Danger,
+            BootstrapVariant.Info
+        };
+        for (var index = 0; index < count; index++)
+        {
+            ShowToast(variants[index % variants.Length], $"Burst {index + 1}", $"FIFO queue demonstration item {index + 1} of {count}.", autoHide: false);
+        }
+    }
+
+    private void CycleToastPlacement()
+    {
+        switch (_toastContainer.Placement)
+        {
+            case BootstrapToastPlacement.TopLeft:
+                _toastContainer.Placement = BootstrapToastPlacement.TopRight;
+                break;
+            case BootstrapToastPlacement.TopRight:
+                _toastContainer.Placement = BootstrapToastPlacement.BottomLeft;
+                break;
+            case BootstrapToastPlacement.BottomLeft:
+                _toastContainer.Placement = BootstrapToastPlacement.BottomRight;
+                break;
+            default:
+                _toastContainer.Placement = BootstrapToastPlacement.TopLeft;
+                break;
+        }
+    }
+
+    private void RapidShowDismiss()
+    {
+        var toast = new BootstrapToast
+        {
+            Width = 320,
+            Title = "Rapid dismissal",
+            Text = "Dismissed immediately after ShowToast to exercise enter interruption.",
+            Variant = BootstrapVariant.Danger,
+            AutoHide = false,
+            AccessibleName = $"Demo Toast {++_toastSequence}"
+        };
+        _toastContainer.ShowToast(toast);
+        toast.Dismiss();
+    }
+
+    private void ShowDisabledToast()
+    {
+        var toast = new BootstrapToast
+        {
+            Width = 320,
+            Title = "Disabled Toast",
+            Text = "Uses the shared neutral disabled feedback palette.",
+            Variant = BootstrapVariant.Info,
+            AutoHide = false,
+            Enabled = false,
+            AccessibleName = $"Demo Toast {++_toastSequence}"
+        };
+        _toastContainer.ShowToast(toast);
+    }
+
+    private static Button CreateActionButton(string text, string accessibleName, EventHandler onClick)
+    {
+        var button = new Button
+        {
+            AutoSize = true,
+            Text = text,
+            AccessibleName = accessibleName,
+            Margin = new Padding(3, 3, 6, 3),
+            UseVisualStyleBackColor = true
+        };
+        button.Click += onClick;
+        return button;
     }
 
     private static Button CreateTooltipTarget(string text, string accessibleName)
@@ -411,12 +489,7 @@ public sealed class FeedbackDemoForm : Form
 
     private static Label CreateTimingLabel(string text)
     {
-        return new Label
-        {
-            AutoSize = true,
-            Text = text,
-            Margin = new Padding(3, 7, 4, 3)
-        };
+        return new Label { AutoSize = true, Text = text, Margin = new Padding(3, 7, 4, 3) };
     }
 
     private static GroupBox CreateGroup(string text)
@@ -480,7 +553,7 @@ public sealed class FeedbackDemoForm : Form
     {
         foreach (Control child in root.Controls)
         {
-            if (child is BootstrapBadge || child is BootstrapAlert)
+            if (child is BootstrapBadge || child is BootstrapAlert || child is BootstrapToast || child is BootstrapToastContainer)
             {
                 continue;
             }
