@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
-using MyDmsVn.Bootstrap5WinFormUI.Icons;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -146,7 +145,7 @@ public sealed class BootstrapToastTests
         using var toast = new BootstrapToast(() =>
         {
             created++;
-            return new TestToastAutoHideTimer();
+            return new ManualToastAutoHideTimer();
         });
 
         toast.Visible = true;
@@ -158,7 +157,7 @@ public sealed class BootstrapToastTests
     [Test]
     public void CallerOwnedFontIsNotDisposedWithToast()
     {
-        using var callerFont = new Font(SystemFonts.MessageBoxFont.FontFamily, 11f, FontStyle.Italic);
+        using var callerFont = new Font(FontFamily.GenericSansSerif, 11f, FontStyle.Italic);
         var toast = new BootstrapToast
         {
             Font = callerFont,
@@ -173,15 +172,5 @@ public sealed class BootstrapToastTests
             var size = callerFont.GetHeight();
             Assert.That(size, Is.GreaterThan(0f));
         }));
-    }
-
-    private sealed class TestToastAutoHideTimer : IBootstrapToastAutoHideTimer
-    {
-        public int Interval { get; set; }
-        public bool Enabled { get; private set; }
-        public event EventHandler? Tick;
-        public void Start() => Enabled = true;
-        public void Stop() => Enabled = false;
-        public void Dispose() => Enabled = false;
     }
 }
