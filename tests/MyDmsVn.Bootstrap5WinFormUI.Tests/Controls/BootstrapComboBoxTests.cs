@@ -117,7 +117,7 @@ public sealed class BootstrapComboBoxTests
         Assert.That(rendererProperty, Is.Not.Null);
         Assert.That(rendererProperty!.GetCustomAttribute<BrowsableAttribute>()?.Browsable, Is.False);
         Assert.That(
-            rendererProperty.GetCustomAttribute<DesignerSerializationVisibilityAttribute>()?.Visibility,
+            rendererProperty!.GetCustomAttribute<DesignerSerializationVisibilityAttribute>()?.Visibility,
             Is.EqualTo(DesignerSerializationVisibility.Hidden));
     }
 
