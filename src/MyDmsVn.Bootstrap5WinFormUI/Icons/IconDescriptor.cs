@@ -1,10 +1,12 @@
 using System;
+using System.ComponentModel;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Icons;
 
 /// <summary>
 /// Describes an icon independently from the provider that renders it.
 /// </summary>
+[TypeConverter(typeof(IconDescriptorTypeConverter))]
 public sealed class IconDescriptor
 {
     private IconDescriptor(IconSourceKind sourceKind, string value, string? sourceId)

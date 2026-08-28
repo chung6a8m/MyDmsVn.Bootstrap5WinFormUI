@@ -235,10 +235,25 @@ public sealed class AdvancedInputsDemoForm : Form
         _comboNote.AutoSize = true;
         _comboNote.MaximumSize = new Size(860, 0);
         _comboNote.Margin = new Padding(6, 0, 6, 8);
+        _comboNote.Dock = DockStyle.Top;
         _comboNote.Text = "Native ownership note: WinForms/OS still owns the editable child, arrow button, hit-testing, and popup chrome. The popup may remain square or OS-themed.";
 
-        _comboSection.Controls.Add(grid);
-        _comboSection.Controls.Add(_comboNote);
+        var stack = new TableLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Dock = DockStyle.Top,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty
+        };
+        stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stack.Controls.Add(grid, 0, 0);
+        stack.Controls.Add(_comboNote, 0, 1);
+
+        _comboSection.Controls.Add(stack);
     }
 
     private static TableLayoutPanel CreateScenarioGrid()
