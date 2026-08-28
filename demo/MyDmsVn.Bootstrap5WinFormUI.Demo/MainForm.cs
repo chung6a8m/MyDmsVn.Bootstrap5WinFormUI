@@ -235,6 +235,11 @@ public sealed class MainForm : Form
             "Pagination",
             "Bounded page windows, ellipses, navigation visibility, sizes, and application-owned DataGrid paging.",
             () => new PaginationDemoForm());
+
+        AddPage(
+            "Navigation / Tabs",
+            "Native-backed tab pages with Tabs/Pills/Underline headers, fill sizing, images, tooltips, disabled pages, variants, and selection events.",
+            () => new NavigationDemoForm());
     }
 
     private BootstrapSidebarItem AddPage(string title, string description, Func<Form> createForm)

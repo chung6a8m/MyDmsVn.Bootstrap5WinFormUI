@@ -65,14 +65,17 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapBadge`
 - `BootstrapAlert`
 - `BootstrapTooltip`
+- `BootstrapTabControl`
 
 ## Integrated demo
 
-The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, and Pagination. Light/Dark switching and Reduced motion remain available while navigating.
+The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, Pagination, and Navigation / Tabs. Light/Dark switching and Reduced motion remain available while navigating.
 
 The Feedback page hosts the component-expansion feedback controls. `BootstrapBadge` covers semantic, pill/custom/disabled, and long-text states; `BootstrapAlert` adds all semantic variants, optional icons, native keyboard-accessible dismissal, multiline/disabled/custom-radius states, and restore cycles; `BootstrapTooltip` adds default Dark, semantic and custom-color owner-drawn popups, explicit multiline/long captions, one Tooltip associated with multiple controls, and live native timing/state forwarding. The page remains the shared runtime Light/Dark and real-Windows 100–200% DPI verification surface.
 
 The Pagination page demonstrates bounded numeric windows, ellipses, navigation visibility, size variants, boundary/zero-item states, and application-owned DataGrid paging. `BootstrapPagination` itself does not own or slice a data source.
+
+The Navigation / Tabs page demonstrates `BootstrapTabControl` using native `TabPage` composition and selection with Bootstrap-inspired Tabs, Pills, and Underline header styles. It includes uniform Fill sizing, all semantic variants, `ImageList`/`ImageKey`/`ImageIndex`, native tooltip text, disabled pages, long labels, and live `SelectedIndexChanged` feedback.
 
 Earlier Rendering / DPI, Icons, and Animation diagnostics remain available below the Theme navigation item.
 
@@ -104,6 +107,8 @@ Alert reuses those same rendering/theme primitives plus the source-neutral icon 
 
 Tooltip is a thin `Component + IExtenderProvider` wrapper over one owned native WinForms `ToolTip`. Native association, popup placement and delay semantics remain native; the framework owns only owner-drawn Bootstrap-inspired presentation. It resolves the current theme at popup/draw time, DPI-scales padding/border/radius through the shared rendering foundation, adds no timer or static theme subscription, and keeps the native `ToolTip` private.
 
+Tabs remain native-backed: `BootstrapTabControl` derives from WinForms `TabControl`, preserves `TabPage`, `TabPages`, selection/events, focus/keyboard, native images/tooltips, and overflow behavior, and custom-paints only the native header rectangles. Header metrics reuse Theme/DPI/Rendering helpers; the control owns one deterministic theme subscription/theme-created font lifecycle and introduces no timer, animation engine, page wrapper, custom window, or external package.
+
 See [Phase 15 — Hardening and API review](docs/PHASE15_HARDENING_AND_API_REVIEW.md) for the audit findings and the real-Windows/manual checks carried into release validation.
 
 ## Documentation
@@ -126,7 +131,7 @@ The primary sources of truth are:
 
 ## Status
 
-Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, and Stage 3 `BootstrapTooltip` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
+Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, and Stage 4 `BootstrapTabControl` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
 
 The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 

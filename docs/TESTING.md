@@ -19,6 +19,7 @@ Prefer ordinary unit tests for logic that does not require a WinForms handle:
 - Radius/geometry calculations
 - Alert palette, DPI metrics, and layout calculations without WinForms handles
 - Tooltip palette, DPI metrics, popup-size, and text-bounds calculations without WinForms handles
+- Tab header palette, DPI metrics, uniform sizing, and layout calculations without WinForms handles
 - Icon descriptor/source selection
 - Selection-state algorithms
 - Pagination numeric-window and ellipsis calculations
@@ -118,6 +119,16 @@ BootstrapTooltip Stage 3 pure tests cover:
 - Popup-size calculation that adds scaled padding/border without framework auto-wrap policy and saturates pathological integer overflow
 - Text-bounds calculation for asymmetric padding plus tiny/malformed rectangles without negative geometry
 
+BootstrapTabControl Stage 4 pure tests cover:
+
+- 96-DPI header baseline of 32px height, 12px horizontal padding, 8px content spacing, 54px minimum width, 1px border, 2px focus/underline thickness, and 6px theme radius
+- Exact metric scaling at DPI 120/144/168/192 plus theme/default and explicit logical-radius behavior
+- Uniform fixed-width calculation from the widest content when `Fill = false` and available client width when `Fill = true`, including minimum-width fallback and invalid count validation
+- Selected/inactive/hover/disabled palette resolution for Tabs/Pills/Underline in Light/Dark using the existing semantic resolver and contrast helper
+- Style-specific corner geometry: top-only Tabs, fully rounded Pills, and no rounded path for Underline
+- Text/image/underline/focus geometry containment for normal, narrow, empty, and malformed rectangles without negative sizes
+- Rejection of undefined `BootstrapTabStyle` / `BootstrapVariant` values before usable output is returned
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -198,6 +209,17 @@ BootstrapTooltip Stage 3 STA tests verify:
 - Runtime theme switching without adding a `BootstrapThemeManager.ThemeChanged` subscription; popup/draw resolve the current theme on demand
 - Idempotent deterministic disposal of the owned native ToolTip and absence of public native-object leakage
 
+BootstrapTabControl Stage 4 STA tests verify:
+
+- Designer-safe/native defaults, `DefaultEvent(SelectedIndexChanged)`, exact four-member framework property surface, `OwnerDrawFixed`, and fixed sizing
+- Native `TabPage` collection identity/order, `SelectedTab`/`SelectedIndex`, and exactly one inherited `SelectedIndexChanged` notification for an effective change
+- Framework properties changing presentation without replacing pages or mutating native selection
+- `HotTrack`, `ShowToolTips`, `ImageList`, and inherited native padding remaining caller-owned
+- Fill/non-Fill uniform `ItemSize`, dynamic widening after native `TabPage.Text` changes, and preservation of native page order
+- Owner-draw smoke under Light/Dark for Tabs/Pills/Underline with images, tooltip text, long labels, selected/inactive/disabled states, and no mutation of native page metadata
+- Runtime theme typography changes updating the same control in place, caller-owned font preservation, framework-owned font disposal, static-theme subscription cleanup, and 100-cycle lifecycle stress
+- Integrated `NavigationDemoForm` coverage for all three styles, Fill, images/tooltips, disabled/long-label pages, all eight variants, and visible native selection-event feedback
+
 ### 2.3 Demo/manual visual tests
 
 A demo application is required because not all rendering quality is productively asserted with pixels.
@@ -235,6 +257,8 @@ For BootstrapAlert Stage 2, stay on **Feedback** and compare all eight semantic 
 
 For BootstrapTooltip Stage 3, stay on **Feedback** and hover the default Dark target, the second target using the same Tooltip instance, the semantic Info target, the custom-color target, the explicit multiline target, and the long single-line target. Change Initial/Reshow/Auto-pop delays and Active/Show always live and confirm native timing behavior changes without manual popup positioning. Switch Light/Dark while the page remains open, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling. Inspect padding, border, radius, text contrast/alignment, explicit newlines, and native screen-edge placement; the framework must not impose automatic word wrapping or a custom popup window.
 
+For BootstrapTabControl Stage 4, choose **Navigation / Tabs**. Compare Tabs/Pills/Underline, Fill off/on, all semantic variants, image-by-key/index, native tooltip text, disabled pages, and long labels. Exercise mouse selection plus Tab, arrow-key, and Ctrl+Tab native keyboard paths; verify focus remains visible and the status label reports inherited `SelectedIndexChanged`. Resize repeatedly, switch Light/Dark live, and repeat under 100/125/150/175/200% real Windows display scaling. Add enough tabs to force native overflow and verify the framework has not replaced native overflow controls, hit-testing, selection, or page hosting.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -260,6 +284,7 @@ Verify:
 - Badge compact padding, preferred size, and pill/theme/explicit radii remain aligned with text.
 - Alert text/icon/close slots, border/focus widths, and theme/explicit radii remain aligned and unclipped.
 - Tooltip content padding, border width, theme/explicit radius, and text alignment scale without clipping while native popup positioning remains intact.
+- Tab header height/padding/image spacing/minimum width/border/focus/underline/radius scale while native page geometry, selection, and overflow remain intact.
 
 The Phase 2 Rendering/DPI demo covers the geometry calculations at all five scale factors. Run the demo under each corresponding Windows display-scaling setting as components are added and during hardening; do not treat the virtual matrix as proof of OS-level DPI behavior.
 
@@ -272,6 +297,8 @@ Badge pure tests cover logical scaling through 96/120/144/168/192 DPI. The Feedb
 Alert pure tests cover the same 96/120/144/168/192 logical matrix for padding, icon/close reservations, border/focus widths, and radius scaling. The shared Feedback page remains the Alert OS-level gate for `DeviceDpi`, wrapped text, native close-button focus/activation, and physical rounded-border rendering.
 
 Tooltip pure tests cover 96/120/144/168/192 logical scaling for content padding, border width, and theme/explicit radius. The shared Feedback page remains the Tooltip OS-level gate because associated-control `DeviceDpi`, native ToolTip placement, monitor-edge behavior, owner-drawn text rendering, and physical rounded-border output require a real Windows popup.
+
+TabControl pure tests cover 96/120/144/168/192 logical header sizing, padding, spacing, stroke, underline, minimum width, and radius. The Navigation / Tabs page remains the OS-level gate for `DeviceDpi`, native `GetTabRect` geometry, text/image rendering, focus cues, keyboard navigation, and overflow controls under physical display scaling.
 
 ## 4. Theme matrix
 
@@ -296,6 +323,8 @@ Badge owns one direct theme subscription because it custom-paints semantic prese
 Alert likewise owns one direct theme subscription because it custom-paints its semantic surface and owns a `Typography.Body` font. Theme-matrix tests verify the same Alert instance updates palette/font/layout in place and disposal removes that subscription without disposing caller-owned fonts or icon infrastructure.
 
 Tooltip deliberately owns no direct theme subscription. Popup and Draw handlers resolve `BootstrapThemeManager.CurrentTheme` at event time, so the next popup/draw after a runtime switch must use the new palette/metrics/`BodySmall` typography while disposed Tooltip components add no static-event lifetime root.
+
+TabControl owns one direct theme subscription because it custom-paints native header rectangles and uses theme `Body` typography. Theme-matrix tests verify the same native-backed instance preserves `TabPages`/selection while updating header palette/font/size, and disposal releases only the framework-owned subscription/font while caller fonts remain usable.
 
 ## 5. Interaction matrix
 
@@ -323,6 +352,8 @@ Alert itself is also outside the tab sequence. With `Dismissible = true`, exactl
 
 Tooltip does not replace or capture the associated control's keyboard/focus behavior. Interaction verification focuses on native hover popup behavior, `Active`/`ShowAlways` state, delay forwarding, association changes, multiple target controls, and preservation of native popup placement rather than introducing a framework-owned focusable popup surface.
 
+TabControl must retain native interaction ownership. Test normal/hover/selected/disabled/focused header presentation while mouse selection, Tab entry, arrow navigation, Ctrl+Tab page cycling, `SelectedIndexChanged`, page identity, and native overflow/hit-testing remain WinForms behavior. Framework property changes must not synthesize selection events or replace pages.
+
 ## 6. Animation matrix
 
 For finite and loop animation, test:
@@ -348,6 +379,8 @@ Badge is also outside the animation matrix and owns no timer or animation primit
 Alert is outside the animation matrix as well: Stage 2 dismissal is immediate and the component owns no timer, timeout, animation primitive, auto-hide scheduler, or Toast queue behavior.
 
 Tooltip is outside the framework animation matrix: native WinForms ToolTip owns its timing behavior, while Stage 3 adds no custom timer, animation scheduler, fading abstraction, or popup loop.
+
+TabControl is outside the animation matrix: Stage 4 header state changes are immediate and no timer, animation owner, transition engine, or reduced-motion-specific behavior is introduced.
 
 ## 7. Resource/lifecycle checks
 
@@ -378,6 +411,8 @@ For Badge, every paint-time path/brush is scoped. The control owns one theme sub
 For Alert, paint-time paths/brushes/pens are scoped; it owns one theme subscription, one framework-created Body font while theme typography is authoritative, and exactly one native dismiss Button. Caller-assigned fonts, icon descriptors, and icon renderers remain caller-owned. Disposal releases only Alert-owned resources/handlers and normal child-control ownership; there is no retained bitmap/path cache, timer, animation object, overlay host, or queue manager.
 
 For Tooltip, the wrapper owns exactly one native ToolTip and its Popup/Draw event handlers. An externally supplied `IContainer` owns only the wrapper component. Repeated `Dispose()` must release the native ToolTip once, and popup/draw resources (`Font`, `GraphicsPath`, brushes, pens) remain event-scoped. Tooltip owns no static theme subscription, retained bitmap/path cache, framework timer, custom window, overlay, or queue manager.
+
+For TabControl, all paint-time paths/brushes/pens are scoped and native page/image objects remain application/WinForms-owned. The control owns one static theme subscription, one optional framework-created theme font, and per-page presentation event handlers for pages currently in the collection. Removal/disposal must detach those handlers; caller-owned fonts and ImageList content remain caller-owned. Repeated create/theme-switch/dispose cycles must return the static theme-handler count to baseline and no timer/cache/window may be retained.
 
 ## 8. DataGridView tests
 
@@ -418,6 +453,8 @@ For Alert, place the control in the Designer without theme bootstrap code. Verif
 
 For Tooltip, place `BootstrapTooltip` in the Designer component tray without theme bootstrap code. Verify the extender `ToolTip` value plus `Variant`, `CustomColor`, `BorderRadius`, `ContentPadding`, `InitialDelay`, `ReshowDelay`, `AutoPopDelay`, `Active`, and `ShowAlways` serialize/reopen correctly. Confirm only the wrapper is container-owned, the private native ToolTip is not separately serialized/exposed, and opening the form requires no application startup, custom timer, or popup host.
 
+For TabControl, place `BootstrapTabControl` in the Designer without theme bootstrap code, add ordinary native `TabPage` children through the existing TabPages collection editor, and verify `TabStyle`, `Variant`, `Fill`, and `BorderRadius` serialize/reopen normally. Confirm native page controls/content, ImageList associations, tooltip text, and selection are preserved and no framework page wrapper or custom host appears in the Designer.
+
 ## 10. Build commands
 
 Once the solution exists, the project should support explicit target verification similar to:
@@ -432,7 +469,7 @@ Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`
 
 The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by implemented phases.
 
-Pagination, Badge, Alert, and Tooltip participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
+Pagination, Badge, Alert, Tooltip, and TabControl participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
 
 ## 11. Definition of done for a component
 
