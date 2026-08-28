@@ -19,6 +19,7 @@ public sealed class IntegratedDemoApplicationTests
         "Buttons / Groups / Toolbar",
         "Inputs",
         "Cards",
+        "Feedback",
         "Collapse / Accordion",
         "Loading / Spinner",
         "Progress",
@@ -61,6 +62,24 @@ public sealed class IntegratedDemoApplicationTests
             embeddedForms.Any(child => child.GetType().Name == "DataGridDemoForm" && !child.TopLevel),
             Is.True,
             "Phase 14 navigation should keep component demos inside the integrated application window.");
+    }
+
+    [Test]
+    public void SelectingFeedbackNavigationEmbedsFeedbackDemoInMainWindow()
+    {
+        using var form = new MainForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var sidebar = FindControls<BootstrapSidebar>(form).Single();
+        sidebar.SelectedItem = sidebar.Items.Single(item => item.Text == "Feedback");
+        form.PerformLayout();
+
+        var embeddedForms = FindControls<Form>(form).ToArray();
+        Assert.That(
+            embeddedForms.Any(child => child.GetType().Name == "FeedbackDemoForm" && !child.TopLevel),
+            Is.True,
+            "The first feedback-stage control should add one reusable Feedback page to the integrated demo.");
     }
 
     [Test]
