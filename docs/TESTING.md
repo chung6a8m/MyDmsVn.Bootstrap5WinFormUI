@@ -18,6 +18,7 @@ Prefer ordinary unit tests for logic that does not require a WinForms handle:
 - Progress percentage/range calculations
 - Radius/geometry calculations
 - Alert palette, DPI metrics, and layout calculations without WinForms handles
+- Tooltip palette, DPI metrics, popup-size, and text-bounds calculations without WinForms handles
 - Icon descriptor/source selection
 - Selection-state algorithms
 - Pagination numeric-window and ellipsis calculations
@@ -108,6 +109,15 @@ BootstrapAlert Stage 2 pure tests cover:
 - Exact no-icon/no-dismiss, icon-only, dismiss-only, and icon-plus-dismiss layouts
 - Narrow, empty, and malformed client rectangles clamping to non-negative contained geometry without throwing
 
+BootstrapTooltip Stage 3 pure tests cover:
+
+- All semantic variants in Light/Dark through `BootstrapVariantColorResolver`, with border from the current theme and foreground selected through `ColorUtil.GetContrastingTextColor`
+- `CustomColor` overriding only the semantic background while preserving contrast selection and validation of undefined variants
+- Logical padding, border width, theme radius, and explicit radius scaling at DPI 96/120/144/168/192 through `DpiScaler`
+- Rejection of null theme inputs, negative padding edges, invalid radius values, and invalid DPI before returning usable render metrics
+- Popup-size calculation that adds scaled padding/border without framework auto-wrap policy and saturates pathological integer overflow
+- Text-bounds calculation for asymmetric padding plus tiny/malformed rectangles without negative geometry
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -176,6 +186,18 @@ BootstrapAlert Stage 2 STA tests verify:
 - Dismissibility-driven native focusability without duplicate children or event handlers
 - Runtime theme palette/font updates in place, caller-owned font preservation, theme-subscription cleanup, framework-owned font disposal, and repeated lifecycle stress
 
+BootstrapTooltip Stage 3 STA tests verify:
+
+- Designer-safe defaults for Dark variant, empty custom color, theme-radius sentinel, 8/4/8/4 logical padding, and native timing/state defaults
+- `[ProvideProperty("ToolTip", typeof(Control))]`, `IExtenderProvider`, and `CanExtend` behavior limited to WinForms controls
+- Parameterless and `IContainer` construction, including wrapper-only external-container ownership and exactly one privately owned native ToolTip
+- Multiple control associations, explicit newline preservation, empty-caption removal, and null-argument guards without a parallel caption dictionary
+- Undefined variant, invalid radius, and negative-padding rejection before state mutation
+- Direct two-way forwarding of `InitialDelay`, `ReshowDelay`, `AutoPopDelay`, `Active`, and `ShowAlways` to the native ToolTip
+- Native owner-draw/non-balloon configuration while keeping the native Tooltip and unplanned popup APIs out of the public surface
+- Runtime theme switching without adding a `BootstrapThemeManager.ThemeChanged` subscription; popup/draw resolve the current theme on demand
+- Idempotent deterministic disposal of the owned native ToolTip and absence of public native-object leakage
+
 ### 2.3 Demo/manual visual tests
 
 A demo application is required because not all rendering quality is productively asserted with pixels.
@@ -211,6 +233,8 @@ For BootstrapBadge Stage 1, choose **Feedback** in the integrated demo. Compare 
 
 For BootstrapAlert Stage 2, stay on **Feedback** and compare all eight semantic variants plus icon, dismissible, multiline, disabled, and explicit-radius alerts. Use mouse, Tab/Shift+Tab, Enter, and Space on the native close affordance; verify focus is visible, each effective dismissal raises one event, direct visibility changes do not, and **Restore dismissed alerts** reuses the same instances across repeated cycles. Switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling to inspect text/icon/close alignment and rounded borders.
 
+For BootstrapTooltip Stage 3, stay on **Feedback** and hover the default Dark target, the second target using the same Tooltip instance, the semantic Info target, the custom-color target, the explicit multiline target, and the long single-line target. Change Initial/Reshow/Auto-pop delays and Active/Show always live and confirm native timing behavior changes without manual popup positioning. Switch Light/Dark while the page remains open, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling. Inspect padding, border, radius, text contrast/alignment, explicit newlines, and native screen-edge placement; the framework must not impose automatic word wrapping or a custom popup window.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -235,6 +259,7 @@ Verify:
 - Pagination connected seams, ellipses, and current-page focus visuals remain aligned.
 - Badge compact padding, preferred size, and pill/theme/explicit radii remain aligned with text.
 - Alert text/icon/close slots, border/focus widths, and theme/explicit radii remain aligned and unclipped.
+- Tooltip content padding, border width, theme/explicit radius, and text alignment scale without clipping while native popup positioning remains intact.
 
 The Phase 2 Rendering/DPI demo covers the geometry calculations at all five scale factors. Run the demo under each corresponding Windows display-scaling setting as components are added and during hardening; do not treat the virtual matrix as proof of OS-level DPI behavior.
 
@@ -245,6 +270,8 @@ Pagination does not own a DPI-specific renderer; its real-Windows DPI check veri
 Badge pure tests cover logical scaling through 96/120/144/168/192 DPI. The Feedback page remains the manual OS-level DPI gate because `DeviceDpi`, text rendering, and physical display scaling are WinForms/Windows behaviors rather than pure arithmetic alone.
 
 Alert pure tests cover the same 96/120/144/168/192 logical matrix for padding, icon/close reservations, border/focus widths, and radius scaling. The shared Feedback page remains the Alert OS-level gate for `DeviceDpi`, wrapped text, native close-button focus/activation, and physical rounded-border rendering.
+
+Tooltip pure tests cover 96/120/144/168/192 logical scaling for content padding, border width, and theme/explicit radius. The shared Feedback page remains the Tooltip OS-level gate because associated-control `DeviceDpi`, native ToolTip placement, monitor-edge behavior, owner-drawn text rendering, and physical rounded-border output require a real Windows popup.
 
 ## 4. Theme matrix
 
@@ -267,6 +294,8 @@ Pagination itself does not subscribe to the theme manager. Theme-matrix verifica
 Badge owns one direct theme subscription because it custom-paints semantic presentation and owns a theme-created font. Tests verify runtime theme changes keep that font usable and disposal removes the subscription without disposing caller-owned fonts.
 
 Alert likewise owns one direct theme subscription because it custom-paints its semantic surface and owns a `Typography.Body` font. Theme-matrix tests verify the same Alert instance updates palette/font/layout in place and disposal removes that subscription without disposing caller-owned fonts or icon infrastructure.
+
+Tooltip deliberately owns no direct theme subscription. Popup and Draw handlers resolve `BootstrapThemeManager.CurrentTheme` at event time, so the next popup/draw after a runtime switch must use the new palette/metrics/`BodySmall` typography while disposed Tooltip components add no static-event lifetime root.
 
 ## 5. Interaction matrix
 
@@ -292,6 +321,8 @@ Badge is intentionally outside the interactive focus/keyboard matrix: it is a no
 
 Alert itself is also outside the tab sequence. With `Dismissible = true`, exactly one native child Button becomes focusable and owns normal WinForms Tab/Shift+Tab, Enter, Space, accessibility, and disabled interaction behavior. Programmatic `Dismiss()` remains valid while disabled; direct `Visible` changes must not synthesize `Dismissed`.
 
+Tooltip does not replace or capture the associated control's keyboard/focus behavior. Interaction verification focuses on native hover popup behavior, `Active`/`ShowAlways` state, delay forwarding, association changes, multiple target controls, and preservation of native popup placement rather than introducing a framework-owned focusable popup surface.
+
 ## 6. Animation matrix
 
 For finite and loop animation, test:
@@ -315,6 +346,8 @@ Pagination is explicitly outside the animation matrix: page-state and navigation
 Badge is also outside the animation matrix and owns no timer or animation primitive.
 
 Alert is outside the animation matrix as well: Stage 2 dismissal is immediate and the component owns no timer, timeout, animation primitive, auto-hide scheduler, or Toast queue behavior.
+
+Tooltip is outside the framework animation matrix: native WinForms ToolTip owns its timing behavior, while Stage 3 adds no custom timer, animation scheduler, fading abstraction, or popup loop.
 
 ## 7. Resource/lifecycle checks
 
@@ -343,6 +376,8 @@ For Pagination, rebuilding the paging structure must dispose every removed dynam
 For Badge, every paint-time path/brush is scoped. The control owns one theme subscription and one framework-created theme font while theme typography remains authoritative. Reassigning `Font` transfers font choice to the caller without transferring disposal ownership; Badge disposal releases only its own font/subscription and owns no timer or retained GDI path/bitmap cache.
 
 For Alert, paint-time paths/brushes/pens are scoped; it owns one theme subscription, one framework-created Body font while theme typography is authoritative, and exactly one native dismiss Button. Caller-assigned fonts, icon descriptors, and icon renderers remain caller-owned. Disposal releases only Alert-owned resources/handlers and normal child-control ownership; there is no retained bitmap/path cache, timer, animation object, overlay host, or queue manager.
+
+For Tooltip, the wrapper owns exactly one native ToolTip and its Popup/Draw event handlers. An externally supplied `IContainer` owns only the wrapper component. Repeated `Dispose()` must release the native ToolTip once, and popup/draw resources (`Font`, `GraphicsPath`, brushes, pens) remain event-scoped. Tooltip owns no static theme subscription, retained bitmap/path cache, framework timer, custom window, overlay, or queue manager.
 
 ## 8. DataGridView tests
 
@@ -381,6 +416,8 @@ For Badge, place the control in the Designer without theme bootstrap code. Verif
 
 For Alert, place the control in the Designer without theme bootstrap code. Verify `Text`, `Variant`, `Icon`, `Dismissible`, and `BorderRadius` serialize/reopen as normal WinForms properties, `IconRenderer` stays runtime-only/non-serialized, the private close Button is not exposed as a public composition surface, and construction requires no DI, application startup, timer, or popup host.
 
+For Tooltip, place `BootstrapTooltip` in the Designer component tray without theme bootstrap code. Verify the extender `ToolTip` value plus `Variant`, `CustomColor`, `BorderRadius`, `ContentPadding`, `InitialDelay`, `ReshowDelay`, `AutoPopDelay`, `Active`, and `ShowAlways` serialize/reopen correctly. Confirm only the wrapper is container-owned, the private native ToolTip is not separately serialized/exposed, and opening the form requires no application startup, custom timer, or popup host.
+
 ## 10. Build commands
 
 Once the solution exists, the project should support explicit target verification similar to:
@@ -395,7 +432,7 @@ Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`
 
 The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by implemented phases.
 
-Pagination, Badge, and Alert participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
+Pagination, Badge, Alert, and Tooltip participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
 
 ## 11. Definition of done for a component
 
