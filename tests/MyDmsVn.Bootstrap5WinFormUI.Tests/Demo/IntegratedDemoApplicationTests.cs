@@ -25,7 +25,8 @@ public sealed class IntegratedDemoApplicationTests
         "Progress",
         "Sidebar",
         "DataGrid",
-        "Pagination"
+        "Pagination",
+        "Navigation / Tabs"
     };
 
     [Test]
