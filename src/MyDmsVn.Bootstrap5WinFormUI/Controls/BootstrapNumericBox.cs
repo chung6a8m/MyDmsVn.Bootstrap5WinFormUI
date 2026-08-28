@@ -1,6 +1,10 @@
 using System;
 using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
@@ -14,14 +18,26 @@ public class BootstrapNumericBox : UserControl
     private readonly NumericUpDown _editor = new NumericUpDown();
     private BootstrapValidationState _validationState = BootstrapValidationState.None;
     private int _borderRadius = -1;
+    private Font? _themeFont;
+    private bool _useThemeFont = true;
+    private bool _settingThemeFont;
+    private bool _themeSubscribed;
 
     /// <summary>
     /// Initializes a designer-safe native-backed numeric input.
     /// </summary>
     public BootstrapNumericBox()
     {
-        SetStyle(ControlStyles.Selectable, true);
+        SetStyle(
+            ControlStyles.UserPaint |
+            ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer |
+            ControlStyles.ResizeRedraw |
+            ControlStyles.SupportsTransparentBackColor |
+            ControlStyles.Selectable,
+            true);
 
+        BackColor = Color.Transparent;
         TabStop = true;
         AccessibleRole = AccessibleRole.SpinButton;
         AccessibleDescription = "Bootstrap-inspired numeric input.";
@@ -32,6 +48,19 @@ public class BootstrapNumericBox : UserControl
         _editor.ValueChanged += OnEditorValueChanged;
 
         Controls.Add(_editor);
+
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
+        _themeSubscribed = true;
+        ApplyThemeFont();
+        ApplyTheme();
+
+        var theme = BootstrapThemeManager.CurrentTheme;
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var metrics = BootstrapNumericBoxRenderLogic.ResolveMetrics(theme.Metrics, dpi, _borderRadius);
+        Size = new Size(
+            _editor.Width + (metrics.HorizontalPadding * 2),
+            DpiScaler.Scale(theme.Metrics.ControlHeight, dpi));
+        PerformLayout();
     }
 
     /// <summary>
@@ -122,7 +151,17 @@ public class BootstrapNumericBox : UserControl
     public bool ReadOnly
     {
         get => _editor.ReadOnly;
-        set => _editor.ReadOnly = value;
+        set
+        {
+            if (_editor.ReadOnly == value)
+            {
+                return;
+            }
+
+            _editor.ReadOnly = value;
+            ApplyTheme();
+            Invalidate();
+        }
     }
 
     /// <summary>
@@ -137,7 +176,14 @@ public class BootstrapNumericBox : UserControl
         set
         {
             BootstrapTextBoxRenderLogic.ValidateState(value);
+            if (_validationState == value)
+            {
+                return;
+            }
+
             _validationState = value;
+            ApplyTheme();
+            Invalidate();
         }
     }
 
@@ -157,12 +203,194 @@ public class BootstrapNumericBox : UserControl
                 throw new ArgumentOutOfRangeException(nameof(value), value, "Border radius must be -1 or a non-negative value.");
             }
 
+            if (_borderRadius == value)
+            {
+                return;
+            }
+
             _borderRadius = value;
+            PerformLayout();
+            Invalidate();
         }
+    }
+
+    /// <inheritdoc />
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        base.OnEnabledChanged(e);
+        ApplyTheme();
+        PerformLayout();
+        Invalidate();
+    }
+
+    /// <inheritdoc />
+    protected override void OnFontChanged(EventArgs e)
+    {
+        base.OnFontChanged(e);
+        if (!_settingThemeFont)
+        {
+            _useThemeFont = false;
+            DisposeThemeFont();
+        }
+
+        ApplyChildFont();
+        PerformLayout();
+        Invalidate();
+    }
+
+    /// <inheritdoc />
+    protected override void OnLayout(LayoutEventArgs e)
+    {
+        base.OnLayout(e);
+        LayoutEditor();
+    }
+
+    /// <inheritdoc />
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+        base.OnDpiChangedAfterParent(e);
+        PerformLayout();
+        Invalidate();
+    }
+
+    /// <inheritdoc />
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var metrics = BootstrapNumericBoxRenderLogic.ResolveMetrics(theme.Metrics, dpi, _borderRadius);
+        var palette = BootstrapNumericBoxRenderLogic.ResolvePalette(
+            theme.Colors,
+            _validationState,
+            ContainsFocus,
+            Enabled,
+            ReadOnly);
+        var borderWidth = Math.Max(
+            1f,
+            ContainsFocus ? metrics.FocusBorderWidth : metrics.BorderWidth);
+        var inset = borderWidth / 2f;
+        var bounds = new RectangleF(
+            inset,
+            inset,
+            Math.Max(0f, ClientSize.Width - borderWidth),
+            Math.Max(0f, ClientSize.Height - borderWidth));
+
+        if (bounds.Width <= 0f || bounds.Height <= 0f)
+        {
+            return;
+        }
+
+        var graphics = e.Graphics;
+        var previousSmoothing = graphics.SmoothingMode;
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        try
+        {
+            using var path = RoundedPath.Create(bounds, new CornerRadius(metrics.Radius));
+            using var surfaceBrush = new SolidBrush(palette.Background);
+            using var borderPen = new Pen(palette.Border, borderWidth);
+            graphics.FillPath(surfaceBrush, path);
+            graphics.DrawPath(borderPen, path);
+        }
+        finally
+        {
+            graphics.SmoothingMode = previousSmoothing;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            if (_themeSubscribed)
+            {
+                BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+                _themeSubscribed = false;
+            }
+
+            _editor.ValueChanged -= OnEditorValueChanged;
+            DisposeThemeFont();
+        }
+
+        base.Dispose(disposing);
     }
 
     private void OnEditorValueChanged(object? sender, EventArgs e)
     {
         ValueChanged?.Invoke(this, e);
+    }
+
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        if (_useThemeFont)
+        {
+            ApplyThemeFont();
+        }
+
+        ApplyTheme();
+        PerformLayout();
+        Invalidate();
+    }
+
+    private void ApplyTheme()
+    {
+        var palette = BootstrapNumericBoxRenderLogic.ResolvePalette(
+            BootstrapThemeManager.CurrentTheme.Colors,
+            _validationState,
+            ContainsFocus,
+            Enabled,
+            ReadOnly);
+
+        _editor.BackColor = palette.Background;
+        _editor.ForeColor = palette.Foreground;
+        ForeColor = palette.Foreground;
+    }
+
+    private void ApplyThemeFont()
+    {
+        var token = BootstrapThemeManager.CurrentTheme.Typography.Body;
+        var nextFont = new Font(token.FontFamilyName, token.SizeInPoints, token.Style);
+        var previous = _themeFont;
+        _themeFont = nextFont;
+        _settingThemeFont = true;
+        try
+        {
+            Font = nextFont;
+        }
+        finally
+        {
+            _settingThemeFont = false;
+        }
+
+        previous?.Dispose();
+        ApplyChildFont();
+    }
+
+    private void ApplyChildFont()
+    {
+        _editor.Font = Font;
+    }
+
+    private void DisposeThemeFont()
+    {
+        var font = _themeFont;
+        _themeFont = null;
+        font?.Dispose();
+    }
+
+    private void LayoutEditor()
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var metrics = BootstrapNumericBoxRenderLogic.ResolveMetrics(theme.Metrics, dpi, _borderRadius);
+        _editor.Bounds = BootstrapNumericBoxRenderLogic.CalculateNativeBounds(
+            ClientSize,
+            Math.Max(1, _editor.PreferredHeight),
+            metrics);
     }
 }
