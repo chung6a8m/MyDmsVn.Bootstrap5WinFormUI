@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Threading;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -67,5 +69,46 @@ public sealed class BootstrapToastReviewRegressionTests
         using var recoveryContainer = new BootstrapToastContainer(harness.Create) { Size = new Size(400, 300) };
         Assert.DoesNotThrow((Action)(() => recoveryContainer.ShowToast(toast)));
         Assert.That(toast.IsOwned, Is.True);
+    }
+
+    [Test]
+    public void HidingAndShowingHostResumesRemainingAutoHideDelayInsteadOfResettingIt()
+    {
+        var harness = new BootstrapToastAnimationHarness { ReducedMotion = true };
+        var timers = new List<ManualToastAutoHideTimer>();
+        using var container = new BootstrapToastContainer(harness.Create) { Size = new Size(400, 300) };
+        var toast = new BootstrapToast(() =>
+        {
+            var timer = new ManualToastAutoHideTimer();
+            timers.Add(timer);
+            return timer;
+        })
+        {
+            Width = 240,
+            Text = "Pause lifetime",
+            AutoHide = true,
+            AutoHideDelay = 5000,
+            AnimationDuration = 200
+        };
+
+        container.ShowToast(toast);
+        Assert.That(timers[0].Interval, Is.EqualTo(5000));
+
+        var elapsed = Stopwatch.StartNew();
+        while (elapsed.ElapsedMilliseconds < 75)
+        {
+            Thread.SpinWait(256);
+        }
+
+        container.Visible = false;
+        container.Visible = true;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(timers.Count, Is.EqualTo(2));
+            Assert.That(timers[0].IsDisposed, Is.True);
+            Assert.That(timers[1].Interval, Is.LessThan(5000), "resuming must preserve elapsed visible lifetime rather than restart the full delay");
+            Assert.That(timers[1].Interval, Is.GreaterThan(4000), "only the short visible interval before hiding should be consumed");
+        }));
     }
 }
