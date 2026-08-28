@@ -210,16 +210,26 @@ public class BootstrapCollapse : Panel
     protected override void OnControlAdded(ControlEventArgs e)
     {
         base.OnControlAdded(e);
-        e.Control.SizeChanged += OnChildLayoutChanged;
-        e.Control.VisibleChanged += OnChildLayoutChanged;
+        var child = e.Control;
+        if (child is not null)
+        {
+            child.SizeChanged += OnChildLayoutChanged;
+            child.VisibleChanged += OnChildLayoutChanged;
+        }
+
         RefreshAutoExpandedHeight();
     }
 
     /// <inheritdoc />
     protected override void OnControlRemoved(ControlEventArgs e)
     {
-        e.Control.SizeChanged -= OnChildLayoutChanged;
-        e.Control.VisibleChanged -= OnChildLayoutChanged;
+        var child = e.Control;
+        if (child is not null)
+        {
+            child.SizeChanged -= OnChildLayoutChanged;
+            child.VisibleChanged -= OnChildLayoutChanged;
+        }
+
         base.OnControlRemoved(e);
         RefreshAutoExpandedHeight();
     }
