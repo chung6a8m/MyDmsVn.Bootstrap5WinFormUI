@@ -23,6 +23,7 @@ public class BootstrapTabControl : TabControl
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
     private bool _updatingItemSize;
+    private Size[] _sizedTabImageSizes = Array.Empty<Size>();
     private Font? _themeFont;
 
     /// <summary>
@@ -186,6 +187,11 @@ public class BootstrapTabControl : TabControl
             return;
         }
 
+        if (!_fill && NativeImageSizingChanged())
+        {
+            ApplyHeaderItemSize();
+        }
+
         var page = TabPages[e.Index];
         var theme = BootstrapThemeManager.CurrentTheme;
         var metrics = BootstrapTabControlRenderLogic.ResolveMetrics(theme.Metrics, GetCurrentDpi(), _borderRadius);
@@ -206,7 +212,7 @@ public class BootstrapTabControl : TabControl
             _tabStyle,
             e.Index == SelectedIndex,
             enabled,
-            e.Index == _hoveredIndex);
+            HotTrack && e.Index == _hoveredIndex);
 
         DrawHeaderSurface(e.Graphics, layout, metrics, palette, e.Index == SelectedIndex);
 
@@ -459,6 +465,7 @@ public class BootstrapTabControl : TabControl
             metrics,
             _fill);
         var next = new Size(Math.Max(1, width), Math.Max(1, metrics.Height));
+        CaptureNativeImageSizing();
         if (ItemSize == next)
         {
             return;
@@ -517,6 +524,36 @@ public class BootstrapTabControl : TabControl
 
         var imageIndex = page.ImageIndex;
         return imageIndex >= 0 && imageIndex < images.Count ? images[imageIndex] : null;
+    }
+
+    private bool NativeImageSizingChanged()
+    {
+        if (_sizedTabImageSizes.Length != TabPages.Count)
+        {
+            return true;
+        }
+
+        for (var index = 0; index < TabPages.Count; index++)
+        {
+            var currentSize = ResolveTabImage(TabPages[index])?.Size ?? Size.Empty;
+            if (currentSize != _sizedTabImageSizes[index])
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void CaptureNativeImageSizing()
+    {
+        var sizes = new Size[TabPages.Count];
+        for (var index = 0; index < TabPages.Count; index++)
+        {
+            sizes[index] = ResolveTabImage(TabPages[index])?.Size ?? Size.Empty;
+        }
+
+        _sizedTabImageSizes = sizes;
     }
 
     private int HitTestTab(Point point)
