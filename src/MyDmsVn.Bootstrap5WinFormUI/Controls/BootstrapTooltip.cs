@@ -17,6 +17,7 @@ public class BootstrapTooltip : Component, IExtenderProvider
     private const TextFormatFlags ToolTipTextFlags = TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
 
     private readonly ToolTip _toolTip;
+    private bool _disposed;
     private BootstrapVariant _variant = BootstrapVariant.Dark;
     private Color _customColor = Color.Empty;
     private int _borderRadius = -1;
@@ -219,8 +220,9 @@ public class BootstrapTooltip : Component, IExtenderProvider
     /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
-        if (disposing)
+        if (disposing && !_disposed)
         {
+            _disposed = true;
             _toolTip.Popup -= OnToolTipPopup;
             _toolTip.Draw -= OnToolTipDraw;
             _toolTip.Dispose();
