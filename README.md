@@ -70,6 +70,12 @@ Earlier Rendering / DPI, Icons, and Animation diagnostics remain available below
 
 See [Phase 14 — Integrated Demo Application](docs/PHASE14_INTEGRATED_DEMO.md) for the navigation contract and manual verification matrix.
 
+## Hardening status
+
+Phase 15 adds foundation-wide hardening gates for the 100–200% logical DPI matrix, runtime theme-switch stress, rapid state reversal, static-event lifetime cleanup, optional icon dependency boundaries, prototype API aliases, and XML documentation completeness. The core library now treats compiler warnings as errors on both target frameworks.
+
+See [Phase 15 — Hardening and API review](docs/PHASE15_HARDENING_AND_API_REVIEW.md) for the audit findings, automated verification, and the real-Windows/manual checks carried forward to release preparation.
+
 ## Documentation
 
 Start with [docs/README.md](docs/README.md).
@@ -88,7 +94,7 @@ The primary sources of truth are:
 
 ## Status
 
-Phases 0–14 of the foundation development plan are implemented through the integrated demo application. Phase 15 is the next planned gate and focuses on hardening and public API review before release preparation.
+Phases 0–15 of the foundation development plan are implemented through the integrated demo and hardening/API-review gate. Phase 16 — Release preparation — is the next planned phase.
 
 The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 

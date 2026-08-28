@@ -32,6 +32,9 @@ internal sealed class BootstrapSidebarItemButton : BootstrapButton
         TextAlign = ContentAlignment.MiddleLeft;
     }
 
+#if NET8_0_OR_GREATER
+    [System.Diagnostics.CodeAnalysis.AllowNull]
+#endif
     public override string Text
     {
         get => _suppressBaseText ? string.Empty : _displayText;
@@ -90,7 +93,7 @@ internal sealed class BootstrapSidebarItemButton : BootstrapButton
         }
     }
 
-    public bool HasChildren
+    public new bool HasChildren
     {
         get => _hasChildren;
         set

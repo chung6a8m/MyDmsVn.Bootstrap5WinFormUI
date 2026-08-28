@@ -112,6 +112,9 @@ public class BootstrapTextBox : UserControl
     [Category("Appearance")]
     [Description("Gets or sets the text edited by the native inner TextBox.")]
     [DefaultValue("")]
+#if NET8_0_OR_GREATER
+    [System.Diagnostics.CodeAnalysis.AllowNull]
+#endif
     public override string Text
     {
         get => _editor.Text;
