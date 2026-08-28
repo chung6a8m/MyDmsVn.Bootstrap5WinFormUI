@@ -24,10 +24,11 @@ All notable release-facing changes to this project are documented here.
 - `BootstrapDropdown`, a Bootstrap-inspired command popup that composes a caller-owned `BootstrapButton` with one owned native `ToolStripDropDownMenu`, snapshots text/icon/checked/disabled/separator models at each opening, and keeps native focus, keyboard navigation, AutoClose/outside-click dismissal, and working-area placement authoritative.
 - Dropdown theme/DPI presentation through the shared semantic variant, rendering, icon, and DPI infrastructure, including logical `MinimumWidth`, target `IconRenderer` reuse, runtime open-popup icon refresh, and deterministic native-item/bitmap cleanup without custom popup windows, global hooks, timers, or animation infrastructure.
 - Expanded the shared Navigation / Tabs demo with basic, icon, checked/disabled/separator, long-menu, and stress/theme Dropdown scenarios plus a real-desktop keyboard, outside-click, working-area, multi-monitor, and 100–200% DPI verification matrix; no second Navigation route was added.
+- `BootstrapToast`, `BootstrapToastContainer`, and four-corner `BootstrapToastPlacement`, providing application-placed transient feedback with explicit ownership transfer, FIFO/max-visible queueing, shared Alert/Toast palette rules, deterministic enter/exit and reflow animation, post-enter auto-hide timing, reduced-motion support, and container-owned dismissal/disposal; the shared Feedback demo includes manual/auto-hide, icon/multiline, burst queue, placement, rapid-dismiss, disabled, Dismiss All, and 100-toast stress scenarios.
 
 ### Changed
 
-- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, `BootstrapTabControl`, `BootstrapNumericBox`, `BootstrapComboBox`, and `BootstrapDropdown` model/component surfaces; all Dropdown renderer/palette/metric helpers remain internal and `AssemblyVersion` remains `1.0.0.0`.
+- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, `BootstrapTabControl`, `BootstrapNumericBox`, `BootstrapComboBox`, `BootstrapDropdown`, `BootstrapToastPlacement`, `BootstrapToast`, and `BootstrapToastContainer` surfaces; all Toast palette/layout/timer/ownership/animation seams remain internal and `AssemblyVersion` remains `1.0.0.0`.
 
 ## [1.0.0-rc.1] - 2026-08-28
 

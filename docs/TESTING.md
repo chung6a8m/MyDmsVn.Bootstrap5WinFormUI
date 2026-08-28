@@ -592,3 +592,42 @@ A component is complete only when:
 - Animation/lifecycle behavior is checked if animated.
 - No obvious GDI/timer/event leak remains.
 - Public API is documented.
+
+## 12. BootstrapToast Stage 8 verification
+
+Stage 8 adds targeted pure, STA, animation/lifetime, integration, and manual checks for `BootstrapToast` and `BootstrapToastContainer` while retaining the shared foundation test strategy.
+
+Pure tests cover:
+
+- Shared Alert/Toast feedback palette behavior under all semantic variants and Light/Dark themes without a second feedback color system.
+- Toast title/body/icon/close layout metrics and preferred-size calculations across logical DPI 96/120/144/168/192, including narrow/malformed geometry containment.
+- Four-corner stack layout (`TopLeft`, `TopRight`, `BottomLeft`, `BottomRight`) with DPI-scaled spacing and stable insertion order.
+- Validation of `ToastSpacing`, `MaximumVisibleToasts`, undefined placement/variant values, `AutoHideDelay`, and `AnimationDuration` before usable state is returned.
+
+STA/control tests cover:
+
+- Designer-safe Toast defaults/metadata, one private native dismiss button, source-neutral icon dispatch, caller-owned font/renderer preservation, and deterministic theme/font cleanup.
+- Container defaults, all four placements, max-visible values, FIFO ownership/queue promotion, and `DismissAll()` snapshot semantics.
+- The ownership boundary: a failed `ShowToast` leaves ownership with the caller; a successful call transfers ownership to the container for both visible and queued Toasts; dismissal/container disposal disposes owned Toasts exactly once.
+- Exactly-once `Dismissed` delivery for manual close, programmatic dismissal, auto-hide, rapid repeated dismissal, queued dismissal, and `DismissAll()`. For container-owned Toasts, logical `Dismissed` occurs before exit completion/removal/disposal.
+- Queue promotion only after the exiting Toast completes, while queued Toasts remain hidden and consume neither enter animation nor auto-hide lifetime.
+- Runtime Light/Dark changes repaint the same Toast instances without changing queue position, ownership, or restarting active lifetime/transition state.
+- Demo action coverage for manual, auto-hide, icon/multiline, disabled, Burst 8, Dismiss All, placement cycling, rapid show/dismiss, and Stress 100 scenarios.
+
+Deterministic animation/lifetime tests use the existing controllable animation clock/frame scheduler plus an internal auto-hide timer seam; they do not sleep on wall-clock time. Coverage includes:
+
+- Enter start/midpoint/completion and `EaseOut` progression from the placement-specific offset.
+- Dismissal during enter reversing from the current visual position without a jump.
+- Exit completion as the only point that removes/disposes the Toast and promotes queued work.
+- At most one transition animation per Toast and one survivor-reflow animation per container, including rapid second-dismiss cancellation/stale callback suppression.
+- Reduced motion completing enter/exit/reflow synchronously with no unnecessary frame scheduling.
+- Auto-hide countdown starting only after enter completion, not at `ShowToast`, and never while queued.
+- `AutoHide` / `AutoHideDelay` changes cancelling or restarting the currently eligible countdown.
+- Stale timer ticks ignored after cancellation/restart/dismissal/disposal through generation guarding.
+- Hidden-host pause/resume without charging hidden wall-clock time and disposal with no remaining useful scheduler/timer work.
+
+Manual Feedback-page verification must cover both Light and Dark themes, normal and Reduced motion, manual and auto-hide Toasts, title/body/icon/multiline content, dismissible and disabled presentation, every placement, `MaximumVisibleToasts` values 1/2/5, FIFO queue promotion, dismiss-during-enter, `DismissAll()` while exits are active, host hide/show, resize/reflow, theme switching during auto-hide, and container disposal while active. Repeat the page at real Windows 100/125/150/175/200% scaling. Run repeated Stress 100 / Dismiss All cycles and observe process USER/GDI handles; unbounded growth is a failure.
+
+Stage 8 participates in the Phase 16 public/protected API fingerprint gate. The gate must first fail against the prior approved hash, the reconstructed export must be reviewed for only `BootstrapToastPlacement`, `BootstrapToast`, and `BootstrapToastContainer`, and only then may the fingerprint be updated. Palette/layout/timer/ownership/animation test seams remain internal/private and `AssemblyVersion` remains `1.0.0.0`.
+
+Both `net48` and `net8.0-windows` must pass the focused Toast/Feedback/demo suite, shared Animation/Alert regressions, and the complete test suite before Stage 8 is considered complete.
