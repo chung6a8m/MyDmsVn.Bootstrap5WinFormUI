@@ -99,6 +99,30 @@ public sealed class BootstrapComboBoxVisualRegressionTests
     }
 
     [Test]
+    public void IntegratedDemoComboBoxPreferredHeightCoversActualHeight()
+    {
+        using var form = new AdvancedInputsDemoForm { ShowInTaskbar = false };
+        form.Show();
+        Application.DoEvents();
+        form.PerformLayout();
+        Application.DoEvents();
+
+        var combo = Descendants(form)
+            .OfType<BootstrapComboBox>()
+            .Single(control => control.AccessibleName == "DropDownList / native selection combo box");
+        var preferred = combo.GetPreferredSize(Size.Empty);
+        var cell = combo.Parent as TableLayoutPanel;
+        var rowHeights = cell?.GetRowHeights() ?? Array.Empty<int>();
+
+        TestContext.WriteLine(
+            $"Combo bounds={combo.Bounds}; preferred={preferred}; parent={combo.Parent?.GetType().Name}; " +
+            $"cell={cell?.ClientSize}; rows=[{string.Join(",", rowHeights)}]");
+
+        Assert.That(preferred.Height, Is.GreaterThanOrEqualTo(combo.Height),
+            "Auto-size containers need a preferred height at least as large as the post-handle native ComboBox height.");
+    }
+
+    [Test]
     public void IntegratedDemoStatusLabelDoesNotOverlapDropDownList()
     {
         using var form = new AdvancedInputsDemoForm { ShowInTaskbar = false };
@@ -113,6 +137,13 @@ public sealed class BootstrapComboBoxVisualRegressionTests
         var status = Descendants(form)
             .OfType<Label>()
             .Single(control => control.Text.StartsWith("SelectedIndexChanged:", StringComparison.Ordinal));
+        var preferred = combo.GetPreferredSize(Size.Empty);
+        var cell = combo.Parent as TableLayoutPanel;
+        var rowHeights = cell?.GetRowHeights() ?? Array.Empty<int>();
+
+        TestContext.WriteLine(
+            $"Combo bounds={combo.Bounds}; preferred={preferred}; status={status.Bounds}; statusMargin={status.Margin}; " +
+            $"cell={cell?.ClientSize}; rows=[{string.Join(",", rowHeights)}]");
 
         Assert.That(status.Top, Is.GreaterThanOrEqualTo(combo.Bottom + status.Margin.Top));
     }
