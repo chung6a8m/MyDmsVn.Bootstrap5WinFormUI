@@ -19,8 +19,8 @@ public class BootstrapToast : UserControl
     private static readonly IIconRenderer DefaultIconRenderer = BootstrapIconRenderer.CreateDefault();
     private static readonly IconDescriptor CloseIcon = IconDescriptor.Framework(FrameworkIconGlyph.Close);
 
-    private readonly Button _dismissButton;
     private readonly Func<IBootstrapToastAutoHideTimer> _timerFactory;
+    private Button? _dismissButton;
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private IconDescriptor? _icon;
     private IIconRenderer _iconRenderer = DefaultIconRenderer;
@@ -37,13 +37,12 @@ public class BootstrapToast : UserControl
     private Action<BootstrapToast>? _dismissRequest;
     private Action<BootstrapToast>? _preferredHeightChanged;
     private bool _enterCompleted;
+    private bool _hostVisible = true;
     private IBootstrapToastAutoHideTimer? _autoHideTimer;
     private EventHandler? _autoHideTickHandler;
     private int _autoHideGeneration;
 
-    /// <summary>
-    /// Initializes a designer-safe toast using the current application theme.
-    /// </summary>
+    /// <summary>Initializes a designer-safe toast using the current application theme.</summary>
     public BootstrapToast()
         : this(() => new WinFormsBootstrapToastAutoHideTimer())
     {
@@ -61,30 +60,14 @@ public class BootstrapToast : UserControl
             ControlStyles.SupportsTransparentBackColor,
             true);
 
+        _dismissButton = CreateDismissButton();
+        Controls.Add(_dismissButton);
+
         BackColor = Color.Transparent;
-        Size = new Size(320, 96);
         TabStop = false;
         AccessibleRole = AccessibleRole.Alert;
         AccessibleDescription = "Transient notification.";
-
-        _dismissButton = new Button
-        {
-            AutoSize = false,
-            Text = string.Empty,
-            FlatStyle = FlatStyle.Flat,
-            UseVisualStyleBackColor = false,
-            Visible = true,
-            TabStop = true,
-            AccessibleRole = AccessibleRole.PushButton,
-            AccessibleName = "Dismiss notification",
-            AccessibleDescription = "Dismisses this notification."
-        };
-        _dismissButton.FlatAppearance.BorderSize = 0;
-        _dismissButton.FlatAppearance.MouseDownBackColor = Color.Transparent;
-        _dismissButton.FlatAppearance.MouseOverBackColor = Color.Transparent;
-        _dismissButton.Click += OnDismissButtonClick;
-        _dismissButton.Paint += OnDismissButtonPaint;
-        Controls.Add(_dismissButton);
+        Size = new Size(320, 96);
 
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         _themeSubscribed = true;
@@ -173,7 +156,7 @@ public class BootstrapToast : UserControl
             }
 
             _iconRenderer = value;
-            _dismissButton.Invalidate();
+            _dismissButton?.Invalidate();
             Invalidate();
         }
     }
@@ -213,13 +196,13 @@ public class BootstrapToast : UserControl
             }
 
             _autoHide = value;
-            if (!value)
+            if (value)
             {
-                StopAndDisposeAutoHideTimer();
+                RestartAutoHideTimerIfEligible();
             }
             else
             {
-                RestartAutoHideTimerIfEligible();
+                StopAndDisposeAutoHideTimer();
             }
         }
     }
@@ -311,7 +294,9 @@ public class BootstrapToast : UserControl
 
     internal bool IsOwned => _dismissRequest is not null;
 
-    internal bool IsFullyVisible => _enterCompleted && Visible && !IsDisposed;
+    internal bool IsFullyVisible => _enterCompleted && Visible && _hostVisible && !IsDisposed;
+
+    internal bool HasActiveAutoHideTimer => _autoHideTimer is not null && _autoHideTimer.Enabled;
 
     internal void AttachOwner(Action<BootstrapToast> dismissRequest, Action<BootstrapToast> preferredHeightChanged)
     {
@@ -364,9 +349,23 @@ public class BootstrapToast : UserControl
         StopAndDisposeAutoHideTimer();
     }
 
+    internal void NotifyHostVisibilityChanged(bool visible)
+    {
+        _hostVisible = visible;
+        if (visible)
+        {
+            RestartAutoHideTimerIfEligible();
+        }
+        else
+        {
+            StopAndDisposeAutoHideTimer();
+        }
+    }
+
     internal void NotifyRemovedFromOwner()
     {
         _enterCompleted = false;
+        _hostVisible = true;
         StopAndDisposeAutoHideTimer();
         _dismissRequest = null;
         _preferredHeightChanged = null;
@@ -386,7 +385,7 @@ public class BootstrapToast : UserControl
     protected override void OnLayout(LayoutEventArgs e)
     {
         base.OnLayout(e);
-        if (IsDisposed)
+        if (IsDisposed || _dismissButton is null)
         {
             return;
         }
@@ -447,7 +446,7 @@ public class BootstrapToast : UserControl
             e.Graphics.SmoothingMode = previousSmoothingMode;
         }
 
-        if (!_title.Equals(string.Empty, StringComparison.Ordinal) && layout.TitleBounds.Width > 0 && layout.TitleBounds.Height > 0)
+        if (!string.IsNullOrEmpty(_title) && layout.TitleBounds.Width > 0 && layout.TitleBounds.Height > 0)
         {
             TextRenderer.DrawText(
                 e.Graphics,
@@ -491,7 +490,7 @@ public class BootstrapToast : UserControl
         base.OnEnabledChanged(e);
         ApplyTheme();
         UpdateDismissButtonState();
-        _dismissButton.Invalidate();
+        _dismissButton?.Invalidate();
         Invalidate();
     }
 
@@ -514,7 +513,7 @@ public class BootstrapToast : UserControl
     {
         base.OnDpiChangedAfterParent(e);
         NotifyContentChanged();
-        _dismissButton.Invalidate();
+        _dismissButton?.Invalidate();
     }
 
     /// <inheritdoc />
@@ -539,6 +538,28 @@ public class BootstrapToast : UserControl
         base.Dispose(disposing);
     }
 
+    private Button CreateDismissButton()
+    {
+        var button = new Button
+        {
+            AutoSize = false,
+            Text = string.Empty,
+            FlatStyle = FlatStyle.Flat,
+            UseVisualStyleBackColor = false,
+            Visible = true,
+            TabStop = true,
+            AccessibleRole = AccessibleRole.PushButton,
+            AccessibleName = "Dismiss notification",
+            AccessibleDescription = "Dismisses this notification."
+        };
+        button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.MouseDownBackColor = Color.Transparent;
+        button.FlatAppearance.MouseOverBackColor = Color.Transparent;
+        button.Click += OnDismissButtonClick;
+        button.Paint += OnDismissButtonPaint;
+        return button;
+    }
+
     private void OnDismissButtonClick(object? sender, EventArgs e)
     {
         Dismiss();
@@ -546,7 +567,8 @@ public class BootstrapToast : UserControl
 
     private void OnDismissButtonPaint(object? sender, PaintEventArgs e)
     {
-        if (_dismissButton.ClientSize.Width <= 0 || _dismissButton.ClientSize.Height <= 0)
+        var button = _dismissButton;
+        if (button is null || button.ClientSize.Width <= 0 || button.ClientSize.Height <= 0)
         {
             return;
         }
@@ -555,16 +577,16 @@ public class BootstrapToast : UserControl
         var dpi = GetCurrentDpi();
         var palette = BootstrapFeedbackRenderLogic.ResolvePalette(theme.Colors, _variant, Enabled);
         var inset = DpiScaler.Scale(theme.Metrics.SpacingXS, dpi);
-        var glyphBounds = Rectangle.Inflate(_dismissButton.ClientRectangle, -inset, -inset);
+        var glyphBounds = Rectangle.Inflate(button.ClientRectangle, -inset, -inset);
         if (glyphBounds.Width > 0 && glyphBounds.Height > 0)
         {
             _iconRenderer.TryRender(e.Graphics, CloseIcon, glyphBounds, palette.Foreground);
         }
 
-        if (_dismissButton.Focused)
+        if (button.Focused)
         {
             var focusWidth = DpiScaler.Scale(theme.Metrics.FocusBorderWidth, dpi);
-            var focusBounds = Rectangle.Inflate(_dismissButton.ClientRectangle, -inset, -inset);
+            var focusBounds = Rectangle.Inflate(button.ClientRectangle, -inset, -inset);
             focusBounds.Width = Math.Max(0, focusBounds.Width - 1);
             focusBounds.Height = Math.Max(0, focusBounds.Height - 1);
             if (focusWidth > 0 && focusBounds.Width > 0 && focusBounds.Height > 0)
@@ -589,12 +611,13 @@ public class BootstrapToast : UserControl
 
         ApplyTheme();
         NotifyContentChanged();
-        _dismissButton.Invalidate();
+        _dismissButton?.Invalidate();
     }
 
     private void ApplyTheme()
     {
-        if (IsDisposed)
+        var button = _dismissButton;
+        if (IsDisposed || button is null)
         {
             return;
         }
@@ -603,8 +626,8 @@ public class BootstrapToast : UserControl
             BootstrapThemeManager.CurrentTheme.Colors,
             _variant,
             Enabled);
-        _dismissButton.BackColor = palette.Surface;
-        _dismissButton.ForeColor = palette.Foreground;
+        button.BackColor = palette.Surface;
+        button.ForeColor = palette.Foreground;
     }
 
     private void ApplyThemeFont()
@@ -635,6 +658,11 @@ public class BootstrapToast : UserControl
 
     private void RebuildTitleFont()
     {
+        if (Font is null)
+        {
+            return;
+        }
+
         var next = new Font(Font, FontStyle.Bold);
         var previous = _titleFont;
         _titleFont = next;
@@ -697,11 +725,7 @@ public class BootstrapToast : UserControl
             _dismissible);
     }
 
-    private void MeasureTextSizes(
-        int width,
-        BootstrapToastMetrics metrics,
-        out Size titleSize,
-        out Size bodySize)
+    private void MeasureTextSizes(int width, BootstrapToastMetrics metrics, out Size titleSize, out Size bodySize)
     {
         var textWidth = Math.Max(1, width - (metrics.HorizontalPadding * 2));
         if (_icon is not null)
@@ -720,7 +744,10 @@ public class BootstrapToast : UserControl
                 _title,
                 _titleFont ?? Font,
                 new Size(textWidth, Math.Max(1, Font.Height * 2)),
-                TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+                TextFormatFlags.NoPrefix |
+                TextFormatFlags.SingleLine |
+                TextFormatFlags.EndEllipsis |
+                TextFormatFlags.NoPadding);
 
         bodySize = string.IsNullOrEmpty(Text)
             ? Size.Empty
@@ -728,21 +755,29 @@ public class BootstrapToast : UserControl
                 Text,
                 Font,
                 new Size(textWidth, 10000),
-                TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding);
+                TextFormatFlags.NoPrefix |
+                TextFormatFlags.WordBreak |
+                TextFormatFlags.NoPadding);
     }
 
     private void UpdateDismissButtonState()
     {
-        _dismissButton.Visible = _dismissible;
-        _dismissButton.Enabled = _dismissible && Enabled;
-        _dismissButton.TabStop = _dismissible && Enabled;
+        var button = _dismissButton;
+        if (button is null)
+        {
+            return;
+        }
+
+        button.Visible = _dismissible;
+        button.Enabled = _dismissible && Enabled;
+        button.TabStop = _dismissible && Enabled;
     }
 
     private void RestartAutoHideTimerIfEligible()
     {
         if (!CanAutoHide())
         {
-            if (!_autoHide)
+            if (!_autoHide || !_hostVisible || !_enterCompleted)
             {
                 StopAndDisposeAutoHideTimer();
             }
@@ -768,7 +803,12 @@ public class BootstrapToast : UserControl
 
     private bool CanAutoHide()
     {
-        return _autoHide && _dismissRequest is not null && _enterCompleted && Visible && !IsDisposed;
+        return _autoHide &&
+               _dismissRequest is not null &&
+               _enterCompleted &&
+               _hostVisible &&
+               Visible &&
+               !IsDisposed;
     }
 
     private void OnAutoHideTick(IBootstrapToastAutoHideTimer timer, int generation, object? sender)
