@@ -94,6 +94,34 @@ public sealed class BootstrapComboBoxVisualRegressionTests
     }
 
     [Test]
+    public void SizeChangedRelayoutDuringHandleCreationRepairsIntegratedDemoStatusPosition()
+    {
+        using var form = new AdvancedInputsDemoForm { ShowInTaskbar = false };
+        var combo = FindDemoComboBox(form);
+        var status = FindDemoStatus(form);
+        var sizeChangedCount = 0;
+
+        combo.SizeChanged += (_, _) =>
+        {
+            sizeChangedCount++;
+            combo.Parent?.PerformLayout(combo, nameof(Control.Size));
+        };
+
+        form.Show();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(sizeChangedCount, Is.GreaterThan(0),
+                "The native owner-draw height transition must raise SizeChanged during handle creation for this lifecycle hook to be viable.");
+            Assert.That(
+                status.Top,
+                Is.GreaterThanOrEqualTo(combo.Bottom + status.Margin.Top),
+                "If layout at SizeChanged timing is sufficient, the status should move below the post-handle ComboBox height.");
+        }));
+    }
+
+    [Test]
     public void IntegratedDemoStatusLabelDoesNotOverlapDropDownList()
     {
         using var form = new AdvancedInputsDemoForm { ShowInTaskbar = false };
@@ -102,17 +130,27 @@ public sealed class BootstrapComboBoxVisualRegressionTests
         form.PerformLayout();
         Application.DoEvents();
 
-        var combo = Descendants(form)
-            .OfType<BootstrapComboBox>()
-            .Single(control => control.AccessibleName == "DropDownList / native selection combo box");
-        var status = Descendants(form)
-            .OfType<Label>()
-            .Single(control => control.Text.StartsWith("SelectedIndexChanged:", StringComparison.Ordinal));
+        var combo = FindDemoComboBox(form);
+        var status = FindDemoStatus(form);
 
         Assert.That(
             status.Top,
             Is.GreaterThanOrEqualTo(combo.Bottom + status.Margin.Top),
             $"Status begins at y={status.Top}, but the ComboBox ends at y={combo.Bottom} and requires {status.Margin.Top}px top margin.");
+    }
+
+    private static BootstrapComboBox FindDemoComboBox(Control root)
+    {
+        return Descendants(root)
+            .OfType<BootstrapComboBox>()
+            .Single(control => control.AccessibleName == "DropDownList / native selection combo box");
+    }
+
+    private static Label FindDemoStatus(Control root)
+    {
+        return Descendants(root)
+            .OfType<Label>()
+            .Single(control => control.Text.StartsWith("SelectedIndexChanged:", StringComparison.Ordinal));
     }
 
     private static IEnumerable<Control> Descendants(Control root)
