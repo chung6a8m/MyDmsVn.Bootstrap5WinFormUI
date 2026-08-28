@@ -99,7 +99,7 @@ public sealed class BootstrapBadgeTests
         Assert.DoesNotThrow((Action)(() => badge.CustomColor = opaque));
         Assert.That(badge.CustomColor, Is.EqualTo(opaque));
         Assert.Throws<ArgumentException>((Action)(() => badge.CustomColor = Color.Transparent));
-        Assert.Throws<ArgumentException>((Action)(() => badge.CustomColor = Color.FromArgb(128, 111, 66, 193))));
+        Assert.Throws<ArgumentException>((Action)(() => badge.CustomColor = Color.FromArgb(128, 111, 66, 193)));
     }
 
     [Test]
