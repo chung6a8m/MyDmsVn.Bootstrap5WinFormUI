@@ -4,14 +4,14 @@
 
 Phase 16 froze the Phase 15-reviewed exported API as the proposed v1 compatibility baseline beginning with `1.0.0-rc.1`.
 
-`BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, and Stage 5 `BootstrapNumericBox` are intentional compatible additions made while the package remains on the release-candidate line. Each API addition was reviewed through the existing fingerprint gate before the approved baseline was updated.
+`BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, and Stage 6 `BootstrapComboBox` are intentional compatible additions made while the package remains on the release-candidate line. Each API addition was reviewed through the existing fingerprint gate before the approved baseline was updated.
 
 The baseline covers every exported type plus each declared public, protected, and protected-internal constructor, field, property, event, and method in the core assembly. Including protected surface is intentional because subclasses can depend on it.
 
 Approved SHA-256 API fingerprint:
 
 ```text
-7e8be98bb686b9971a9f2da1c8eb9438416167c3894987cdc1d266910a2cce76
+3725b5012381672dcdcb64e8151ea4a4ec6c463e4ccf3ab65dedce278bb74a21
 ```
 
 The reviewed Pagination addition exports only `MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapPagination`. Its declared surface is the parameterless constructor, `TotalItems`, `PageSize`, `CurrentPage`, `TotalPages`, `MaxVisiblePages`, `ShowFirstLast`, `ShowPreviousNext`, `ButtonSize`, `Variant`, `BorderRadius`, `PageChanged`, and the `GetPreferredSize(Size)` override inherited as part of the control contract. Pagination layout helper types remain internal.
@@ -26,11 +26,15 @@ The reviewed Tabs addition exports `MyDmsVn.Bootstrap5WinFormUI.Controls.Bootstr
 
 The reviewed NumericBox addition exports only `MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapNumericBox : System.Windows.Forms.UserControl`. Its declared surface is the parameterless constructor; `Value`, `Minimum`, `Maximum`, `Increment`, `DecimalPlaces`, `ThousandsSeparator`, `ReadOnly`, `ValidationState`, and `BorderRadius`; the `ValueChanged` event; and only the protected lifecycle/interaction overrides required by the native-backed wrapper (`Dispose`, `OnDpiChangedAfterParent`, `OnEnabledChanged`, `OnEnter`, `OnFontChanged`, `OnLayout`, `OnMouseDown`, and `OnPaint`). `BootstrapNumericBoxRenderLogic` plus its palette/metrics/layout implementation types remain internal/private. The owned native WinForms `NumericUpDown` remains private and no public/protected child accessor was introduced. `BootstrapValidationState` remains exactly `None = 0`, `Valid = 1`, and `Invalid = 2`. No Hexadecimal/Accelerations/custom-parser/adornment API, timer, animation scheduler, popup/window host, new theme service, geometry type, or package dependency was introduced.
 
+The reviewed ComboBox addition exports only `MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapComboBox : System.Windows.Forms.ComboBox`. Its declared public surface is the parameterless constructor plus `ValidationState`, `BorderRadius`, `LeadingIcon`, and `IconRenderer`. The only declared protected surface added by the native-backed implementation is `Dispose(bool)`, `OnDrawItem(DrawItemEventArgs)`, `OnHandleCreated(EventArgs)`, and `WndProc(ref Message)`, required for deterministic theme/font cleanup, owner-draw presentation, handle restoration, and conservative post-native shell painting. All `Items`, `DataSource`, `DisplayMember`, `ValueMember`, `SelectedIndex`, `SelectedItem`, `SelectedValue`, autocomplete properties, keyboard/focus behavior, dropdown lifecycle, and native events remain inherited WinForms API rather than being re-declared or mirrored. ComboBox render/palette/metrics/layout helpers remain internal/private. No item wrapper, custom popup/list host, `BootstrapDropdown` dependency, timer, animation scheduler, native-private-field reflection, P/Invoke hook, new theme service, geometry type, or package dependency was introduced.
+
 The Stage 3 fingerprint was approved only after CI printed the reconstructed exported surface and the Tooltip section was checked against the plan. That reviewed fingerprint was `b5eba7ddc68201d597cb1cdb7494ee1e7a259431f57e228e3711d0f8dfcd0b78`.
 
 The Stage 4 fingerprint was likewise approved only after CI first failed the compatibility gate and printed the reconstructed exported surface. Review confirmed that the only intended additions were `BootstrapTabStyle` and the native-backed `BootstrapTabControl` surface described above. That reviewed fingerprint was `6fa7cadf03af069a07dd9a5eff38ed53a8b248664aba4f03343fcbeb2fc209a9`.
 
 The Stage 5 fingerprint was approved only after CI on the completed Tasks 1–6 HEAD first failed the compatibility gate and printed the reconstructed exported surface. Review confirmed that the only intended addition was the native-backed `BootstrapNumericBox` surface described above, helper types stayed internal, the native editor stayed private, no existing exported type/member changed signature, and the compatibility assembly version stayed `1.0.0.0`. The reviewed fingerprint is `7e8be98bb686b9971a9f2da1c8eb9438416167c3894987cdc1d266910a2cce76`.
+
+The Stage 6 fingerprint was approved only after CI first failed the compatibility gate and printed the reconstructed exported surface. Review confirmed that the only intended addition was the native-backed `BootstrapComboBox` surface described above, the four framework properties were the only new public members, the four protected overrides were implementation-required native extensibility points, helper types stayed internal, native binding/selection/autocomplete/dropdown surface remained inherited, and `AssemblyVersion` stayed `1.0.0.0`. The reviewed fingerprint is `3725b5012381672dcdcb64e8151ea4a4ec6c463e4ccf3ab65dedce278bb74a21`.
 
 `Phase16PublicApiBaselineTests.ExportedApiMatchesApprovedV1Baseline` deterministically reconstructs the surface with reflection and fails when the fingerprint changes. Its failure output contains the reconstructed surface so reviewers can inspect the change before approving a new fingerprint.
 
