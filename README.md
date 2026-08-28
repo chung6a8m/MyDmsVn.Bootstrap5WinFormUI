@@ -69,6 +69,8 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapAlert`
 - `BootstrapTooltip`
 - `BootstrapTabControl`
+- `BootstrapToast`
+- `BootstrapToastContainer`
 
 ## Integrated demo
 
@@ -76,7 +78,7 @@ The demo project is a single navigable showcase using `BootstrapSidebar` as the 
 
 The Advanced Inputs page is the shared native-backed input showcase. Stage 5 adds `BootstrapNumericBox` examples for integer/default values, decimal formatting/increments, thousands separators, signed ranges, validation states, read-only behavior, disabled behavior, and live `ValueChanged` feedback. Stage 6 extends the same page with `BootstrapComboBox` examples for native unbound and bound items, `DisplayMember` / `ValueMember`, editable `DropDown`, selection-only `DropDownList`, native autocomplete, long text/ellipsis, optional leading icons, validation, disabled state, explicit radius, and live native selection feedback. The editable child, arrow button, hit-testing, and popup remain WinForms/OS-owned.
 
-The Feedback page hosts the component-expansion feedback controls. `BootstrapBadge` covers semantic, pill/custom/disabled, and long-text states; `BootstrapAlert` adds all semantic variants, optional icons, native keyboard-accessible dismissal, multiline/disabled/custom-radius states, and restore cycles; `BootstrapTooltip` adds default Dark, semantic and custom-color owner-drawn popups, explicit multiline/long captions, one Tooltip associated with multiple controls, and live native timing/state forwarding. The page remains the shared runtime Light/Dark and real-Windows 100–200% DPI verification surface.
+The Feedback page hosts the component-expansion feedback controls. `BootstrapBadge` covers semantic, pill/custom/disabled, and long-text states; `BootstrapAlert` adds all semantic variants, optional icons, native keyboard-accessible dismissal, multiline/disabled/custom-radius states, and restore cycles; `BootstrapTooltip` adds default Dark, semantic and custom-color owner-drawn popups, explicit multiline/long captions, one Tooltip associated with multiple controls, and live native timing/state forwarding. Stage 8 adds an application-placed `BootstrapToastContainer` with manual and auto-hide Toasts, icon/multiline content, a burst of eight notifications that demonstrates FIFO/max-visible queueing, `DismissAll()`, all four placements, rapid show/dismiss, disabled presentation, and a 100-toast lifecycle/resource stress action. The page remains the shared runtime Light/Dark, Reduced motion, and real-Windows 100–200% DPI verification surface.
 
 The Pagination page demonstrates bounded numeric windows, ellipses, navigation visibility, size variants, boundary/zero-item states, and application-owned DataGrid paging. `BootstrapPagination` itself does not own or slice a data source.
 
@@ -141,6 +143,32 @@ actions.Items.Add(new BootstrapDropdownItem { Text = "Unavailable", Enabled = fa
 
 The target and public item models remain caller-owned. Native WinForms owns menu focus, keyboard navigation, AutoClose/outside-click dismissal, and working-area placement. `Checked` is presentation state only and is changed only by application code. Icons use the target button's current `IconRenderer`, theme color, and DPI; generated native menu images are owned and disposed by the Dropdown.
 
+## Toast notification usage
+
+`BootstrapToastContainer` is an application-placed WinForms host. It does not create a global notification service or a framework-owned top-level window. Configure a `BootstrapToast`, then transfer ownership when showing it:
+
+```csharp
+var toastContainer = new BootstrapToastContainer
+{
+    Placement = BootstrapToastPlacement.TopRight,
+    MaximumVisibleToasts = 3,
+    ToastSpacing = 8
+};
+
+var toast = new BootstrapToast
+{
+    Title = "Saved",
+    Text = "Changes were saved successfully.",
+    Variant = BootstrapVariant.Success,
+    AutoHide = true,
+    AutoHideDelay = 5000
+};
+
+toastContainer.ShowToast(toast); // ownership transfers here
+```
+
+Before `ShowToast`, the caller owns the Toast and may configure or dispose it. After a successful `ShowToast`, the container owns the Toast until dismissal/disposal; callers must not dispose, reparent, remove, or manually toggle `Visible`. Use `Dismiss()` or `DismissAll()` to request dismissal. `Dismissed` is raised once when logical dismissal is accepted, before exit animation and container disposal complete. The auto-hide countdown begins only after enter animation completes. Reduced motion makes enter/exit/reflow transitions synchronous but keeps `AutoHideDelay` unchanged. `TopLeft`, `TopRight`, `BottomLeft`, and `BottomRight` are supported; notifications beyond `MaximumVisibleToasts` wait in FIFO order and are promoted as visible Toasts finish dismissal.
+
 ## Release candidate
 
 Phase 16 prepares package `MyDmsVn.Bootstrap5WinFormUI` version `1.0.0-rc.1`. The v1 assembly compatibility version is `1.0.0.0`, and the proposed public/protected API is protected by a deterministic fingerprint test.
@@ -175,6 +203,8 @@ ComboBox stays even closer to native WinForms: `BootstrapComboBox` derives direc
 
 Dropdown uses a separate native-first command-menu pattern: `BootstrapDropdown : Component` owns one `ToolStripDropDownMenu` and one internal theme renderer, while the application owns its `BootstrapButton` target and `BootstrapDropdownItem` models. Each opening builds a short-lived native snapshot; native ToolStrip owns focus, keyboard, dismissal and screen placement. The framework owns target wiring, command dispatch, token-based rendering, DPI sizing, icon bitmap generation, theme refresh, and deterministic cleanup. It introduces no top-level custom form, global hook, timer, animation scheduler, submenu model, live collection synchronization, or external dependency.
 
+Toast reuses the existing feedback palette/layout rules shared with Alert, source-neutral icon rendering, `BootstrapAnimation` finite transitions, DPI helpers, and theme typography. `BootstrapToastContainer` owns FIFO queueing, max-visible enforcement, placement/reflow, and deterministic Toast disposal; each Toast owns only its semantic auto-hide countdown after enter completion. Reduced motion completes transitions immediately without changing configured delays. No top-level notification `Form`, global/static Toast manager, second feedback palette, public timer/scheduler seam, or external dependency is introduced.
+
 See [Phase 15 — Hardening and API review](docs/PHASE15_HARDENING_AND_API_REVIEW.md) for the audit findings and the real-Windows/manual checks carried into release validation.
 
 ## Documentation
@@ -197,7 +227,7 @@ The primary sources of truth are:
 
 ## Status
 
-Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, Stage 6 `BootstrapComboBox`, and Stage 7 `BootstrapDropdown` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
+Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, Stage 6 `BootstrapComboBox`, Stage 7 `BootstrapDropdown`, and Stage 8 `BootstrapToast` / `BootstrapToastContainer` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
 
 The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 
