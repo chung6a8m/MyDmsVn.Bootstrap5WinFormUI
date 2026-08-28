@@ -72,16 +72,21 @@ public class BootstrapBadge : Control
     }
 
     /// <summary>
-    /// Gets or sets an optional background color that overrides <see cref="Variant"/>.
+    /// Gets or sets an optional opaque background color that overrides <see cref="Variant"/>.
     /// Use <see cref="Color.Empty"/> to resolve the semantic variant from the current theme.
     /// </summary>
     [Category("Appearance")]
-    [Description("Overrides the semantic badge color when set to a non-empty color.")]
+    [Description("Overrides the semantic badge color with Color.Empty or a fully opaque color.")]
     public Color CustomColor
     {
         get => _customColor;
         set
         {
+            if (!value.IsEmpty && value.A != byte.MaxValue)
+            {
+                throw new ArgumentException("Custom color must be Color.Empty or fully opaque.", nameof(value));
+            }
+
             if (_customColor == value)
             {
                 return;
