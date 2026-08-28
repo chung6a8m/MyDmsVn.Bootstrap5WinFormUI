@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Animation;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Tests.Animation;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
