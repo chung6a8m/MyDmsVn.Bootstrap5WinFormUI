@@ -137,6 +137,15 @@ BootstrapNumericBox Stage 5 pure tests cover:
 - DPI scaling of horizontal padding, border/focus widths, and theme/explicit radius at 96/120/144/168/192 logical DPI
 - Native-editor bounds containment for normal, narrow, empty, and malformed client sizes without negative rectangles
 
+BootstrapComboBox Stage 6 pure tests cover:
+
+- Disabled/valid/invalid/focused/neutral border palette priority using the established input validation tokens
+- Enabled and disabled surface/foreground selection from the current theme
+- Validation-state and radius-sentinel rejection before mutation
+- DPI scaling at logical 96/120/144/168/192 for item height, horizontal padding, icon slot/spacing, border/focus widths, and theme/explicit radius
+- Closed-item icon/text layout containment for normal, narrow, empty, and malformed rectangles without negative geometry
+- Long-text bounds suitable for single-line ellipsis while retaining native `GetItemText` as the source of display text
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -239,6 +248,19 @@ BootstrapNumericBox Stage 5 STA tests verify:
 - Runtime Light/Dark palette/font updates, caller-owned font preservation, deterministic theme subscription cleanup, and repeated lifecycle stress
 - Draw/layout smoke for validation, disabled/read-only, explicit radius, tiny bounds, and supported logical DPI calculations
 
+BootstrapComboBox Stage 6 STA tests verify:
+
+- Designer-safe/native defaults, `OwnerDrawFixed`, the exact four framework properties, runtime-only `IconRenderer`, and no duplicate public binding/selection/autocomplete surface
+- Unbound item/selection behavior and event-count parity with a plain native `ComboBox`, including no-op selection assignments
+- Bound-object `DataSource` identity, `DisplayMember`, `ValueMember`, `SelectedValue`, selection changes, rebinding/clearing, and native `GetItemText` formatting semantics
+- Framework-only `ValidationState`, `BorderRadius`, `LeadingIcon`, and `IconRenderer` changes do not raise native selection/commit events or mutate selection/binding state
+- Owner-draw text uses native display resolution; `LeadingIcon` is limited to the closed `ComboBoxEdit` presentation and does not create a per-item item model
+- Handle recreation preserves data source, selected value/index, DropDown style, and native autocomplete configuration without framework caches
+- Hosted `DropDown` / `DropDownClosed`, `DropDownList`, editable `DropDown`, Up/Down/Enter/Escape, Tab traversal, disabled/re-enabled interaction, and native autocomplete restrictions remain WinForms behavior
+- Runtime Light/Dark updates palette/theme-owned font/item metrics while preserving items/data/selection/autocomplete; caller-owned fonts remain caller-owned
+- Disposal before/after handle creation/theme changes releases the static theme subscription and framework-owned font, and repeated lifecycle stress returns handler count to baseline
+- Advanced Inputs demo coverage includes native unbound/bound lists, editable autocomplete, selection-only mode, long text, leading-icon/no-icon, valid/invalid, disabled, radius, and OS-owned popup/edit/arrow note
+
 ### 2.3 Demo/manual visual tests
 
 A demo application is required because not all rendering quality is productively asserted with pixels.
@@ -280,6 +302,8 @@ For BootstrapTabControl Stage 4, choose **Navigation / Tabs**. Compare Tabs/Pill
 
 For BootstrapNumericBox Stage 5, choose **Advanced Inputs**. Verify integer/default, decimal `0.25` increment with two decimal places, thousands formatting, signed `-100..100` range with step `10`, valid/invalid borders, read-only versus disabled behavior, and live `ValueChanged` feedback. Type culture-sensitive values, use Up/Down and native spin buttons, exercise mouse wheel, Tab/Shift+Tab, switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling.
 
+For BootstrapComboBox Stage 6, stay on **Advanced Inputs**. Verify unbound items, a bound object list using `DisplayMember`/`ValueMember`, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` with `ListItems`, long text/ellipsis, leading-icon and no-icon comparison, Valid/Invalid, disabled, and explicit radius examples. Exercise the native arrow and popup plus Up/Down/Enter/Escape, free typing, Tab/Shift+Tab, selected-value changes, and runtime Light/Dark switching without losing binding or selection. Repeat at 100/125/150/175/200% real Windows scaling. Native editable child, arrow button, and popup chrome may remain OS-themed/square; the framework must not replace them merely for visual uniformity.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -307,6 +331,7 @@ Verify:
 - Tooltip content padding, border width, theme/explicit radius, and text alignment scale without clipping while native popup positioning remains intact.
 - Tab header height/padding/image spacing/minimum width/border/focus/underline/radius scale while native page geometry, selection, and overflow remain intact.
 - NumericBox shell padding, border/focus widths, radius, and native editor bounds remain aligned without clipping the native text/spin affordance.
+- ComboBox fixed item height, text/icon slot, border/focus width, and shell radius scale without corrupting native selection, arrow hit-testing, edit child, or popup geometry.
 
 The Phase 2 Rendering/DPI demo covers the geometry calculations at all five scale factors. Run the demo under each corresponding Windows display-scaling setting as components are added and during hardening; do not treat the virtual matrix as proof of OS-level DPI behavior.
 
@@ -323,6 +348,8 @@ Tooltip pure tests cover 96/120/144/168/192 logical scaling for content padding,
 TabControl pure tests cover 96/120/144/168/192 logical header sizing, padding, spacing, stroke, underline, minimum width, and radius. The Navigation / Tabs page remains the OS-level gate for `DeviceDpi`, native `GetTabRect` geometry, text/image rendering, focus cues, keyboard navigation, and overflow controls under physical display scaling.
 
 NumericBox pure tests cover 96/120/144/168/192 logical shell metrics and native-editor bounds. The Advanced Inputs page remains the OS-level gate for `DeviceDpi`, native `NumericUpDown` text/spin layout, culture-sensitive editing, wheel behavior, focus cues, and physical rounded-border rendering.
+
+ComboBox pure tests cover 96/120/144/168/192 logical item/icon/padding/border/focus/radius metrics. The Advanced Inputs page remains the ComboBox OS-level gate for actual native edit/arrow/popup geometry, `DeviceDpi`, owner-drawn text/icon alignment, keyboard behavior, and physical shell-border rendering.
 
 ## 4. Theme matrix
 
@@ -351,6 +378,8 @@ Tooltip deliberately owns no direct theme subscription. Popup and Draw handlers 
 TabControl owns one direct theme subscription because it custom-paints native header rectangles and uses theme `Body` typography. Theme-matrix tests verify the same native-backed instance preserves `TabPages`/selection while updating header palette/font/size, and disposal releases only the framework-owned subscription/font while caller fonts remain usable.
 
 NumericBox owns one direct theme subscription because its wrapper custom-paints the shell and owns a theme-created Body font. Tests verify the same native-backed instance preserves numeric state while changing palette/font/layout, and disposal returns static theme-handler count to baseline without disposing caller-owned fonts.
+
+ComboBox owns one direct theme subscription because it owner-draws item presentation, paints the shell border, and owns a theme-created Body font. Tests verify runtime Light/Dark changes preserve `Items`/`DataSource`, selected item/value/index, DropDown mode, and autocomplete configuration; disposal returns the static theme-handler count to baseline without disposing caller-owned fonts or renderers.
 
 ## 5. Interaction matrix
 
@@ -382,6 +411,8 @@ TabControl must retain native interaction ownership. Test normal/hover/selected/
 
 NumericBox owns one public tab stop while its private native editor has `TabStop = false`. Test wrapper Tab entry and Shift+Tab exit, shell clicks redirecting focus to the editor, wrapper KeyDown/KeyPress/KeyUp/PreviewKeyDown forwarding exactly once, and preservation of native spin buttons, Up/Down, wheel, boundaries, and read-only spin behavior.
 
+ComboBox remains a native `ComboBox`, so it retains one native focus/input path rather than a wrapper redirect. Test `DropDownList` and editable `DropDown`, native arrow/popup open-close, Up/Down/Enter/Escape, free typing, autocomplete, Tab/Shift+Tab traversal, disabled/re-enabled behavior, bound/unbound selection, and native selection/dropdown events. Framework presentation changes must never synthesize those events or create a second selection state.
+
 ## 6. Animation matrix
 
 For finite and loop animation, test:
@@ -411,6 +442,8 @@ Tooltip is outside the framework animation matrix: native WinForms ToolTip owns 
 TabControl is outside the animation matrix: Stage 4 header state changes are immediate and no timer, animation owner, transition engine, or reduced-motion-specific behavior is introduced.
 
 NumericBox is outside the animation matrix: Stage 5 focus, validation, value, and spin changes are immediate and no timer or animation primitive is introduced.
+
+ComboBox is outside the animation matrix: Stage 6 selection/dropdown/autocomplete behavior remains native and presentation changes are immediate. It introduces no timer, animation owner, popup scheduler, or reduced-motion-specific path.
 
 ## 7. Resource/lifecycle checks
 
@@ -445,6 +478,8 @@ For Tooltip, the wrapper owns exactly one native ToolTip and its Popup/Draw even
 For TabControl, all paint-time paths/brushes/pens are scoped and native page/image objects remain application/WinForms-owned. The control owns one static theme subscription, one optional framework-created theme font, and per-page presentation event handlers for pages currently in the collection. Removal/disposal must detach those handlers; caller-owned fonts and ImageList content remain caller-owned. Repeated create/theme-switch/dispose cycles must return the static theme-handler count to baseline and no timer/cache/window may be retained.
 
 For NumericBox, all paint-time paths/brushes/pens are scoped. The wrapper owns exactly one native `NumericUpDown`, one static theme subscription, and one optional framework-created Body font while theme typography is authoritative. Disposal detaches native editor events and the theme handler, releases only the framework-owned font, and retains no timer, parser, bitmap/path cache, popup, or alternate value state.
+
+For ComboBox, all item/shell paint-time paths/brushes/pens remain scoped. The native `ComboBox` owns its items, data binding, editable child, arrow and popup windows; the framework owns one static theme subscription and one optional framework-created Body font. Disposal removes the theme handler and releases only framework-owned resources. Handle recreation must not add subscriptions or mirror/copy native data. No retained per-item bitmap/path cache, timer, custom popup host, or alternate selection state is permitted.
 
 ## 8. DataGridView tests
 
@@ -489,6 +524,8 @@ For TabControl, place `BootstrapTabControl` in the Designer without theme bootst
 
 For NumericBox, place `BootstrapNumericBox` in the Designer without theme bootstrap code. Verify `Minimum = -100`, `Maximum = 1000`, `Increment = 0.25`, `DecimalPlaces = 2`, `ThousandsSeparator = true`, `ReadOnly = true`, `ValidationState = Valid`, and `BorderRadius = 6` serialize/reopen as wrapper properties. Confirm the private native `NumericUpDown` is not separately serialized/exposed and construction requires no DI, application startup, timer, popup, or parser service.
 
+For ComboBox, place `BootstrapComboBox` in the Designer without theme bootstrap code. Verify inherited native `Items`, `DataSource`, `DisplayMember`, `ValueMember`, `DropDownStyle`, and autocomplete properties remain normal native designer surfaces; `ValidationState`, `BorderRadius`, and `LeadingIcon` serialize/reopen normally; `IconRenderer` stays runtime-only/non-serialized. Confirm no framework item wrapper, popup component, private child replacement, DI/bootstrap requirement, timer, or extra selector appears.
+
 ## 10. Build commands
 
 Once the solution exists, the project should support explicit target verification similar to:
@@ -503,7 +540,7 @@ Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`
 
 The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by implemented phases.
 
-Pagination, Badge, Alert, Tooltip, TabControl, and NumericBox participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
+Pagination, Badge, Alert, Tooltip, TabControl, NumericBox, and ComboBox participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
 
 ## 11. Definition of done for a component
 

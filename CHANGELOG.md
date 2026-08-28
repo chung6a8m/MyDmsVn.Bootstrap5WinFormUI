@@ -19,10 +19,12 @@ All notable release-facing changes to this project are documented here.
 - Integrated Navigation / Tabs demo covering all three header styles, all eight semantic variants, native `TabPage` composition and `SelectedIndexChanged`, Fill sizing, `ImageList`/`ImageKey`/`ImageIndex`, tooltip text, disabled pages, and long labels.
 - `BootstrapNumericBox`, a native-backed numeric input that owns one borderless WinForms `NumericUpDown`, directly forwards value/range/increment/formatting/read-only semantics, and adds Bootstrap-themed validation/focus/radius/DPI presentation with a single wrapper `ValueChanged` path.
 - Integrated Advanced Inputs demo page with integer/default, decimal, thousands-separator, signed-range, valid/invalid, read-only, disabled, and live NumericBox `ValueChanged` scenarios; the page is intentionally reusable by later ComboBox and DatePicker stages.
+- `BootstrapComboBox`, a direct native WinForms `ComboBox` subclass that preserves native items, binding, selection, editable text, autocomplete, keyboard/drop-down behavior, and events while adding fixed-height owner-draw presentation, validation/focus shell rendering, runtime theme/DPI handling, configurable radius, and an optional source-neutral leading icon.
+- Expanded the shared Advanced Inputs demo with unbound and bound ComboBox data, `DisplayMember` / `ValueMember`, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` autocomplete, long-text ellipsis, icon/no-icon, validation, disabled, explicit-radius, and native selection-feedback scenarios without adding a second navigation page.
 
 ### Changed
 
-- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, `BootstrapTabControl`, and `BootstrapNumericBox` surfaces; all component-specific render/layout helpers remain internal and `AssemblyVersion` remains `1.0.0.0`.
+- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, `BootstrapTabControl`, `BootstrapNumericBox`, and `BootstrapComboBox` surfaces; all component-specific render/layout helpers remain internal and `AssemblyVersion` remains `1.0.0.0`.
 
 ## [1.0.0-rc.1] - 2026-08-28
 
