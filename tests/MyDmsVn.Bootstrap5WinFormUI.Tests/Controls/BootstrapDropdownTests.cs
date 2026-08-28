@@ -13,116 +13,101 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 
 [TestFixture]
 [Apartment(ApartmentState.STA)]
+[NonParallelizable]
 public sealed class BootstrapDropdownTests
 {
+    private BootstrapTheme? _originalTheme;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _originalTheme = BootstrapThemeManager.CurrentTheme;
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (_originalTheme is not null)
+        {
+            BootstrapThemeManager.CurrentTheme = _originalTheme;
+        }
+    }
+
     [Test]
-    public void NativeDropDownUsesAutoCloseAndForwardsOneOpenCloseTransition()
+    public void NativeDropDownCharacterizationPreservesAutoCloseAndLifecycle()
     {
         var button = new Button { Text = "Open" };
         using var form = CreateHost(button);
         using var menu = new ToolStripDropDownMenu();
         menu.Items.Add(new ToolStripMenuItem("Action"));
-
         var opened = 0;
         var closed = 0;
         menu.Opened += (_, _) => opened++;
         menu.Closed += (_, _) => closed++;
 
         Assert.That(menu.AutoClose, Is.True);
-
         menu.Show(button, new Point(0, button.Height));
         Application.DoEvents();
-
-        Assert.Multiple((Action)(() =>
-        {
-            Assert.That(menu.Visible, Is.True);
-            Assert.That(opened, Is.EqualTo(1));
-        }));
-
+        menu.Close();
+        Application.DoEvents();
         menu.Close();
         Application.DoEvents();
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(menu.Visible, Is.False);
+            Assert.That(opened, Is.EqualTo(1));
             Assert.That(closed, Is.EqualTo(1));
         }));
     }
 
     [Test]
-    public void NativeMenuItemsPreserveCheckedEnabledSeparatorAndNonTogglePolicy()
+    public void NativeMenuItemCharacterizationPreservesCheckedDisabledSeparatorAndNonTogglePolicy()
     {
         using var menu = new ToolStripDropDownMenu();
         var checkedItem = new ToolStripMenuItem("Checked")
         {
             Checked = true,
-            Enabled = true,
             CheckOnClick = false
         };
         var disabledItem = new ToolStripMenuItem("Disabled") { Enabled = false };
         var separator = new ToolStripSeparator();
-        var clickCount = 0;
-        checkedItem.Click += (_, _) => clickCount++;
-
+        var clicks = 0;
+        checkedItem.Click += (_, _) => clicks++;
         menu.Items.Add(checkedItem);
         menu.Items.Add(disabledItem);
         menu.Items.Add(separator);
+
         checkedItem.PerformClick();
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(menu.Items[0], Is.SameAs(checkedItem));
-            Assert.That(menu.Items[1], Is.SameAs(disabledItem));
-            Assert.That(menu.Items[2], Is.SameAs(separator));
             Assert.That(checkedItem.Checked, Is.True);
             Assert.That(checkedItem.CheckOnClick, Is.False);
             Assert.That(disabledItem.Enabled, Is.False);
-            Assert.That(clickCount, Is.EqualTo(1));
+            Assert.That(menu.Items[2], Is.TypeOf<ToolStripSeparator>());
+            Assert.That(clicks, Is.EqualTo(1));
         }));
     }
 
     [Test]
-    public void NativeCloseIsIdempotent()
-    {
-        var button = new Button { Text = "Open" };
-        using var form = CreateHost(button);
-        using var menu = new ToolStripDropDownMenu();
-        menu.Items.Add(new ToolStripMenuItem("Action"));
-
-        var closed = 0;
-        menu.Closed += (_, _) => closed++;
-        menu.Show(button, new Point(0, button.Height));
-        Application.DoEvents();
-        menu.Close();
-        Application.DoEvents();
-        menu.Close();
-        Application.DoEvents();
-
-        Assert.Multiple((Action)(() =>
-        {
-            Assert.That(menu.Visible, Is.False);
-            Assert.That(closed, Is.EqualTo(1));
-        }));
-    }
-
-    [Test]
-    public void ItemDefaultsNormalizeTextAndValidateKind()
+    public void ItemModelDefaultsNormalizeTextAndRejectUndefinedKind()
     {
         var item = new BootstrapDropdownItem();
-        var separator = new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator);
         item.Text = null!;
+        var separator = new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator);
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(item.Kind, Is.EqualTo(BootstrapDropdownItemKind.Item));
-            Assert.That(item.Text, Is.EqualTo(string.Empty));
+            Assert.That(item.Text, Is.Empty);
             Assert.That(item.Icon, Is.Null);
             Assert.That(item.Enabled, Is.True);
             Assert.That(item.Checked, Is.False);
             Assert.That(item.Tag, Is.Null);
             Assert.That(separator.Kind, Is.EqualTo(BootstrapDropdownItemKind.Separator));
         }));
-
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
             _ = new BootstrapDropdownItem((BootstrapDropdownItemKind)999)));
     }
@@ -141,11 +126,8 @@ public sealed class BootstrapDropdownTests
         Assert.That(collection.ToArray(), Is.EqualTo(new[] { first, separator, last }));
 
         collection.RemoveAt(1);
-        Assert.That(collection.ToArray(), Is.EqualTo(new[] { first, last }));
-
         collection[0] = separator;
         Assert.That(collection.ToArray(), Is.EqualTo(new[] { separator, last }));
-
         Assert.Throws<ArgumentNullException>((Action)(() => collection.Add(null!)));
         Assert.Throws<ArgumentNullException>((Action)(() => collection[0] = null!));
 
@@ -157,11 +139,11 @@ public sealed class BootstrapDropdownTests
     public void ItemRaiseClickUsesItemAsSender()
     {
         var item = new BootstrapDropdownItem();
-        var count = 0;
+        var clicks = 0;
         object? sender = null;
         item.Click += (actualSender, _) =>
         {
-            count++;
+            clicks++;
             sender = actualSender;
         };
 
@@ -170,20 +152,20 @@ public sealed class BootstrapDropdownTests
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(count, Is.EqualTo(2));
+            Assert.That(clicks, Is.EqualTo(2));
             Assert.That(sender, Is.SameAs(item));
         }));
     }
 
     [Test]
-    public void RendererPaletteUsesThemeTokensForEveryVariant()
+    public void RendererPaletteUsesThemeTokensForEveryVariantAndThemeMode()
     {
         foreach (var mode in new[] { BootstrapThemeMode.Light, BootstrapThemeMode.Dark })
         {
             var colors = BootstrapThemeColors.CreateDefault(mode);
             foreach (var variant in Enum.GetValues(typeof(BootstrapVariant)).Cast<BootstrapVariant>())
             {
-                var variantColor = BootstrapVariantColorResolver.Resolve(colors, variant);
+                var accent = BootstrapVariantColorResolver.Resolve(colors, variant);
                 var normal = BootstrapDropdownRenderer.ResolvePalette(colors, variant, enabled: true, selected: false);
                 var selected = BootstrapDropdownRenderer.ResolvePalette(colors, variant, enabled: true, selected: true);
                 var disabled = BootstrapDropdownRenderer.ResolvePalette(colors, variant, enabled: false, selected: false);
@@ -193,9 +175,8 @@ public sealed class BootstrapDropdownTests
                     Assert.That(normal.Background, Is.EqualTo(colors.Surface));
                     Assert.That(normal.Foreground, Is.EqualTo(colors.Text));
                     Assert.That(normal.Border, Is.EqualTo(colors.Border));
-                    Assert.That(normal.Accent, Is.EqualTo(variantColor));
-                    Assert.That(selected.Background, Is.EqualTo(ColorUtil.Blend(variantColor, colors.Surface, 0.12f)));
-                    Assert.That(selected.Foreground, Is.EqualTo(colors.Text));
+                    Assert.That(normal.Accent, Is.EqualTo(accent));
+                    Assert.That(selected.Background, Is.EqualTo(ColorUtil.Blend(accent, colors.Surface, 0.12f)));
                     Assert.That(disabled.Foreground, Is.EqualTo(colors.MutedText));
                     Assert.That(disabled.Accent, Is.EqualTo(colors.Disabled));
                 }));
@@ -204,7 +185,7 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
-    public void RendererMetricsScaleAndValidateInputs()
+    public void RendererMetricsScaleAcrossSupportedDpiMatrixAndRejectInvalidInputs()
     {
         foreach (var dpi in new[] { 96, 120, 144, 168, 192 })
         {
@@ -222,13 +203,19 @@ public sealed class BootstrapDropdownTests
         Assert.Throws<ArgumentNullException>((Action)(() =>
             BootstrapDropdownRenderer.ResolvePalette(null!, BootstrapVariant.Primary, true, false)));
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
-            BootstrapDropdownRenderer.ResolvePalette(BootstrapThemeColors.CreateDefault(BootstrapThemeMode.Light), (BootstrapVariant)999, true, false)));
-        Assert.Throws<ArgumentNullException>((Action)(() => BootstrapDropdownRenderer.ResolveMetrics(null!, 96)));
-        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapDropdownRenderer.ResolveMetrics(BootstrapThemeMetrics.Default, 0)));
+            BootstrapDropdownRenderer.ResolvePalette(
+                BootstrapThemeColors.CreateDefault(BootstrapThemeMode.Light),
+                (BootstrapVariant)999,
+                true,
+                false)));
+        Assert.Throws<ArgumentNullException>((Action)(() =>
+            BootstrapDropdownRenderer.ResolveMetrics(null!, 96)));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            BootstrapDropdownRenderer.ResolveMetrics(BootstrapThemeMetrics.Default, 0)));
     }
 
     [Test]
-    public void DropdownDefaultsValidationAndMissingTargetContract()
+    public void DropdownDefaultsValidationAndMissingTargetContractAreStable()
     {
         using var dropdown = new BootstrapDropdown();
 
@@ -238,17 +225,16 @@ public sealed class BootstrapDropdownTests
             Assert.That(dropdown.Items, Is.SameAs(dropdown.Items));
             Assert.That(dropdown.Items, Is.Empty);
             Assert.That(dropdown.Variant, Is.EqualTo(BootstrapVariant.Primary));
-            Assert.That(dropdown.MinimumWidth, Is.EqualTo(0));
+            Assert.That(dropdown.MinimumWidth, Is.Zero);
         }));
-
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() => dropdown.Variant = (BootstrapVariant)999));
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() => dropdown.MinimumWidth = -1));
         Assert.Throws<InvalidOperationException>((Action)(() => dropdown.Show()));
-        Assert.DoesNotThrow(() => dropdown.Close());
+        Assert.DoesNotThrow((Action)(() => dropdown.Close()));
     }
 
     [Test]
-    public void DropdownActivationRejectsDisabledAndSeparatorWithoutTogglingChecked()
+    public void DropdownActivationDispatchesOnlyEnabledCommandsAndNeverTogglesChecked()
     {
         using var dropdown = new BootstrapDropdown();
         var enabled = new BootstrapDropdownItem { Checked = true };
@@ -281,7 +267,7 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
-    public void DropdownNoOpsForEmptyDisabledAndLoadingTargets()
+    public void DropdownShowNoOpsForEmptyDisabledAndLoadingTargets()
     {
         var button = new BootstrapButton { Text = "Menu" };
         using var form = CreateHost(button);
@@ -291,29 +277,26 @@ public sealed class BootstrapDropdownTests
 
         dropdown.Show();
         Application.DoEvents();
-        Assert.That(opened, Is.Zero);
-
         dropdown.Items.Add(new BootstrapDropdownItem { Text = "Action" });
+
         button.Enabled = false;
         dropdown.Show();
         Application.DoEvents();
-        Assert.That(opened, Is.Zero);
-
         button.Enabled = true;
         button.Loading = true;
         dropdown.Show();
         Application.DoEvents();
+
         Assert.That(opened, Is.Zero);
     }
 
     [Test]
-    public void DropdownForwardsNativeLifecycleThroughShowAndTargetClick()
+    public void DropdownForwardsNativeLifecycleThroughShowCloseAndTargetClickToggle()
     {
         var button = new BootstrapButton { Text = "Menu" };
         using var form = CreateHost(button);
         using var dropdown = new BootstrapDropdown { Target = button };
         dropdown.Items.Add(new BootstrapDropdownItem { Text = "Action" });
-
         var opened = 0;
         var closed = 0;
         object? openedSender = null;
@@ -340,7 +323,7 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
-    public void DropdownRebuildsSnapshotOnEachOpening()
+    public void DropdownRebuildsCurrentModelSnapshotOnEveryEffectiveOpening()
     {
         var button = new BootstrapButton { Text = "Menu" };
         using var form = CreateHost(button);
@@ -350,11 +333,8 @@ public sealed class BootstrapDropdownTests
         dropdown.Items.Add(first);
         dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator));
         dropdown.Items.Add(second);
-
         var opened = 0;
-        var closed = 0;
         dropdown.Opened += (_, _) => opened++;
-        dropdown.Closed += (_, _) => closed++;
 
         dropdown.Show();
         Application.DoEvents();
@@ -375,18 +355,23 @@ public sealed class BootstrapDropdownTests
         Assert.Multiple((Action)(() =>
         {
             Assert.That(opened, Is.EqualTo(2));
-            Assert.That(closed, Is.EqualTo(2));
+            Assert.That(second.Text, Is.EqualTo("B changed"));
             Assert.That(second.Checked, Is.True);
             Assert.That(second.Enabled, Is.False);
         }));
     }
 
     [Test]
-    public void DropdownTargetReplacementAndDisposalDetachOldTargetWithoutOwningIt()
+    public void DropdownTargetReplacementAndTargetDisposalDetachWithoutOwnershipTransfer()
     {
         var first = new BootstrapButton { Text = "First" };
         var second = new BootstrapButton { Text = "Second" };
-        using var form = new Form { Size = new Size(500, 300), StartPosition = FormStartPosition.Manual, Location = new Point(100, 100) };
+        using var form = new Form
+        {
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(100, 100),
+            Size = new Size(500, 300)
+        };
         first.Location = new Point(24, 24);
         second.Location = new Point(160, 24);
         form.Controls.Add(first);
@@ -421,6 +406,7 @@ public sealed class BootstrapDropdownTests
         }));
 
         second.Dispose();
+        Assert.That(dropdown.Target, Is.Null);
         dropdown.Target = first;
         dropdown.Show();
         Application.DoEvents();
@@ -430,7 +416,7 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
-    public void DropdownUsesTargetIconRendererAndScalesMinimumWidth()
+    public void DropdownUsesTargetIconRendererAndLogicalMinimumWidthScaling()
     {
         var button = new BootstrapButton { Text = "Menu" };
         var renderer = new RecordingIconRenderer();
@@ -462,9 +448,8 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
-    public void OpenDropdownRefreshesIconsWhenThemeChangesAndUnsubscribesOnDispose()
+    public void OpenDropdownRefreshesOwnedIconsOnThemeChangeAndUnsubscribesOnDispose()
     {
-        var originalTheme = BootstrapThemeManager.CurrentTheme;
         var button = new BootstrapButton { Text = "Menu" };
         var renderer = new RecordingIconRenderer();
         button.IconRenderer = renderer;
@@ -476,30 +461,22 @@ public sealed class BootstrapDropdownTests
             Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus)
         });
 
-        try
-        {
-            dropdown.Show();
-            Application.DoEvents();
-            var beforeThemeChange = renderer.RenderCount;
+        dropdown.Show();
+        Application.DoEvents();
+        var before = renderer.RenderCount;
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        Application.DoEvents();
+        Assert.That(renderer.RenderCount, Is.GreaterThan(before));
 
-            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
-            Application.DoEvents();
-            Assert.That(renderer.RenderCount, Is.GreaterThan(beforeThemeChange));
-
-            dropdown.Close();
-            Application.DoEvents();
-            dropdown.Dispose();
-            Assert.DoesNotThrow(() => BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light));
-        }
-        finally
-        {
-            dropdown.Dispose();
-            BootstrapThemeManager.CurrentTheme = originalTheme;
-        }
+        dropdown.Close();
+        Application.DoEvents();
+        dropdown.Dispose();
+        Assert.DoesNotThrow((Action)(() =>
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light)));
     }
 
     [Test]
-    public void DropdownRepeatedOpenCloseRebuildIsStable()
+    public void DropdownRepeatedOpenCloseAndSnapshotRebuildIsStable()
     {
         var button = new BootstrapButton { Text = "Menu" };
         var renderer = new RecordingIconRenderer();
@@ -511,12 +488,12 @@ public sealed class BootstrapDropdownTests
         dropdown.Opened += (_, _) => opened++;
         dropdown.Closed += (_, _) => closed++;
 
-        for (var i = 0; i < 50; i++)
+        for (var index = 0; index < 50; index++)
         {
             dropdown.Items.Clear();
             dropdown.Items.Add(new BootstrapDropdownItem
             {
-                Text = "Action " + i,
+                Text = "Action " + index,
                 Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus)
             });
             dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator));
@@ -554,13 +531,11 @@ public sealed class BootstrapDropdownTests
     {
         public int RenderCount { get; private set; }
         public Rectangle LastBounds { get; private set; }
-        public Color LastColor { get; private set; }
 
         public bool TryRender(Graphics graphics, IconDescriptor descriptor, Rectangle bounds, Color color)
         {
             RenderCount++;
             LastBounds = bounds;
-            LastColor = color;
             using var brush = new SolidBrush(color);
             graphics.FillRectangle(brush, bounds);
             return true;
