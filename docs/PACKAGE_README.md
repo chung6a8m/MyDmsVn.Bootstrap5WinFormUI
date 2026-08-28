@@ -11,11 +11,13 @@ The library is native WinForms. It does not require a browser, WebView, Bootstra
 
 ## Included foundation controls
 
-`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapComboBox`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, and `BootstrapTabControl`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
+`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapComboBox`, `BootstrapDropdown`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, and `BootstrapTabControl`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
 
 `BootstrapNumericBox` is a native-backed numeric input. It owns one borderless WinForms `NumericUpDown` and forwards `Value`, `Minimum`, `Maximum`, `Increment`, `DecimalPlaces`, `ThousandsSeparator`, and `ReadOnly` directly, while the framework owns the themed shell, validation/focus rendering, DPI layout, single public tab stop, and `BorderRadius`. Native range exceptions, spin buttons, Up/Down keys, mouse wheel, parsing, and formatting semantics remain native.
 
 `BootstrapComboBox` derives directly from WinForms `ComboBox`. Native `Items`, `DataSource`, `DisplayMember`, `ValueMember`, selection, editable text, autocomplete, keyboard/drop-down behavior, and events remain authoritative. The framework owns fixed-height owner-draw presentation, validation/focus border rendering, theme/DPI integration, `BorderRadius`, and an optional control-level `LeadingIcon`. The editable child, arrow button, hit-testing, and popup remain WinForms/OS-owned; no framework item wrapper or custom popup is introduced.
+
+`BootstrapDropdown` is a Bootstrap-inspired command dropdown backed by one native `ToolStripDropDownMenu`. A caller-owned `BootstrapButton` supplies the target/anchor and icon renderer; caller-owned `BootstrapDropdownItem` models are snapshotted into short-lived native command rows each time `Show()` opens the menu. Native WinForms remains authoritative for focus, Up/Down/Home/End/Enter/Escape navigation, outside-click/focus-loss dismissal, AutoClose, and working-area placement. Dropdown adds semantic `Variant`, logical-DPI `MinimumWidth`, text/icon/checked/disabled/separator presentation, deterministic resource cleanup, and `Opened` / `Closed` lifecycle forwarding. Checked state is presentation-only and is never toggled automatically by the framework.
 
 `BootstrapPagination` is a data-source-agnostic composite control. Applications own data retrieval/slicing and react to `PageChanged`; the control owns only page state and navigation presentation.
 
@@ -43,6 +45,31 @@ var saveButton = new BootstrapButton
     Variant = BootstrapVariant.Primary,
     AutoSize = true
 };
+
+var actionsButton = new BootstrapButton
+{
+    Text = "Actions",
+    Variant = BootstrapVariant.Primary,
+    AutoSize = true
+};
+var actions = new BootstrapDropdown
+{
+    Target = actionsButton,
+    Variant = BootstrapVariant.Primary,
+    MinimumWidth = 180
+};
+var createItem = new BootstrapDropdownItem
+{
+    Text = "Create item",
+    Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus)
+};
+createItem.Click += (_, _) =>
+{
+    // Execute the application command. Checked state, if used, is application-owned.
+};
+actions.Items.Add(createItem);
+actions.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator));
+actions.Items.Add(new BootstrapDropdownItem { Text = "Unavailable", Enabled = false });
 
 var amount = new BootstrapNumericBox
 {
@@ -123,9 +150,9 @@ pagination.PageChanged += (_, _) =>
 };
 ```
 
-Runtime Light/Dark switching is handled through `BootstrapThemeManager`. NumericBox, ComboBox, Badge, Alert, and TabControl directly update their semantic presentation and theme-owned fonts through the existing theme lifecycle; Pagination inherits theme behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children; Tooltip resolves the current theme only when its native Popup/Draw events execute. None introduces a separate theme service.
+Runtime Light/Dark switching is handled through `BootstrapThemeManager`. NumericBox, ComboBox, Dropdown, Badge, Alert, and TabControl directly update their semantic presentation through the existing theme lifecycle; Dropdown also regenerates any owned native menu icon bitmaps while open using the target button's current renderer and DPI. Pagination inherits theme behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children; Tooltip resolves the current theme only when its native Popup/Draw events execute. None introduces a separate theme service.
 
-The integrated demo exposes NumericBox and ComboBox under **Advanced Inputs**. ComboBox scenarios include unbound and bound items, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` autocomplete, long text, optional leading icons, validation, disabled state, explicit radius, and native selection feedback.
+The integrated demo exposes NumericBox and ComboBox under **Advanced Inputs**. ComboBox scenarios include unbound and bound items, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` autocomplete, long text, optional leading icons, validation, disabled state, explicit radius, and native selection feedback. The shared **Navigation / Tabs** page also contains Dropdown basic, icon, state, long-menu, stress/theme, and real-desktop keyboard/DPI/working-area verification scenarios; no separate Dropdown route is added.
 
 ## Icons
 
@@ -133,7 +160,7 @@ The core package contains source-neutral icon contracts and built-in Segoe MDL2/
 
 ## Release candidate status
 
-`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, and Stage 6 `BootstrapComboBox` were added deliberately on the RC line and the compatibility fingerprint is re-reviewed whenever an exported surface is added. The assembly compatibility version remains `1.0.0.0`.
+`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, Stage 6 `BootstrapComboBox`, and Stage 7 `BootstrapDropdown` were added deliberately on the RC line and the compatibility fingerprint is re-reviewed whenever an exported surface is added. The assembly compatibility version remains `1.0.0.0`.
 
 The package is a release candidate, not an automatic NuGet.org publication.
 
