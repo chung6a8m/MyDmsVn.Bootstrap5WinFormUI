@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -41,6 +42,8 @@ public class BootstrapToast : UserControl
     private IBootstrapToastAutoHideTimer? _autoHideTimer;
     private EventHandler? _autoHideTickHandler;
     private int _autoHideGeneration;
+    private int _autoHideRemainingDelay = 5000;
+    private long _autoHideStartedTimestamp;
 
     /// <summary>Initializes a designer-safe toast using the current application theme.</summary>
     public BootstrapToast()
@@ -203,6 +206,7 @@ public class BootstrapToast : UserControl
             else
             {
                 StopAndDisposeAutoHideTimer();
+                ResetAutoHideRemainingDelay();
             }
         }
     }
@@ -324,12 +328,14 @@ public class BootstrapToast : UserControl
         _preferredHeightChanged = preferredHeightChanged;
         _enterCompleted = false;
         StopAndDisposeAutoHideTimer();
+        ResetAutoHideRemainingDelay();
     }
 
     internal void NotifyEnterStarted()
     {
         _enterCompleted = false;
         StopAndDisposeAutoHideTimer();
+        ResetAutoHideRemainingDelay();
     }
 
     internal void NotifyEnterCompleted()
@@ -347,6 +353,7 @@ public class BootstrapToast : UserControl
     {
         _enterCompleted = false;
         StopAndDisposeAutoHideTimer();
+        ResetAutoHideRemainingDelay();
     }
 
     internal void NotifyHostVisibilityChanged(bool visible)
@@ -354,11 +361,11 @@ public class BootstrapToast : UserControl
         _hostVisible = visible;
         if (visible)
         {
-            RestartAutoHideTimerIfEligible();
+            RestartAutoHideTimerIfEligible(resetDelay: false);
         }
         else
         {
-            StopAndDisposeAutoHideTimer();
+            PauseAutoHideTimer();
         }
     }
 
@@ -367,6 +374,7 @@ public class BootstrapToast : UserControl
         _enterCompleted = false;
         _hostVisible = true;
         StopAndDisposeAutoHideTimer();
+        ResetAutoHideRemainingDelay();
         _dismissRequest = null;
         _preferredHeightChanged = null;
     }
@@ -773,19 +781,19 @@ public class BootstrapToast : UserControl
         button.TabStop = _dismissible && Enabled;
     }
 
-    private void RestartAutoHideTimerIfEligible()
+    private void RestartAutoHideTimerIfEligible(bool resetDelay = true)
     {
+        StopAndDisposeAutoHideTimer();
+        if (resetDelay)
+        {
+            ResetAutoHideRemainingDelay();
+        }
+
         if (!CanAutoHide())
         {
-            if (!_autoHide || !_hostVisible || !_enterCompleted)
-            {
-                StopAndDisposeAutoHideTimer();
-            }
-
             return;
         }
 
-        StopAndDisposeAutoHideTimer();
         var generation = ++_autoHideGeneration;
         var timer = _timerFactory();
         if (timer is null)
@@ -796,9 +804,32 @@ public class BootstrapToast : UserControl
         EventHandler handler = (sender, args) => OnAutoHideTick(timer, generation, sender);
         _autoHideTimer = timer;
         _autoHideTickHandler = handler;
-        timer.Interval = _autoHideDelay;
+        timer.Interval = Math.Max(1, _autoHideRemainingDelay);
         timer.Tick += handler;
+        _autoHideStartedTimestamp = Stopwatch.GetTimestamp();
         timer.Start();
+    }
+
+    private void PauseAutoHideTimer()
+    {
+        if (_autoHideTimer is null)
+        {
+            return;
+        }
+
+        if (_autoHideStartedTimestamp != 0)
+        {
+            var elapsedTicks = Math.Max(0L, Stopwatch.GetTimestamp() - _autoHideStartedTimestamp);
+            var elapsedMilliseconds = (long)Math.Floor((elapsedTicks * 1000d) / Stopwatch.Frequency);
+            _autoHideRemainingDelay = (int)Math.Max(1L, (long)_autoHideRemainingDelay - elapsedMilliseconds);
+        }
+
+        StopAndDisposeAutoHideTimer();
+    }
+
+    private void ResetAutoHideRemainingDelay()
+    {
+        _autoHideRemainingDelay = _autoHideDelay;
     }
 
     private bool CanAutoHide()
@@ -833,6 +864,7 @@ public class BootstrapToast : UserControl
         var handler = _autoHideTickHandler;
         _autoHideTimer = null;
         _autoHideTickHandler = null;
+        _autoHideStartedTimestamp = 0;
         if (timer is null)
         {
             return;
