@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Icons;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
@@ -10,10 +13,11 @@ public sealed class NavigationDemoForm : Form
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
     private readonly Label _selectionStatus = new Label();
     private readonly ImageList _images = new ImageList();
+    private readonly List<BootstrapDropdown> _dropdowns = new List<BootstrapDropdown>();
 
     public NavigationDemoForm()
     {
-        Text = "BootstrapTabControl Demo";
+        Text = "Navigation Demo";
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(1080, 760);
         MinimumSize = new Size(760, 520);
@@ -31,7 +35,7 @@ public sealed class NavigationDemoForm : Form
 
         _selectionStatus.AutoSize = true;
         _selectionStatus.AccessibleName = "Selected tab status";
-        _selectionStatus.Text = "Select a tab to see native SelectedIndexChanged events.";
+        _selectionStatus.Text = "Select a tab or activate a dropdown command to observe native lifecycle events.";
         _selectionStatus.Margin = new Padding(0, 0, 0, 12);
         _content.Controls.Add(_selectionStatus);
 
@@ -41,12 +45,19 @@ public sealed class NavigationDemoForm : Form
         AddFillScenario();
         AddContentScenario();
         AddVariantScenario();
+        AddDropdownScenarios();
     }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
+            foreach (var dropdown in _dropdowns)
+            {
+                dropdown.Dispose();
+            }
+
+            _dropdowns.Clear();
             _images.Dispose();
         }
 
@@ -143,6 +154,119 @@ public sealed class NavigationDemoForm : Form
         }
 
         _content.Controls.Add(CreateSection("Semantic variants", "All Bootstrap variants feed the selected header accent through the shared resolver.", panel));
+    }
+
+    private void AddDropdownScenarios()
+    {
+        var basicTarget = CreateDropdownTarget("Basic dropdown", "Dropdown basic");
+        var basic = CreateDropdown(basicTarget, BootstrapVariant.Primary);
+        AddCommand(basic, "Create", () => SetDropdownStatus("Basic", "Create command activated."));
+        AddCommand(basic, "Edit", () => SetDropdownStatus("Basic", "Edit command activated."));
+        AddCommand(basic, "Archive", () => SetDropdownStatus("Basic", "Archive command activated."));
+        AddDropdownSection("Basic dropdown", "Three text commands. Native ToolStrip owns popup activation, focus, keyboard navigation, outside-click dismissal, and placement.", basicTarget);
+
+        var iconTarget = CreateDropdownTarget("Icons", "Dropdown icons");
+        var icons = CreateDropdown(iconTarget, BootstrapVariant.Success);
+        AddCommand(icons, "Create item", () => SetDropdownStatus("Icons", "Create item activated."), FrameworkIconGlyph.Plus);
+        AddCommand(icons, "Approve", () => SetDropdownStatus("Icons", "Approve activated."), FrameworkIconGlyph.Check);
+        AddCommand(icons, "Close item", () => SetDropdownStatus("Icons", "Close item activated."), FrameworkIconGlyph.Close);
+        AddDropdownSection("Dropdown icons", "Icons use the target BootstrapButton IconRenderer at the target's current DPI and theme text color.", iconTarget);
+
+        var statesTarget = CreateDropdownTarget("States", "Dropdown states");
+        var states = CreateDropdown(statesTarget, BootstrapVariant.Warning);
+        var pinned = new BootstrapDropdownItem { Text = "Pinned", Checked = true };
+        pinned.Click += (_, _) =>
+        {
+            pinned.Checked = !pinned.Checked;
+            SetDropdownStatus("States", "Application code changed Pinned.Checked for the next opening.");
+        };
+        states.Items.Add(pinned);
+        states.Items.Add(new BootstrapDropdownItem { Text = "Disabled command", Enabled = false });
+        states.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator));
+        AddCommand(states, "Normal command", () => SetDropdownStatus("States", "Normal command activated."));
+        AddDropdownSection("Checked, disabled, separator", "Checked state is presentation-only: the framework never toggles it. Disabled rows and separators never dispatch commands.", statesTarget);
+
+        var longTarget = CreateDropdownTarget("Long menu", "Dropdown long menu");
+        var longMenu = CreateDropdown(longTarget, BootstrapVariant.Info);
+        longMenu.MinimumWidth = 220;
+        AddCommand(
+            longMenu,
+            "A deliberately long command caption that demonstrates native content auto-sizing beyond MinimumWidth",
+            () => SetDropdownStatus("Long menu", "Long command activated."));
+        AddDropdownSection("Long menu", "MinimumWidth is a logical DPI-scaled floor only; native content measurement may make the popup wider.", longTarget);
+
+        var stressTarget = CreateDropdownTarget("Stress", "Dropdown stress");
+        var stress = CreateDropdown(stressTarget, BootstrapVariant.Danger);
+        AddCommand(stress, "Create stress item", () => SetDropdownStatus("Stress", "Command activated."), FrameworkIconGlyph.Plus);
+        AddCommand(stress, "Toggle Light / Dark while open", ToggleTheme, FrameworkIconGlyph.Check);
+        AddDropdownSection("Stress / runtime theme", "Open and close repeatedly; use the theme command while the popup is open to verify icon refresh and renderer invalidation.", stressTarget);
+
+        var instructions = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(980, 0),
+            AccessibleName = "Dropdown manual verification matrix",
+            Text = "Manual Dropdown checks: open target by mouse and keyboard; navigate with Up/Down/Home/End; activate with Enter; close with Escape and outside click; verify disabled/separator rows do not activate; verify checked state changes only through application code; switch Light/Dark while open; test near bottom/right screen edges; repeat at 100/125/150/175/200% DPI and on a secondary monitor when available; repeat open/close to check focus restoration and stale artifacts."
+        };
+        _content.Controls.Add(CreateSection("Dropdown manual verification", "Native-first interaction checks intentionally remain real-desktop verification rather than synthetic SendKeys tests.", instructions));
+    }
+
+    private BootstrapDropdown CreateDropdown(BootstrapButton target, BootstrapVariant variant)
+    {
+        var dropdown = new BootstrapDropdown
+        {
+            Target = target,
+            Variant = variant
+        };
+        dropdown.Opened += (_, _) => _selectionStatus.Text = target.Text + ": Opened (native popup event).";
+        dropdown.Closed += (_, _) => _selectionStatus.Text = target.Text + ": Closed (native popup event).";
+        _dropdowns.Add(dropdown);
+        return dropdown;
+    }
+
+    private static BootstrapButton CreateDropdownTarget(string text, string accessibleName)
+    {
+        return new BootstrapButton
+        {
+            Text = text,
+            AccessibleName = accessibleName,
+            AutoSize = true,
+            Margin = new Padding(0, 4, 0, 4)
+        };
+    }
+
+    private void AddDropdownSection(string title, string description, BootstrapButton target)
+    {
+        _content.Controls.Add(CreateSection(title, description, target));
+    }
+
+    private static void AddCommand(
+        BootstrapDropdown dropdown,
+        string text,
+        Action action,
+        FrameworkIconGlyph? icon = null)
+    {
+        var item = new BootstrapDropdownItem
+        {
+            Text = text,
+            Icon = icon.HasValue ? IconDescriptor.Framework(icon.Value) : null
+        };
+        item.Click += (_, _) => action();
+        dropdown.Items.Add(item);
+    }
+
+    private void SetDropdownStatus(string scenario, string message)
+    {
+        _selectionStatus.Text = scenario + ": " + message;
+    }
+
+    private void ToggleTheme()
+    {
+        var nextMode = BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light
+            ? BootstrapThemeMode.Dark
+            : BootstrapThemeMode.Light;
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(nextMode);
+        SetDropdownStatus("Stress", "Theme changed to " + nextMode + ".");
     }
 
     private BootstrapTabControl CreateTabs(BootstrapTabStyle style, BootstrapVariant variant, bool fill)
