@@ -129,6 +129,14 @@ BootstrapTabControl Stage 4 pure tests cover:
 - Text/image/underline/focus geometry containment for normal, narrow, empty, and malformed rectangles without negative sizes
 - Rejection of undefined `BootstrapTabStyle` / `BootstrapVariant` values before usable output is returned
 
+BootstrapNumericBox Stage 5 pure tests cover:
+
+- Border palette priority for disabled, validation, focus, and neutral states using the established TextBox validation tokens
+- Read-only and disabled surface/foreground selection
+- Validation-state and radius-sentinel rejection before mutation
+- DPI scaling of horizontal padding, border/focus widths, and theme/explicit radius at 96/120/144/168/192 logical DPI
+- Native-editor bounds containment for normal, narrow, empty, and malformed client sizes without negative rectangles
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -220,6 +228,17 @@ BootstrapTabControl Stage 4 STA tests verify:
 - Runtime theme typography changes updating the same control in place, caller-owned font preservation, framework-owned font disposal, static-theme subscription cleanup, and 100-cycle lifecycle stress
 - Integrated `NavigationDemoForm` coverage for all three styles, Fill, images/tooltips, disabled/long-label pages, all eight variants, and visible native selection-event feedback
 
+BootstrapNumericBox Stage 5 STA tests verify:
+
+- Designer-safe native defaults, `DefaultProperty(Value)`, `DefaultEvent(ValueChanged)`, `AccessibleRole.SpinButton`, and the exact planned public member surface
+- Exactly one owned borderless native `NumericUpDown`, with the wrapper as the single tab stop
+- Direct forwarding of value/range/increment/decimal/thousands/read-only properties and preservation of native range normalization/exceptions
+- Exactly one wrapper `ValueChanged` notification for each effective native value change
+- Tab entry, Shift+Tab exit, shell click focus redirection, and wrapper keyboard-event forwarding without duplicate event paths
+- Native Up/Down spin boundaries, read-only spin semantics, and mouse-wheel behavior without framework reimplementation
+- Runtime Light/Dark palette/font updates, caller-owned font preservation, deterministic theme subscription cleanup, and repeated lifecycle stress
+- Draw/layout smoke for validation, disabled/read-only, explicit radius, tiny bounds, and supported logical DPI calculations
+
 ### 2.3 Demo/manual visual tests
 
 A demo application is required because not all rendering quality is productively asserted with pixels.
@@ -259,6 +278,8 @@ For BootstrapTooltip Stage 3, stay on **Feedback** and hover the default Dark ta
 
 For BootstrapTabControl Stage 4, choose **Navigation / Tabs**. Compare Tabs/Pills/Underline, Fill off/on, all semantic variants, image-by-key/index, native tooltip text, disabled pages, and long labels. Exercise mouse selection plus Tab, arrow-key, and Ctrl+Tab native keyboard paths; verify focus remains visible and the status label reports inherited `SelectedIndexChanged`. Resize repeatedly, switch Light/Dark live, and repeat under 100/125/150/175/200% real Windows display scaling. Add enough tabs to force native overflow and verify the framework has not replaced native overflow controls, hit-testing, selection, or page hosting.
 
+For BootstrapNumericBox Stage 5, choose **Advanced Inputs**. Verify integer/default, decimal `0.25` increment with two decimal places, thousands formatting, signed `-100..100` range with step `10`, valid/invalid borders, read-only versus disabled behavior, and live `ValueChanged` feedback. Type culture-sensitive values, use Up/Down and native spin buttons, exercise mouse wheel, Tab/Shift+Tab, switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -285,6 +306,7 @@ Verify:
 - Alert text/icon/close slots, border/focus widths, and theme/explicit radii remain aligned and unclipped.
 - Tooltip content padding, border width, theme/explicit radius, and text alignment scale without clipping while native popup positioning remains intact.
 - Tab header height/padding/image spacing/minimum width/border/focus/underline/radius scale while native page geometry, selection, and overflow remain intact.
+- NumericBox shell padding, border/focus widths, radius, and native editor bounds remain aligned without clipping the native text/spin affordance.
 
 The Phase 2 Rendering/DPI demo covers the geometry calculations at all five scale factors. Run the demo under each corresponding Windows display-scaling setting as components are added and during hardening; do not treat the virtual matrix as proof of OS-level DPI behavior.
 
@@ -299,6 +321,8 @@ Alert pure tests cover the same 96/120/144/168/192 logical matrix for padding, i
 Tooltip pure tests cover 96/120/144/168/192 logical scaling for content padding, border width, and theme/explicit radius. The shared Feedback page remains the Tooltip OS-level gate because associated-control `DeviceDpi`, native ToolTip placement, monitor-edge behavior, owner-drawn text rendering, and physical rounded-border output require a real Windows popup.
 
 TabControl pure tests cover 96/120/144/168/192 logical header sizing, padding, spacing, stroke, underline, minimum width, and radius. The Navigation / Tabs page remains the OS-level gate for `DeviceDpi`, native `GetTabRect` geometry, text/image rendering, focus cues, keyboard navigation, and overflow controls under physical display scaling.
+
+NumericBox pure tests cover 96/120/144/168/192 logical shell metrics and native-editor bounds. The Advanced Inputs page remains the OS-level gate for `DeviceDpi`, native `NumericUpDown` text/spin layout, culture-sensitive editing, wheel behavior, focus cues, and physical rounded-border rendering.
 
 ## 4. Theme matrix
 
@@ -325,6 +349,8 @@ Alert likewise owns one direct theme subscription because it custom-paints its s
 Tooltip deliberately owns no direct theme subscription. Popup and Draw handlers resolve `BootstrapThemeManager.CurrentTheme` at event time, so the next popup/draw after a runtime switch must use the new palette/metrics/`BodySmall` typography while disposed Tooltip components add no static-event lifetime root.
 
 TabControl owns one direct theme subscription because it custom-paints native header rectangles and uses theme `Body` typography. Theme-matrix tests verify the same native-backed instance preserves `TabPages`/selection while updating header palette/font/size, and disposal releases only the framework-owned subscription/font while caller fonts remain usable.
+
+NumericBox owns one direct theme subscription because its wrapper custom-paints the shell and owns a theme-created Body font. Tests verify the same native-backed instance preserves numeric state while changing palette/font/layout, and disposal returns static theme-handler count to baseline without disposing caller-owned fonts.
 
 ## 5. Interaction matrix
 
@@ -354,6 +380,8 @@ Tooltip does not replace or capture the associated control's keyboard/focus beha
 
 TabControl must retain native interaction ownership. Test normal/hover/selected/disabled/focused header presentation while mouse selection, Tab entry, arrow navigation, Ctrl+Tab page cycling, `SelectedIndexChanged`, page identity, and native overflow/hit-testing remain WinForms behavior. Framework property changes must not synthesize selection events or replace pages.
 
+NumericBox owns one public tab stop while its private native editor has `TabStop = false`. Test wrapper Tab entry and Shift+Tab exit, shell clicks redirecting focus to the editor, wrapper KeyDown/KeyPress/KeyUp/PreviewKeyDown forwarding exactly once, and preservation of native spin buttons, Up/Down, wheel, boundaries, and read-only spin behavior.
+
 ## 6. Animation matrix
 
 For finite and loop animation, test:
@@ -381,6 +409,8 @@ Alert is outside the animation matrix as well: Stage 2 dismissal is immediate an
 Tooltip is outside the framework animation matrix: native WinForms ToolTip owns its timing behavior, while Stage 3 adds no custom timer, animation scheduler, fading abstraction, or popup loop.
 
 TabControl is outside the animation matrix: Stage 4 header state changes are immediate and no timer, animation owner, transition engine, or reduced-motion-specific behavior is introduced.
+
+NumericBox is outside the animation matrix: Stage 5 focus, validation, value, and spin changes are immediate and no timer or animation primitive is introduced.
 
 ## 7. Resource/lifecycle checks
 
@@ -413,6 +443,8 @@ For Alert, paint-time paths/brushes/pens are scoped; it owns one theme subscript
 For Tooltip, the wrapper owns exactly one native ToolTip and its Popup/Draw event handlers. An externally supplied `IContainer` owns only the wrapper component. Repeated `Dispose()` must release the native ToolTip once, and popup/draw resources (`Font`, `GraphicsPath`, brushes, pens) remain event-scoped. Tooltip owns no static theme subscription, retained bitmap/path cache, framework timer, custom window, overlay, or queue manager.
 
 For TabControl, all paint-time paths/brushes/pens are scoped and native page/image objects remain application/WinForms-owned. The control owns one static theme subscription, one optional framework-created theme font, and per-page presentation event handlers for pages currently in the collection. Removal/disposal must detach those handlers; caller-owned fonts and ImageList content remain caller-owned. Repeated create/theme-switch/dispose cycles must return the static theme-handler count to baseline and no timer/cache/window may be retained.
+
+For NumericBox, all paint-time paths/brushes/pens are scoped. The wrapper owns exactly one native `NumericUpDown`, one static theme subscription, and one optional framework-created Body font while theme typography is authoritative. Disposal detaches native editor events and the theme handler, releases only the framework-owned font, and retains no timer, parser, bitmap/path cache, popup, or alternate value state.
 
 ## 8. DataGridView tests
 
@@ -455,6 +487,8 @@ For Tooltip, place `BootstrapTooltip` in the Designer component tray without the
 
 For TabControl, place `BootstrapTabControl` in the Designer without theme bootstrap code, add ordinary native `TabPage` children through the existing TabPages collection editor, and verify `TabStyle`, `Variant`, `Fill`, and `BorderRadius` serialize/reopen normally. Confirm native page controls/content, ImageList associations, tooltip text, and selection are preserved and no framework page wrapper or custom host appears in the Designer.
 
+For NumericBox, place `BootstrapNumericBox` in the Designer without theme bootstrap code. Verify `Minimum = -100`, `Maximum = 1000`, `Increment = 0.25`, `DecimalPlaces = 2`, `ThousandsSeparator = true`, `ReadOnly = true`, `ValidationState = Valid`, and `BorderRadius = 6` serialize/reopen as wrapper properties. Confirm the private native `NumericUpDown` is not separately serialized/exposed and construction requires no DI, application startup, timer, popup, or parser service.
+
 ## 10. Build commands
 
 Once the solution exists, the project should support explicit target verification similar to:
@@ -469,7 +503,7 @@ Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`
 
 The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by implemented phases.
 
-Pagination, Badge, Alert, Tooltip, and TabControl participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
+Pagination, Badge, Alert, Tooltip, TabControl, and NumericBox participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
 
 ## 11. Definition of done for a component
 
