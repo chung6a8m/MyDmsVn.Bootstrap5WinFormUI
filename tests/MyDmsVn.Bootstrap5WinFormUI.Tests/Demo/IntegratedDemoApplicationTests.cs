@@ -18,6 +18,7 @@ public sealed class IntegratedDemoApplicationTests
         "Theme",
         "Buttons / Groups / Toolbar",
         "Inputs",
+        "Advanced Inputs",
         "Cards",
         "Feedback",
         "Collapse / Accordion",
@@ -81,6 +82,24 @@ public sealed class IntegratedDemoApplicationTests
             embeddedForms.Any(child => child.GetType().Name == "FeedbackDemoForm" && !child.TopLevel),
             Is.True,
             "The first feedback-stage control should add one reusable Feedback page to the integrated demo.");
+    }
+
+    [Test]
+    public void SelectingAdvancedInputsNavigationEmbedsAdvancedInputsDemoInMainWindow()
+    {
+        using var form = new MainForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var sidebar = FindControls<BootstrapSidebar>(form).Single();
+        sidebar.SelectedItem = sidebar.Items.Single(item => item.Text == "Advanced Inputs");
+        form.PerformLayout();
+
+        var embeddedForms = FindControls<Form>(form).ToArray();
+        Assert.That(
+            embeddedForms.Any(child => child.GetType().Name == "AdvancedInputsDemoForm" && !child.TopLevel),
+            Is.True,
+            "Advanced input stages should share one reusable integrated demo page.");
     }
 
     [Test]
