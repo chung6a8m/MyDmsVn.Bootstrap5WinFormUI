@@ -198,6 +198,11 @@ public sealed class MainForm : Form
             () => new TextBoxCardDemoForm());
 
         AddPage(
+            "Feedback",
+            "Badge indicators across semantic variants, pill/custom/disabled states, runtime theme switching, and DPI verification.",
+            () => new FeedbackDemoForm());
+
+        AddPage(
             "Collapse / Accordion",
             "Variable and fixed collapse content plus keyboard-friendly single/multiple accordion scenarios.",
             () => new DemoPageHostForm(

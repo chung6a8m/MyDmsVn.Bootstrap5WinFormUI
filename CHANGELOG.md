@@ -9,10 +9,12 @@ All notable release-facing changes to this project are documented here.
 - `BootstrapPagination`, a data-source-agnostic composite page-navigation control built from the existing `BootstrapButtonGroup` and `BootstrapButton` controls.
 - Bounded numeric page windows with ellipses, First/Previous/Next/Last navigation, Small/Default/Large button sizing, semantic variants, and connected outer-radius forwarding.
 - Integrated Pagination demo including caller-owned `BootstrapDataGridView` page slicing through `PageChanged`.
+- `BootstrapBadge`, a compact auto-sized, non-focusable text indicator with all semantic variants, custom color override, pill/default radius modes, disabled presentation, runtime theme switching, and DPI-scaled layout.
+- Integrated Feedback demo page covering Badge semantic variants, pill/custom/disabled/long-text scenarios, runtime Light/Dark switching, and the real-Windows 100–200% DPI verification path.
 
 ### Changed
 
-- Reviewed and intentionally updated the proposed v1 public API fingerprint to include only the new exported `BootstrapPagination` surface; Pagination layout helper types remain internal and `AssemblyVersion` remains `1.0.0.0`.
+- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination` and `BootstrapBadge` surfaces; Pagination/Badge render-layout helpers remain internal and `AssemblyVersion` remains `1.0.0.0`.
 
 ## [1.0.0-rc.1] - 2026-08-28
 
