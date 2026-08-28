@@ -11,7 +11,9 @@ The library is native WinForms. It does not require a browser, WebView, Bootstra
 
 ## Included foundation controls
 
-`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapTextBox`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, and `BootstrapDataGridView`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
+`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapTextBox`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, and `BootstrapPagination`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
+
+`BootstrapPagination` is a data-source-agnostic composite control. Applications own data retrieval/slicing and react to `PageChanged`; the control owns only page state and navigation presentation.
 
 ## Minimal example
 
@@ -28,9 +30,21 @@ var saveButton = new BootstrapButton
     Variant = BootstrapVariant.Primary,
     AutoSize = true
 };
+
+var pagination = new BootstrapPagination
+{
+    TotalItems = 250,
+    PageSize = 20,
+    CurrentPage = 1
+};
+
+pagination.PageChanged += (_, _) =>
+{
+    // The application loads/slices pagination.CurrentPage here.
+};
 ```
 
-Runtime Light/Dark switching is handled through `BootstrapThemeManager`. Controls update through the shared theme lifecycle.
+Runtime Light/Dark switching is handled through `BootstrapThemeManager`. Pagination inherits that behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children rather than owning a separate theme subscription.
 
 ## Icons
 
@@ -38,6 +52,8 @@ The core package contains source-neutral icon contracts and built-in Segoe MDL2/
 
 ## Release candidate status
 
-`1.0.0-rc.1` freezes the proposed v1 public API baseline for compatibility review. The package is a release candidate, not an automatic NuGet.org publication.
+`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. `BootstrapPagination` was added deliberately on the RC line and the compatibility fingerprint was re-reviewed before approval. The assembly compatibility version remains `1.0.0.0`.
+
+The package is a release candidate, not an automatic NuGet.org publication.
 
 Project source and full documentation: https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI
