@@ -436,8 +436,42 @@ Behavior:
 
 Manual verification: launch the integrated demo and choose **Feedback**. Compare all eight semantic variants, default and pill geometry, custom color, disabled, explicit square radius, and long-text AutoSize cases. Switch Light/Dark while the page is open, resize the host, and repeat at 100/125/150/175/200% Windows scaling to verify text clipping, padding, and rounded geometry.
 
+## BootstrapAlert
+
+Responsibility: display inline semantic feedback without owning toast timing, popup hosting, overlay placement, or queue behavior.
+
+Stage 2 of the component-expansion roadmap finalizes the public concepts as:
+
+```text
+BootstrapAlert : UserControl
+
+BootstrapAlert.Variant
+BootstrapAlert.Icon
+BootstrapAlert.IconRenderer
+BootstrapAlert.Dismissible
+BootstrapAlert.BorderRadius
+BootstrapAlert.Dismissed
+BootstrapAlert.Dismiss()
+```
+
+Behavior:
+
+- `Text` remains the inherited WinForms content property. Defaults are empty text, `Variant = Primary`, `Icon = null`, a non-null default `IconRenderer`, `Dismissible = false`, `BorderRadius = -1`, `TabStop = false`, and `AccessibleRole.Alert` with a default description.
+- All eight `BootstrapVariant` values reuse `BootstrapVariantColorResolver`. Enabled alerts derive the surface, border, and foreground from the semantic color plus current theme `Surface`/`Border`/`Text` tokens, with a 4.5:1 foreground contrast fallback; disabled alerts use `SurfaceSecondary`, `Border`, `MutedText`, and `Disabled` focus tokens.
+- Alert paints the rounded surface, border, optional content icon, and text itself. `Icon` stays source-neutral and uses `IIconRenderer`; no icon-source branching is introduced in the control.
+- `Dismissible = true` exposes exactly one private native WinForms `Button` with accessible name `Dismiss alert` and description `Dismisses this alert.`. The close glyph is `IconDescriptor.Framework(FrameworkIconGlyph.Close)` rendered through the same configured `IconRenderer`; no nested `BootstrapButton` is created.
+- The Alert container itself never enters the tab sequence. When dismissible, only the native close button is focusable and therefore retains normal WinForms Tab/Shift+Tab, Enter, Space, accessibility, and disabled behavior.
+- `Dismiss()` hides a currently visible alert immediately and raises `Dismissed` once for that effective dismissal. Repeated calls while hidden are no-ops; re-showing with normal `Visible` permits a later dismissal event. Direct `Visible = false` changes never synthesize `Dismissed`, dismissal never disposes the control, and programmatic dismissal remains valid while the Alert is disabled.
+- Logical 96-DPI metrics use 12px horizontal padding, 8px vertical padding/content spacing, a 16px icon slot, a 28px close slot, 1px border, 2px focus border, and the current theme radius. All metrics and explicit non-negative radii scale through `DpiScaler`; narrow/empty layouts clamp without negative rectangles.
+- Text uses the current theme `Body` typography token and `TextRenderer` with word wrapping, end ellipsis, left alignment, vertical centering, and no mnemonic processing.
+- Runtime Light/Dark changes recompute palette/layout and replace only the framework-owned theme font. Caller-assigned fonts and caller-supplied icon renderers/descriptors remain caller-owned. Disposal releases the Alert theme subscription and its framework-owned font; the child native Button is disposed through normal WinForms ownership.
+- Alert introduces no timer, animation primitive, timeout/auto-hide state, overlay, z-order host, popup/window host, queue manager, Toast abstraction, or external package dependency.
+- Designer construction is parameterless and requires no application bootstrap.
+
+Manual verification: choose **Feedback** in the integrated demo. Compare all eight variants plus icon, dismissible, multiline, disabled, and explicit-radius examples. Dismiss with mouse and keyboard, restore the same instances repeatedly, switch Light/Dark while the page remains open, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling. Confirm text/icon/close alignment, focus visibility, rounded borders, and absence of stale rendering.
+
 ## Deferred components
 
-Alert, Toast, Tooltip, Dialog/Modal, Dropdown, Tabs, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
+Toast, Tooltip, Dialog/Modal, Dropdown, Tabs, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
 
 Before adding one, document which existing foundation pieces it reuses.

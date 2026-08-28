@@ -63,12 +63,13 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapDataGridView`
 - `BootstrapPagination`
 - `BootstrapBadge`
+- `BootstrapAlert`
 
 ## Integrated demo
 
 The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, and Pagination. Light/Dark switching and Reduced motion remain available while navigating.
 
-The Feedback page starts the component-expansion demo group with `BootstrapBadge`: all semantic variants, default/pill geometry, custom color, disabled state, long text, runtime Light/Dark switching, and a documented real-Windows 100–200% DPI check.
+The Feedback page hosts the component-expansion feedback controls. `BootstrapBadge` covers semantic, pill/custom/disabled, and long-text states; `BootstrapAlert` adds all semantic variants, optional icons, native keyboard-accessible dismissal, multiline/disabled/custom-radius states, restore cycles, runtime Light/Dark switching, and the documented real-Windows 100–200% DPI check.
 
 The Pagination page demonstrates bounded numeric windows, ellipses, navigation visibility, size variants, boundary/zero-item states, and application-owned DataGrid paging. `BootstrapPagination` itself does not own or slice a data source.
 
@@ -98,6 +99,8 @@ Pagination extends that hardened surface without adding a new timer, theme subsc
 
 Badge extends the same hardened foundations as a primitive visual control: it reuses `BootstrapVariantColorResolver`, `ColorUtil`, `DpiScaler`, `RoundedPath`, and theme typography; owns one deterministic theme subscription/theme-created font lifecycle; and adds no timer, animation scheduler, icon model, geometry library, or external package.
 
+Alert reuses those same rendering/theme primitives plus the source-neutral icon infrastructure. It owns one private native WinForms dismiss button, one deterministic theme subscription/theme-created font lifecycle, and no timeout, timer, overlay, floating host, queue manager, or Toast behavior.
+
 See [Phase 15 — Hardening and API review](docs/PHASE15_HARDENING_AND_API_REVIEW.md) for the audit findings and the real-Windows/manual checks carried into release validation.
 
 ## Documentation
@@ -120,7 +123,7 @@ The primary sources of truth are:
 
 ## Status
 
-Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination` and Stage 1 `BootstrapBadge` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
+Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, and Stage 2 `BootstrapAlert` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
 
 The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 
