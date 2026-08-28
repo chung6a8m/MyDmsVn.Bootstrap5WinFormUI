@@ -19,6 +19,7 @@ Prefer ordinary unit tests for logic that does not require a WinForms handle:
 - Radius/geometry calculations
 - Icon descriptor/source selection
 - Selection-state algorithms
+- Pagination numeric-window and ellipsis calculations
 
 These tests should run for all appropriate target frameworks.
 
@@ -79,6 +80,15 @@ Phase 8 covers TextBox/Card presentation logic with automated tests for:
 - Card double-buffered custom-painting styles
 - Theme-default Card padding and caller-owned custom padding behavior
 
+BootstrapPagination pure tests cover:
+
+- Small ranges with no ellipsis
+- Beginning, middle, and ending windows for large ranges
+- Different `MaxVisiblePages` values
+- Page `1`, current page, and last page always being retained when the range is truncated
+- No duplicate numeric page entries
+- Rejection of invalid total-page/current-page/max-visible inputs by the internal helper
+
 ### 2.2 WinForms control tests
 
 Tests that instantiate or interact with controls must run on Windows and use an STA-capable execution strategy.
@@ -94,6 +104,7 @@ Examples:
 - Accordion single-open behavior
 - Animation stop/dispose behavior
 - DataGridView style application
+- Pagination boundary, focus, accessibility, event, and disposal behavior
 
 Do not rely on arbitrary sleeps to wait for animation. Prefer controllable clocks/timing abstractions where practical or test state/progress deterministically.
 
@@ -111,6 +122,19 @@ Phase 8 TextBox/Card tests run in STA and verify:
 - The clear affordance uses the normal native `TextChanged` path and disappears when no editable text remains.
 - Runtime theme changes update Card region colors and preserve explicit custom Card padding.
 - Header/Body/Footer are stable child containers suitable for Designer serialization.
+
+BootstrapPagination STA tests verify:
+
+- Default values, `AccessibleRole.Grouping`, and the default accessibility description
+- Exactly one owned horizontal `BootstrapButtonGroup` using `SelectionMode.None`
+- First/Previous/Next/Last boundary enablement and current-page focusability
+- Disabled/non-tabbable ellipses and semantic accessible names for navigation/current/other page buttons
+- Mouse/native `PerformClick()` navigation with exactly one `PageChanged` event for an effective page change and no event for no-op activation
+- Range-change clamping semantics for `TotalItems` and `PageSize`
+- `ButtonSize`, `Variant`, and `BorderRadius` presentation changes without changing page state
+- Disposal of dynamically removed buttons and normal disposal of the owned group
+- Repeated state/visibility/style changes without duplicate child controls or event multiplication
+- Preferred-size containment of the owned connected group
 
 ### 2.3 Demo/manual visual tests
 
@@ -141,6 +165,8 @@ For Phase 7, choose **Groups / Toolbar**. Verify a horizontal Single-selection g
 
 For Phase 8, choose **TextBox / Card**. Verify placeholder behavior, leading/trailing icons, clear button, valid/invalid borders, native read-only/password/disabled behavior, Tab focus, selection/copy/paste, and live Light/Dark switching. Compare default, Header/Body/Footer, shadow, and borderless/custom-radius cards. Resize repeatedly and run the page at 100/125/150/175/200% Windows scaling; editor text must remain vertically usable, icon slots must stay aligned, Card corners must not clip, and the lightweight shadow must not leave stale pixels.
 
+For Pagination, choose **Pagination** in the integrated demo. Verify the small-range, middle-window, boundary, zero-item, Small/Default/Large, and directional-navigation visibility scenarios. Use mouse and keyboard to activate First/Previous/numeric/Next/Last controls, confirm the active page stays focusable/selected, and confirm ellipses are skipped by the tab sequence. Exercise the DataGrid example and verify the application owns the source table and ten-row slicing in response to `PageChanged`. Switch Light/Dark, resize repeatedly, and repeat under the supported real-Windows DPI matrix.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -162,10 +188,13 @@ Verify:
 - Nested layouts do not drift.
 - Accordion/Collapse measured heights remain correct.
 - DataGridView headers/rows remain aligned.
+- Pagination connected seams, ellipses, and current-page focus visuals remain aligned.
 
 The Phase 2 Rendering/DPI demo covers the geometry calculations at all five scale factors. Run the demo under each corresponding Windows display-scaling setting as components are added and during hardening; do not treat the virtual matrix as proof of OS-level DPI behavior.
 
 For Phase 8 specifically, verify the native TextBox caret/text baseline remains centered and usable after DPI changes, leading/trailing/clear slots remain inside the rounded input, and Card theme-default padding scales without overwriting application-set custom padding.
+
+Pagination does not own a DPI-specific renderer; its real-Windows DPI check verifies that composed ButtonGroup/Button preferred sizes, connected seams, accessible navigation, and wrapping-free AutoSize behavior remain correct together.
 
 ## 4. Theme matrix
 
@@ -182,6 +211,8 @@ Disposed control after a theme switch
 ```
 
 A disposed control must not be kept alive by the theme manager.
+
+Pagination itself does not subscribe to the theme manager. Theme-matrix verification confirms its composed ButtonGroup/Button children continue to react through their existing lifecycle without introducing a duplicate Pagination subscription.
 
 ## 5. Interaction matrix
 
@@ -201,6 +232,8 @@ For Phase 7, Group and Toolbar themselves are intentionally non-focusable; inter
 
 For Phase 8, `BootstrapTextBox` owns one public tab stop and forwards focus to its native editor. Test Tab entry, Shift+Tab exit, pointer clicks on the border/placeholder, keyboard text selection, clipboard commands, clear-button behavior, read-only copy behavior, and password masking. `BootstrapCard` is a non-focusable container; focus order belongs to controls placed in Header/Body/Footer.
 
+For Pagination, the container and owned ButtonGroup are intentionally non-focusable; enabled child Buttons own Tab/Enter/Space behavior. Boundary navigation and ellipses are disabled, while the selected current-page button remains enabled/focusable and activation is a no-op. Setting `Enabled = false` on the Pagination container must prevent child activation without mutating `CurrentPage`.
+
 ## 6. Animation matrix
 
 For finite and loop animation, test:
@@ -218,6 +251,8 @@ For finite and loop animation, test:
 Shared Phase 4 primitives additionally verify that progress is elapsed-time based rather than tick-count based, stop/resume excludes paused time, completion is emitted exactly once, loop progress wraps predictably, and event callbacks can safely stop/restart/dispose the animation.
 
 Animated controls must not continue producing useful work after disposal. New control-specific timers are prohibited unless an explicit documented exception is approved.
+
+Pagination is explicitly outside the animation matrix: page-state and navigation changes are immediate and it must not introduce a timer or animation owner.
 
 ## 7. Resource/lifecycle checks
 
@@ -241,6 +276,8 @@ For Phase 7, ButtonGroup owns only theme notification plus child Button event su
 
 For Phase 8, TextBox and Card own only theme subscriptions plus TextBox's theme-created font. They must unsubscribe/dispose deterministically. Card shadow painting must not retain bitmaps, paths, brushes, or pens between frames; all temporary GDI objects remain scoped to painting.
 
+For Pagination, rebuilding the paging structure must dispose every removed dynamic Button after detaching its click handler. Repeated current-page/max-visible/navigation-visibility changes must not duplicate controls or handlers. Disposing Pagination releases the owned ButtonGroup and its current Buttons through normal WinForms ownership. Pagination owns no timer, custom GDI cache, or direct theme subscription.
+
 ## 8. DataGridView tests
 
 Use realistic scenarios:
@@ -256,6 +293,8 @@ Use realistic scenarios:
 
 Avoid tests that replace normal DataGridView behavior with framework-specific assumptions.
 
+Pagination integration tests/demos must keep this same boundary: Pagination does not receive a `DataSource` or DataGrid reference. Application/demo code listens to `PageChanged`, slices or queries the appropriate page, and binds that result to the grid.
+
 ## 9. Designer checks
 
 For Designer-oriented controls verify in Visual Studio:
@@ -270,6 +309,8 @@ For Phase 7, place Group and Toolbar in the Designer, add Buttons/Groups through
 
 For Phase 8, place TextBox and Card in the Designer without theme bootstrap code. Serialize placeholder/validation/icons/clear/read-only/password/radius settings as applicable. Add controls into `Header`, `Body`, and `Footer`, toggle Header/Footer visibility, set custom Card padding/border/shadow/radius, save and reopen the form, and confirm the region contents and public property values are preserved.
 
+For Pagination, place the control in the Designer without theme bootstrap code. Verify `TotalItems`, `PageSize`, `CurrentPage`, `MaxVisiblePages`, `ShowFirstLast`, `ShowPreviousNext`, `ButtonSize`, `Variant`, and `BorderRadius` serialize/reopen correctly; `TotalPages` remains read-only/non-serialized; no runtime timer or application data dependency is created by design-time instantiation.
+
 ## 10. Build commands
 
 Once the solution exists, the project should support explicit target verification similar to:
@@ -283,6 +324,8 @@ dotnet test -c Release
 Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`.
 
 The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by implemented phases.
+
+Pagination also participates in the Phase 16 public/protected API fingerprint gate. Adding it must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
 
 ## 11. Definition of done for a component
 
