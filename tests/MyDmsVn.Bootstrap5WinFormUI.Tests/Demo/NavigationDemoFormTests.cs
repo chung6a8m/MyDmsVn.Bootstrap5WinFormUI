@@ -34,6 +34,9 @@ public sealed class NavigationDemoFormTests
             Assert.That(tabs.SelectMany(tab => tab.TabPages.Cast<TabPage>()).Any(page => page.Text.Length > 50), Is.True);
             Assert.That(tabs.Select(tab => tab.Variant).Distinct().Count(), Is.EqualTo(8));
             Assert.That(Descendants(form).OfType<Label>().Any(label => label.AccessibleName == "Selected tab status"), Is.True);
+            Assert.That(Descendants(form).OfType<TextBox>().Any(), Is.True, "Tabs demo should expose a focusable TextBox for Tab/Shift+Tab verification.");
+            Assert.That(Descendants(form).OfType<Button>().Any(), Is.True, "Tabs demo should expose a focusable Button for Tab/Shift+Tab verification.");
+            Assert.That(Descendants(form).OfType<CheckBox>().Any(), Is.True, "Tabs demo should expose a focusable CheckBox for Tab/Shift+Tab verification.");
         }));
     }
 
