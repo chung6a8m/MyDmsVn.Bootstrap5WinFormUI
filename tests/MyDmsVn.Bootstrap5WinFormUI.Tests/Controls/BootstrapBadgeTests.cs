@@ -75,9 +75,9 @@ public sealed class BootstrapBadgeTests
     {
         using var badge = new BootstrapBadge();
 
-        Assert.Throws<ArgumentOutOfRangeException>((TestDelegate)(() => badge.BorderRadius = -2));
-        Assert.DoesNotThrow((TestDelegate)(() => badge.BorderRadius = -1));
-        Assert.DoesNotThrow((TestDelegate)(() => badge.BorderRadius = 0));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => badge.BorderRadius = -2));
+        Assert.DoesNotThrow((Action)(() => badge.BorderRadius = -1));
+        Assert.DoesNotThrow((Action)(() => badge.BorderRadius = 0));
     }
 
     [Test]
@@ -85,8 +85,8 @@ public sealed class BootstrapBadgeTests
     {
         using var badge = new BootstrapBadge();
 
-        Assert.Throws<ArgumentOutOfRangeException>((TestDelegate)(() => badge.Variant = (BootstrapVariant)(-1)));
-        Assert.Throws<ArgumentOutOfRangeException>((TestDelegate)(() => badge.Variant = (BootstrapVariant)99));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => badge.Variant = (BootstrapVariant)(-1)));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => badge.Variant = (BootstrapVariant)99));
     }
 
     [Test]
@@ -104,17 +104,16 @@ public sealed class BootstrapBadgeTests
     }
 
     [Test]
-    public void RuntimeThemeChangesReplaceThemeOwnedFontAndDisposalDetachesSubscription()
+    public void RuntimeThemeChangesKeepThemeFontUsableAndDisposalDetachesSubscription()
     {
         var baselineSubscriptions = GetThemeSubscriptionCount();
         var badge = new BootstrapBadge();
-        var lightFont = badge.Font;
 
         Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions + 1));
 
         BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
 
-        Assert.That(badge.Font, Is.Not.SameAs(lightFont));
+        Assert.DoesNotThrow((Action)(() => badge.GetPreferredSize(Size.Empty)));
 
         badge.Dispose();
 
@@ -137,7 +136,7 @@ public sealed class BootstrapBadgeTests
 
         using var bitmap = new Bitmap(24, 24);
         using var graphics = Graphics.FromImage(bitmap);
-        Assert.DoesNotThrow((TestDelegate)(() => graphics.MeasureString("x", callerFont)));
+        Assert.DoesNotThrow((Action)(() => graphics.MeasureString("x", callerFont)));
     }
 
     [Test]
@@ -149,7 +148,7 @@ public sealed class BootstrapBadgeTests
 
         using var bitmap = new Bitmap(24, 24);
         using var graphics = Graphics.FromImage(bitmap);
-        Assert.Catch((TestDelegate)(() => graphics.MeasureString("x", ownedFont)));
+        Assert.Catch((Action)(() => graphics.MeasureString("x", ownedFont)));
     }
 
     private static int GetThemeSubscriptionCount()

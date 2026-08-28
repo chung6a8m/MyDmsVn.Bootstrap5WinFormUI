@@ -284,7 +284,7 @@ public class BootstrapBadge : Control
         var token = BootstrapThemeManager.CurrentTheme.Typography.Label;
         var nextFont = new Font(token.FontFamilyName, token.SizeInPoints, token.Style);
         var previous = _themeFont;
-        _themeFont = nextFont;
+
         _settingThemeFont = true;
         try
         {
@@ -295,6 +295,16 @@ public class BootstrapBadge : Control
             _settingThemeFont = false;
         }
 
+        // WinForms may treat a value-equal Font assignment as a no-op. In that case
+        // the control still references the previous instance, so keep owning it and
+        // dispose only the unused replacement.
+        if (previous is not null && ReferenceEquals(Font, previous))
+        {
+            nextFont.Dispose();
+            return;
+        }
+
+        _themeFont = nextFont;
         previous?.Dispose();
     }
 
