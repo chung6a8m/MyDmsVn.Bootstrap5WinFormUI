@@ -75,6 +75,86 @@ public sealed class BootstrapSidebarAnimatedLayoutTests
         }
     }
 
+    [Test]
+    public void AnimatedReExpandKeepsRowsAfterExpandedSectionVisible()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light, reducedMotion: false);
+        try
+        {
+            using var form = new Form
+            {
+                ClientSize = new System.Drawing.Size(900, 700),
+                ShowInTaskbar = false
+            };
+            using var sidebar = new BootstrapSidebar
+            {
+                Dock = DockStyle.Left,
+                ExpandedWidth = 260,
+                CollapsedWidth = 72,
+                AnimationDuration = TimeSpan.FromMilliseconds(40)
+            };
+
+            var theme = new BootstrapSidebarItem
+            {
+                Text = "Theme",
+                Expanded = true
+            };
+            theme.Items.Add(new BootstrapSidebarItem { Text = "Colors" });
+            theme.Items.Add(new BootstrapSidebarItem { Text = "Typography" });
+            theme.Items.Add(new BootstrapSidebarItem { Text = "Metrics" });
+            sidebar.Items.Add(theme);
+
+            foreach (var text in new[]
+            {
+                "Rendering / DPI",
+                "Icons",
+                "Animation",
+                "Buttons / Groups / Toolbar",
+                "Inputs",
+                "Cards",
+                "Collapse / Accordion",
+                "Loading / Spinner",
+                "Progress",
+                "Sidebar",
+                "DataGrid"
+            })
+            {
+                sidebar.Items.Add(new BootstrapSidebarItem { Text = text });
+            }
+
+            form.Controls.Add(sidebar);
+            form.Show();
+            PumpMessagesUntil(
+                () => sidebar.IsHandleCreated && sidebar.Width == sidebar.ExpandedWidth && NestedTransitionsCompleted(sidebar),
+                TimeSpan.FromSeconds(2));
+            AssertRowsVisible(sidebar, "initial expanded section state");
+
+            sidebar.Collapse();
+            PumpMessagesUntil(
+                () => sidebar.Width == sidebar.CollapsedWidth && NestedTransitionsCompleted(sidebar),
+                TimeSpan.FromSeconds(2));
+            AssertRowsVisible(sidebar, "collapsed state with section remembered");
+
+            sidebar.Expand();
+            PumpMessagesUntil(
+                () => sidebar.Width == sidebar.ExpandedWidth && NestedTransitionsCompleted(sidebar),
+                TimeSpan.FromSeconds(2));
+            AssertRowsVisible(sidebar, "re-expanded state with section restored");
+
+            var host = sidebar.Controls.OfType<FlowLayoutPanel>().Single();
+            var dataGrid = FindButton(sidebar, sidebar.Items.Last());
+            Assert.That(
+                host.ClientRectangle.IntersectsWith(dataGrid.Bounds),
+                Is.True,
+                $"The final root row was clipped after re-expanding an open section. Host={host.Bounds}; DataGrid={dataGrid.Bounds}.");
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
+    }
+
     private static bool NestedTransitionsCompleted(Control root)
     {
         return Descendants(root).OfType<BootstrapCollapse>().All(collapse => !collapse.IsAnimating);
