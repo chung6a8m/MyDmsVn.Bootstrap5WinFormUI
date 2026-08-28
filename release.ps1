@@ -73,7 +73,7 @@ try {
         Assert-PackageEntry $entryNames '^lib/net48/MyDmsVn\.Bootstrap5WinFormUI\.xml$' 'the net48 XML documentation'
         Assert-PackageEntry $entryNames '^lib/net8\.0-windows[^/]*/MyDmsVn\.Bootstrap5WinFormUI\.dll$' 'the net8.0-windows assembly'
         Assert-PackageEntry $entryNames '^lib/net8\.0-windows[^/]*/MyDmsVn\.Bootstrap5WinFormUI\.xml$' 'the net8.0-windows XML documentation'
-        Assert-PackageEntry $entryNames '^README\.md$' 'the package README'
+        Assert-PackageEntry $entryNames '^PACKAGE_README\.md$' 'the package README'
 
         $nuspecEntry = $archive.Entries | Where-Object { $_.FullName -match '\.nuspec$' } | Select-Object -First 1
         if ($null -eq $nuspecEntry) {

@@ -16,7 +16,7 @@
     <RepositoryUrl>https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>winforms;bootstrap;ui;desktop;net48;net8</PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReadmeFile>PACKAGE_README.md</PackageReadmeFile>
     <IsPackable>true</IsPackable>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -28,6 +28,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\..\docs\PACKAGE_README.md" Pack="true" PackagePath="\" Link="README.md" />
+    <None Include="..\..\docs\PACKAGE_README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
