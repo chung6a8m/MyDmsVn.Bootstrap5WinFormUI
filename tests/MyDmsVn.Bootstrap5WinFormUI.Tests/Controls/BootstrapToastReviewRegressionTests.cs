@@ -36,4 +36,36 @@ public sealed class BootstrapToastReviewRegressionTests
             Assert.That(harness.Records.Count, Is.EqualTo(1), "no exit animation should be created after the callback disposed the owner");
         }));
     }
+
+    [Test]
+    public void ShowToastFailureRollsBackOwnershipParentAndVisibility()
+    {
+        using var failingContainer = new BootstrapToastContainer((_, _, _) =>
+            throw new InvalidOperationException("animation factory failure"))
+        {
+            Size = new Size(400, 300)
+        };
+        var toast = new BootstrapToast
+        {
+            Width = 240,
+            Text = "Transactional ownership",
+            AutoHide = false,
+            Visible = true
+        };
+
+        Assert.Throws<InvalidOperationException>((Action)(() => failingContainer.ShowToast(toast)));
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(toast.IsOwned, Is.False, "failed ShowToast must leave ownership with the caller");
+            Assert.That(toast.Parent, Is.Null);
+            Assert.That(toast.IsDisposed, Is.False);
+            Assert.That(toast.Visible, Is.True, "failed transfer should restore caller-visible state");
+            Assert.That(failingContainer.Controls.Count, Is.Zero);
+        }));
+
+        var harness = new BootstrapToastAnimationHarness { ReducedMotion = true };
+        using var recoveryContainer = new BootstrapToastContainer(harness.Create) { Size = new Size(400, 300) };
+        Assert.DoesNotThrow((Action)(() => recoveryContainer.ShowToast(toast)));
+        Assert.That(toast.IsOwned, Is.True);
+    }
 }
