@@ -248,17 +248,29 @@ public class BootstrapAlert : UserControl
             return;
         }
 
+        var borderWidth = Math.Max(0f, metrics.BorderWidth);
+        var borderInset = borderWidth / 2f;
+        var surfaceBounds = new RectangleF(
+            layout.SurfaceBounds.X + borderInset,
+            layout.SurfaceBounds.Y + borderInset,
+            Math.Max(0f, layout.SurfaceBounds.Width - borderWidth),
+            Math.Max(0f, layout.SurfaceBounds.Height - borderWidth));
+        if (surfaceBounds.Width <= 0f || surfaceBounds.Height <= 0f)
+        {
+            return;
+        }
+
         var previousSmoothingMode = e.Graphics.SmoothingMode;
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         try
         {
-            using var path = RoundedPath.Create(layout.SurfaceBounds, layout.CornerRadius);
+            using var path = RoundedPath.Create(surfaceBounds, layout.CornerRadius);
             using var surfaceBrush = new SolidBrush(palette.Surface);
             e.Graphics.FillPath(surfaceBrush, path);
 
             if (metrics.BorderWidth > 0)
             {
-                using var borderPen = new Pen(palette.Border, metrics.BorderWidth);
+                using var borderPen = new Pen(palette.Border, borderWidth);
                 e.Graphics.DrawPath(borderPen, path);
             }
 
