@@ -266,7 +266,7 @@ public class BootstrapComboBox : ComboBox
     {
         if (index >= 0 && index < Items.Count)
         {
-            return GetItemText(Items[index]);
+            return GetItemText(Items[index]) ?? string.Empty;
         }
 
         return Text ?? string.Empty;
