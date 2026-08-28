@@ -150,7 +150,7 @@ public sealed class BootstrapPaginationContractTests
     {
         using var pagination = new BootstrapPagination();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => pagination.TotalItems = value);
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => pagination.TotalItems = value));
     }
 
     [TestCase(0)]
@@ -159,7 +159,7 @@ public sealed class BootstrapPaginationContractTests
     {
         using var pagination = new BootstrapPagination();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => pagination.PageSize = value);
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => pagination.PageSize = value));
     }
 
     [TestCase(0)]
@@ -168,7 +168,7 @@ public sealed class BootstrapPaginationContractTests
     {
         using var pagination = new BootstrapPagination();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => pagination.MaxVisiblePages = value);
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => pagination.MaxVisiblePages = value));
     }
 
     [Test]
@@ -178,8 +178,8 @@ public sealed class BootstrapPaginationContractTests
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => pagination.CurrentPage = 0);
-            Assert.Throws<ArgumentOutOfRangeException>(() => pagination.CurrentPage = 6);
+            Assert.Throws<ArgumentOutOfRangeException>((Action)(() => pagination.CurrentPage = 0));
+            Assert.Throws<ArgumentOutOfRangeException>((Action)(() => pagination.CurrentPage = 6));
         }));
     }
 
@@ -188,8 +188,8 @@ public sealed class BootstrapPaginationContractTests
     {
         using var pagination = new BootstrapPagination();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => pagination.BorderRadius = -2);
-        Assert.DoesNotThrow(() => pagination.BorderRadius = -1);
-        Assert.DoesNotThrow(() => pagination.BorderRadius = 0);
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => pagination.BorderRadius = -2));
+        Assert.DoesNotThrow((Action)(() => pagination.BorderRadius = -1));
+        Assert.DoesNotThrow((Action)(() => pagination.BorderRadius = 0));
     }
 }

@@ -74,21 +74,21 @@ public sealed class BootstrapPaginationLayoutLogicTests
     [TestCase(-1, 1, 5)]
     public void BuildRejectsInvalidTotalPages(int totalPages, int currentPage, int maxVisiblePages)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => BootstrapPaginationLayoutLogic.Build(totalPages, currentPage, maxVisiblePages));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapPaginationLayoutLogic.Build(totalPages, currentPage, maxVisiblePages)));
     }
 
     [TestCase(5, 0, 5)]
     [TestCase(5, 6, 5)]
     public void BuildRejectsCurrentPageOutsideRange(int totalPages, int currentPage, int maxVisiblePages)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => BootstrapPaginationLayoutLogic.Build(totalPages, currentPage, maxVisiblePages));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapPaginationLayoutLogic.Build(totalPages, currentPage, maxVisiblePages)));
     }
 
     [TestCase(1)]
     [TestCase(4)]
     public void BuildRejectsMaxVisiblePagesBelowFive(int maxVisiblePages)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => BootstrapPaginationLayoutLogic.Build(10, 1, maxVisiblePages));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapPaginationLayoutLogic.Build(10, 1, maxVisiblePages)));
     }
 
     private static string Format(IReadOnlyList<BootstrapPaginationItem> items)
