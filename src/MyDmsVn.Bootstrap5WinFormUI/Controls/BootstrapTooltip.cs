@@ -213,7 +213,7 @@ public class BootstrapTooltip : Component, IExtenderProvider
             throw new ArgumentNullException(nameof(control));
         }
 
-        return _toolTip.GetToolTip(control);
+        return _toolTip.GetToolTip(control) ?? string.Empty;
     }
 
     /// <inheritdoc />
