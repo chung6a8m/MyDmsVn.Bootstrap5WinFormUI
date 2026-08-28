@@ -131,8 +131,8 @@ public sealed class BootstrapComboBoxInteractionTests
         var bootstrapItem = new LookupItem(1, "Alpha");
         native.Items.Add(nativeItem);
         bootstrap.Items.Add(bootstrapItem);
-        native.Format += (_, e) => e.Value = "Formatted: " + ((LookupItem)e.ListItem).Name;
-        bootstrap.Format += (_, e) => e.Value = "Formatted: " + ((LookupItem)e.ListItem).Name;
+        native.Format += (_, e) => e.Value = "Formatted: " + ((LookupItem)e.ListItem!).Name;
+        bootstrap.Format += (_, e) => e.Value = "Formatted: " + ((LookupItem)e.ListItem!).Name;
 
         native.SelectedIndex = 0;
         bootstrap.SelectedIndex = 0;
