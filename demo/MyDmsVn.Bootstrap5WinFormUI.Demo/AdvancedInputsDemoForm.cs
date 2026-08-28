@@ -72,10 +72,10 @@ public sealed class AdvancedInputsDemoForm : Form
 
         var integer = new BootstrapNumericBox
         {
-            Value = 12m,
             Minimum = 0m,
             Maximum = 100m,
-            Increment = 1m
+            Increment = 1m,
+            Value = 12m
         };
         _integerStatus.AutoSize = true;
         _integerStatus.Text = "ValueChanged: 12";
@@ -85,28 +85,28 @@ public sealed class AdvancedInputsDemoForm : Form
 
         AddNumericCell(grid, "Decimal", new BootstrapNumericBox
         {
-            Value = 12.50m,
             Minimum = 0m,
             Maximum = 100m,
             Increment = 0.25m,
-            DecimalPlaces = 2
+            DecimalPlaces = 2,
+            Value = 12.50m
         });
 
         AddNumericCell(grid, "Thousands", new BootstrapNumericBox
         {
-            Value = 123456m,
             Minimum = 0m,
             Maximum = 1000000m,
             Increment = 1000m,
-            ThousandsSeparator = true
+            ThousandsSeparator = true,
+            Value = 123456m
         });
 
         AddNumericCell(grid, "Signed / large step", new BootstrapNumericBox
         {
-            Value = 0m,
             Minimum = -100m,
             Maximum = 100m,
-            Increment = 10m
+            Increment = 10m,
+            Value = 0m
         });
 
         AddNumericCell(grid, "Valid", new BootstrapNumericBox
@@ -195,7 +195,6 @@ public sealed class AdvancedInputsDemoForm : Form
         _content.ForeColor = theme.Colors.Text;
         _numericSection.BackColor = theme.Colors.Body;
         _numericSection.ForeColor = theme.Colors.Text;
-        _integerStatus.ForeColor = theme.Colors.MutedText;
         ApplyStandardTextColor(_numericSection, theme.Colors.Text);
         _integerStatus.ForeColor = theme.Colors.MutedText;
     }
