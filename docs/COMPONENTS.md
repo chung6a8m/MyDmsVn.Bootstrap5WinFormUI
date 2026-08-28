@@ -192,6 +192,43 @@ Behavior:
 
 Manual verification: launch the demo and choose **TextBox / Card**. Exercise placeholder, leading/trailing icons, clear, valid/invalid, read-only, password, and disabled examples. Tab into inputs, type/select/copy text, verify focus/validation border priority, switch Light/Dark, and repeat at each supported Windows DPI setting.
 
+## BootstrapNumericBox
+
+Responsibility: provide Bootstrap-themed numeric input while preserving native WinForms numeric editing, formatting, range, spin, keyboard, and wheel semantics.
+
+Stage 5 of the component-expansion roadmap finalizes the public concepts as:
+
+```text
+BootstrapNumericBox : UserControl
+
+BootstrapNumericBox.Value
+BootstrapNumericBox.Minimum
+BootstrapNumericBox.Maximum
+BootstrapNumericBox.Increment
+BootstrapNumericBox.DecimalPlaces
+BootstrapNumericBox.ThousandsSeparator
+BootstrapNumericBox.ReadOnly
+BootstrapNumericBox.ValidationState
+BootstrapNumericBox.BorderRadius
+BootstrapNumericBox.ValueChanged
+```
+
+Behavior:
+
+- `BootstrapNumericBox` composes exactly one real borderless native WinForms `NumericUpDown`. The native editor remains the single source of truth for value, range, increment, decimal formatting, thousands formatting, typed editing, spin buttons, Up/Down keys, and mouse-wheel behavior; the framework does not maintain a parallel numeric state model.
+- `Value`, `Minimum`, `Maximum`, `Increment`, `DecimalPlaces`, `ThousandsSeparator`, and `ReadOnly` forward directly to the native editor. Native range normalization and native `ArgumentOutOfRangeException` behavior are intentionally preserved rather than wrapped or replaced.
+- The wrapper owns the single public tab stop and keeps the private native editor out of the tab sequence. Tab entry and shell clicks redirect focus to the native editor; Shift+Tab exit remains normal WinForms navigation.
+- Native `KeyDown`, `KeyPress`, `KeyUp`, and `PreviewKeyDown` are forwarded through the wrapper exactly once so application handlers can observe the public control without introducing a second input path.
+- `ValueChanged` is raised only from the native editor's effective `ValueChanged` path and reports the `BootstrapNumericBox` wrapper as sender. Assigning the same value is therefore a no-op according to native semantics.
+- Border priority matches the established input validation model: disabled presentation wins first; otherwise `Valid` uses the success token, `Invalid` uses danger, neutral focus uses the focus token, and the unfocused neutral state uses the normal border token.
+- `ReadOnly = true` prevents typed editing but intentionally retains native spin-button, Up/Down, and wheel behavior. `Enabled = false` remains the distinct non-interactive state and uses disabled presentation tokens.
+- `BorderRadius = -1` uses the current theme radius; non-negative values specify an explicit logical uniform radius and values below `-1` are rejected before mutation.
+- Runtime Light/Dark changes update the wrapper shell, native editor palette, and theme-owned `Body` font while preserving caller-owned numeric state. Parent-DPI changes recompute shell padding, border/focus widths, radius, and contained native-editor bounds through shared DPI/rendering helpers.
+- Designer construction is parameterless and requires no application bootstrap. The private native editor is an implementation detail rather than a separately serialized/public composition surface. Disposal detaches native/theme handlers and releases only framework-created font resources.
+- Stage 5 deliberately does **not** expose or implement `Hexadecimal`, `Accelerations`, custom numeric parsing/format-provider contracts, icons, prefix/suffix slots, or other adornments. Those capabilities remain deferred until a later explicit contract is planned; no aliases or hidden proxy APIs are added now.
+
+Manual verification: choose **Advanced Inputs** in the integrated demo. Compare integer/default, decimal `0.25` increment with two decimal places, thousands separators, signed `-100..100` with step `10`, valid/invalid, read-only, disabled, and live `ValueChanged` examples. Type culture-sensitive values, use native spin buttons, Up/Down keys, mouse wheel, Tab/Shift+Tab, switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling.
+
 ## BootstrapCard
 
 Responsibility: reusable themed surface/container with lightweight composition regions.
@@ -545,6 +582,6 @@ Manual verification: choose **Navigation / Tabs** in the integrated demo. Exerci
 
 ## Deferred components
 
-Toast, Dialog/Modal, Dropdown, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
+Toast, Dialog/Modal, Dropdown, Skeleton, ComboBox, DatePicker, and others are not part of the initial foundation contract.
 
 Before adding one, document which existing foundation pieces it reuses.
