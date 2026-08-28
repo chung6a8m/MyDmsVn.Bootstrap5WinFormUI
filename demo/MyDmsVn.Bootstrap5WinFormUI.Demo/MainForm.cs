@@ -225,6 +225,11 @@ public sealed class MainForm : Form
             "DataGrid",
             "Bound tabular data, empty state, loading overlay, sorting/selection, and 10,000-row manual performance scenario.",
             () => new DataGridDemoForm());
+
+        AddPage(
+            "Pagination",
+            "Bounded page windows, ellipses, navigation visibility, sizes, and application-owned DataGrid paging.",
+            () => new PaginationDemoForm());
     }
 
     private BootstrapSidebarItem AddPage(string title, string description, Func<Form> createForm)

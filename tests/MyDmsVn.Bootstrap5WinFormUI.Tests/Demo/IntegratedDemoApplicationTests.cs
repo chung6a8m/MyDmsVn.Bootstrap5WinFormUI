@@ -23,7 +23,8 @@ public sealed class IntegratedDemoApplicationTests
         "Loading / Spinner",
         "Progress",
         "Sidebar",
-        "DataGrid"
+        "DataGrid",
+        "Pagination"
     };
 
     [Test]
