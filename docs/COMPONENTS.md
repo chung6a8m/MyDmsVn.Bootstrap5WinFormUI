@@ -509,8 +509,42 @@ Behavior:
 
 Manual verification: stay on **Feedback** and hover the default Dark, same-instance second target, semantic Info, custom-color, multiline, and long-caption examples. Change Initial/Reshow/Auto-pop delays and Active/Show always live. Switch Light/Dark while the page stays open and repeat at 100/125/150/175/200% real Windows scaling. Confirm native popup positioning/timing remains intact, explicit newlines render, long captions are not framework-wrapped, padding/border/radius scale cleanly, and the same Tooltip can serve multiple controls.
 
+## BootstrapTabControl
+
+Responsibility: apply Bootstrap-inspired tab-header presentation while retaining native WinForms `TabControl` page composition, selection, focus, keyboard, image, tooltip, and overflow behavior.
+
+Stage 4 of the component-expansion roadmap finalizes the public concepts as:
+
+```text
+BootstrapTabStyle: Tabs | Pills | Underline
+
+BootstrapTabControl : TabControl
+
+BootstrapTabControl.TabStyle
+BootstrapTabControl.Variant
+BootstrapTabControl.Fill
+BootstrapTabControl.BorderRadius
+```
+
+Behavior:
+
+- `BootstrapTabControl` derives directly from native `TabControl`. `TabPage`, `TabPages`, `SelectedIndex`, `SelectedTab`, `SelectedIndexChanged`, arrow/Ctrl+Tab behavior, mouse hit-testing/selection, accessibility, `ImageList`, `ImageKey`/`ImageIndex`, `ToolTipText`, and native overflow remain WinForms-owned rather than being mirrored or wrapped.
+- The control forces `DrawMode = OwnerDrawFixed` and `SizeMode = Fixed`, then paints only rectangles supplied by the native `DrawItem` event / `GetTabRect`. It never paints or recolors the selected page content area and introduces no custom page host/window.
+- `TabStyle` defaults to `Tabs`; `Variant` defaults to `Primary`; `Fill` defaults to `false`; `BorderRadius = -1` uses the current theme radius. Undefined style/variant values and radius values below `-1` are rejected before mutation.
+- `Tabs` uses rounded top corners and a semantic selected border/text accent; `Pills` uses a rounded semantic selected surface with contrast-selected foreground; `Underline` stays visually minimal and paints only a DPI-scaled selected accent at the header bottom.
+- Enabled inactive headers remain theme-neutral and use the current Hover token while hovered. Disabled headers use `SurfaceSecondary`, `Border`, and `Disabled` tokens independent of semantic variant. Selected focus uses the shared theme focus token without replacing native focus/selection behavior.
+- Header metrics reuse `BootstrapThemeMetrics` and `DpiScaler`: the 96-DPI baseline is 32px height, 12px horizontal padding, 8px image/text spacing, 54px minimum width, 1px border, 2px focus/underline thickness, and the theme 6px radius.
+- With `Fill = false`, all fixed headers use one uniform width based on the widest measured native tab content plus horizontal padding and the minimum width. With `Fill = true`, all headers share available client width evenly but never shrink below the minimum; native TabControl overflow/navigation remains responsible when all minimum headers do not fit.
+- Header text uses `TextRenderer` with single-line end ellipsis. Native images are read from the assigned `ImageList` through each page's `ImageKey`/`ImageIndex`; the control does not introduce a second icon model or copy image state.
+- Runtime theme changes update theme-owned `Body` typography, metrics, palette, header size, and painting in place. Caller-assigned fonts remain caller-owned. Parent-DPI changes recompute `ItemSize`; page text/enabled changes and add/remove update sizing/presentation without replacing pages or selection.
+- Hover tracking uses native `GetTabRect` bounds only. No surrogate button controls, synthetic selection state, animation/timer, P/Invoke, custom window, page wrapper, or external package dependency is introduced.
+- Disposal releases the direct theme subscription, page presentation handlers, control event handlers, and framework-created font while leaving caller-owned fonts/images/pages to normal WinForms ownership semantics.
+- Designer construction is parameterless and requires no application bootstrap.
+
+Manual verification: choose **Navigation / Tabs** in the integrated demo. Exercise Tabs/Pills/Underline with mouse, Tab/arrow/Ctrl+Tab keyboard paths, Fill on/off, all eight variants, native ImageList/ImageKey/ImageIndex, tooltip text, disabled pages, long labels, and live `SelectedIndexChanged` status. Switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling. Confirm headers stay aligned/unclipped, focus remains visible, selection/page identity remains native, and native overflow controls remain usable when headers exceed available width.
+
 ## Deferred components
 
-Toast, Dialog/Modal, Dropdown, Tabs, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
+Toast, Dialog/Modal, Dropdown, Skeleton, ComboBox, NumericBox, DatePicker, and others are not part of the initial foundation contract.
 
 Before adding one, document which existing foundation pieces it reuses.
