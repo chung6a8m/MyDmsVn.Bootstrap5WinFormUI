@@ -38,9 +38,9 @@ public sealed class BootstrapNumericBoxRenderLogicTests
         Assert.That(
             BootstrapNumericBoxRenderLogic.ResolveMetrics(metrics, 192, 6).Radius,
             Is.EqualTo(DpiScaler.Scale(6f, 192)));
-        Assert.Throws<ArgumentOutOfRangeException>(() => BootstrapNumericBoxRenderLogic.ResolveMetrics(metrics, 96, -2));
-        Assert.Throws<ArgumentOutOfRangeException>(() => BootstrapNumericBoxRenderLogic.ResolveMetrics(metrics, 0, -1));
-        Assert.Throws<ArgumentNullException>(() => BootstrapNumericBoxRenderLogic.ResolveMetrics(null!, 96, -1));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapNumericBoxRenderLogic.ResolveMetrics(metrics, 96, -2)));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapNumericBoxRenderLogic.ResolveMetrics(metrics, 0, -1)));
+        Assert.Throws<ArgumentNullException>((Action)(() => BootstrapNumericBoxRenderLogic.ResolveMetrics(null!, 96, -1)));
     }
 
     [Test]
@@ -76,9 +76,9 @@ public sealed class BootstrapNumericBoxRenderLogicTests
             Assert.That(disabled.Border, Is.EqualTo(colors.Disabled));
         }));
 
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
             BootstrapNumericBoxRenderLogic.ResolvePalette(
-                colors, (BootstrapValidationState)999, containsFocus: false, enabled: true, readOnly: false));
+                colors, (BootstrapValidationState)999, containsFocus: false, enabled: true, readOnly: false)));
     }
 
     [Test]
@@ -118,7 +118,7 @@ public sealed class BootstrapNumericBoxRenderLogicTests
         Assert.That(tiny.Width, Is.GreaterThan(0));
         Assert.That(tiny.Height, Is.EqualTo(10));
         Assert.That(new Rectangle(0, 0, 5, 10).Contains(tiny), Is.True);
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            BootstrapNumericBoxRenderLogic.CalculateNativeBounds(new Size(160, 32), 0, metrics));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            BootstrapNumericBoxRenderLogic.CalculateNativeBounds(new Size(160, 32), 0, metrics)));
     }
 }
