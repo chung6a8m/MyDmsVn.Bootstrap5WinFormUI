@@ -94,30 +94,32 @@ public sealed class BootstrapComboBoxVisualRegressionTests
     }
 
     [Test]
-    public void SizeChangedRelayoutDuringHandleCreationRepairsIntegratedDemoStatusPosition()
+    public void DeferredRelayoutAfterHandleCreationRepairsIntegratedDemoStatusPosition()
     {
         using var form = new AdvancedInputsDemoForm { ShowInTaskbar = false };
         var combo = FindDemoComboBox(form);
         var status = FindDemoStatus(form);
-        var sizeChangedCount = 0;
+        var deferredLayoutCount = 0;
 
-        combo.SizeChanged += (_, _) =>
-        {
-            sizeChangedCount++;
-            combo.Parent?.PerformLayout(combo, nameof(Control.Size));
-        };
+        combo.HandleCreated += (_, _) =>
+            combo.BeginInvoke(new Action(() =>
+            {
+                deferredLayoutCount++;
+                combo.Parent?.PerformLayout(combo, nameof(Control.Size));
+            }));
 
         form.Show();
+        Application.DoEvents();
         Application.DoEvents();
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(sizeChangedCount, Is.GreaterThan(0),
-                "The native owner-draw height transition must raise SizeChanged during handle creation for this lifecycle hook to be viable.");
+            Assert.That(deferredLayoutCount, Is.GreaterThan(0),
+                "The diagnostic deferred layout must execute after handle creation.");
             Assert.That(
                 status.Top,
                 Is.GreaterThanOrEqualTo(combo.Bottom + status.Margin.Top),
-                "If layout at SizeChanged timing is sufficient, the status should move below the post-handle ComboBox height.");
+                "A layout request deferred until after handle creation should use the corrected post-handle preferred height.");
         }));
     }
 
