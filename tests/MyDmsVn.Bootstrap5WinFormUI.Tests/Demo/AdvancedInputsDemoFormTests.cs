@@ -72,6 +72,38 @@ public sealed class AdvancedInputsDemoFormTests
         }));
     }
 
+    [Test]
+    public void AdvancedInputsDemoContainsStage9BootstrapDatePickerScenarios()
+    {
+        using var form = new AdvancedInputsDemoForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var datePickers = FindControls<BootstrapDatePicker>(form).ToArray();
+        var labels = FindControls<Label>(form).ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(datePickers.Length, Is.GreaterThanOrEqualTo(11));
+            Assert.That(datePickers.Any(picker => picker.Format == DateTimePickerFormat.Long), Is.True);
+            Assert.That(datePickers.Any(picker => picker.Format == DateTimePickerFormat.Short), Is.True);
+            Assert.That(datePickers.Any(picker => picker.Format == DateTimePickerFormat.Time), Is.True);
+            Assert.That(datePickers.Any(picker => picker.Format == DateTimePickerFormat.Custom && picker.CustomFormat == "yyyy-MM-dd"), Is.True);
+            Assert.That(datePickers.Any(picker => picker.Format == DateTimePickerFormat.Custom && picker.CustomFormat == "yyyy-MM-dd HH:mm"), Is.True);
+            Assert.That(datePickers.Any(picker => picker.ShowCheckBox && !picker.Checked), Is.True);
+            Assert.That(datePickers.Any(picker => picker.MinDate == new DateTime(2026, 1, 1) && picker.MaxDate == new DateTime(2026, 12, 31)), Is.True);
+            Assert.That(datePickers.Any(picker => picker.ValidationState == BootstrapValidationState.Valid), Is.True);
+            Assert.That(datePickers.Any(picker => picker.ValidationState == BootstrapValidationState.Invalid), Is.True);
+            Assert.That(datePickers.Any(picker => !picker.Enabled), Is.True);
+            Assert.That(datePickers.Any(picker => picker.BorderRadius == 8), Is.True);
+            Assert.That(labels.Any(label => label.Text.StartsWith("ValueChanged:", StringComparison.Ordinal)), Is.True);
+            Assert.That(labels.Any(label =>
+                label.Text.IndexOf("native", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                label.Text.IndexOf("calendar", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                label.Text.IndexOf("popup", StringComparison.OrdinalIgnoreCase) >= 0), Is.True);
+        }));
+    }
+
     private static IEnumerable<T> FindControls<T>(Control root)
         where T : Control
     {
