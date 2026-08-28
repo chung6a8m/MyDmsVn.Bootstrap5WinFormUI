@@ -195,8 +195,8 @@ public sealed class BootstrapTabControlTests
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(withoutHotTrack, Is.EqualTo(colors.Surface));
-            Assert.That(withHotTrack, Is.EqualTo(colors.Hover));
+            Assert.That(withoutHotTrack.ToArgb(), Is.EqualTo(colors.Surface.ToArgb()));
+            Assert.That(withHotTrack.ToArgb(), Is.EqualTo(colors.Hover.ToArgb()));
         }));
     }
 
