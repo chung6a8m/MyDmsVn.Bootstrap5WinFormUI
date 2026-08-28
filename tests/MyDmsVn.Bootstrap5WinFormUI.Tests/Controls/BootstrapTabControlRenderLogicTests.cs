@@ -153,7 +153,7 @@ public sealed class BootstrapTabControlRenderLogicTests
                     selected: true,
                     enabled: false,
                     hovered: true);
-                Assert.That(actual.Background, Is.EqualTo(colors.SurfaceSecondary));
+                Assert.That(actual.Background, Is.EqualTo(colors.Surface));
                 Assert.That(actual.Foreground, Is.EqualTo(colors.Disabled));
                 Assert.That(actual.Border, Is.EqualTo(colors.Border));
                 Assert.That(actual.Accent, Is.EqualTo(colors.Disabled));
