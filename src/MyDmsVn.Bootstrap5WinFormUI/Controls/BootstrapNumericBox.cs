@@ -46,6 +46,12 @@ public class BootstrapNumericBox : UserControl
         _editor.TabStop = false;
         _editor.Margin = Padding.Empty;
         _editor.ValueChanged += OnEditorValueChanged;
+        _editor.KeyDown += OnEditorKeyDown;
+        _editor.KeyPress += OnEditorKeyPress;
+        _editor.KeyUp += OnEditorKeyUp;
+        _editor.PreviewKeyDown += OnEditorPreviewKeyDown;
+        _editor.GotFocus += OnEditorFocusChanged;
+        _editor.LostFocus += OnEditorFocusChanged;
 
         Controls.Add(_editor);
 
@@ -215,6 +221,20 @@ public class BootstrapNumericBox : UserControl
     }
 
     /// <inheritdoc />
+    protected override void OnEnter(EventArgs e)
+    {
+        base.OnEnter(e);
+        FocusEditor();
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        FocusEditor();
+    }
+
+    /// <inheritdoc />
     protected override void OnEnabledChanged(EventArgs e)
     {
         base.OnEnabledChanged(e);
@@ -309,6 +329,12 @@ public class BootstrapNumericBox : UserControl
             }
 
             _editor.ValueChanged -= OnEditorValueChanged;
+            _editor.KeyDown -= OnEditorKeyDown;
+            _editor.KeyPress -= OnEditorKeyPress;
+            _editor.KeyUp -= OnEditorKeyUp;
+            _editor.PreviewKeyDown -= OnEditorPreviewKeyDown;
+            _editor.GotFocus -= OnEditorFocusChanged;
+            _editor.LostFocus -= OnEditorFocusChanged;
             DisposeThemeFont();
         }
 
@@ -318,6 +344,32 @@ public class BootstrapNumericBox : UserControl
     private void OnEditorValueChanged(object? sender, EventArgs e)
     {
         ValueChanged?.Invoke(this, e);
+    }
+
+    private void OnEditorKeyDown(object? sender, KeyEventArgs e)
+    {
+        OnKeyDown(e);
+    }
+
+    private void OnEditorKeyPress(object? sender, KeyPressEventArgs e)
+    {
+        OnKeyPress(e);
+    }
+
+    private void OnEditorKeyUp(object? sender, KeyEventArgs e)
+    {
+        OnKeyUp(e);
+    }
+
+    private void OnEditorPreviewKeyDown(object? sender, PreviewKeyDownEventArgs e)
+    {
+        OnPreviewKeyDown(e);
+    }
+
+    private void OnEditorFocusChanged(object? sender, EventArgs e)
+    {
+        ApplyTheme();
+        Invalidate();
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
@@ -381,6 +433,14 @@ public class BootstrapNumericBox : UserControl
         var font = _themeFont;
         _themeFont = null;
         font?.Dispose();
+    }
+
+    private void FocusEditor()
+    {
+        if (Enabled && !_editor.Focused)
+        {
+            _editor.Focus();
+        }
     }
 
     private void LayoutEditor()
