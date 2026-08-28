@@ -1,10 +1,12 @@
 using System;
 using System.ComponentModel;
+using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -14,6 +16,24 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapNumericBoxTests
 {
+    private BootstrapTheme? _originalTheme;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _originalTheme = BootstrapThemeManager.CurrentTheme;
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (_originalTheme is not null)
+        {
+            BootstrapThemeManager.CurrentTheme = _originalTheme;
+        }
+    }
+
     [Test]
     public void DefaultsMatchNativeBackedContract()
     {
@@ -171,5 +191,156 @@ public sealed class BootstrapNumericBoxTests
             Assert.That(lastSender, Is.SameAs(input));
             Assert.That(input.Value, Is.EqualTo(2m));
         }));
+    }
+
+    [Test]
+    public void NativeEditorUsesShellPaletteAndRemainsInsideClientBounds()
+    {
+        using var input = new BootstrapNumericBox { Size = new Size(180, 32) };
+        var native = input.Controls.OfType<NumericUpDown>().Single();
+
+        input.PerformLayout();
+        var colors = BootstrapThemeManager.CurrentTheme.Colors;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.ClientRectangle.Contains(native.Bounds), Is.True);
+            Assert.That(native.BackColor, Is.EqualTo(colors.Surface));
+            Assert.That(native.ForeColor, Is.EqualTo(colors.Text));
+            Assert.That(native.Font, Is.SameAs(input.Font));
+        }));
+
+        input.ReadOnly = true;
+        Assert.That(native.BackColor, Is.EqualTo(colors.SurfaceSecondary));
+
+        input.Enabled = false;
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.BackColor, Is.EqualTo(colors.SurfaceSecondary));
+            Assert.That(native.ForeColor, Is.EqualTo(colors.MutedText));
+        }));
+    }
+
+    [Test]
+    public void DrawToBitmapSmokeSupportsShellStatesAndCustomRadius()
+    {
+        using var input = new BootstrapNumericBox { Size = new Size(180, 32) };
+        using var bitmap = new Bitmap(input.Width, input.Height);
+
+        Assert.DoesNotThrow((Action)(() => input.DrawToBitmap(bitmap, input.ClientRectangle)));
+
+        input.ValidationState = BootstrapValidationState.Valid;
+        Assert.DoesNotThrow((Action)(() => input.DrawToBitmap(bitmap, input.ClientRectangle)));
+
+        input.ValidationState = BootstrapValidationState.Invalid;
+        input.BorderRadius = 8;
+        Assert.DoesNotThrow((Action)(() => input.DrawToBitmap(bitmap, input.ClientRectangle)));
+
+        input.ReadOnly = true;
+        Assert.DoesNotThrow((Action)(() => input.DrawToBitmap(bitmap, input.ClientRectangle)));
+
+        input.Enabled = false;
+        Assert.DoesNotThrow((Action)(() => input.DrawToBitmap(bitmap, input.ClientRectangle)));
+    }
+
+    [Test]
+    public void RuntimeThemeSwitchUpdatesThemeOwnedFontAndNativeFont()
+    {
+        using var input = new BootstrapNumericBox();
+        var native = input.Controls.OfType<NumericUpDown>().Single();
+        var baseTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        var typography = new BootstrapThemeTypography(
+            new BootstrapFontToken("Segoe UI", 11f, FontStyle.Bold),
+            baseTheme.Typography.BodySmall,
+            baseTheme.Typography.Label,
+            baseTheme.Typography.HeadingSmall,
+            baseTheme.Typography.HeadingMedium);
+
+        BootstrapThemeManager.CurrentTheme = new BootstrapTheme(
+            BootstrapThemeMode.Dark,
+            baseTheme.Colors,
+            baseTheme.Metrics,
+            typography);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.Font.SizeInPoints, Is.EqualTo(11f).Within(0.05f));
+            Assert.That(input.Font.Style, Is.EqualTo(FontStyle.Bold));
+            Assert.That(native.Font, Is.SameAs(input.Font));
+            Assert.That(native.BackColor, Is.EqualTo(baseTheme.Colors.Surface));
+            Assert.That(native.ForeColor, Is.EqualTo(baseTheme.Colors.Text));
+        }));
+    }
+
+    [Test]
+    public void CallerAssignedFontRemainsCallerOwnedAcrossThemeChangesAndDispose()
+    {
+        using var callerFont = new Font("Segoe UI", 11f, FontStyle.Bold);
+        var input = new BootstrapNumericBox { Font = callerFont };
+
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+
+        Assert.That(input.Font, Is.SameAs(callerFont));
+        input.Dispose();
+
+        using var bitmap = new Bitmap(24, 24);
+        using var graphics = Graphics.FromImage(bitmap);
+        Assert.DoesNotThrow((Action)(() => graphics.MeasureString("x", callerFont)));
+    }
+
+    [Test]
+    public void DisposalReleasesThemeSubscriptionAndThemeOwnedFont()
+    {
+        var baselineSubscriptions = GetThemeSubscriptionCount();
+        var input = new BootstrapNumericBox();
+        var ownedFont = input.Font;
+
+        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions + 1));
+
+        input.Dispose();
+
+        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions));
+        Assert.DoesNotThrow((Action)(() =>
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark)));
+
+        using var bitmap = new Bitmap(24, 24);
+        using var graphics = Graphics.FromImage(bitmap);
+        Assert.Catch((Action)(() => graphics.MeasureString("x", ownedFont)));
+    }
+
+    [Test]
+    public void RepeatedLifecycleStressDoesNotLeakStaticThemeHandlers()
+    {
+        var baselineSubscriptions = GetThemeSubscriptionCount();
+
+        for (var index = 0; index < 50; index++)
+        {
+            using var input = new BootstrapNumericBox
+            {
+                Minimum = -100m,
+                Maximum = 100m,
+                Value = index % 100,
+                BorderRadius = index % 10,
+                ValidationState = (BootstrapValidationState)(index % 3)
+            };
+
+            if (index % 10 == 0)
+            {
+                var mode = BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light
+                    ? BootstrapThemeMode.Dark
+                    : BootstrapThemeMode.Light;
+                BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+            }
+        }
+
+        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions));
+    }
+
+    private static int GetThemeSubscriptionCount()
+    {
+        var eventField = typeof(BootstrapThemeManager).GetField("ThemeChanged", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(eventField, Is.Not.Null);
+        var handler = eventField!.GetValue(null) as Delegate;
+        return handler?.GetInvocationList().Length ?? 0;
     }
 }
