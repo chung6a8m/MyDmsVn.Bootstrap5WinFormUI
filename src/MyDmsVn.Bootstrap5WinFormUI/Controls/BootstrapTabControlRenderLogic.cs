@@ -212,7 +212,7 @@ internal static class BootstrapTabControlRenderLogic
         if (!enabled)
         {
             return new BootstrapTabHeaderPalette(
-                colors.SurfaceSecondary,
+                colors.Surface,
                 colors.Border,
                 colors.Disabled,
                 colors.Disabled,
