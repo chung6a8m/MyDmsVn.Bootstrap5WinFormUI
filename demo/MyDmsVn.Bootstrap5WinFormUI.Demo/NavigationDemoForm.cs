@@ -56,9 +56,19 @@ public sealed class NavigationDemoForm : Form
     private void AddStyleScenario(string title, BootstrapTabStyle style, BootstrapVariant variant, bool fill)
     {
         var tabs = CreateTabs(style, variant, fill);
-        tabs.TabPages.Add(CreatePage("Overview", "Native TabPage content for Overview."));
-        tabs.TabPages.Add(CreatePage("Details", "Native TabPage content for Details."));
-        tabs.TabPages.Add(CreatePage("Settings", "Native TabPage content for Settings."));
+        if (style == BootstrapTabStyle.Tabs)
+        {
+            tabs.TabPages.Add(CreateFocusablePage("Overview", "Use Tab/Shift+Tab to move through native child controls."));
+            tabs.TabPages.Add(CreateFocusablePage("Details", "Native focus traversal stays inside the selected TabPage."));
+            tabs.TabPages.Add(CreateFocusablePage("Settings", "Arrow/Ctrl+Tab selection remains owned by WinForms TabControl."));
+        }
+        else
+        {
+            tabs.TabPages.Add(CreatePage("Overview", "Native TabPage content for Overview."));
+            tabs.TabPages.Add(CreatePage("Details", "Native TabPage content for Details."));
+            tabs.TabPages.Add(CreatePage("Settings", "Native TabPage content for Settings."));
+        }
+
         _content.Controls.Add(CreateSection(title + " style", "Selection, mouse hit-testing, focus, and keyboard navigation remain native.", tabs));
     }
 
@@ -165,6 +175,33 @@ public sealed class NavigationDemoForm : Form
             Location = new Point(12, 14)
         };
         page.Controls.Add(label);
+        return page;
+    }
+
+    private static TabPage CreateFocusablePage(string title, string body)
+    {
+        var page = CreatePage(title, body);
+        page.Controls.Add(new TextBox
+        {
+            AccessibleName = title + " text input",
+            Location = new Point(12, 42),
+            Width = 220,
+            Text = title + " value"
+        });
+        page.Controls.Add(new Button
+        {
+            AccessibleName = title + " action",
+            AutoSize = true,
+            Location = new Point(244, 40),
+            Text = "Action"
+        });
+        page.Controls.Add(new CheckBox
+        {
+            AccessibleName = title + " option",
+            AutoSize = true,
+            Location = new Point(12, 76),
+            Text = "Enabled option"
+        });
         return page;
     }
 
