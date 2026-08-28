@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Animation;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
