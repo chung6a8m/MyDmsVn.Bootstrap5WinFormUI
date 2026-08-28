@@ -1,7 +1,7 @@
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 /// <summary>
-/// Describes the validation presentation of a <see cref="BootstrapTextBox"/>.
+/// Describes the validation presentation shared by framework input controls.
 /// </summary>
 public enum BootstrapValidationState
 {
