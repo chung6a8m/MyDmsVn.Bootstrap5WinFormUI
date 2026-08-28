@@ -75,6 +75,81 @@ public sealed class BootstrapSidebarAnimatedLayoutTests
         }
     }
 
+    [Test]
+    public void AnimatedReExpandKeepsRowsAfterExpandedSectionVisible()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light, reducedMotion: false);
+        try
+        {
+            using var form = new Form
+            {
+                ClientSize = new System.Drawing.Size(1280, 800),
+                ShowInTaskbar = false
+            };
+            using var sidebar = new BootstrapSidebar
+            {
+                Dock = DockStyle.Left,
+                ExpandedWidth = 250,
+                CollapsedWidth = 68,
+                AnimationDuration = TimeSpan.FromMilliseconds(200)
+            };
+
+            var theme = new BootstrapSidebarItem { Text = "Theme" };
+            sidebar.Items.Add(theme);
+            theme.Expanded = true;
+            theme.Items.Add(new BootstrapSidebarItem { Text = "Rendering / DPI" });
+            theme.Items.Add(new BootstrapSidebarItem { Text = "Icons" });
+            theme.Items.Add(new BootstrapSidebarItem { Text = "Animation" });
+
+            foreach (var text in new[]
+            {
+                "Buttons / Groups / Toolbar",
+                "Inputs",
+                "Cards",
+                "Collapse / Accordion",
+                "Loading / Spinner",
+                "Progress",
+                "Sidebar",
+                "DataGrid"
+            })
+            {
+                sidebar.Items.Add(new BootstrapSidebarItem { Text = text });
+            }
+
+            sidebar.SelectedItem = theme;
+            form.Controls.Add(sidebar);
+            form.Show();
+            PumpMessagesUntil(
+                () => sidebar.IsHandleCreated && sidebar.Width == sidebar.ExpandedWidth && NestedTransitionsCompleted(sidebar),
+                TimeSpan.FromSeconds(3));
+            AssertRowsVisible(sidebar, "initial integrated-demo layout");
+
+            sidebar.Collapse();
+            PumpMessagesUntil(
+                () => sidebar.Width == sidebar.CollapsedWidth && NestedTransitionsCompleted(sidebar),
+                TimeSpan.FromSeconds(3));
+            AssertRowsVisible(sidebar, "collapsed integrated-demo layout");
+
+            sidebar.Expand();
+            PumpMessagesUntil(
+                () => sidebar.Width == sidebar.ExpandedWidth && NestedTransitionsCompleted(sidebar),
+                TimeSpan.FromSeconds(3));
+            AssertRowsVisible(sidebar, "re-expanded integrated-demo layout");
+
+            var host = sidebar.Controls.OfType<FlowLayoutPanel>().Single();
+            var dataGrid = FindButton(sidebar, sidebar.Items.Last());
+            Assert.That(
+                host.ClientRectangle.IntersectsWith(dataGrid.Bounds),
+                Is.True,
+                $"The DataGrid row was clipped after restoring the expanded Theme section. Host={host.Bounds}; DataGrid={dataGrid.Bounds}.");
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
+    }
+
     private static bool NestedTransitionsCompleted(Control root)
     {
         return Descendants(root).OfType<BootstrapCollapse>().All(collapse => !collapse.IsAnimating);

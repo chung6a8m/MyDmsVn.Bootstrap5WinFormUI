@@ -875,18 +875,18 @@ public class BootstrapSidebar : Panel
     private void ConfigureHostWidth(FlowLayoutPanel host, int width)
     {
         width = Math.Max(1, width);
-        var minimumHeight = GetAlwaysVisibleRowHeight(host);
+        var minimumHeight = GetVisibleContentHeight(host);
         host.MinimumSize = new Size(width, minimumHeight);
         host.MaximumSize = new Size(width, 0);
         host.Width = width;
     }
 
-    private static int GetAlwaysVisibleRowHeight(FlowLayoutPanel host)
+    private static int GetVisibleContentHeight(FlowLayoutPanel host)
     {
         var height = host.Padding.Vertical;
         foreach (Control control in host.Controls)
         {
-            if (control is BootstrapSidebarItemButton && control.Visible)
+            if (control.Visible)
             {
                 height += control.Height + control.Margin.Vertical;
             }
