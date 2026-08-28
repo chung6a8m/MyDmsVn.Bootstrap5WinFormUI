@@ -11,9 +11,11 @@ The library is native WinForms. It does not require a browser, WebView, Bootstra
 
 ## Included foundation controls
 
-`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, and `BootstrapTabControl`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
+`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapComboBox`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, and `BootstrapTabControl`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
 
 `BootstrapNumericBox` is a native-backed numeric input. It owns one borderless WinForms `NumericUpDown` and forwards `Value`, `Minimum`, `Maximum`, `Increment`, `DecimalPlaces`, `ThousandsSeparator`, and `ReadOnly` directly, while the framework owns the themed shell, validation/focus rendering, DPI layout, single public tab stop, and `BorderRadius`. Native range exceptions, spin buttons, Up/Down keys, mouse wheel, parsing, and formatting semantics remain native.
+
+`BootstrapComboBox` derives directly from WinForms `ComboBox`. Native `Items`, `DataSource`, `DisplayMember`, `ValueMember`, selection, editable text, autocomplete, keyboard/drop-down behavior, and events remain authoritative. The framework owns fixed-height owner-draw presentation, validation/focus border rendering, theme/DPI integration, `BorderRadius`, and an optional control-level `LeadingIcon`. The editable child, arrow button, hit-testing, and popup remain WinForms/OS-owned; no framework item wrapper or custom popup is introduced.
 
 `BootstrapPagination` is a data-source-agnostic composite control. Applications own data retrieval/slicing and react to `PageChanged`; the control owns only page state and navigation presentation.
 
@@ -55,6 +57,19 @@ var amount = new BootstrapNumericBox
 amount.ValueChanged += (_, _) =>
 {
     // React to the native numeric value change through the wrapper event.
+};
+
+var customerCombo = new BootstrapComboBox
+{
+    DropDownStyle = ComboBoxStyle.DropDownList,
+    DisplayMember = nameof(CustomerOption.Name),
+    ValueMember = nameof(CustomerOption.Id),
+    DataSource = customers,
+    LeadingIcon = IconDescriptor.Framework(FrameworkIconGlyph.Check)
+};
+customerCombo.SelectedIndexChanged += (_, _) =>
+{
+    // SelectedValue / SelectedItem remain the inherited native ComboBox values.
 };
 
 var statusBadge = new BootstrapBadge
@@ -108,9 +123,9 @@ pagination.PageChanged += (_, _) =>
 };
 ```
 
-Runtime Light/Dark switching is handled through `BootstrapThemeManager`. NumericBox, Badge, Alert, and TabControl directly update their semantic presentation and theme-owned fonts through the existing theme lifecycle; Pagination inherits theme behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children; Tooltip resolves the current theme only when its native Popup/Draw events execute. None introduces a separate theme service.
+Runtime Light/Dark switching is handled through `BootstrapThemeManager`. NumericBox, ComboBox, Badge, Alert, and TabControl directly update their semantic presentation and theme-owned fonts through the existing theme lifecycle; Pagination inherits theme behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children; Tooltip resolves the current theme only when its native Popup/Draw events execute. None introduces a separate theme service.
 
-The integrated demo exposes NumericBox under **Advanced Inputs**, including integer/default, decimal, thousands, signed-range, valid/invalid, read-only, disabled, and live `ValueChanged` scenarios.
+The integrated demo exposes NumericBox and ComboBox under **Advanced Inputs**. ComboBox scenarios include unbound and bound items, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` autocomplete, long text, optional leading icons, validation, disabled state, explicit radius, and native selection feedback.
 
 ## Icons
 
@@ -118,7 +133,7 @@ The core package contains source-neutral icon contracts and built-in Segoe MDL2/
 
 ## Release candidate status
 
-`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, and Stage 5 `BootstrapNumericBox` were added deliberately on the RC line and the compatibility fingerprint is re-reviewed whenever an exported surface is added. The assembly compatibility version remains `1.0.0.0`.
+`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, and Stage 6 `BootstrapComboBox` were added deliberately on the RC line and the compatibility fingerprint is re-reviewed whenever an exported surface is added. The assembly compatibility version remains `1.0.0.0`.
 
 The package is a release candidate, not an automatic NuGet.org publication.
 
