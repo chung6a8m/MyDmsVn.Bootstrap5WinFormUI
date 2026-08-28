@@ -1,0 +1,28 @@
+name: DatePicker CI
+
+on:
+  pull_request:
+
+jobs:
+  focused-tests:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run BootstrapDatePicker tests on both target frameworks
+        shell: pwsh
+        run: |
+          $project = "tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj"
+          foreach ($framework in @("net48", "net8.0-windows")) {
+            dotnet test $project -c Release -f $framework --filter "FullyQualifiedName~BootstrapDatePicker"
+            if ($LASTEXITCODE -ne 0) {
+              throw "BootstrapDatePicker tests failed for $framework with exit code $LASTEXITCODE."
+            }
+          }
