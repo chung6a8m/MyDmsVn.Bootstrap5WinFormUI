@@ -56,6 +56,7 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapTextBox`
 - `BootstrapNumericBox`
 - `BootstrapComboBox`
+- `BootstrapDropdown`
 - `BootstrapCard`
 - `BootstrapCollapse`
 - `BootstrapAccordion`
@@ -79,7 +80,7 @@ The Feedback page hosts the component-expansion feedback controls. `BootstrapBad
 
 The Pagination page demonstrates bounded numeric windows, ellipses, navigation visibility, size variants, boundary/zero-item states, and application-owned DataGrid paging. `BootstrapPagination` itself does not own or slice a data source.
 
-The Navigation / Tabs page demonstrates `BootstrapTabControl` using native `TabPage` composition and selection with Bootstrap-inspired Tabs, Pills, and Underline header styles. It includes uniform Fill sizing, all semantic variants, `ImageList`/`ImageKey`/`ImageIndex`, native tooltip text, disabled pages, long labels, and live `SelectedIndexChanged` feedback.
+The Navigation / Tabs page demonstrates `BootstrapTabControl` using native `TabPage` composition and selection with Bootstrap-inspired Tabs, Pills, and Underline header styles. It includes uniform Fill sizing, all semantic variants, `ImageList`/`ImageKey`/`ImageIndex`, native tooltip text, disabled pages, long labels, and live `SelectedIndexChanged` feedback. Stage 7 extends the same page with `BootstrapDropdown` basic, icon, checked/disabled/separator, long-caption/minimum-width, and stress/theme scenarios without adding a second navigation route. The page also records the real-desktop native keyboard, outside-click, screen-edge, multi-monitor, and 100–200% DPI verification matrix.
 
 Earlier Rendering / DPI, Icons, and Animation diagnostics remain available below the Theme navigation item.
 
@@ -106,6 +107,39 @@ customerCombo.SelectedIndexChanged += (_, _) =>
 ```
 
 No framework item wrapper is required. `Items`, `DataSource`, `DisplayMember`, `ValueMember`, `SelectedIndex`, `SelectedItem`, `SelectedValue`, autocomplete, keyboard behavior, and native selection/drop-down events are inherited from `ComboBox`.
+
+## Native command Dropdown usage
+
+`BootstrapDropdown` composes a caller-owned `BootstrapButton` target with one native `ToolStripDropDownMenu`. The public item collection is the source of truth; native rows are rebuilt from the current model values at each effective `Show()`.
+
+```csharp
+var actionsButton = new BootstrapButton
+{
+    Text = "Actions",
+    Variant = BootstrapVariant.Primary,
+    AutoSize = true
+};
+
+var actions = new BootstrapDropdown
+{
+    Target = actionsButton,
+    Variant = BootstrapVariant.Primary,
+    MinimumWidth = 180
+};
+
+var create = new BootstrapDropdownItem
+{
+    Text = "Create",
+    Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus)
+};
+create.Click += (_, _) => CreateRecord();
+
+actions.Items.Add(create);
+actions.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator));
+actions.Items.Add(new BootstrapDropdownItem { Text = "Unavailable", Enabled = false });
+```
+
+The target and public item models remain caller-owned. Native WinForms owns menu focus, keyboard navigation, AutoClose/outside-click dismissal, and working-area placement. `Checked` is presentation state only and is changed only by application code. Icons use the target button's current `IconRenderer`, theme color, and DPI; generated native menu images are owned and disposed by the Dropdown.
 
 ## Release candidate
 
@@ -139,6 +173,8 @@ NumericBox is likewise native-backed: `BootstrapNumericBox` owns one borderless 
 
 ComboBox stays even closer to native WinForms: `BootstrapComboBox` derives directly from `ComboBox`, uses fixed-height owner draw only for framework-controlled item/closed-selection presentation, adds validation/focus shell rendering and an optional control-level `LeadingIcon`, and deliberately leaves binding, selection, autocomplete, edit child, arrow button, popup lifecycle, keyboard behavior, and native events authoritative. It adds no custom popup, parallel item model, timer, reflection into private WinForms internals, or external dependency.
 
+Dropdown uses a separate native-first command-menu pattern: `BootstrapDropdown : Component` owns one `ToolStripDropDownMenu` and one internal theme renderer, while the application owns its `BootstrapButton` target and `BootstrapDropdownItem` models. Each opening builds a short-lived native snapshot; native ToolStrip owns focus, keyboard, dismissal and screen placement. The framework owns target wiring, command dispatch, token-based rendering, DPI sizing, icon bitmap generation, theme refresh, and deterministic cleanup. It introduces no top-level custom form, global hook, timer, animation scheduler, submenu model, live collection synchronization, or external dependency.
+
 See [Phase 15 — Hardening and API review](docs/PHASE15_HARDENING_AND_API_REVIEW.md) for the audit findings and the real-Windows/manual checks carried into release validation.
 
 ## Documentation
@@ -161,7 +197,7 @@ The primary sources of truth are:
 
 ## Status
 
-Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, and Stage 6 `BootstrapComboBox` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
+Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, Stage 6 `BootstrapComboBox`, and Stage 7 `BootstrapDropdown` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
 
 The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 
