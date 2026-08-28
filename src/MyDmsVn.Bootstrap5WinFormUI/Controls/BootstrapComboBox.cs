@@ -380,7 +380,7 @@ public class BootstrapComboBox : ComboBox
 
     private void ApplyOwnerDrawMetrics()
     {
-        if (IsDisposed)
+        if (IsDisposed || !IsHandleCreated)
         {
             return;
         }
