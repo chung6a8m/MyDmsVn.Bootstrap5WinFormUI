@@ -11,9 +11,11 @@ The library is native WinForms. It does not require a browser, WebView, Bootstra
 
 ## Included foundation controls
 
-`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapTextBox`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, and `BootstrapPagination`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
+`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapTextBox`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, and `BootstrapBadge`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
 
 `BootstrapPagination` is a data-source-agnostic composite control. Applications own data retrieval/slicing and react to `PageChanged`; the control owns only page state and navigation presentation.
+
+`BootstrapBadge` is a compact, auto-sized, non-interactive text indicator. `Variant` selects an existing semantic color; `CustomColor` can override it; `Pill` selects half-height pill geometry; `BorderRadius = -1` uses the current theme radius.
 
 ## Minimal example
 
@@ -31,6 +33,13 @@ var saveButton = new BootstrapButton
     AutoSize = true
 };
 
+var statusBadge = new BootstrapBadge
+{
+    Text = "Active",
+    Variant = BootstrapVariant.Success,
+    Pill = true
+};
+
 var pagination = new BootstrapPagination
 {
     TotalItems = 250,
@@ -44,7 +53,7 @@ pagination.PageChanged += (_, _) =>
 };
 ```
 
-Runtime Light/Dark switching is handled through `BootstrapThemeManager`. Pagination inherits that behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children rather than owning a separate theme subscription.
+Runtime Light/Dark switching is handled through `BootstrapThemeManager`. Pagination inherits that behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children, while Badge directly updates its semantic palette and theme-owned font through the existing theme lifecycle. Neither introduces a separate theme service.
 
 ## Icons
 
@@ -52,7 +61,7 @@ The core package contains source-neutral icon contracts and built-in Segoe MDL2/
 
 ## Release candidate status
 
-`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. `BootstrapPagination` was added deliberately on the RC line and the compatibility fingerprint was re-reviewed before approval. The assembly compatibility version remains `1.0.0.0`.
+`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. `BootstrapPagination` and Stage 1 `BootstrapBadge` were added deliberately on the RC line and the compatibility fingerprint was re-reviewed before approval. The assembly compatibility version remains `1.0.0.0`.
 
 The package is a release candidate, not an automatic NuGet.org publication.
 
