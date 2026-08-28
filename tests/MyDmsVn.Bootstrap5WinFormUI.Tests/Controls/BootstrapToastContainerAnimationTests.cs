@@ -168,6 +168,89 @@ public sealed class BootstrapToastContainerAnimationTests
         }));
     }
 
+    [Test]
+    public void RemovingFirstVisibleToastReflowsSurvivorsThroughOneContainerAnimation()
+    {
+        var harness = new BootstrapToastAnimationHarness();
+        using var container = new BootstrapToastContainer(harness.Create)
+        {
+            Size = new Size(400, 400),
+            Placement = BootstrapToastPlacement.TopRight
+        };
+        var first = CreateToast(200);
+        var second = CreateToast(200);
+        var third = CreateToast(200);
+
+        container.ShowToast(first);
+        harness.Records[0].Advance(200);
+        container.ShowToast(second);
+        harness.Records[1].Advance(200);
+        container.ShowToast(third);
+        harness.Records[2].Advance(200);
+
+        var secondBefore = second.Bounds;
+        var thirdBefore = third.Bounds;
+        first.Dismiss();
+        harness.Records[3].Advance(200);
+
+        Assert.That(harness.Records.Count, Is.EqualTo(5));
+        var reflow = harness.Records[4];
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(reflow.Animation.Easing(0.5), Is.EqualTo(BootstrapEasing.EaseInOut(0.5)).Within(0.000001));
+            Assert.That(reflow.Scheduler.IsRunning, Is.True);
+        }));
+
+        reflow.Advance(100);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(second.Top, Is.LessThan(secondBefore.Top));
+            Assert.That(third.Top, Is.LessThan(thirdBefore.Top));
+        }));
+
+        reflow.Advance(100);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(second.Top, Is.EqualTo(0));
+            Assert.That(third.Top, Is.GreaterThan(second.Bottom));
+            Assert.That(reflow.Scheduler.IsRunning, Is.False);
+        }));
+    }
+
+    [Test]
+    public void RapidSecondDismissalCancelsStaleReflowBeforeStartingNextExit()
+    {
+        var harness = new BootstrapToastAnimationHarness();
+        using var container = new BootstrapToastContainer(harness.Create) { Size = new Size(400, 400) };
+        var first = CreateToast(200);
+        var second = CreateToast(200);
+        var third = CreateToast(200);
+
+        container.ShowToast(first);
+        harness.Records[0].Advance(200);
+        container.ShowToast(second);
+        harness.Records[1].Advance(200);
+        container.ShowToast(third);
+        harness.Records[2].Advance(200);
+
+        first.Dismiss();
+        harness.Records[3].Advance(200);
+        var staleReflow = harness.Records[4];
+        staleReflow.Advance(50);
+        var secondCurrent = second.Bounds;
+
+        second.Dismiss();
+
+        Assert.That(harness.Records.Count, Is.EqualTo(6));
+        var secondExit = harness.Records[5];
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(staleReflow.Scheduler.IsRunning, Is.False);
+            Assert.That(secondExit.Scheduler.IsRunning, Is.True);
+            Assert.That(second.Bounds, Is.EqualTo(secondCurrent));
+        }));
+    }
+
     private static BootstrapToast CreateToast(int width)
     {
         return new BootstrapToast
