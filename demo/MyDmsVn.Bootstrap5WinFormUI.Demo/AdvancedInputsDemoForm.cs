@@ -14,6 +14,7 @@ public sealed class AdvancedInputsDemoForm : Form
     private readonly GroupBox _comboSection = new GroupBox();
     private readonly Label _integerStatus = new Label();
     private readonly Label _comboStatus = new Label();
+    private readonly Label _comboNote = new Label();
 
     public AdvancedInputsDemoForm()
     {
@@ -147,7 +148,13 @@ public sealed class AdvancedInputsDemoForm : Form
         {
             DropDownStyle = ComboBoxStyle.DropDownList
         };
-        dropDownList.Items.AddRange(new object[] { "Alpha", "Beta", "Gamma", "Delta" });
+        dropDownList.Items.AddRange(new object[]
+        {
+            "Alpha",
+            "Beta",
+            "Gamma",
+            "A deliberately long option used to verify end ellipsis without changing native selection"
+        });
         dropDownList.SelectedIndex = 1;
         _comboStatus.AutoSize = true;
         _comboStatus.Text = "SelectedIndexChanged: 1 / Beta";
@@ -223,9 +230,15 @@ public sealed class AdvancedInputsDemoForm : Form
         };
         explicitRadius.Items.AddRange(new object[] { "8px logical radius", "Alternative" });
         explicitRadius.SelectedIndex = 0;
-        AddComboCell(grid, "Explicit radius", explicitRadius);
+        AddComboCell(grid, "Explicit radius / no icon", explicitRadius);
+
+        _comboNote.AutoSize = true;
+        _comboNote.MaximumSize = new Size(860, 0);
+        _comboNote.Margin = new Padding(6, 0, 6, 8);
+        _comboNote.Text = "Native ownership note: WinForms/OS still owns the editable child, arrow button, hit-testing, and popup chrome. The popup may remain square or OS-themed.";
 
         _comboSection.Controls.Add(grid);
+        _comboSection.Controls.Add(_comboNote);
     }
 
     private static TableLayoutPanel CreateScenarioGrid()
@@ -327,6 +340,7 @@ public sealed class AdvancedInputsDemoForm : Form
         ApplyStandardTextColor(_comboSection, theme.Colors.Text);
         _integerStatus.ForeColor = theme.Colors.MutedText;
         _comboStatus.ForeColor = theme.Colors.MutedText;
+        _comboNote.ForeColor = theme.Colors.MutedText;
     }
 
     private static void ApplyStandardTextColor(Control root, Color color)
