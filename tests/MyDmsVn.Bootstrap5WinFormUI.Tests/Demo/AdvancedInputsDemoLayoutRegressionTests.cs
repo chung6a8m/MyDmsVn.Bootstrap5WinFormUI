@@ -28,13 +28,17 @@ public sealed class AdvancedInputsDemoLayoutRegressionTests
         var comboSection = Descendants(form)
             .OfType<GroupBox>()
             .Single(control => string.Equals(control.Text, "ComboBox scenarios", StringComparison.Ordinal));
-        var grid = comboSection.Controls.OfType<TableLayoutPanel>().Single();
-        var note = comboSection.Controls
+        var grid = Descendants(comboSection)
+            .OfType<TableLayoutPanel>()
+            .Single(control => control.ColumnCount == 2);
+        var note = Descendants(comboSection)
             .OfType<Label>()
             .Single(control => control.Text.StartsWith("Native ownership note:", StringComparison.Ordinal));
 
         Assert.Multiple((Action)(() =>
         {
+            Assert.That(grid.Parent, Is.SameAs(note.Parent),
+                "The note and scenario grid should participate in the same deterministic stack layout.");
             Assert.That(grid.Bounds.IntersectsWith(note.Bounds), Is.False,
                 "The explanatory note must not overlay the scenario grid.");
             Assert.That(note.Top, Is.GreaterThanOrEqualTo(grid.Bottom),
