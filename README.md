@@ -56,6 +56,7 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapTextBox`
 - `BootstrapNumericBox`
 - `BootstrapComboBox`
+- `BootstrapDatePicker`
 - `BootstrapDropdown`
 - `BootstrapCard`
 - `BootstrapCollapse`
@@ -76,7 +77,7 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 
 The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Advanced Inputs, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, Pagination, and Navigation / Tabs. Light/Dark switching and Reduced motion remain available while navigating.
 
-The Advanced Inputs page is the shared native-backed input showcase. Stage 5 adds `BootstrapNumericBox` examples for integer/default values, decimal formatting/increments, thousands separators, signed ranges, validation states, read-only behavior, disabled behavior, and live `ValueChanged` feedback. Stage 6 extends the same page with `BootstrapComboBox` examples for native unbound and bound items, `DisplayMember` / `ValueMember`, editable `DropDown`, selection-only `DropDownList`, native autocomplete, long text/ellipsis, optional leading icons, validation, disabled state, explicit radius, and live native selection feedback. The editable child, arrow button, hit-testing, and popup remain WinForms/OS-owned.
+The Advanced Inputs page is the shared native-backed input showcase. Stage 5 adds `BootstrapNumericBox` examples for integer/default values, decimal formatting/increments, thousands separators, signed ranges, validation states, read-only behavior, disabled behavior, and live `ValueChanged` feedback. Stage 6 extends the same page with `BootstrapComboBox` examples for native unbound and bound items, `DisplayMember` / `ValueMember`, editable `DropDown`, selection-only `DropDownList`, native autocomplete, long text/ellipsis, optional leading icons, validation, disabled state, explicit radius, and live native selection feedback. Stage 9 adds `BootstrapDatePicker` Long/Short/Time and custom date/date-time formats, optional unchecked checkbox, constrained range, valid/invalid, disabled, explicit-radius, and live `ValueChanged` scenarios. ComboBox popup chrome and DatePicker calendar/localized rendering remain WinForms/OS-owned.
 
 The Feedback page hosts the component-expansion feedback controls. `BootstrapBadge` covers semantic, pill/custom/disabled, and long-text states; `BootstrapAlert` adds all semantic variants, optional icons, native keyboard-accessible dismissal, multiline/disabled/custom-radius states, and restore cycles; `BootstrapTooltip` adds default Dark, semantic and custom-color owner-drawn popups, explicit multiline/long captions, one Tooltip associated with multiple controls, and live native timing/state forwarding. Stage 8 adds an application-placed `BootstrapToastContainer` with manual and auto-hide Toasts, icon/multiline content, a burst of eight notifications that demonstrates FIFO/max-visible queueing, `DismissAll()`, all four placements, rapid show/dismiss, disabled presentation, and a 100-toast lifecycle/resource stress action. The page remains the shared runtime Light/Dark, Reduced motion, and real-Windows 100–200% DPI verification surface.
 
@@ -109,6 +110,31 @@ customerCombo.SelectedIndexChanged += (_, _) =>
 ```
 
 No framework item wrapper is required. `Items`, `DataSource`, `DisplayMember`, `ValueMember`, `SelectedIndex`, `SelectedItem`, `SelectedValue`, autocomplete, keyboard behavior, and native selection/drop-down events are inherited from `ComboBox`.
+
+## Native DatePicker usage
+
+`BootstrapDatePicker` is a lightweight shell around exactly one native WinForms `DateTimePicker`. Native value/range/format/checkbox/calendar behavior stays canonical:
+
+```csharp
+var dueDate = new BootstrapDatePicker
+{
+    MinDate = new DateTime(2026, 1, 1),
+    MaxDate = new DateTime(2026, 12, 31),
+    Value = new DateTime(2026, 8, 28),
+    Format = DateTimePickerFormat.Custom,
+    CustomFormat = "yyyy-MM-dd",
+    ShowCheckBox = true,
+    Checked = true,
+    ValidationState = BootstrapValidationState.None
+};
+
+dueDate.ValueChanged += (_, _) =>
+{
+    var value = dueDate.Value;
+};
+```
+
+`Value`, `MinDate`, `MaxDate`, `Format`, `CustomFormat`, `ShowCheckBox`, and `Checked` forward directly to the owned native picker. The framework adds only the themed shell, validation/focus border, theme-owned font lifecycle, and DPI-aware layout. The native localized text, calendar popup, keyboard navigation, range normalization, and exception behavior are intentionally preserved. Stage 9 does not expose `ShowUpDown`, a nullable-value abstraction, a replacement calendar, or a custom parser/culture model.
 
 ## Native command Dropdown usage
 
@@ -201,6 +227,8 @@ NumericBox is likewise native-backed: `BootstrapNumericBox` owns one borderless 
 
 ComboBox stays even closer to native WinForms: `BootstrapComboBox` derives directly from `ComboBox`, uses fixed-height owner draw only for framework-controlled item/closed-selection presentation, adds validation/focus shell rendering and an optional control-level `LeadingIcon`, and deliberately leaves binding, selection, autocomplete, edit child, arrow button, popup lifecycle, keyboard behavior, and native events authoritative. It adds no custom popup, parallel item model, timer, reflection into private WinForms internals, or external dependency.
 
+DatePicker follows the NumericBox wrapper pattern around exactly one native `DateTimePicker`. Native date state, range rules, localized display, checkbox semantics, keyboard navigation, and calendar popup remain authoritative; the wrapper owns one tab stop, shared validation/focus shell rendering, theme-created font lifecycle, and DPI-scaled layout. It introduces no `MonthCalendar`, custom popup `Form`, nullable-date model, `ShowUpDown` proxy, parsing engine, culture property, timer, animation scheduler, Win32 hook, or external dependency.
+
 Dropdown uses a separate native-first command-menu pattern: `BootstrapDropdown : Component` owns one `ToolStripDropDownMenu` and one internal theme renderer, while the application owns its `BootstrapButton` target and `BootstrapDropdownItem` models. Each opening builds a short-lived native snapshot; native ToolStrip owns focus, keyboard, dismissal and screen placement. The framework owns target wiring, command dispatch, token-based rendering, DPI sizing, icon bitmap generation, theme refresh, and deterministic cleanup. It introduces no top-level custom form, global hook, timer, animation scheduler, submenu model, live collection synchronization, or external dependency.
 
 Toast reuses the existing feedback palette/layout rules shared with Alert, source-neutral icon rendering, `BootstrapAnimation` finite transitions, DPI helpers, and theme typography. `BootstrapToastContainer` owns FIFO queueing, max-visible enforcement, placement/reflow, and deterministic Toast disposal; each Toast owns only its semantic auto-hide countdown after enter completion. Reduced motion completes transitions immediately without changing configured delays. No top-level notification `Form`, global/static Toast manager, second feedback palette, public timer/scheduler seam, or external dependency is introduced.
@@ -227,7 +255,7 @@ The primary sources of truth are:
 
 ## Status
 
-Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, Stage 6 `BootstrapComboBox`, Stage 7 `BootstrapDropdown`, and Stage 8 `BootstrapToast` / `BootstrapToastContainer` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
+Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, Stage 6 `BootstrapComboBox`, Stage 7 `BootstrapDropdown`, Stage 8 `BootstrapToast` / `BootstrapToastContainer`, and Stage 9 `BootstrapDatePicker` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
 
 The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 

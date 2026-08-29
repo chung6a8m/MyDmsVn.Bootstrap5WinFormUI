@@ -723,8 +723,46 @@ After the final line, use the Toast/container API to request dismissal rather th
 
 Manual verification: choose **Feedback** in the integrated demo. Exercise manual and auto-hide Toasts, title/body/icon/multiline/disabled states, Burst 8 with `MaximumVisibleToasts = 3`, `DismissAll()`, all four placements, rapid show-then-dismiss, and Stress 100. Repeat with Light/Dark and Reduced motion, resize while Toasts are active, hide/show the host, switch theme during auto-hide, and repeat at 100/125/150/175/200% real Windows scaling. For resource soak, repeat stress/dismiss cycles and inspect process USER/GDI handles for unbounded growth.
 
+## BootstrapDatePicker
+
+Responsibility: provide a Bootstrap-themed date/time input while preserving native WinForms date state, range, formatting, checkbox, keyboard, localized display, and calendar-popup semantics.
+
+Stage 9 of the component-expansion roadmap finalizes the public concepts as:
+
+```text
+BootstrapDatePicker : UserControl
+
+BootstrapDatePicker.Value
+BootstrapDatePicker.MinDate
+BootstrapDatePicker.MaxDate
+BootstrapDatePicker.Format
+BootstrapDatePicker.CustomFormat
+BootstrapDatePicker.ShowCheckBox
+BootstrapDatePicker.Checked
+BootstrapDatePicker.ValidationState
+BootstrapDatePicker.BorderRadius
+BootstrapDatePicker.ValueChanged
+```
+
+Behavior:
+
+- `BootstrapDatePicker` owns exactly one private native WinForms `DateTimePicker`. The native picker is the single source of truth for `Value`, `MinDate`, `MaxDate`, `Format`, `CustomFormat`, `ShowCheckBox`, `Checked`, localized text, range normalization/exceptions, keyboard navigation, and the calendar popup; the framework does not mirror date state.
+- The wrapper owns the single public tab stop and keeps the private native picker out of the tab sequence. Entering the wrapper or clicking its shell redirects focus to the native picker; native `KeyDown`, `KeyPress`, `KeyUp`, and `PreviewKeyDown` are forwarded through the wrapper exactly once.
+- `ValueChanged` is raised only from the native picker's effective `ValueChanged` path and reports the `BootstrapDatePicker` wrapper as sender. Assigning the same value remains a native no-op, and range-driven value adjustments preserve native event behavior.
+- `Format` directly uses `DateTimePickerFormat.Long`, `Short`, `Time`, or `Custom`; `CustomFormat` is passed through unchanged. Stage 9 adds no custom parser, formatter, culture property, nullable-date model, or parallel text representation.
+- `ShowCheckBox` and `Checked` retain native optional-date checkbox presentation/state. Stage 9 intentionally fixes the owned picker to `ShowUpDown = false` and does not expose `ShowUpDown` publicly.
+- Border priority matches the established input model: disabled presentation wins first; otherwise Valid uses success, Invalid uses danger, neutral focus uses the focus token, and unfocused neutral uses the normal border token. Palette resolution reuses `BootstrapTextBoxRenderLogic` instead of creating a competing validation formula.
+- `BorderRadius = -1` uses the current theme radius; non-negative values specify an explicit logical radius and values below `-1` are rejected before mutation. Radius applies only to the framework-owned outer shell and does not promise rounded OS-owned calendar/dropdown chrome.
+- Shell padding uses current `SpacingXS`; border/focus widths and radius scale through `DpiScaler`. An internal pure layout helper centers the native preferred height inside the shell and clamps narrow/tiny client rectangles without negative geometry.
+- The wrapper paints only its themed surface/border. The native picker paints its own text, checkbox/dropdown affordance, focus/edit internals, and calendar popup. No `MonthCalendar`, custom `Form`, popup host, global hook, P/Invoke, private WinForms reflection, timer, animation engine, or package dependency is introduced.
+- Runtime Light/Dark switches update the shell/native palette and theme-owned `Body` font while preserving native date/range/format/checkbox state. Parent-DPI changes relayout the owned native picker. Caller-assigned fonts remain caller-owned.
+- Designer construction is parameterless and requires no application bootstrap. Disposal detaches native/theme handlers and disposes only framework-created font resources; the owned native picker is disposed through normal WinForms child ownership.
+
+Manual verification: choose **Advanced Inputs**. Compare Long/Short/Time, custom `yyyy-MM-dd`, custom `yyyy-MM-dd HH:mm`, optional unchecked checkbox, constrained range, Valid/Invalid, disabled, explicit radius, and live `ValueChanged`. Exercise Tab/Shift+Tab, native calendar open/close and arrow/navigation keys, locale-sensitive display, Light/Dark switching, repeated resize, and 100/125/150/175/200% real Windows scaling. The calendar popup and localized native rendering remain WinForms/OS-owned and may differ by Windows/runtime/culture.
+
 ## Deferred components
 
-Dialog/Modal, Skeleton, DatePicker, and others are not part of the initial foundation contract.
+Dialog/Modal, Skeleton, and others are not part of the initial foundation contract.
 
 Before adding one, document which existing foundation pieces it reuses.
+

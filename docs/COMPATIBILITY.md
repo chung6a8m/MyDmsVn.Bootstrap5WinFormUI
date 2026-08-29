@@ -58,6 +58,11 @@ Areas to verify on both targets include:
 - Accessibility behavior
 - DataGridView painting
 - Font availability/fallback
+- Native `DateTimePicker` localized text, checkbox state, range normalization/exceptions, keyboard navigation, and calendar-popup behavior
+
+`BootstrapDatePicker` deliberately keeps one native `DateTimePicker` authoritative on both TFMs. Tests that characterize date/range/format/checkbox behavior should compare against a fresh native peer instead of freezing culture- or runtime-specific rendered strings. The framework may theme the wrapper shell but does not promise to recolor, round, replace, or otherwise normalize the OS-owned calendar popup across Windows versions, cultures, or target frameworks.
+
+Stage 9 therefore introduces no target-specific `MonthCalendar`, popup `Form`, P/Invoke hook, private WinForms reflection, parsing engine, or culture abstraction to force visual/behavioral parity. Differences that are genuinely native remain native unless a later explicit compatibility contract says otherwise.
 
 ## 7. System.Drawing
 
