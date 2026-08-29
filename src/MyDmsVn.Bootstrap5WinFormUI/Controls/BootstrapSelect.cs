@@ -15,7 +15,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// </summary>
 [DefaultEvent(nameof(SelectionChanged))]
 [DefaultProperty(nameof(Placeholder))]
-public class BootstrapSelect : UserControl
+public partial class BootstrapSelect : UserControl
 {
     private BootstrapSelectMode _selectionMode = BootstrapSelectMode.Single;
     private BootstrapSelectSelectionState _selectionState;
@@ -671,7 +671,7 @@ public class BootstrapSelect : UserControl
         base.Dispose(disposing);
     }
 
-    private bool CanSelect(BootstrapSelectItem item, BootstrapSelectChangeReason reason)
+    private new bool CanSelect(BootstrapSelectItem item, BootstrapSelectChangeReason reason)
     {
         var args = new BootstrapSelectItemCancelEventArgs(item, reason);
         Selecting?.Invoke(this, args);
