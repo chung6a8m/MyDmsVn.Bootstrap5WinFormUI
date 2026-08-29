@@ -69,15 +69,15 @@ public sealed class BootstrapSelectDemoContractTests
             .GetResult();
         Assert.That(largePage.Items, Has.Count.GreaterThanOrEqualTo(200));
 
-        Assert.Throws<InvalidOperationException>(() => providers[1]
+        Assert.Throws<InvalidOperationException>((Action)(() => providers[1]
             .SearchAsync(new BootstrapSelectQuery("fail-first", 1, 20), CancellationToken.None)
             .GetAwaiter()
-            .GetResult());
+            .GetResult()));
 
-        Assert.Throws<InvalidOperationException>(() => providers[1]
+        Assert.Throws<InvalidOperationException>((Action)(() => providers[1]
             .SearchAsync(new BootstrapSelectQuery("retry", 2, 20), CancellationToken.None)
             .GetAwaiter()
-            .GetResult());
+            .GetResult()));
     }
 
     private static IEnumerable<T> FindControls<T>(Control root)
