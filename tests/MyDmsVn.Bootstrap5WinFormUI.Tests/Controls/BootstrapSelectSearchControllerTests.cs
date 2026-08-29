@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
@@ -46,7 +45,7 @@ public sealed class BootstrapSelectSearchControllerTests
 
         controller.BeginQuery("ab", 20);
         Assert.That(provider.Tokens[0].IsCancellationRequested, Is.True);
-        Assert.ThrowsAsync<OperationCanceledException>((AsyncTestDelegate)(async () => await taskA));
+        Assert.That((Action)(() => taskA.GetAwaiter().GetResult()), Throws.InstanceOf<OperationCanceledException>());
     }
 
     [Test]
