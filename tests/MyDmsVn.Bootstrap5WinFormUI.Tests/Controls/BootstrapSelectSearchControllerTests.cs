@@ -36,7 +36,7 @@ public sealed class BootstrapSelectSearchControllerTests
     }
 
     [Test]
-    public async Task NewLogicalQueryCancelsPreviousRequest()
+    public void NewLogicalQueryCancelsPreviousRequest()
     {
         var provider = new BootstrapSelectControlledProvider(honorCancellation: true);
         using var controller = CreateController();
@@ -46,7 +46,7 @@ public sealed class BootstrapSelectSearchControllerTests
 
         controller.BeginQuery("ab", 20);
         Assert.That(provider.Tokens[0].IsCancellationRequested, Is.True);
-        Assert.That(async () => await taskA, Throws.InstanceOf<OperationCanceledException>());
+        Assert.ThrowsAsync<OperationCanceledException>(async () => await taskA);
     }
 
     [Test]
