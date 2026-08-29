@@ -12,24 +12,47 @@
 
 ## Global Constraints
 
-- Read `AGENTS.md`, `README.md`, `AI_CONTEXT.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/COMPATIBILITY.md`, `docs/TESTING.md`, the relevant sections of `docs/COMPONENTS.md`, and the approved spec before editing product code.
-- Preserve `BootstrapComboBox` as the existing native-backed `ComboBox`; do not change its inheritance, public API, popup behavior, or tests to implement this feature.
-- Reuse `BootstrapOverlayDropDown`, `BootstrapOverlaySurface`, `BootstrapOverlayAnchorTracker`, `BootstrapOverlayPlacement`, `BootstrapOverlayCollisionBehavior`, and `BootstrapOverlayPlacementEngine`; do not introduce a second popup/placement engine.
-- Preserve the existing `BootstrapValidationState` contract exactly. Do not add a `Warning` member as part of this feature.
-- Keep local `Items` mode and async `DataProvider` mode mutually exclusive at runtime. When `DataProvider != null`, preserve but ignore local `Items`; never merge them.
-- `BootstrapSelectItem.Value` is non-null, immutable, and the sole logical identity. All deduplication and selection reconciliation use `ValueComparer`.
-- Caller-injected `DataProvider`, `Matcher`, `Renderer`, items, icons, and tags are caller-owned and must not be disposed by `BootstrapSelect`.
-- Result rows use fixed DPI-scaled heights in v1 and are owner-rendered. Never create one WinForms child control per result item.
-- The provider is transport-agnostic. Do not add URL, HTTP method, headers, JSON mapping, or networking dependencies.
-- Public types and members require XML documentation because the core project treats CS1591 as an error.
-- Keep nullable annotations valid on both target frameworks and avoid runtime APIs unavailable on `net48` unless guarded by existing compatibility helpers.
-- Follow TDD: create or extend the named tests first, observe the expected failure, add the smallest implementation, then rerun the focused tests.
-- After each task, build/test both target frameworks where that task has public/product impact. All commands are intended to run on Windows.
-- Do not update the public API fingerprint until the final exported surface has been reviewed from the intentional compatibility-test failure.
+- Before product-code changes, read `AGENTS.md`, `README.md`, `AI_CONTEXT.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/COMPATIBILITY.md`, `docs/TESTING.md`, the relevant `docs/COMPONENTS.md` sections, and the approved spec.
+- Preserve `BootstrapComboBox` as the native-backed `ComboBox`; do not change its inheritance, public API, popup behavior, or tests to implement this feature.
+- Reuse `BootstrapOverlayDropDown`, `BootstrapOverlaySurface`, `BootstrapOverlayAnchorTracker`, `BootstrapOverlayPlacement`, `BootstrapOverlayCollisionBehavior`, and `BootstrapOverlayPlacementEngine`; do not add a second popup/placement engine.
+- Preserve `BootstrapValidationState` exactly as it exists. This feature must not add `Warning` or any other enum value.
+- Keep local `Items` and async `DataProvider` as alternate modes. `DataProvider != null` means async mode; local items remain stored but are ignored, never merged or destroyed.
+- `BootstrapSelectItem.Value` is non-null, immutable, and the sole logical identity. Selection, result deduplication, and reconciliation use `ValueComparer`.
+- Caller-provided provider/matcher/renderer/items/tags are caller-owned and are not disposed by `BootstrapSelect`.
+- Result rows are owner-rendered with fixed DPI-scaled heights in v1. Never create one WinForms child control per item.
+- Provider APIs are transport-agnostic; do not add URL/HTTP/header/JSON/network dependencies.
+- Public types/members require XML documentation because the core project treats CS1591 as an error.
+- Keep one shared code path for both TFMs; avoid APIs unavailable on `net48` unless an existing compatibility helper or necessary conditional implementation is used.
+- Follow TDD for every task: add/extend the named test first, observe the expected failure, add the minimum implementation, and rerun the focused tests.
+- Public API fingerprint changes are approved only in Task 12 after the intentional baseline failure prints the final exported surface.
+
+### Locked v1 defaults
+
+These defaults are part of the implementation contract and must be covered by `BootstrapSelectTests`:
+
+```text
+SelectionMode = Single
+AllowClear = true
+AllowCustomValues = false
+SearchEnabled = true
+MinimumSearchLength = 0
+SearchDebounce = 250 ms
+PageSize = 20
+DropDownWidth = 0          // automatic, owner width is the minimum/default reference
+MaxDropDownHeight = 320    // logical pixels before DPI scaling/working-area clamp
+MaximumSelectionRows = 3
+ValidationState = None
+BorderRadius = -1          // use theme radius
+Matcher = BootstrapSelectTextMatcher instance
+Renderer = BootstrapSelectRenderer instance
+DataProvider = null
+```
+
+`CloseOnSelect` has an effective mode default: `true` in Single mode and `false` in Multiple mode. Once explicitly assigned by the caller, that explicit value survives later mode changes.
 
 ---
 
-## Task 1: Add the public item, collection, mode, change-reason, and event contracts
+## Task 1: Add public item, collection, mode, change-reason, and event contracts
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectMode.cs`
@@ -40,13 +63,9 @@
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectItemTests.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectItemCollectionTests.cs`
 
-**Interfaces:**
-- Consumes: `IconDescriptor` from the existing icon infrastructure.
-- Produces: stable public item/collection/event types used by every later task.
+**Interfaces:** Consumes existing `IconDescriptor`; produces all basic public item/event contracts used later.
 
-- [ ] **Step 1: Write failing item-contract tests.**
-
-Add tests that require non-null `Value`, non-null `Text`, immutable `Value`, mutable presentation metadata, and no ownership/disposal behavior:
+- [ ] **Step 1: Write failing item tests.** Require null guards, immutable `Value`, mutable `Text`/`Disabled`/`Group`/`Icon`/`Tag`, and exact enum values.
 
 ```csharp
 [Test]
@@ -55,12 +74,7 @@ public void ItemRequiresValueAndTextAndKeepsIdentityImmutable()
     Assert.That(() => new BootstrapSelectItem(null!, "Alpha"), Throws.TypeOf<ArgumentNullException>());
     Assert.That(() => new BootstrapSelectItem(1, null!), Throws.TypeOf<ArgumentNullException>());
 
-    var item = new BootstrapSelectItem(42, "Alpha")
-    {
-        Disabled = true,
-        Group = "Customers",
-        Tag = "domain-object"
-    };
+    var item = new BootstrapSelectItem(42, "Alpha") { Disabled = true, Group = "Customers", Tag = "domain" };
 
     Assert.Multiple((Action)(() =>
     {
@@ -68,52 +82,23 @@ public void ItemRequiresValueAndTextAndKeepsIdentityImmutable()
         Assert.That(item.Text, Is.EqualTo("Alpha"));
         Assert.That(item.Disabled, Is.True);
         Assert.That(item.Group, Is.EqualTo("Customers"));
-        Assert.That(item.Tag, Is.EqualTo("domain-object"));
         Assert.That(typeof(BootstrapSelectItem).GetProperty(nameof(BootstrapSelectItem.Value))!.CanWrite, Is.False);
     }));
 }
 ```
 
-- [ ] **Step 2: Write failing collection tests.**
+- [ ] **Step 2: Write failing collection tests.** `BootstrapSelectItemCollection` is a `Collection<BootstrapSelectItem>`-style public collection with a public parameterless constructor, null guards, and an internal owner-callback constructor used by `BootstrapSelect`. Insert/set/remove/clear notify once per mutation.
 
-Require null guards and deterministic change notification to the owner through an internal callback while keeping a normal `IList<BootstrapSelectItem>` surface:
-
-```csharp
-[Test]
-public void CollectionRejectsNullAndNotifiesOnMutation()
-{
-    var changes = 0;
-    var items = new BootstrapSelectItemCollection(() => changes++);
-
-    Assert.That(() => items.Add(null!), Throws.TypeOf<ArgumentNullException>());
-    items.Add(new BootstrapSelectItem(1, "One"));
-    items[0] = new BootstrapSelectItem(2, "Two");
-    items.RemoveAt(0);
-
-    Assert.That(changes, Is.EqualTo(3));
-}
-```
-
-If the constructor receiving the callback must remain internal, keep the public parameterless constructor and use the repository's existing internal-test access mechanism; do not make the callback public merely for tests.
-
-- [ ] **Step 3: Run the new tests and verify they fail because the types do not exist.**
+- [ ] **Step 3: Run the tests and verify compile/test failure for missing contracts.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectItem"
 ```
 
-Expected: compile/test failure naming missing `BootstrapSelectItem`, `BootstrapSelectItemCollection`, or related contracts.
-
-- [ ] **Step 4: Implement the public contracts with XML documentation.**
-
-Use these exact semantic contracts:
+- [ ] **Step 4: Implement the contracts with XML docs.** Lock these declarations:
 
 ```csharp
-public enum BootstrapSelectMode
-{
-    Single = 0,
-    Multiple = 1
-}
+public enum BootstrapSelectMode { Single = 0, Multiple = 1 }
 
 public enum BootstrapSelectChangeReason
 {
@@ -138,18 +123,18 @@ public class BootstrapSelectItem
 }
 ```
 
-`BootstrapSelectEventArgs.cs` must define the event-argument types needed by the approved event model, including cancellable item changes and non-cancellable post-change events. Each item-change event args instance must expose `Item` and `Reason`; cancellable args expose `Cancel`.
+`BootstrapSelectEventArgs.cs` defines `BootstrapSelectItemEventArgs` and `BootstrapSelectItemCancelEventArgs`; both expose `Item` and `Reason`, and the cancellable type exposes `Cancel`. Constructors may remain internal because callers receive, rather than manufacture, control events.
 
-- [ ] **Step 5: Run item/collection tests on both frameworks.**
+- [ ] **Step 5: Run item tests on both TFMs.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectItem"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelectItem"
 ```
 
-Expected: all focused tests pass.
+Expected: pass.
 
-- [ ] **Step 6: Commit the contracts.**
+- [ ] **Step 6: Commit.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectMode.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectChangeReason.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectItem.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectItemCollection.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectEventArgs.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectItemTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectItemCollectionTests.cs
@@ -165,97 +150,39 @@ git commit -m "feat: add BootstrapSelect item contracts"
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSelectionMutation.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectSelectionStateTests.cs`
 
-**Interfaces:**
-- Consumes: `BootstrapSelectItem`, `BootstrapSelectMode`, `IEqualityComparer<object>`.
-- Produces: internal deterministic selection mutations for the public control to apply and publish as events later.
+**Interfaces:** Consumes item/mode/comparer contracts; produces pure selection state/mutations with no WinForms-handle dependency.
 
-- [ ] **Step 1: Write failing tests for identity, duplicate prevention, and order.**
-
-Cover same-value/different-instance items, a custom comparer, single replacement, multiple insertion order, and disabled candidates:
+- [ ] **Step 1: Write failing tests** for same-value/different-instance deduplication, custom comparer identity, single replacement, multiple insertion order, disabled-new-selection rejection, and disabled-existing-selection removal.
 
 ```csharp
 [Test]
-public void MultipleSelectionUsesValueComparerInsteadOfReferenceIdentity()
+public void MultipleSelectionUsesValueComparerNotReferenceIdentity()
 {
     var state = new BootstrapSelectSelectionState(BootstrapSelectMode.Multiple, EqualityComparer<object>.Default);
-    var first = new BootstrapSelectItem(7, "Seven A");
-    var sameValue = new BootstrapSelectItem(7, "Seven B");
-
-    Assert.That(state.TrySelect(first, BootstrapSelectChangeReason.Programmatic).Changed, Is.True);
-    Assert.That(state.TrySelect(sameValue, BootstrapSelectChangeReason.Programmatic).Changed, Is.False);
+    Assert.That(state.TrySelect(new BootstrapSelectItem(7, "A"), BootstrapSelectChangeReason.Programmatic).Changed, Is.True);
+    Assert.That(state.TrySelect(new BootstrapSelectItem(7, "B"), BootstrapSelectChangeReason.Programmatic).Changed, Is.False);
     Assert.That(state.SelectedItems, Has.Count.EqualTo(1));
-    Assert.That(state.SelectedItems[0].Value, Is.EqualTo(7));
 }
 ```
 
-- [ ] **Step 2: Write failing tests for mode changes and batch clear.**
+- [ ] **Step 2: Add failing mode-transition and reconciliation tests.** Require Single→Multiple preservation, Multiple→Single first-item preservation, atomic preflight/commit support, batch-clear mutation, and metadata refresh for a same-value result without logical selection change.
 
-Require:
-
-```text
-Single -> Multiple: preserve selection
-Multiple -> Single: preserve first selection
-Clear: produce one batch mutation containing the allowed removals
-Disabled selected item: may be deselected
-Disabled unselected item: may not be newly selected
-```
-
-Keep public event cancellation out of this internal type; the state engine should expose enough mutation detail for `BootstrapSelect` to perform preflight cancellation before commit.
-
-- [ ] **Step 3: Run the focused tests and confirm failure.**
+- [ ] **Step 3: Run focused tests and confirm failure.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectSelectionStateTests"
 ```
 
-Expected: compile/test failure for missing internal selection types.
+- [ ] **Step 4: Implement pure selection logic.** Every lookup/dedup uses `ValueComparer`. The state holds a selected item snapshot independent from the current result set. It returns mutation descriptions; it does not raise public control events.
 
-- [ ] **Step 4: Implement selection state as pure logic.**
-
-The state object must expose read-only snapshots and operations that never depend on WinForms handles. Use `ValueComparer` for every lookup and duplicate check. Keep selected presentation snapshots independent from the current result set.
-
-The mutation result must distinguish:
-
-```text
-no change
-single selection replacement
-item addition
-item removal
-batch removal
-mode conversion
-metadata refresh without logical selection change
-```
-
-Do not raise public events from the pure state engine.
-
-- [ ] **Step 5: Add reconciliation tests and implementation.**
-
-A provider/local result with the same logical `Value` may refresh selected presentation metadata without changing selected order or reporting a logical selection change:
-
-```csharp
-[Test]
-public void ReconcileSameValueRefreshesPresentationWithoutLogicalChange()
-{
-    var state = CreateMultipleState();
-    state.TrySelect(new BootstrapSelectItem(42, "Old name"), BootstrapSelectChangeReason.Programmatic);
-
-    var mutation = state.Reconcile(new BootstrapSelectItem(42, "New name"));
-
-    Assert.That(mutation.SelectionChanged, Is.False);
-    Assert.That(state.SelectedItems.Single().Text, Is.EqualTo("New name"));
-}
-```
-
-- [ ] **Step 6: Run selection tests on both frameworks.**
+- [ ] **Step 5: Run both TFMs.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectSelectionStateTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelectSelectionStateTests"
 ```
 
-Expected: pass.
-
-- [ ] **Step 7: Commit selection logic.**
+- [ ] **Step 6: Commit.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSelectionState.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSelectionMutation.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectSelectionStateTests.cs
@@ -275,31 +202,13 @@ git commit -m "feat: add BootstrapSelect selection engine"
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectMatcherTests.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectResultSetTests.cs`
 
-**Interfaces:**
-- Consumes: local item collection, matcher, selected-value predicate, `AllowCustomValues`, current search text.
-- Produces: immutable/logical result-row sequence for the viewport, independent of drawing.
+**Interfaces:** Consumes item sequences/matcher/selection predicate; produces drawing-independent logical rows.
 
-- [ ] **Step 1: Write failing matcher tests.**
+- [ ] **Step 1: Write failing default matcher tests.** Require case-insensitive `Text.Contains`, empty-query match-all, null argument guards, and no implicit fuzzy/accent transformation.
 
-Require case-insensitive `Text` matching and safe empty-query behavior:
+- [ ] **Step 2: Write failing result-builder tests.** Cover grouped/ungrouped rows, hidden empty groups, disabled item preservation, selected-state projection, empty/instruction/error row construction, and adjacent group-header suppression across appended pages.
 
-```csharp
-[TestCase("Customer Alpha", "alpha", true)]
-[TestCase("Customer Alpha", "ALPHA", true)]
-[TestCase("Customer Alpha", "supplier", false)]
-[TestCase("Customer Alpha", "", true)]
-public void DefaultMatcherUsesCaseInsensitiveTextContains(string text, string query, bool expected)
-{
-    var matcher = new BootstrapSelectTextMatcher();
-    Assert.That(matcher.IsMatch(new BootstrapSelectItem(1, text), query), Is.EqualTo(expected));
-}
-```
-
-- [ ] **Step 2: Write failing result normalization tests.**
-
-Cover grouped and ungrouped rows, hidden empty groups, disabled item preservation, selected-state projection, and adjacent group-header suppression across appended pages.
-
-The internal row-kind enum must contain exactly the v1 logical categories required by the spec:
+The internal row-kind enum is exactly:
 
 ```text
 GroupHeader
@@ -312,51 +221,39 @@ Instruction
 Error
 ```
 
-- [ ] **Step 3: Write the exact-match custom-value test.**
-
-Prove exact matching does not use a fuzzy custom matcher:
+- [ ] **Step 3: Lock exact-text custom-value suppression.**
 
 ```csharp
 [Test]
-public void CustomValueSuppressionUsesTextEqualityNotMatcher()
+public void ExactTextMatchIsIndependentFromMatcher()
 {
-    var item = new BootstrapSelectItem(1, "ABC Corporation");
-    Assert.That(BootstrapSelectResultBuilder.HasExactTextMatch(new[] { item }, "abc"), Is.False);
-    Assert.That(BootstrapSelectResultBuilder.HasExactTextMatch(new[] { new BootstrapSelectItem(2, "ABC") }, "abc"), Is.True);
+    Assert.That(BootstrapSelectResultBuilder.HasExactTextMatch(
+        new[] { new BootstrapSelectItem(1, "ABC Corporation") }, "abc"), Is.False);
+    Assert.That(BootstrapSelectResultBuilder.HasExactTextMatch(
+        new[] { new BootstrapSelectItem(2, "ABC") }, "abc"), Is.True);
 }
 ```
 
-- [ ] **Step 4: Run the focused tests and confirm failure.**
+- [ ] **Step 4: Run focused tests; expect failure.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectMatcherTests|FullyQualifiedName~BootstrapSelectResultSetTests"
 ```
 
-Expected: compile/test failure for missing matcher/result types.
+- [ ] **Step 5: Implement matcher and result normalization as pure logic.** Grouping remains `BootstrapSelectItem.Group`; do not add a public group tree. Builder inputs are generic loaded-item sequences so both local and remote modes reuse it.
 
-- [ ] **Step 5: Implement matcher and result normalization as pure logic.**
-
-Keep grouping as `BootstrapSelectItem.Group` metadata. A group header is not selectable. Do not create a public group model. The result builder must accept already-loaded remote items as an input later, so it must not depend directly on `BootstrapSelectItemCollection`.
-
-- [ ] **Step 6: Run focused tests on both targets.**
+- [ ] **Step 6: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectMatcherTests|FullyQualifiedName~BootstrapSelectResultSetTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelectMatcherTests|FullyQualifiedName~BootstrapSelectResultSetTests"
-```
-
-Expected: pass.
-
-- [ ] **Step 7: Commit local search/result logic.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/IBootstrapSelectMatcher.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectTextMatcher.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultRow.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultSet.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultBuilder.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectMatcherTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectResultSetTests.cs
 git commit -m "feat: add BootstrapSelect local result model"
 ```
 
 ---
 
-## Task 4: Add renderer contracts, selection-surface layout, and the first `BootstrapSelect` shell
+## Task 4: Add renderer contracts, selection layout, and the initial control shell
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/IBootstrapSelectRenderer.cs`
@@ -368,74 +265,19 @@ git commit -m "feat: add BootstrapSelect local result model"
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectLayoutTests.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectTests.cs`
 
-**Interfaces:**
-- Consumes: theme manager/tokens, `IconDescriptor`/`IIconRenderer`, `BootstrapValidationState`, selection state.
-- Produces: designer-safe public control surface and stateless public renderer extension point.
+**Interfaces:** Consumes theme/icon/validation/selection state; produces designer-safe control shell and public renderer extension point.
 
-- [ ] **Step 1: Write failing geometry tests before painting.**
+- [ ] **Step 1: Write failing geometry tests.** Cover placeholder/single text, clear/arrow hit targets, chip wrapping, 3-row limit, long-chip clamping, and RTL mirroring. Paint and hit-test must consume the same layout result.
 
-Cover single text/placeholder bounds, clear hit target, arrow bounds, chip wrapping, maximum selection rows, long-chip clamping, and RTL mirroring. Assert geometry, not screenshot pixels.
+- [ ] **Step 2: Write failing default-contract tests.** Assert every locked default above, plus `BootstrapSelect : UserControl`, empty selections, non-null matcher/renderer, and `DataProvider == null`.
 
-Example:
-
-```csharp
-[Test]
-public void MultipleLayoutWrapsChipsAndKeepsClearAndArrowHitTargetsInsideBounds()
-{
-    var layout = BootstrapSelectSelectionLayout.Calculate(
-        new Rectangle(0, 0, 240, 80),
-        CreateMetrics(dpi: 96),
-        CreateItems("Alpha", "Beta", "Gamma", "Delta"),
-        showClear: true,
-        rightToLeft: false,
-        maximumRows: 3);
-
-    Assert.That(layout.ChipBounds.Count, Is.EqualTo(4));
-    Assert.That(layout.ClearButtonBounds.Right, Is.LessThanOrEqualTo(240));
-    Assert.That(layout.ArrowBounds.Right, Is.LessThanOrEqualTo(240));
-    Assert.That(layout.RequiredHeight, Is.GreaterThan(0));
-}
-```
-
-- [ ] **Step 2: Write failing default-control contract tests.**
-
-Require at least:
-
-```text
-SelectionMode = Single
-Items non-null
-DataProvider = null
-SelectedItem = null
-SelectedValue = null
-SelectedItems empty
-SelectedValues empty
-AllowClear = true or the approved implementation default documented in test
-AllowCustomValues = false
-SearchEnabled = true
-MinimumSearchLength = 0
-PageSize > 0
-DropDownWidth = 0
-MaxDropDownHeight > 0
-MaximumSelectionRows = 3
-ValidationState = None
-BorderRadius = -1
-Matcher non-null
-Renderer non-null
-```
-
-Also assert `BootstrapSelect` derives from `UserControl`, not `ComboBox`.
-
-- [ ] **Step 3: Run the focused tests and confirm failure.**
+- [ ] **Step 3: Run focused tests; expect missing-type/member failure.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectLayoutTests|FullyQualifiedName~BootstrapSelectTests"
 ```
 
-Expected: missing types/members.
-
-- [ ] **Step 4: Implement public renderer contracts.**
-
-The public interface must expose the approved four presentation operations:
+- [ ] **Step 4: Implement renderer API.** Export the approved operations:
 
 ```csharp
 public interface IBootstrapSelectRenderer
@@ -447,43 +289,22 @@ public interface IBootstrapSelectRenderer
 }
 ```
 
-Public contexts expose only semantic item/group data, bounds, state flags, DPI, font, and theme-derived presentation data. Never expose internal row/controller types.
+`BootstrapSelectRenderContexts.cs` also defines the public `[Flags]` state needed by custom renderers (selected/highlighted/hot/disabled) without exposing internal row/controller types.
 
-- [ ] **Step 5: Implement layout and control shell.**
+- [ ] **Step 5: Implement `BootstrapSelect` shell.** Enable double buffering, own the collection/selection state, validate properties, subscribe/unsubscribe theme changes, use only existing validation enum values, scale logical metrics once, paint single/multiple surfaces through the renderer, and remain designer-safe. Do not create a popup yet.
 
-`BootstrapSelect` must:
-
-- enable user painting/double buffering;
-- own `BootstrapSelectItemCollection` and internal selection state;
-- expose the approved properties with validation;
-- subscribe/unsubscribe theme notifications consistently with existing controls;
-- use `BootstrapValidationState.None/Valid/Invalid` only;
-- scale geometry once for current DPI;
-- render single selection/placeholder, multi chips, clear affordance, arrow, focus/open state through the renderer;
-- use one calculated layout result for both paint and hit testing;
-- remain safe when instantiated in the WinForms Designer.
-
-Do not create the popup yet.
-
-- [ ] **Step 6: Run layout/control tests on both frameworks.**
+- [ ] **Step 6: Run both TFMs and core builds.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectLayoutTests|FullyQualifiedName~BootstrapSelectTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelectLayoutTests|FullyQualifiedName~BootstrapSelectTests"
-```
-
-Expected: pass.
-
-- [ ] **Step 7: Build the core project on both TFMs.**
-
-```powershell
 dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -f net8.0-windows
 dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -f net48
 ```
 
-Expected: zero warnings and zero errors.
+Expected: zero warnings/errors.
 
-- [ ] **Step 8: Commit the visual shell.**
+- [ ] **Step 7: Commit.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/IBootstrapSelectRenderer.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectRenderContexts.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectRenderer.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSelectionLayout.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectHitTestInfo.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectLayoutTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectTests.cs
@@ -492,7 +313,7 @@ git commit -m "feat: add BootstrapSelect visual shell"
 
 ---
 
-## Task 5: Wire the public selection API, events, mode transitions, clear, and chip removal
+## Task 5: Wire public selection API, events, mode transitions, clear, and chip removal
 
 **Files:**
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs`
@@ -500,95 +321,44 @@ git commit -m "feat: add BootstrapSelect visual shell"
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectInteractionTests.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectTests.cs`
 
-**Interfaces:**
-- Consumes: selection engine and surface hit testing.
-- Produces: complete public selection semantics before popup/search is introduced.
+**Interfaces:** Consumes selection state/layout; produces complete public selection semantics before popup/search.
 
-- [ ] **Step 1: Write failing tests for imperative selection and selected-value properties.**
-
-Require these signatures and semantics:
+- [ ] **Step 1: Write failing tests** for:
 
 ```csharp
-public bool Select(BootstrapSelectItem item);
-public bool SelectValue(object value);
-public bool Deselect(BootstrapSelectItem item);
-public bool DeselectValue(object value);
-public void ClearSelection();
+bool Select(BootstrapSelectItem item);
+bool SelectValue(object value);
+bool Deselect(BootstrapSelectItem item);
+bool DeselectValue(object value);
+void ClearSelection();
 ```
 
-`SelectedItem`/`SelectedValue` are meaningful in single mode; `SelectedItems`/`SelectedValues` reflect all selections in either mode without exposing mutable backing storage.
+Require `SelectedItem`, `SelectedValue`, `SelectedItems`, and `SelectedValues` to remain coherent and caller read-only.
 
-- [ ] **Step 2: Write failing event-order tests.**
+- [ ] **Step 2: Write event-order/cancellation tests.** Successful select is `Selecting -> commit -> Selected -> SelectionChanged`; cancelled pre-event produces no post-event. Mirror for deselect. Multi-clear raises per-item pre/post events but one final `SelectionChanged`.
 
-Capture event names in a list and assert:
+- [ ] **Step 3: Write mode/default tests.** Require effective Single/Multiple `CloseOnSelect` defaults, explicit override persistence, Single→Multiple preservation, and atomic Multiple→Single first-item preservation when deselection cancellation is possible.
 
-```text
-Selecting
-Selected
-SelectionChanged
-```
-
-for a successful select, and no post-change events when `Selecting.Cancel = true`. Do the equivalent for deselection.
-
-For multi-clear, require all cancellable preflight events, successful removals, and exactly one final `SelectionChanged`.
-
-- [ ] **Step 3: Write failing mode/default tests.**
-
-Require mode-sensitive effective `CloseOnSelect` behavior:
-
-```text
-new control + Single -> true
-switch to Multiple without explicit CloseOnSelect assignment -> false
-caller explicitly sets CloseOnSelect -> retain explicit value across later mode switches
-```
-
-Multiple-to-single conversion must preserve the first selected value and be atomic if any required deselection is cancelled.
-
-- [ ] **Step 4: Run the focused tests and confirm failure.**
+- [ ] **Step 4: Run focused tests; expect failure.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectTests|FullyQualifiedName~BootstrapSelectInteractionTests"
 ```
 
-Expected: failures for missing selection API/event wiring.
+- [ ] **Step 5: Implement public selection/events.** Public/programmatic changes use `Programmatic`; outer clear uses `Clear`; chip remove uses `ChipRemove`. Clear/chip hit targets must not simultaneously open the future popup.
 
-- [ ] **Step 5: Implement selection orchestration in `BootstrapSelect`.**
-
-Public events:
-
-```csharp
-public event EventHandler<BootstrapSelectItemCancelEventArgs>? Selecting;
-public event EventHandler<BootstrapSelectItemEventArgs>? Selected;
-public event EventHandler<BootstrapSelectItemCancelEventArgs>? Deselecting;
-public event EventHandler<BootstrapSelectItemEventArgs>? Deselected;
-public event EventHandler? SelectionChanged;
-```
-
-All public/programmatic calls use `BootstrapSelectChangeReason.Programmatic`. Mouse clear/chip removal pass `Clear` or `ChipRemove`. The later popup task will pass `Mouse`/`Keyboard`.
-
-- [ ] **Step 6: Wire clear and chip-remove hit testing.**
-
-Clear must not also open the popup. Chip removal must remove exactly the hit chip, remain possible when the item's latest metadata is disabled, and preserve selection order of remaining chips.
-
-- [ ] **Step 7: Run focused tests on both TFMs.**
+- [ ] **Step 6: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectTests|FullyQualifiedName~BootstrapSelectInteractionTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelectTests|FullyQualifiedName~BootstrapSelectInteractionTests"
-```
-
-Expected: pass.
-
-- [ ] **Step 8: Commit public selection behavior.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectEventArgs.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectInteractionTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectTests.cs
 git commit -m "feat: wire BootstrapSelect selection behavior"
 ```
 
 ---
 
-## Task 6: Add the local searchable popup and owner-rendered result viewport
+## Task 6: Add local searchable popup and owner-rendered results viewport
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultLayout.cs`
@@ -600,123 +370,49 @@ git commit -m "feat: wire BootstrapSelect selection behavior"
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectPopupTests.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectInteractionTests.cs`
 
-**Interfaces:**
-- Consumes: result rows, renderer, matcher, selected-value predicate, existing overlay classes/placement engine.
-- Produces: complete local searchable select experience with keyboard/mouse interaction.
+**Interfaces:** Consumes result model/renderer/matcher/selection and existing overlay infrastructure; produces complete local searchable behavior.
 
-- [ ] **Step 1: Write failing pure result-layout tests.**
-
-Require fixed DPI-scaled row/group heights, visible-range calculation from `ScrollOffset`, hit testing by logical row, and total content height without allocating child controls.
+- [ ] **Step 1: Write failing pure viewport-layout tests.** Require fixed DPI row metrics, scroll-offset/visible-range calculations, hit testing, total height, and no item-child-control allocation.
 
 ```csharp
 [Test]
-public void VisibleRangeOnlyCoversRowsIntersectingViewport()
+public void VisibleRangeStartsAtScrollOffsetRow()
 {
-    var layout = BootstrapSelectResultLayout.Create(rowCount: 1000, rowHeight: 32, viewportHeight: 160, scrollOffset: 320);
+    var layout = BootstrapSelectResultLayout.Create(1000, rowHeight: 32, viewportHeight: 160, scrollOffset: 320);
     Assert.That(layout.FirstVisibleIndex, Is.EqualTo(10));
-    Assert.That(layout.LastVisibleIndex, Is.EqualTo(14));
 }
 ```
 
-Adapt expected last-index semantics consistently if the implementation intentionally includes a partially visible trailing row; keep that choice locked by tests.
+- [ ] **Step 2: Write failing popup tests.** Require lazy creation, reuse after close/open, owner-width default sizing, shared overlay composition, working-area placement, and `DropDownOpened`/`DropDownClosed`.
 
-- [ ] **Step 2: Write failing popup integration tests.**
+- [ ] **Step 3: Write failing keyboard/mouse tests.** Cover `Alt+Down`, `F4`, `Enter`, `Space`, printable-key open/forward, Up/Down, Home/End, PageUp/PageDown, Enter select/toggle, Esc close, Tab close/traverse, disabled/group skip, selected marker, mouse wheel containment, and selected item remaining visible in results.
 
-Require lazy popup creation, reuse across open/close, owner-width default sizing, and use of the existing overlay host. Reuse the STA/non-parallel test style already used by overlay tests.
-
-- [ ] **Step 3: Write failing local search and keyboard tests.**
-
-Cover:
-
-```text
-open -> real TextBox receives focus
-printable key on closed control -> open + character in search editor
-Up/Down -> selectable rows only
-Home/End -> first/last selectable loaded row
-Enter -> select/toggle highlighted item
-Esc -> close
-Tab -> close without stealing tab navigation
-selected result stays in list and renders selected state
-group headers and disabled rows skipped
-mouse wheel scroll stays in results viewport
-```
-
-- [ ] **Step 4: Run focused tests and confirm failure.**
+- [ ] **Step 4: Run focused tests; expect failure.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectResultsViewTests|FullyQualifiedName~BootstrapSelectPopupTests|FullyQualifiedName~BootstrapSelectInteractionTests"
 ```
 
-Expected: missing popup/view behavior.
+- [ ] **Step 5: Implement `BootstrapSelectResultsView`.** It owns logical rows, scroll offset, visible range, hot/highlight state, painting, hit test, navigation helpers, and a near-end signal reserved for paging. It never references/calls a data provider.
 
-- [ ] **Step 5: Implement the results viewport.**
+- [ ] **Step 6: Implement popup content with a real WinForms `TextBox`.** This preserves caret/clipboard/selection/IME/Unicode. `SearchEnabled=false` hides the editor; search text then remains empty. In async mode with `SearchEnabled=false`, the provider can auto-load only when `MinimumSearchLength == 0`.
 
-`BootstrapSelectResultsView : Control` must own only viewport concerns:
+- [ ] **Step 7: Implement popup controller using existing overlay types.** Compose `BootstrapOverlaySurface`, `BootstrapOverlayDropDown`, `BootstrapOverlayAnchorTracker`, and `BootstrapOverlayPlacementEngine`; bottom-start preferred, top-start fallback through existing flip/shift rules. No new `Form`, global hook, or collision engine.
 
-```text
-logical rows
-scroll offset
-visible range
-hot/highlight index
-paint
-hit test
-keyboard-navigation helpers
-load-more threshold signal reserved for later task
-```
+- [ ] **Step 8: Wire local search.** `Items -> Matcher -> ResultBuilder -> ResultsView`, immediate with no debounce. Collection changes while open refresh results. Search text clears on close.
 
-It must never hold/call `IBootstrapSelectDataProvider`.
-
-- [ ] **Step 6: Implement popup content with a real search editor.**
-
-`BootstrapSelectDropDownContent` composes:
-
-```text
-TextBox searchEditor
-BootstrapSelectResultsView resultsView
-```
-
-Use native text editing for IME/clipboard/caret. `SearchEnabled = false` hides/skips the editor and lets results consume the content area.
-
-- [ ] **Step 7: Implement drop-down controller by composing existing overlay infrastructure.**
-
-Use `BootstrapOverlaySurface` + `BootstrapOverlayDropDown` + `BootstrapOverlayAnchorTracker` + `BootstrapOverlayPlacementEngine`. Preferred placement is bottom-start with top-start fallback and existing flip/shift behavior. No new top-level `Form`, no global hook, no duplicate collision engine.
-
-- [ ] **Step 8: Connect local query refresh and popup events.**
-
-When local search text changes:
-
-```text
-current Items -> Matcher -> result builder -> results view
-```
-
-No debounce. `Items` mutation while open immediately rebuilds local results. Search text clears on close.
-
-Expose and raise:
-
-```csharp
-public event EventHandler? DropDownOpened;
-public event EventHandler? DropDownClosed;
-```
-
-- [ ] **Step 9: Run popup/local tests on both frameworks plus overlay regression tests.**
+- [ ] **Step 9: Run Select + overlay tests on both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelect|FullyQualifiedName~BootstrapOverlay"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelect|FullyQualifiedName~BootstrapOverlay"
-```
-
-Expected: all focused Select/overlay tests pass.
-
-- [ ] **Step 10: Commit the local popup.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultLayout.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultsView.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectDropDownContent.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectDropDownController.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectResultsViewTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectPopupTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectInteractionTests.cs
 git commit -m "feat: add BootstrapSelect local searchable popup"
 ```
 
 ---
 
-## Task 7: Add async provider contracts, debounce, cancellation, generation protection, and error events
+## Task 7: Add async provider contracts, debounce, cancellation, generation safety, and search events
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/IBootstrapSelectDataProvider.cs`
@@ -731,146 +427,64 @@ git commit -m "feat: add BootstrapSelect local searchable popup"
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectSearchControllerTests.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectConcurrencyTests.cs`
 
-**Interfaces:**
-- Consumes: transport-agnostic provider, popup lifecycle, result builder/view.
-- Produces: page-1 async search with loading/error/retry lifecycle and stale-result safety.
+**Interfaces:** Consumes transport-agnostic provider/popup lifecycle/result builder; produces async page-1 loading/error/retry behavior.
 
-- [ ] **Step 1: Write failing provider-contract tests.**
-
-Lock immutable/read-only query semantics and page validation:
+- [ ] **Step 1: Write failing public contract tests.** Lock:
 
 ```csharp
 public interface IBootstrapSelectDataProvider
 {
-    Task<BootstrapSelectPage> SearchAsync(
-        BootstrapSelectQuery query,
-        CancellationToken cancellationToken);
+    Task<BootstrapSelectPage> SearchAsync(BootstrapSelectQuery query, CancellationToken cancellationToken);
 }
-```
 
-`BootstrapSelectQuery` contains `SearchText`, one-based `Page`, and positive `PageSize`. `BootstrapSelectPage` contains a read-only item snapshot and `HasMore`.
-
-- [ ] **Step 2: Create deterministic test providers.**
-
-`BootstrapSelectTestProviders.cs` must include test-only implementations capable of:
-
-```text
-immediate success
-TaskCompletionSource-controlled delayed completion
-cancellation honored
-cancellation ignored
-exception failure
-recorded query history
-```
-
-Use `TaskCompletionSource<T>` instead of real sleeps for race tests.
-
-- [ ] **Step 3: Write the mandatory out-of-order completion test.**
-
-```csharp
-[Test]
-public async Task OlderGenerationCannotOverwriteNewerQueryWhenProviderIgnoresCancellation()
+public sealed class BootstrapSelectQuery
 {
-    // start query "a"
-    // start query "ab"
-    // complete "ab" first
-    // complete "a" second
-    // assert effective SearchText/results are still for "ab"
+    public BootstrapSelectQuery(string searchText, int page, int pageSize);
+    public string SearchText { get; }
+    public int Page { get; }
+    public int PageSize { get; }
+}
+
+public sealed class BootstrapSelectPage
+{
+    public BootstrapSelectPage(IEnumerable<BootstrapSelectItem> items, bool hasMore);
+    public IReadOnlyList<BootstrapSelectItem> Items { get; }
+    public bool HasMore { get; }
 }
 ```
 
-Implement the full test with controlled `TaskCompletionSource<BootstrapSelectPage>` instances; do not use `Task.Delay` to manufacture ordering.
+Validate non-null search text/items, `page >= 1`, and `pageSize >= 1`.
 
-- [ ] **Step 4: Write cancellation/error tests.**
+- [ ] **Step 2: Add deterministic test providers** for immediate success, `TaskCompletionSource`-controlled completion, cancellation-honoring, cancellation-ignoring, exception failure, and query-history recording. Race tests must not depend on sleeps.
 
-Require:
+- [ ] **Step 3: Write mandatory stale-generation test.** Start `"a"`, start `"ab"`, complete `"ab"`, then complete cancellation-ignoring `"a"`; effective query/results remain `"ab"`.
 
-```text
-new query cancels old CTS
-popup close invalidates generation
-provider replacement invalidates generation and restarts current allowed query
-OperationCanceledException -> no SearchFailed
-other Exception -> ShowingError + SearchFailed
-MinimumSearchLength not reached -> no provider call
-MinimumSearchLength == 0 + open -> empty-text page 1 allowed
-```
+- [ ] **Step 4: Write cancellation/error/minimum-length tests.** Require new query cancellation, close invalidation, provider replacement invalidation/restart, silent expected `OperationCanceledException`, `SearchFailed` for other exceptions, no call below minimum length, and empty page-1 load on open when minimum is zero.
 
-- [ ] **Step 5: Run focused async tests and confirm failure.**
+- [ ] **Step 5: Run focused tests; expect failure.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectSearchControllerTests|FullyQualifiedName~BootstrapSelectConcurrencyTests"
 ```
 
-Expected: missing provider/search-controller contracts.
+- [ ] **Step 6: Implement provider/query/page contracts and search controller.** Controller owns current query/generation/CTS/result state/error descriptor. New logical query sequence is: increment generation → cancel/dispose old CTS → clear previous-query results → UI-thread debounce timer → provider page 1 → generation/lifecycle check → UI-thread state publication. Cancellation alone is never the correctness guard.
 
-- [ ] **Step 6: Implement provider/query/page contracts with XML docs.**
+- [ ] **Step 7: Add public search events.** `BootstrapSelectEventArgs.cs` adds `BootstrapSelectSearchEventArgs`, `BootstrapSelectSearchCompletedEventArgs`, and `BootstrapSelectSearchFailedEventArgs` carrying search text/page plus count/error data without leaking controllers. `BootstrapSelect` exposes `SearchStarted`, `SearchCompleted`, `SearchFailed`.
 
-Do not add any networking-specific member. Keep `HasMore` authoritative.
+- [ ] **Step 8: Integrate async mode.** When `DataProvider != null`, local items are preserved but ignored. Replacing provider while open resets remote results, keeps selection, and restarts the current allowed query.
 
-- [ ] **Step 7: Implement the search controller.**
-
-The controller owns:
-
-```text
-SearchText
-current generation
-active CancellationTokenSource
-page 1 state
-current result items
-HasMore
-last error/retry descriptor
-```
-
-New logical query sequence:
-
-```text
-increment generation
-cancel/dispose old CTS
-clear prior-query results
-debounce on UI-thread WinForms Timer
-call SearchAsync(page 1)
-validate generation/lifecycle
-marshal result to UI thread
-publish loading/results/error state
-```
-
-Cancellation alone is never considered sufficient; generation must also match.
-
-- [ ] **Step 8: Wire public async events.**
-
-Expose:
-
-```csharp
-public event EventHandler<BootstrapSelectSearchEventArgs>? SearchStarted;
-public event EventHandler<BootstrapSelectSearchCompletedEventArgs>? SearchCompleted;
-public event EventHandler<BootstrapSelectSearchFailedEventArgs>? SearchFailed;
-```
-
-Event args expose search text/page and result/error information needed by callers without leaking controller internals.
-
-- [ ] **Step 9: Integrate async mode into `BootstrapSelect`.**
-
-When `DataProvider != null`, ignore local `Items` for result generation. Preserve local items in memory. Replacing the provider while open resets remote result state, preserves selection, and restarts the current query if `MinimumSearchLength` permits it.
-
-- [ ] **Step 10: Run async tests on both targets.**
+- [ ] **Step 9: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectSearchControllerTests|FullyQualifiedName~BootstrapSelectConcurrencyTests|FullyQualifiedName~BootstrapSelectPopupTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelectSearchControllerTests|FullyQualifiedName~BootstrapSelectConcurrencyTests|FullyQualifiedName~BootstrapSelectPopupTests"
-```
-
-Expected: pass without timing-dependent flakiness.
-
-- [ ] **Step 11: Commit async search.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/IBootstrapSelectDataProvider.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectQuery.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectPage.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSearchState.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSearchController.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectDebouncer.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectEventArgs.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectTestProviders.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectSearchControllerTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectConcurrencyTests.cs
 git commit -m "feat: add BootstrapSelect async search provider"
 ```
 
 ---
 
-## Task 8: Add infinite paging, deduplication, retry, grouping across pages, and selection reconciliation
+## Task 8: Add infinite paging, deduplication, retry, and selection/group reconciliation
 
 **Files:**
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSearchController.cs`
@@ -881,87 +495,29 @@ git commit -m "feat: add BootstrapSelect async search provider"
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectPagingTests.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectConcurrencyTests.cs`
 
-**Interfaces:**
-- Consumes: `HasMore`, viewport near-end signal, `ValueComparer`, selection reconciliation.
-- Produces: stable multi-page query state and inline load-more error/retry behavior.
+**Interfaces:** Consumes `HasMore`, near-end signal, comparer, selection state; produces stable multi-page query state.
 
-- [ ] **Step 1: Write failing paging tests.**
+- [ ] **Step 1: Write failing paging tests** for page-1 reset, authoritative `HasMore`, one active load-more, page advancement only after success, later-page error preserving prior items, retrying same page, duplicate values across pages, and `HasMore=false` suppression.
 
-Cover all of these assertions explicitly:
+- [ ] **Step 2: Add group-boundary tests.** Same group ending page 1 and beginning page 2 renders one adjacent header, not two.
 
-```text
-new query starts at page 1
-page 2 starts only when HasMore == true
-only one load-more request may be active
-current page advances only after success
-page-2 failure preserves page-1 items
-retry requests page 2 again, not page 3
-duplicate Value across pages appears once
-empty page + HasMore true does not break state
-HasMore false prevents later requests
-```
+- [ ] **Step 3: Add selection reconciliation test.** Later item with same value/new text updates selected snapshot without count/order change or `SelectionChanged`.
 
-- [ ] **Step 2: Write grouping-across-page tests.**
-
-Require no duplicate adjacent group header when page 1 ends and page 2 begins with the same `Group` value.
-
-- [ ] **Step 3: Write selection-reconciliation tests.**
-
-Select value 42 with old text, append a later page containing value 42 with new text, then assert:
-
-```text
-selection count unchanged
-selection order unchanged
-selected snapshot text updated
-SelectionChanged not raised
-```
-
-- [ ] **Step 4: Run paging tests and confirm failure.**
+- [ ] **Step 4: Run focused tests; expect failure.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectPagingTests|FullyQualifiedName~BootstrapSelectConcurrencyTests"
 ```
 
-Expected: paging/retry behaviors not yet implemented.
+- [ ] **Step 5: Implement paging guards/merge/retry.** Near-end threshold remains internal. `ValueComparer` deduplicates pages. First-page failure uses full error state; later-page failure appends `LoadMoreError`. Retry uses exact failed query/page/page-size and does not advance page until success.
 
-- [ ] **Step 5: Implement load-more state and guards.**
+- [ ] **Step 6: Reconcile selections after successful merges** without publishing logical-selection events for metadata-only refreshes.
 
-The viewport raises a near-end signal before the absolute bottom. The controller checks:
-
-```text
-HasMore
-!IsLoading
-!IsLoadingMore
-current generation still active
-no unresolved load-more retry blocking the next page
-```
-
-Do not expose the threshold as public API in v1.
-
-- [ ] **Step 6: Implement page merging and deduplication.**
-
-Deduplicate using the control's `ValueComparer`. If a later item has the same logical value, prefer the newer presentation snapshot while preserving the original row/order position unless group normalization requires a deterministic rebuild.
-
-- [ ] **Step 7: Implement inline load-more error/retry.**
-
-First-page error remains a full error state. Later-page error appends `LoadMoreError` after existing results. Retry reuses the exact failed `SearchText`, `Page`, and `PageSize` descriptor.
-
-- [ ] **Step 8: Reconcile selection snapshots after successful merges.**
-
-Call selection reconciliation for each effective logical result without publishing `SelectionChanged` when only metadata changed.
-
-- [ ] **Step 9: Run paging tests on both targets.**
+- [ ] **Step 7: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectPagingTests|FullyQualifiedName~BootstrapSelectConcurrencyTests|FullyQualifiedName~BootstrapSelectSelectionStateTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelectPagingTests|FullyQualifiedName~BootstrapSelectConcurrencyTests|FullyQualifiedName~BootstrapSelectSelectionStateTests"
-```
-
-Expected: pass.
-
-- [ ] **Step 10: Commit paging.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSearchController.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSearchState.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultSet.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultsView.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectPagingTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectConcurrencyTests.cs
 git commit -m "feat: add BootstrapSelect infinite paging"
 ```
@@ -977,53 +533,25 @@ git commit -m "feat: add BootstrapSelect infinite paging"
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectCustomValueTests.cs`
 
-**Interfaces:**
-- Consumes: `AllowCustomValues`, `CustomValueFactory`, current search text, exact-text matching.
-- Produces: keyboard/mouse-accessible create action in local and async result modes.
+**Interfaces:** Consumes `AllowCustomValues`, `CustomValueFactory`, query text/exact matcher; produces keyboard/mouse-accessible create action.
 
-- [ ] **Step 1: Write failing custom-value tests.**
+- [ ] **Step 1: Write failing tests** for disabled-by-default behavior, whitespace suppression, exact-text suppression, partial/fuzzy match still allowing create, null factory result causing no selection, successful factory result using `CustomValue` reason, and mode-sensitive close behavior.
 
-Require:
-
-```text
-AllowCustomValues false -> no CreateValue row
-empty/whitespace query -> no CreateValue row
-exact text match -> no CreateValue row
-partial/fuzzy match only -> CreateValue row remains allowed
-factory returns null -> no selection change
-factory returns item -> normal Selecting/Selected/SelectionChanged pipeline with reason CustomValue
-multiple mode retains popup by default
-single mode closes by default after successful creation
-```
-
-- [ ] **Step 2: Run tests and confirm failure.**
+- [ ] **Step 2: Run focused tests; expect failure.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectCustomValueTests"
 ```
 
-Expected: create-row behavior absent.
+- [ ] **Step 3: Implement create-row generation.** Exact suppression uses dedicated case-insensitive `Text` equality, never the custom/fuzzy matcher.
 
-- [ ] **Step 3: Implement create-row generation.**
+- [ ] **Step 4: Implement mouse/keyboard activation.** Create row participates in highlight navigation. `Enter`/click invokes the synchronous factory; a returned item goes through normal selection preflight/events with `BootstrapSelectChangeReason.CustomValue`.
 
-Normalize the query used for display/factory invocation consistently. Do not use `Matcher.IsMatch` to suppress the create row; use dedicated case-insensitive exact `Text` equality.
-
-- [ ] **Step 4: Implement keyboard and mouse activation.**
-
-The create row is actionable and participates in highlight navigation. `Enter` or mouse click invokes `CustomValueFactory`; a returned item then goes through normal selection preflight/events using `BootstrapSelectChangeReason.CustomValue`.
-
-- [ ] **Step 5: Run custom-value and interaction tests on both targets.**
+- [ ] **Step 5: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectCustomValueTests|FullyQualifiedName~BootstrapSelectInteractionTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelectCustomValueTests|FullyQualifiedName~BootstrapSelectInteractionTests"
-```
-
-Expected: pass.
-
-- [ ] **Step 6: Commit custom values.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultBuilder.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultsView.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectDropDownContent.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectCustomValueTests.cs
 git commit -m "feat: add BootstrapSelect custom values"
 ```
@@ -1044,108 +572,36 @@ git commit -m "feat: add BootstrapSelect custom values"
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectAccessibilityTests.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectVisualRegressionTests.cs`
 
-**Interfaces:**
-- Consumes: theme notifications, DPI events, WinForms accessibility, form/owner lifecycle.
-- Produces: production-safe composite control behavior across desktop environments.
+**Interfaces:** Consumes theme/DPI/accessibility/form lifecycle; produces production-safe desktop behavior.
 
-- [ ] **Step 1: Write failing lifecycle race tests.**
+- [ ] **Step 1: Write failing lifecycle race tests.** Use cancellation-ignoring controlled providers to prove late completion is ignored after close/dispose/provider replacement; hidden/disabled closes/cancels while preserving selection; handle recreation preserves state and overlay tracking recovers.
 
-Use a cancellation-ignoring controlled provider to require:
+- [ ] **Step 2: Write failing focus tests.** Esc/internal close may restore focus; outside-click dismissal must not steal focus from destination; Tab closes and traverses; once search `TextBox` has focus, Ctrl+A/C/V/X and IME/composition paths are not intercepted by outer-key routing.
 
-```text
-close popup -> late completion ignored
-dispose control -> late completion ignored, no BeginInvoke/ObjectDisposedException
-replace provider -> old provider completion ignored
-Visible=false while open -> close + cancel, selection preserved
-Enabled=false while open -> close + cancel, selection preserved
-handle recreation -> selection/data state preserved and overlay hooks recover
-```
+- [ ] **Step 3: Write failing DPI/RTL tests.** Cover 96/120/144/192 DPI and mirrored major affordances in `RightToLeft.Yes`.
 
-- [ ] **Step 2: Write failing focus tests.**
+- [ ] **Step 4: Write failing accessibility tests.** Require meaningful combo/select role/value/state, collapsed/expanded, disabled/focused, single selected text, multiple selected-count summary, and popup semantics where the target API supports them.
 
-Require:
-
-```text
-Esc/internal close may restore focus to BootstrapSelect
-clicking another control to dismiss popup must not steal focus back
-Tab closes and advances normally
-search TextBox keeps Ctrl+A/C/V/X and IME path
-```
-
-Do not intercept printable/composition keys after the real search editor owns focus.
-
-- [ ] **Step 3: Write failing theme/DPI/RTL geometry tests.**
-
-Cover 96, 120, 144, and 192 DPI. Assert logical scaling of border/radius/chip padding/row heights/hit targets and mirrored major horizontal affordances for `RightToLeft.Yes`.
-
-- [ ] **Step 4: Write failing accessibility tests.**
-
-Require a meaningful accessible object/value/state for:
-
-```text
-collapsed/expanded
-focused/disabled
-single selected text
-multiple selected-count summary
-has-popup semantics where supported by the target framework
-```
-
-Keep target-specific accessibility implementation behind conditional compilation only when the platform APIs genuinely differ.
-
-- [ ] **Step 5: Run hardening tests and confirm failure.**
+- [ ] **Step 5: Run hardening tests; expect failures.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectLifecycleTests|FullyQualifiedName~BootstrapSelectAccessibilityTests|FullyQualifiedName~BootstrapSelectVisualRegressionTests"
 ```
 
-Expected: lifecycle/accessibility gaps fail before hardening.
+- [ ] **Step 6: Implement disposal/handle safety.** Dispose order: mark disposing → stop debounce → invalidate generation → cancel CTS → detach hooks → close popup → detach owner tracking → dispose owned popup/content/overlay → timers/CTS/GDI → base. Never dispose caller dependencies.
 
-- [ ] **Step 6: Implement lifecycle-safe disposal and handle management.**
+- [ ] **Step 7: Implement theme/DPI/RTL/accessibility refresh.** Open popup responds to theme changes and DPI moves without close/reopen. Metrics are logical and scaled once. RTL is layout-driven. Accessibility does not require real per-result child controls.
 
-Dispose in this order:
-
-```text
-mark disposing
-stop debounce
-invalidate generation
-cancel active CTS
-detach events
-close popup
-detach owner tracking
-dispose owned popup/content/overlay
-dispose timers/CTS/GDI resources
-base.Dispose
-```
-
-Never dispose caller-injected provider/matcher/renderer/items.
-
-- [ ] **Step 7: Implement theme/DPI refresh and popup reposition.**
-
-A theme change while open repaints owner + search + results. A per-monitor DPI change remeasures owner metrics and popup bounds, then reruns shared placement. Do not cache already-scaled constants across DPI changes.
-
-- [ ] **Step 8: Implement RTL and accessibility.**
-
-Use mirrored layout calculations rather than ad-hoc painting branches. Expose accessible selection summary and expanded/collapsed state without creating one real child control per result row.
-
-- [ ] **Step 9: Run all `BootstrapSelect` tests on both targets.**
+- [ ] **Step 8: Run all Select tests plus overlay/ComboBox regressions on both TFMs.**
 
 ```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelect"
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelect"
+dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelect|FullyQualifiedName~BootstrapOverlay|FullyQualifiedName~BootstrapComboBox"
+dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelect|FullyQualifiedName~BootstrapOverlay|FullyQualifiedName~BootstrapComboBox"
 ```
 
 Expected: pass.
 
-- [ ] **Step 10: Run overlay and ComboBox regression suites.**
-
-```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapOverlay|FullyQualifiedName~BootstrapComboBox"
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapOverlay|FullyQualifiedName~BootstrapComboBox"
-```
-
-Expected: existing overlay and native ComboBox behavior remains green.
-
-- [ ] **Step 11: Commit hardening.**
+- [ ] **Step 9: Commit.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectRenderer.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSelectionLayout.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultLayout.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultsView.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectDropDownController.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectSearchController.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectLifecycleTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectAccessibilityTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectVisualRegressionTests.cs
@@ -1154,74 +610,36 @@ git commit -m "test: harden BootstrapSelect lifecycle and accessibility"
 
 ---
 
-## Task 11: Add demo scenarios and documentation examples
+## Task 11: Add demo scenarios and user documentation
 
 **Files:**
 - Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/AdvancedInputsDemoForm.cs`
 - Create: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectDemoProvider.cs`
-- Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs` only if `AdvancedInputsDemoForm` is not already reachable from navigation; otherwise leave `MainForm.cs` unchanged.
+- Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs` only if Advanced Inputs is not already reachable; otherwise do not edit it.
 - Modify: `docs/COMPONENTS.md`
 - Modify: `docs/PACKAGE_README.md`
 - Modify: `README.md`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/BootstrapSelectDemoContractTests.cs`
 
-**Interfaces:**
-- Consumes: finished public `BootstrapSelect` API.
-- Produces: discoverable manual validation surface and supported usage documentation.
+**Interfaces:** Consumes final public API; produces discoverable demo/manual verification and supported usage examples.
 
-- [ ] **Step 1: Write a failing demo contract test.**
+- [ ] **Step 1: Write failing demo contract test.** Require discoverable scenarios for local single, local multi, grouped results, custom values, async single, async multi/paging, and failure/retry.
 
-Require `AdvancedInputsDemoForm` to expose controls/scenarios discoverable by the existing demo-test style for at least:
-
-```text
-local single select
-local multiple select
-grouped local results
-custom value creation
-async single select
-async multiple select with paging
-provider failure/retry
-```
-
-Do not assert private pixel layout details from the demo test.
-
-- [ ] **Step 2: Run the demo contract test and confirm failure.**
+- [ ] **Step 2: Run demo test; expect failure.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectDemoContractTests"
 ```
 
-Expected: demo scenarios absent.
+- [ ] **Step 3: Add local demo cases.** Include grouped customer/product-like data, disabled item, long text, multi chips, clear, and custom creation.
 
-- [ ] **Step 3: Add deterministic local demo scenarios.**
+- [ ] **Step 4: Add `BootstrapSelectDemoProvider`.** Use at least 200 in-memory records, server-side-from-control-perspective filtering, page size 20, deterministic failure toggle, and cancellation-aware artificial latency.
 
-Use representative customer/product-like items with groups and at least one disabled item. Include single, multiple/chips, clear, custom values, and a long-text item for ellipsis/wrapping verification.
+- [ ] **Step 5: Add async/placement cases.** Include rapid typing, multi selection retained across queries, infinite paging, first/later-page retry, and a select positioned near lower/right demo edges to observe flip/shift.
 
-- [ ] **Step 4: Add a demo-only async provider.**
+- [ ] **Step 6: Document concrete examples.** `README.md`, `docs/PACKAGE_README.md`, and `docs/COMPONENTS.md` cover local single, multiple, `IBootstrapSelectDataProvider`, custom matcher, custom renderer, custom values, local-vs-provider mode rule, and when to prefer native-backed `BootstrapComboBox`.
 
-`BootstrapSelectDemoProvider` implements `IBootstrapSelectDataProvider`, uses an in-memory data set of at least 200 logical items, applies search server-side from the control's perspective, returns pages of 20 by default, and can deterministically simulate a failure mode toggled by the demo UI. Artificial latency may use `Task.Delay` here because this is demo behavior, but must honor the passed cancellation token.
-
-- [ ] **Step 5: Add placement/hardening demo arrangements.**
-
-Place at least one select near the lower/right edge of the demo content area so manual validation can observe overlay flip/shift. Include UI instructions for rapid typing, failure/retry, theme switching, and multi-selection.
-
-- [ ] **Step 6: Document the supported API.**
-
-`docs/COMPONENTS.md`, `docs/PACKAGE_README.md`, and `README.md` must include concrete compilable examples for:
-
-```csharp
-var select = new BootstrapSelect();
-select.Items.Add(new BootstrapSelectItem(1, "Customer A"));
-select.Items.Add(new BootstrapSelectItem(2, "Customer B"));
-```
-
-```csharp
-select.SelectionMode = BootstrapSelectMode.Multiple;
-```
-
-and complete examples for `IBootstrapSelectDataProvider`, a custom matcher, a custom renderer, and `AllowCustomValues`/`CustomValueFactory`. Explicitly document that local `Items` and `DataProvider` are alternate modes and that `BootstrapComboBox` remains the native-backed choice when native binding/autocomplete semantics are desired.
-
-- [ ] **Step 7: Run demo test and build demo on both frameworks.**
+- [ ] **Step 7: Run demo test/builds.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectDemoContractTests"
@@ -1229,79 +647,54 @@ dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.D
 dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.Demo.csproj -f net48
 ```
 
-Expected: pass with zero warnings/errors.
-
-- [ ] **Step 8: Manually verify the demo on Windows.**
-
-Run:
+- [ ] **Step 8: Run manual Windows demo validation.**
 
 ```powershell
 dotnet run --project demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.Demo.csproj -f net8.0-windows
 ```
 
-Verify:
+Verify local search/select/clear; multi wrap/remove; create row; groups/disabled row; loading/debounce/rapid typing; paging; first/later-page retry; popup flip; light/dark live refresh; keyboard-only use; Vietnamese IME; 100/125/150/200% DPI; multi-monitor placement/DPI when available.
 
-```text
-local single search/select/clear
-local multiple chip wrap/remove/clear
-custom create row
-group headers/disabled row
-async loading/debounce/rapid typing
-async multi selection retained across queries
-infinite page loading
-first-page failure/retry
-later-page failure/retry retaining earlier rows
-popup below and flipped above near edge
-light/dark theme refresh while open
-keyboard-only open/search/navigation/select/deselect/close
-Vietnamese IME typing in search editor
-100%, 125%, 150%, 200% DPI when available
-multi-monitor DPI/placement when available
-```
-
-- [ ] **Step 9: Commit demo and docs.**
+- [ ] **Step 9: Commit.**
 
 ```powershell
-git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/AdvancedInputsDemoForm.cs demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectDemoProvider.cs demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs docs/COMPONENTS.md docs/PACKAGE_README.md README.md tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/BootstrapSelectDemoContractTests.cs
+git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/AdvancedInputsDemoForm.cs demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectDemoProvider.cs docs/COMPONENTS.md docs/PACKAGE_README.md README.md tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/BootstrapSelectDemoContractTests.cs
+git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs 2>$null
 git commit -m "docs: add BootstrapSelect demo and usage"
 ```
 
-If `MainForm.cs` was intentionally not changed because the advanced-inputs page was already reachable, omit it from `git add` rather than making a no-op edit.
+If `MainForm.cs` is unchanged, the second `git add` is harmless and no no-op edit should be introduced.
 
 ---
 
-## Task 12: Review and approve the public API baseline, then run full validation
+## Task 12: Review/approve public API baseline and run full validation
 
 **Files:**
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Release/Phase16PublicApiBaselineTests.cs`
 - Modify: `docs/PUBLIC_API_BASELINE.md`
 - Modify: `CHANGELOG.md`
-- Modify: any `BootstrapSelect` source file only if the exported-surface review identifies a naming/nullability/visibility defect; rerun all affected tests before baseline approval.
+- Modify BootstrapSelect source only if exported-surface review discovers an API defect; rerun affected tasks before approval.
 
-**Interfaces:**
-- Consumes: final exported assembly surface.
-- Produces: intentional compatibility-baseline update and release-quality verification evidence.
+**Interfaces:** Consumes final assembly surface; produces intentional RC-line baseline approval and release-quality evidence.
 
-- [ ] **Step 1: Build both core target frameworks before touching the fingerprint.**
+- [ ] **Step 1: Build both core TFMs before fingerprint changes.**
 
 ```powershell
 dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -f net8.0-windows
 dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -f net48
 ```
 
-Expected: zero warnings, zero errors.
+Expected: zero warnings/errors.
 
-- [ ] **Step 2: Run the existing public API baseline test without changing its approved hash.**
+- [ ] **Step 2: Run the current baseline test without changing its hash.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~Phase16PublicApiBaselineTests.ExportedApiMatchesApprovedV1Baseline"
 ```
 
-Expected: **FAIL intentionally** because `BootstrapSelect` and its approved public contracts add exported surface. Capture the reconstructed exported surface and proposed hash from the failure output.
+Expected: **intentional failure** showing reconstructed exported surface and proposed SHA-256.
 
-- [ ] **Step 3: Review the reconstructed exported surface against the approved spec before accepting any hash.**
-
-Verify every new exported symbol is intentional. The expected families are:
+- [ ] **Step 3: Review the export before accepting the hash.** Expected intentional public families are:
 
 ```text
 BootstrapSelect
@@ -1316,48 +709,30 @@ BootstrapSelectPage
 IBootstrapSelectMatcher
 BootstrapSelectTextMatcher
 IBootstrapSelectRenderer
-public renderer contexts/state flags required by the renderer extension point
+renderer contexts/state flags required to implement the renderer
 ```
 
-Confirm these are **not** exported:
+These remain internal:
 
 ```text
-selection/search state internals
-result rows/kinds/layout
+selection/search state and mutations
+result rows/kinds/layout/result set/builder
 popup controller/content
 results viewport
-retry descriptors
-debouncer
+debouncer/retry descriptors
 overlay implementation aliases
-provider test/demo helpers
+test/demo providers
 ```
 
-Confirm `BootstrapValidationState` has not changed and `BootstrapComboBox` exported surface is unchanged.
+Also verify `BootstrapValidationState` and `BootstrapComboBox` exported surfaces are unchanged. If an accidental public/protected member appears, fix it and repeat Steps 1–3; never approve a hash merely to make CI green.
 
-If the review finds an accidental public/protected member, fix visibility/API design and return to Step 1. Do not approve the hash until the surface is correct.
+- [ ] **Step 4: Update the reviewed fingerprint in the baseline test.** Do not weaken/bypass the test.
 
-- [ ] **Step 4: Update the baseline test with the reviewed hash.**
+- [ ] **Step 5: Update `docs/PUBLIC_API_BASELINE.md`.** Record the intentional BootstrapSelect additions, internal helpers, unchanged existing signatures, unchanged `AssemblyVersion` `1.0.0.0`, and reviewed new fingerprint.
 
-Replace only the approved fingerprint constant/mechanism used by `Phase16PublicApiBaselineTests`. Do not weaken or bypass the test.
+- [ ] **Step 6: Update `CHANGELOG.md` under `[Unreleased]`.** Describe only supported capabilities; do not claim DataSource binding, built-in HTTP/AJAX, per-row hosted controls, or ComboBox replacement semantics.
 
-- [ ] **Step 5: Update `docs/PUBLIC_API_BASELINE.md`.**
-
-Add a BootstrapSelect section that records:
-
-```text
-why the addition is compatible on the RC line
-all intentional exported types/members at a reviewable level
-which helpers remain internal
-that no existing exported signature changed
-that AssemblyVersion remains 1.0.0.0
-the reviewed new SHA-256 fingerprint
-```
-
-- [ ] **Step 6: Add an unreleased/RC changelog entry.**
-
-Describe `BootstrapSelect` capability without claiming unsupported `DataSource`, built-in HTTP/AJAX, arbitrary hosted item controls, or changes to `BootstrapComboBox`.
-
-- [ ] **Step 7: Re-run the baseline test on both frameworks.**
+- [ ] **Step 7: Re-run baseline test on both TFMs.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~Phase16PublicApiBaselineTests.ExportedApiMatchesApprovedV1Baseline"
@@ -1366,16 +741,14 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: pass.
 
-- [ ] **Step 8: Run all BootstrapSelect, overlay, and ComboBox regression tests on both frameworks.**
+- [ ] **Step 8: Run Select + overlay + ComboBox regressions on both TFMs.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelect|FullyQualifiedName~BootstrapOverlay|FullyQualifiedName~BootstrapComboBox"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapSelect|FullyQualifiedName~BootstrapOverlay|FullyQualifiedName~BootstrapComboBox"
 ```
 
-Expected: pass.
-
-- [ ] **Step 9: Run the entire test suite on both frameworks.**
+- [ ] **Step 9: Run full tests on both TFMs.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows
@@ -1384,15 +757,15 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: all tests pass.
 
-- [ ] **Step 10: Run the repository build script if the documented local environment prerequisites are satisfied.**
+- [ ] **Step 10: Run repository build script when documented prerequisites are available.**
 
 ```powershell
 ./build.ps1
 ```
 
-Expected: repository-level build/package validation succeeds. If the script requires a documented external prerequisite that is unavailable, record that exact prerequisite and retain the successful explicit dual-target build/test evidence from the prior steps.
+If a documented external prerequisite is unavailable, record the exact missing prerequisite and retain the explicit successful dual-target build/test evidence.
 
-- [ ] **Step 11: Inspect the final diff for forbidden scope expansion.**
+- [ ] **Step 11: Inspect final diff/scope.**
 
 ```powershell
 git diff --check
@@ -1401,78 +774,59 @@ git diff -- src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapComboBox.cs
 git diff -- src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapOverlayDropDown.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapOverlaySurface.cs src/MyDmsVn.Bootstrap5WinFormUI/Rendering/BootstrapOverlayPlacementEngine.cs
 ```
 
-Expected:
+Expected: clean whitespace; no unintended ComboBox edits; shared-overlay changes, if any, are minimal/backward-compatible/tested; no generated binaries/bin/obj are staged.
 
-- `git diff --check` is clean;
-- no unintended `BootstrapComboBox` edits;
-- any shared overlay edits are minimal, backward-compatible, justified by the approved architecture, and covered by existing/new overlay regressions;
-- no generated binaries or `bin/obj` files are staged.
-
-- [ ] **Step 12: Commit baseline and release documentation.**
+- [ ] **Step 12: Commit baseline/release docs.**
 
 ```powershell
 git add tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Release/Phase16PublicApiBaselineTests.cs docs/PUBLIC_API_BASELINE.md CHANGELOG.md
 git commit -m "docs: approve BootstrapSelect public API"
 ```
 
-- [ ] **Step 13: Record final verification evidence in the implementation handoff.**
-
-The completion report must state the actual results for:
-
-```text
-net48 core build
-net8.0-windows core build
-net48 full tests
-net8.0-windows full tests
-public API fingerprint review
-manual BootstrapSelect demo checks
-BootstrapComboBox regression checks
-overlay regression checks
-```
-
-Do not mark the implementation complete if any mandatory item is unverified.
+- [ ] **Step 13: Record actual completion evidence** for net48/net8 core builds, both full test suites, baseline fingerprint review, manual demo checks, ComboBox regressions, and overlay regressions. Do not mark complete with any mandatory item unverified.
 
 ---
 
 ## Final Spec-Coverage Checklist
 
-Before declaring the plan implementation complete, verify every approved design area has a corresponding passing test or explicit manual verification:
-
 - [ ] Single selection and programmatic value selection.
 - [ ] Multiple selection, ordered chips, chip removal, batch clear.
-- [ ] Identity by non-null immutable `Value` and configurable `ValueComparer`.
-- [ ] Selection independence from filtering/current page and metadata reconciliation.
-- [ ] Local `Items` + default/custom matcher.
-- [ ] Async provider mode with no networking coupling.
-- [ ] Local/async mutual exclusion without destroying `Items`.
-- [ ] Debounce, cancellation, generation protection, UI-thread safety.
-- [ ] One-based paging, `HasMore`, near-end loading, no overlapping page requests.
-- [ ] First-page error and later-page inline retry semantics.
+- [ ] Non-null immutable `Value` identity with `IEqualityComparer<object>`.
+- [ ] Selection independent from filtering/page; metadata reconciliation without false selection events.
+- [ ] Local items and replaceable matcher.
+- [ ] Async paged provider with no networking coupling.
+- [ ] Local/async mutual exclusion without destroying local items.
+- [ ] 250 ms debounce, cancellation, generation guard, UI-thread safety.
+- [ ] One-based paging, authoritative `HasMore`, near-end loading, no overlapping load-more.
+- [ ] First-page error and later-page inline retry preserving loaded rows.
 - [ ] Duplicate-value elimination across pages.
-- [ ] Grouping by `Group` metadata, including page-boundary group reconciliation.
-- [ ] Opt-in custom values with exact-text suppression and synchronous factory.
-- [ ] Public custom renderer with no internal-row leakage.
-- [ ] Real WinForms search editor and Vietnamese IME-safe input path.
-- [ ] Owner-rendered fixed-height result viewport without per-item child controls.
-- [ ] Keyboard and mouse parity, including retry/create actions.
-- [ ] Popup lazy creation/reuse, click-outside/Esc/Tab behavior, focus non-stealing.
-- [ ] Shared overlay flip/shift/clamp and owner/DPI repositioning.
-- [ ] Theme, validation, DPI, RTL, accessibility, Designer safety, handle recreation, disposal.
-- [ ] `BootstrapComboBox` behavior/API unchanged.
-- [ ] Public API baseline intentionally reviewed and updated only after inspecting the failure output.
-- [ ] Documentation and demo cover local single, multi, async, matcher, renderer, custom values, paging, and errors.
-- [ ] Both target frameworks build and full test suites pass.
+- [ ] Grouping via `Group`, including page-boundary reconciliation.
+- [ ] Opt-in custom values, exact-text suppression, synchronous factory.
+- [ ] Public renderer contexts/state without internal-row leakage.
+- [ ] Real search `TextBox` and Vietnamese IME-safe path.
+- [ ] Fixed-height owner-rendered viewport without per-item child controls.
+- [ ] Keyboard/mouse parity including retry/create.
+- [ ] Lazy/reused popup, click-outside/Esc/Tab, focus non-stealing.
+- [ ] Shared overlay flip/shift/clamp plus owner/DPI repositioning.
+- [ ] Theme, existing validation enum, DPI, RTL, accessibility, Designer, handle/disposal safety.
+- [ ] `BootstrapComboBox` API/behavior unchanged.
+- [ ] Public API fingerprint reviewed from intentional failure before update.
+- [ ] Demo/docs cover local single/multi, async, matcher, renderer, tags, paging, errors.
+- [ ] Both TFMs build and full tests pass.
 
 ## Placeholder and Type-Consistency Check
 
-Before execution handoff, the implementer must confirm this plan contains no unresolved implementation placeholders and that names introduced by earlier tasks are used consistently by later tasks. In particular:
+This plan intentionally leaves no implementation-choice placeholders. Keep these names/types consistent across tasks:
 
-- `BootstrapSelectItem.Value` is `object`, never nullable in its declared contract.
-- `SelectedValue` may be `null` only to represent no selection; `SelectedValues` contains values from selected items.
-- `ValueComparer` is `IEqualityComparer<object>`.
-- `BootstrapValidationState` is reused unchanged.
-- `IconDescriptor` is the item icon type.
-- `BootstrapSelectQuery.Page` is one-based.
-- `BootstrapSelectPage.HasMore` is the paging authority.
-- The renderer contexts are public only because callers need them to implement `IBootstrapSelectRenderer`; result rows/controllers remain internal.
-- No task introduces `DataSource`, `DisplayMember`, `ValueMember`, built-in HTTP/AJAX configuration, `IAsyncEnumerable`, arbitrary per-row child controls, or variable-height rows.
+```text
+BootstrapSelectItem.Value             object, non-null and read-only
+BootstrapSelect.SelectedValue         object?; null means no selection
+BootstrapSelect.SelectedValues        IReadOnlyList<object>
+BootstrapSelect.ValueComparer         IEqualityComparer<object>
+BootstrapSelect.ValidationState       existing BootstrapValidationState only
+BootstrapSelectItem.Icon              IconDescriptor?
+BootstrapSelectQuery.Page             one-based int
+BootstrapSelectPage.HasMore           authoritative bool
+```
+
+Do not introduce `DataSource`, `DisplayMember`, `ValueMember`, built-in HTTP/AJAX, `IAsyncEnumerable`, arbitrary per-row child controls, variable-height result rows, a public group tree, or a second overlay engine.
