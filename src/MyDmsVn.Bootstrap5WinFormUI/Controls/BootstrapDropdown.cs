@@ -21,6 +21,7 @@ public class BootstrapDropdown : Component
     private readonly BootstrapDropdownItemCollection _items;
     private readonly List<Image> _ownedImages = new List<Image>();
     private BootstrapButton? _target;
+    private BootstrapButton? _activePresentationSource;
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private int _minimumWidth;
     private bool _themeSubscribed;
@@ -142,9 +143,15 @@ public class BootstrapDropdown : Component
             }
 
             _minimumWidth = value;
-            if (_dropDown.Visible && _target is not null && !_target.IsDisposed)
+            if (_dropDown.Visible)
             {
-                _dropDown.MinimumSize = new Size(ResolveMinimumWidth(value, GetTargetDpi(_target)), 0);
+                var presentationSource = _activePresentationSource ?? _target;
+                if (presentationSource is not null && !presentationSource.IsDisposed)
+                {
+                    _dropDown.MinimumSize = new Size(
+                        ResolveMinimumWidth(value, GetTargetDpi(presentationSource)),
+                        0);
+                }
             }
         }
     }
@@ -167,14 +174,43 @@ public class BootstrapDropdown : Component
     {
         ThrowIfDisposed();
         var target = _target ?? throw new InvalidOperationException("A BootstrapDropdown Target must be assigned before Show is called.");
-        if (_dropDown.Visible || !CanOpen(target))
+        ShowFrom(target, target, new Point(0, target.Height));
+    }
+
+    internal void ShowFrom(BootstrapButton presentationSource, Control anchor, Point location)
+    {
+        ThrowIfDisposed();
+        if (presentationSource is null)
+        {
+            throw new ArgumentNullException(nameof(presentationSource));
+        }
+
+        if (anchor is null)
+        {
+            throw new ArgumentNullException(nameof(anchor));
+        }
+
+        if (_dropDown.Visible ||
+            presentationSource.IsDisposed ||
+            anchor.IsDisposed ||
+            !CanOpen(presentationSource))
         {
             return;
         }
 
         ValidateItemTree(_items);
-        RebuildNativeItems(target);
-        _dropDown.Show(target, new Point(0, target.Height));
+        try
+        {
+            RebuildNativeItems(presentationSource);
+            _activePresentationSource = presentationSource;
+            _dropDown.Show(anchor, location);
+        }
+        catch
+        {
+            _activePresentationSource = null;
+            ClearNativeItems();
+            throw;
+        }
     }
 
     /// <summary>
@@ -265,6 +301,7 @@ public class BootstrapDropdown : Component
             _dropDown.Closed -= OnNativeClosed;
             ClearNativeItems();
             _dropDown.Dispose();
+            _activePresentationSource = null;
             _disposed = true;
         }
 
@@ -378,6 +415,7 @@ public class BootstrapDropdown : Component
 
     private void OnNativeClosed(object? sender, ToolStripDropDownClosedEventArgs e)
     {
+        _activePresentationSource = null;
         Closed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -675,10 +713,14 @@ public class BootstrapDropdown : Component
         }
 
         _renderer.Variant = _variant;
-        if (_dropDown.Visible && _target is not null && !_target.IsDisposed)
+        if (_dropDown.Visible)
         {
-            ApplyPresentation(_target, refreshImages: true);
-            InvalidateNativeLevels(_dropDown);
+            var presentationSource = _activePresentationSource ?? _target;
+            if (presentationSource is not null && !presentationSource.IsDisposed)
+            {
+                ApplyPresentation(presentationSource, refreshImages: true);
+                InvalidateNativeLevels(_dropDown);
+            }
         }
     }
 

@@ -832,6 +832,101 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void DropdownInternalAnchorOpensWithoutChangingPublicTargetAndForwardsLifecycle()
+    {
+        var presentationSource = new BootstrapButton { Text = "Presentation" };
+        var anchor = new Panel { Size = new Size(240, 48) };
+        using var form = new Form
+        {
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(200, 200),
+            Size = new Size(500, 300)
+        };
+        presentationSource.Location = new Point(24, 24);
+        anchor.Location = new Point(24, 80);
+        form.Controls.Add(presentationSource);
+        form.Controls.Add(anchor);
+        form.Show();
+        Application.DoEvents();
+        using var dropdown = new BootstrapDropdown();
+        dropdown.Items.Add(new BootstrapDropdownItem { Text = "Action" });
+        var opened = 0;
+        var closed = 0;
+        dropdown.Opened += (_, _) => opened++;
+        dropdown.Closed += (_, _) => closed++;
+
+        InvokeShowFrom(dropdown, presentationSource, anchor, new Point(0, anchor.Height));
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(dropdown.Target, Is.Null);
+            Assert.That(opened, Is.EqualTo(1));
+        }));
+
+        dropdown.Close();
+        Application.DoEvents();
+        Assert.That(closed, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void DropdownActivePresentationSourceDrivesLiveMinimumWidthAndThemeRefresh()
+    {
+        var presentationSource = new BootstrapButton { Text = "Presentation" };
+        var renderer = new RecordingIconRenderer();
+        presentationSource.IconRenderer = renderer;
+        var anchor = new Panel { Size = new Size(240, 48) };
+        using var form = new Form
+        {
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(200, 200),
+            Size = new Size(500, 300)
+        };
+        form.Controls.Add(presentationSource);
+        form.Controls.Add(anchor);
+        form.Show();
+        Application.DoEvents();
+        using var dropdown = new BootstrapDropdown();
+        dropdown.Items.Add(new BootstrapDropdownItem
+        {
+            Text = "Action",
+            Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus)
+        });
+
+        InvokeShowFrom(dropdown, presentationSource, anchor, new Point(0, anchor.Height));
+        Application.DoEvents();
+        dropdown.MinimumWidth = 220;
+        var expectedWidth = BootstrapDropdown.ResolveMinimumWidth(220, presentationSource.DeviceDpi);
+        var rendersBeforeTheme = renderer.RenderCount;
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(dropdown.Target, Is.Null);
+            Assert.That(GetNativeDropDown(dropdown).MinimumSize.Width, Is.EqualTo(expectedWidth));
+            Assert.That(renderer.RenderCount, Is.GreaterThan(rendersBeforeTheme));
+        }));
+    }
+
+    [Test]
+    public void DropdownClassicTargetStillUpdatesMinimumWidthWhileOpen()
+    {
+        var button = new BootstrapButton { Text = "Menu" };
+        using var form = CreateHost(button);
+        using var dropdown = new BootstrapDropdown { Target = button };
+        dropdown.Items.Add(new BootstrapDropdownItem { Text = "Action" });
+        dropdown.Show();
+        Application.DoEvents();
+
+        dropdown.MinimumWidth = 210;
+
+        Assert.That(
+            GetNativeDropDown(dropdown).MinimumSize.Width,
+            Is.EqualTo(BootstrapDropdown.ResolveMinimumWidth(210, button.DeviceDpi)));
+    }
+
+    [Test]
     public void DropdownRebuildsCurrentModelSnapshotOnEveryEffectiveOpening()
     {
         var button = new BootstrapButton { Text = "Menu" };
@@ -1063,6 +1158,27 @@ public sealed class BootstrapDropdownTests
         var field = typeof(BootstrapDropdown).GetField("_dropDown", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.That(field, Is.Not.Null);
         return (ToolStripDropDownMenu)field!.GetValue(dropdown)!;
+    }
+
+    private static void InvokeShowFrom(
+        BootstrapDropdown dropdown,
+        BootstrapButton presentationSource,
+        Control anchor,
+        Point location)
+    {
+        var method = typeof(BootstrapDropdown).GetMethod(
+            "ShowFrom",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null, "BootstrapDropdown must expose the planned internal anchored-show path.");
+
+        try
+        {
+            method!.Invoke(dropdown, new object[] { presentationSource, anchor, location });
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+        }
     }
 
     private sealed class RecordingIconRenderer : IIconRenderer
