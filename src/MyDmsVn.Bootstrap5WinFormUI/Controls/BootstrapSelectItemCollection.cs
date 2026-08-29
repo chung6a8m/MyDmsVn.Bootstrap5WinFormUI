@@ -22,6 +22,8 @@ public sealed class BootstrapSelectItemCollection : Collection<BootstrapSelectIt
         _changed = changed ?? throw new ArgumentNullException(nameof(changed));
     }
 
+    internal event Action? Changed;
+
     /// <inheritdoc />
     protected override void InsertItem(int index, BootstrapSelectItem item)
     {
@@ -31,7 +33,7 @@ public sealed class BootstrapSelectItemCollection : Collection<BootstrapSelectIt
         }
 
         base.InsertItem(index, item);
-        _changed?.Invoke();
+        NotifyChanged();
     }
 
     /// <inheritdoc />
@@ -43,14 +45,14 @@ public sealed class BootstrapSelectItemCollection : Collection<BootstrapSelectIt
         }
 
         base.SetItem(index, item);
-        _changed?.Invoke();
+        NotifyChanged();
     }
 
     /// <inheritdoc />
     protected override void RemoveItem(int index)
     {
         base.RemoveItem(index);
-        _changed?.Invoke();
+        NotifyChanged();
     }
 
     /// <inheritdoc />
@@ -62,6 +64,12 @@ public sealed class BootstrapSelectItemCollection : Collection<BootstrapSelectIt
         }
 
         base.ClearItems();
+        NotifyChanged();
+    }
+
+    private void NotifyChanged()
+    {
         _changed?.Invoke();
+        Changed?.Invoke();
     }
 }
