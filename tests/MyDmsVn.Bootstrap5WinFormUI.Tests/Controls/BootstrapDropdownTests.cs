@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
@@ -185,6 +186,62 @@ public sealed class BootstrapDropdownTests
 
         collection.Clear();
         Assert.That(collection, Is.Empty);
+    }
+
+    [Test]
+    public void ItemModelExtendsKindsWithoutRenumberingExistingValues()
+    {
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That((int)BootstrapDropdownItemKind.Item, Is.Zero);
+            Assert.That((int)BootstrapDropdownItemKind.Separator, Is.EqualTo(1));
+            Assert.That(Enum.GetName(typeof(BootstrapDropdownItemKind), 2), Is.EqualTo("HostedControl"));
+        }));
+
+        var hosted = new BootstrapDropdownItem((BootstrapDropdownItemKind)2);
+        Assert.That((int)hosted.Kind, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void ItemModelOwnsStableNestedCollectionThatRejectsNull()
+    {
+        var item = new BootstrapDropdownItem();
+        var property = typeof(BootstrapDropdownItem).GetProperty("DropDownItems");
+
+        Assert.That(property, Is.Not.Null);
+        var first = property!.GetValue(item) as BootstrapDropdownItemCollection;
+        var second = property.GetValue(item) as BootstrapDropdownItemCollection;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(first, Is.Not.Null);
+            Assert.That(second, Is.SameAs(first));
+            Assert.That(first, Is.Empty);
+        }));
+        Assert.Throws<ArgumentNullException>((Action)(() => first!.Add(null!)));
+    }
+
+    [Test]
+    public void ItemModelHostedControlFactoryDefaultsToNullAndUsesHiddenDesignerMetadata()
+    {
+        var item = new BootstrapDropdownItem();
+        var property = typeof(BootstrapDropdownItem).GetProperty("HostedControlFactory");
+
+        Assert.That(property, Is.Not.Null);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(property!.PropertyType, Is.EqualTo(typeof(Func<Control>)));
+            Assert.That(property.GetValue(item), Is.Null);
+            Assert.That(property.GetCustomAttributes(typeof(BrowsableAttribute), inherit: true)
+                .Cast<BrowsableAttribute>().Single().Browsable, Is.False);
+            Assert.That(property.GetCustomAttributes(typeof(DesignerSerializationVisibilityAttribute), inherit: true)
+                .Cast<DesignerSerializationVisibilityAttribute>().Single().Visibility,
+                Is.EqualTo(DesignerSerializationVisibility.Hidden));
+        }));
+
+        Func<Control> factory = () => new TextBox();
+        property!.SetValue(item, factory);
+        Assert.That(property.GetValue(item), Is.SameAs(factory));
     }
 
     [Test]

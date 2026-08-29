@@ -1,7 +1,7 @@
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 /// <summary>
-/// Identifies whether a dropdown model represents an activatable command or a visual separator.
+/// Identifies whether a dropdown model represents a command, separator, or hosted control.
 /// </summary>
 public enum BootstrapDropdownItemKind
 {
@@ -13,5 +13,10 @@ public enum BootstrapDropdownItemKind
     /// <summary>
     /// Represents a non-activatable separator row.
     /// </summary>
-    Separator = 1
+    Separator = 1,
+
+    /// <summary>
+    /// Represents a row whose control is created for the current native menu snapshot.
+    /// </summary>
+    HostedControl = 2
 }
