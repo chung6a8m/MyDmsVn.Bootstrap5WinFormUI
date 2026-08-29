@@ -11,36 +11,17 @@ internal static class BootstrapSelectResultBuilder
         IBootstrapSelectMatcher matcher,
         Func<BootstrapSelectItem, bool> isSelected)
     {
-        if (items is null)
-        {
-            throw new ArgumentNullException(nameof(items));
-        }
-
-        if (searchText is null)
-        {
-            throw new ArgumentNullException(nameof(searchText));
-        }
-
-        if (matcher is null)
-        {
-            throw new ArgumentNullException(nameof(matcher));
-        }
-
-        if (isSelected is null)
-        {
-            throw new ArgumentNullException(nameof(isSelected));
-        }
+        if (items is null) throw new ArgumentNullException(nameof(items));
+        if (searchText is null) throw new ArgumentNullException(nameof(searchText));
+        if (matcher is null) throw new ArgumentNullException(nameof(matcher));
+        if (isSelected is null) throw new ArgumentNullException(nameof(isSelected));
 
         var filtered = new List<BootstrapSelectItem>();
         foreach (var item in items)
         {
             ValidateItem(item, nameof(items));
-            if (matcher.IsMatch(item, searchText))
-            {
-                filtered.Add(item);
-            }
+            if (matcher.IsMatch(item, searchText)) filtered.Add(item);
         }
-
         return BuildLoaded(filtered, isSelected);
     }
 
@@ -48,16 +29,8 @@ internal static class BootstrapSelectResultBuilder
         IEnumerable<BootstrapSelectItem> items,
         Func<BootstrapSelectItem, bool> isSelected)
     {
-        if (items is null)
-        {
-            throw new ArgumentNullException(nameof(items));
-        }
-
-        if (isSelected is null)
-        {
-            throw new ArgumentNullException(nameof(isSelected));
-        }
-
+        if (items is null) throw new ArgumentNullException(nameof(items));
+        if (isSelected is null) throw new ArgumentNullException(nameof(isSelected));
         var rows = new List<BootstrapSelectResultRow>();
         AppendRows(rows, items, isSelected, null);
         return new BootstrapSelectResultSet(rows);
@@ -68,53 +41,47 @@ internal static class BootstrapSelectResultBuilder
         IEnumerable<BootstrapSelectItem> items,
         Func<BootstrapSelectItem, bool> isSelected)
     {
-        if (existing is null)
-        {
-            throw new ArgumentNullException(nameof(existing));
-        }
-
-        if (items is null)
-        {
-            throw new ArgumentNullException(nameof(items));
-        }
-
-        if (isSelected is null)
-        {
-            throw new ArgumentNullException(nameof(isSelected));
-        }
-
+        if (existing is null) throw new ArgumentNullException(nameof(existing));
+        if (items is null) throw new ArgumentNullException(nameof(items));
+        if (isSelected is null) throw new ArgumentNullException(nameof(isSelected));
         var rows = new List<BootstrapSelectResultRow>(existing.Rows.Count);
-        for (var i = 0; i < existing.Rows.Count; i++)
-        {
-            rows.Add(existing.Rows[i]);
-        }
-
+        for (var i = 0; i < existing.Rows.Count; i++) rows.Add(existing.Rows[i]);
         var activeGroup = ResolveTrailingActiveGroup(existing.Rows);
         AppendRows(rows, items, isSelected, activeGroup);
         return new BootstrapSelectResultSet(rows);
     }
 
+    internal static BootstrapSelectResultSet AppendCreateValue(
+        BootstrapSelectResultSet existing,
+        IEnumerable<BootstrapSelectItem> exactMatchItems,
+        string searchText,
+        bool allowCustomValues)
+    {
+        if (existing is null) throw new ArgumentNullException(nameof(existing));
+        if (exactMatchItems is null) throw new ArgumentNullException(nameof(exactMatchItems));
+        if (searchText is null) throw new ArgumentNullException(nameof(searchText));
+        if (!allowCustomValues || string.IsNullOrWhiteSpace(searchText)) return existing;
+
+        var candidate = searchText.Trim();
+        if (HasExactTextMatch(exactMatchItems, candidate)) return existing;
+        var rows = new List<BootstrapSelectResultRow>(existing.Rows.Count + 1);
+        for (var i = 0; i < existing.Rows.Count; i++)
+        {
+            if (existing.Rows[i].Kind != BootstrapSelectResultRowKind.Empty) rows.Add(existing.Rows[i]);
+        }
+        rows.Add(BootstrapSelectResultRow.CreateValue(candidate));
+        return new BootstrapSelectResultSet(rows);
+    }
+
     internal static bool HasExactTextMatch(IEnumerable<BootstrapSelectItem> items, string searchText)
     {
-        if (items is null)
-        {
-            throw new ArgumentNullException(nameof(items));
-        }
-
-        if (searchText is null)
-        {
-            throw new ArgumentNullException(nameof(searchText));
-        }
-
+        if (items is null) throw new ArgumentNullException(nameof(items));
+        if (searchText is null) throw new ArgumentNullException(nameof(searchText));
         foreach (var item in items)
         {
             ValidateItem(item, nameof(items));
-            if (string.Equals(item.Text, searchText, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
+            if (string.Equals(item.Text, searchText, StringComparison.OrdinalIgnoreCase)) return true;
         }
-
         return false;
     }
 
@@ -129,33 +96,21 @@ internal static class BootstrapSelectResultBuilder
         {
             ValidateItem(item, nameof(items));
             var group = NormalizeGroup(item.Group);
-            if (group is null)
-            {
-                activeGroup = null;
-            }
+            if (group is null) activeGroup = null;
             else if (!string.Equals(activeGroup, group, StringComparison.Ordinal))
             {
                 rows.Add(BootstrapSelectResultRow.GroupHeader(group));
                 activeGroup = group;
             }
-
             rows.Add(BootstrapSelectResultRow.ItemRow(item, isSelected(item)));
         }
     }
 
     private static string? ResolveTrailingActiveGroup(IReadOnlyList<BootstrapSelectResultRow> rows)
     {
-        if (rows.Count == 0)
-        {
-            return null;
-        }
-
+        if (rows.Count == 0) return null;
         var last = rows[rows.Count - 1];
-        if (last.Kind != BootstrapSelectResultRowKind.Item || last.Item is null)
-        {
-            return null;
-        }
-
+        if (last.Kind != BootstrapSelectResultRowKind.Item || last.Item is null) return null;
         return NormalizeGroup(last.Item.Group);
     }
 
@@ -166,9 +121,6 @@ internal static class BootstrapSelectResultBuilder
 
     private static void ValidateItem(BootstrapSelectItem? item, string parameterName)
     {
-        if (item is null)
-        {
-            throw new ArgumentException("Select item sequences cannot contain null entries.", parameterName);
-        }
+        if (item is null) throw new ArgumentException("Select item sequences cannot contain null entries.", parameterName);
     }
 }
