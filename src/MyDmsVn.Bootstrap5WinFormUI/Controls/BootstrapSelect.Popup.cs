@@ -128,6 +128,13 @@ public partial class BootstrapSelect
     }
 
     /// <inheritdoc />
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        CloseDropDownInternal(false);
+        base.OnHandleDestroyed(e);
+    }
+
+    /// <inheritdoc />
     protected override void OnVisibleChanged(EventArgs e)
     {
         base.OnVisibleChanged(e);
