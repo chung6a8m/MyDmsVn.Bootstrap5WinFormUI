@@ -155,7 +155,7 @@ public sealed class BootstrapSelectDemoForm : Form
         _asyncSingleStatus.Text = "Open and type quickly to exercise debounce/cancellation/latest-query wins.";
         asyncSingle.SearchStarted += (_, e) => _asyncSingleStatus.Text = "Loading query page...";
         asyncSingle.SearchCompleted += (_, e) => _asyncSingleStatus.Text = "Loaded results. Scroll near the end to request the next page.";
-        asyncSingle.SearchFailed += (_, e) => _asyncSingleStatus.Text = "Provider failure: " + e.Exception.Message;
+        asyncSingle.SearchFailed += (_, e) => _asyncSingleStatus.Text = "Provider failure: " + e.Error.Message;
         asyncSingle.SelectionChanged += (_, _) =>
             _asyncSingleStatus.Text = "Selected: " + (asyncSingle.SelectedItem?.Text ?? "none");
         AddScenario(grid, "Async single / delayed provider / paging", asyncSingle, _asyncSingleStatus,
@@ -274,14 +274,14 @@ public sealed class BootstrapSelectDemoForm : Form
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
     {
-        ApplyTheme(e.Theme);
+        ApplyTheme(e.NewTheme);
     }
 
     private void ApplyTheme(BootstrapTheme theme)
     {
-        BackColor = theme.Colors.Background;
+        BackColor = theme.Colors.Body;
         ForeColor = theme.Colors.Text;
-        _content.BackColor = theme.Colors.Background;
+        _content.BackColor = theme.Colors.Body;
         _content.ForeColor = theme.Colors.Text;
         _localSection.ForeColor = theme.Colors.Text;
         _asyncSection.ForeColor = theme.Colors.Text;
