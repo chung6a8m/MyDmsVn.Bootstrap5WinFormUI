@@ -38,7 +38,7 @@
 - Switching `SelectionMode` clears prior-mode selection. Raise `SelectionChanged` once if anything was selected; never reinterpret state across modes implicitly.
 - Keyboard focus date is private state distinct from public selection. Its lifecycle is deterministic and defined below; focus movement alone never raises `SelectionChanged`.
 - Left/Right move keyboard focus +/-1 day; Up/Down +/-7 days; PageUp/PageDown +/-1 month with day clamping; Home/End move to culture-week start/end; Enter/Space activates the focused date. Crossing a month boundary updates `DisplayMonth`.
-- Month arithmetic clamps day safely (for example January 31 -> February 28/29) and must not use `Math.Clamp`, unavailable on `net48`.
+- Month arithmetic clamps day safely and must not use `Math.Clamp`, unavailable on `net48`.
 - Navigation buttons are disabled/no-op when the adjacent month does not intersect allowed bounds.
 - Theme colors/metrics come from `BootstrapThemeManager.CurrentTheme`; do not add calendar-only hard-coded palette constants where existing `Surface`, `SurfaceSecondary`, `Border`, `Text`, `MutedText`, `Disabled`, `Focus`, `Hover`, `Active`, and `Primary` suffice.
 - Selected endpoint/multiple cells use `Active` surface plus `Primary` outline; committed range interiors use `SurfaceSecondary`; preview range uses `Hover`; focused cell adds the `Focus` outline. Text uses `Text`/`MutedText` according to enabled/current-month state.
@@ -203,7 +203,7 @@ public class BootstrapCalendarPicker : Control
 }
 ```
 
-Picker mode-specific selection semantics exactly match `BootstrapCalendar`. Do not add ambiguous aliases such as `Value`, `StartDate`, `EndDate`, `Dates`, `SelectedRange`, or public `IsOpen`.
+Picker mode-specific selection semantics exactly match `BootstrapCalendar`. Do not add aliases such as `Value`, `StartDate`, `EndDate`, `Dates`, `SelectedRange`, or public `IsOpen`.
 
 ### Deliberately not added
 
@@ -286,7 +286,7 @@ internal sealed class BootstrapCalendarSelectionActivatedEventArgs : EventArgs
 internal event EventHandler<BootstrapCalendarSelectionActivatedEventArgs>? SelectionActivated;
 ```
 
-All valid user-equivalent activation paths funnel through one private method such as:
+All valid user-equivalent activation paths funnel through one private method:
 
 ```csharp
 private void ActivateDate(DateTime date)
@@ -438,11 +438,12 @@ private bool _synchronizingCalendar;
 Rules:
 
 - `_lastDisplayMonth` starts `null`.
-- First opening seeds the popup month from current selection in this order: `SelectedDate`, `RangeEnd ?? RangeStart`, first Multiple date, `DateTime.Today`; then clamp to bounds.
+- First opening seeds the popup month from current selection in this order: `SelectedDate`, `RangeStart`, first Multiple date, `DateTime.Today`; then clamp to bounds.
 - After a hosted calendar reports `DisplayMonthChanged`, retain its normalized display month in `_lastDisplayMonth`.
 - Subsequent openings prefer `_lastDisplayMonth` before selection/today fallback.
 - Bounds changes clamp `_lastDisplayMonth` if non-null.
-- The HostedControl factory creates a fresh calendar, configures mode/bounds/state/display month/size, subscribes `SelectionActivated` and `DisplayMonthChanged`, assigns `_activeCalendar`, and returns it.
+- The HostedControl factory creates a fresh calendar, configures mode/bounds/state/display month/size, subscribes `SelectionActivated` and `DisplayMonthChanged`, assigns `_activeCalendar` as its final successful setup step, and returns it. If setup fails before return, unsubscribe/dispose the local calendar and rethrow.
+- `ShowDropDown()` wraps the generic Dropdown open call. If opening throws after the factory assigned `_activeCalendar`, detach/clear `_activeCalendar` and rethrow; the picker never retains a failed-open control reference.
 - `Opened` sets `_isDropDownOpen=true`, raises the picker `Opened` event once, and transfers keyboard focus to `_activeCalendar` so arrows/PageUp/Home/Enter operate on the calendar rather than the ToolStrip host.
 - `Closed` first unsubscribes from `_activeCalendar`, clears `_activeCalendar`, sets `_isDropDownOpen=false`, then raises picker `Closed` once. The reference is not retained merely because plan-002 may keep a closed native snapshot alive until rebuild/disposal.
 - Programmatic picker state changes while open update the picker model first, raise picker `SelectionChanged` if needed, then synchronize the complete state into `_activeCalendar` under `_synchronizingCalendar=true`. This synchronization must not be interpreted as a user activation and must not auto-close the popup.
@@ -479,7 +480,7 @@ The picker is one custom-drawn focusable control with `AccessibleRole.DropList`.
 
 Its accessibility object exposes:
 
-- `Name`: caller-provided `AccessibleName` when set; otherwise normal control naming behavior.
+- `Name`: caller-provided `AccessibleName` when set; otherwise the base accessible name.
 - `Value`: current formatted summary, or `PlaceholderText` when empty.
 - State: `Expanded` while `_isDropDownOpen`, otherwise `Collapsed`; include `Unavailable` when disabled.
 - `DefaultAction`: Open calendar when closed, Close calendar when open.
@@ -754,7 +755,7 @@ git commit -m "feat: harden calendar lifecycle accessibility"
 #### 7A — Generalize the existing internal opening primitive without public API change
 
 - [ ] **Step 1:** Add failing Dropdown tests for a non-button presentation source. Use a plain focusable `Control` anchor/presentation source plus `BootstrapIconRenderer.CreateDefault()`. One HostedControl-only model must open/close normally, use the anchor's DPI/font, and leave public `Target` unchanged.
-- [ ] **Step 2:** Keep the plan-002 overload exactly as an internal convenience path:
+- [ ] **Step 2:** Keep the plan-002 overload as the Button-specific guard/convenience path:
 
 ```csharp
 internal void ShowFrom(
@@ -762,6 +763,12 @@ internal void ShowFrom(
     Control anchor,
     Point location)
 {
+    ThrowIfDisposed();
+    if (presentationSource is null)
+    {
+        throw new ArgumentNullException(nameof(presentationSource));
+    }
+
     if (!CanOpen(presentationSource))
     {
         return;
@@ -775,7 +782,7 @@ internal void ShowFrom(
 }
 ```
 
-- [ ] **Step 3:** Add the generic internal overload:
+- [ ] **Step 3:** Add the generic internal overload with explicit argument validation, no-op policy, snapshot build, active presentation tracking, and failed-open cleanup:
 
 ```csharp
 internal void ShowFrom(
@@ -784,28 +791,62 @@ internal void ShowFrom(
     Control anchor,
     Point location)
 {
-    // ThrowIfDisposed.
-    // Reject null/disposed presentationSource, iconRenderer, or anchor.
-    // Require presentationSource/anchor enabled and usable.
-    // Validate item tree before snapshot mutation.
-    // Build native snapshot using iconRenderer.
-    // Resolve DPI from presentationSource (fall back to DpiScaler.DefaultDpi).
-    // Use presentationSource.Font.
-    // Record active presentation source + renderer while visible.
-    // _dropDown.Show(anchor, location).
+    ThrowIfDisposed();
+
+    if (presentationSource is null)
+    {
+        throw new ArgumentNullException(nameof(presentationSource));
+    }
+    if (iconRenderer is null)
+    {
+        throw new ArgumentNullException(nameof(iconRenderer));
+    }
+    if (anchor is null)
+    {
+        throw new ArgumentNullException(nameof(anchor));
+    }
+    if (presentationSource.IsDisposed)
+    {
+        throw new ObjectDisposedException(nameof(presentationSource));
+    }
+    if (anchor.IsDisposed)
+    {
+        throw new ObjectDisposedException(nameof(anchor));
+    }
+    if (_dropDown.Visible || !presentationSource.Enabled || !anchor.Enabled || _items.Count == 0)
+    {
+        return;
+    }
+
+    ValidateItemTree(_items);
+    RebuildNativeItems(presentationSource, iconRenderer);
+    _activePresentationSource = presentationSource;
+    _activeIconRenderer = iconRenderer;
+
+    try
+    {
+        _dropDown.Show(anchor, location);
+    }
+    catch
+    {
+        _activePresentationSource = null;
+        _activeIconRenderer = null;
+        ClearNativeItems();
+        throw;
+    }
 }
 ```
 
-Do not expose this overload publicly.
+Change private presentation helpers to accept `Control presentationSource` plus explicit `IIconRenderer`, so font/DPI no longer depend on `BootstrapButton`. Keep the existing plan-002 recursive tree validation and exception-safe hosted-control snapshot construction.
 
-- [ ] **Step 4:** Refactor active presentation tracking for theme refresh:
+- [ ] **Step 4:** Track active presentation for runtime theme refresh:
 
 ```csharp
 private Control? _activePresentationSource;
 private IIconRenderer? _activeIconRenderer;
 ```
 
-Public `Show()` still calls the existing Button overload, preserving Stage-7 `Target` and Button loading/disabled semantics. `BootstrapSplitButton` continues calling the existing Button overload from plan 002; no SplitButton public or behavioral change is required. Recursive icon refresh uses `_activeIconRenderer`; DPI/font use `_activePresentationSource`.
+Public `Show()` still calls the existing Button overload, preserving Stage-7 `Target` and Button loading/disabled semantics. `BootstrapSplitButton` continues calling the Button overload from plan 002. Native `Closed` clears both active presentation fields after forwarding the normal close lifecycle. Recursive icon refresh uses `_activeIconRenderer`; DPI/font use `_activePresentationSource`.
 
 - [ ] **Step 5:** Run complete Dropdown tests on both targets before creating the picker:
 
@@ -826,17 +867,36 @@ Expected: classic Target path, SplitButton-oriented internal Button path, hosted
 
 #### 7C — Implement hosted-calendar creation, active reference, focus, synchronization, and completion policy
 
-- [ ] **Step 11:** Add popup-factory synchronization tests. On first open with `_lastDisplayMonth=null`, the fresh hosted calendar receives mode/bounds/logical selection and display month chosen by `SelectedDate -> RangeEnd ?? RangeStart -> first Multiple -> today`, clamped to bounds. After user month navigation and close, the next fresh instance starts from retained `_lastDisplayMonth`.
-- [ ] **Step 12:** Construct one internal Dropdown with exactly one `HostedControl` model item. `HostedControlFactory` creates a **fresh** calendar, configures DPI-aware size using `BootstrapCalendarRenderLogic.CalculatePreferredSize(...)` with picker DPI, synchronizes state, subscribes internal `SelectionActivated` and `DisplayMonthChanged`, assigns non-owning `_activeCalendar`, and returns it.
-- [ ] **Step 13:** Open with the generic shared Dropdown primitive, never with a fake hidden Button:
+- [ ] **Step 11:** Add popup-factory synchronization tests. On first open with `_lastDisplayMonth=null`, the fresh hosted calendar receives mode/bounds/logical selection and display month chosen by `SelectedDate -> RangeStart -> first Multiple -> today`, clamped to bounds. After user month navigation and close, the next fresh instance starts from retained `_lastDisplayMonth`.
+- [ ] **Step 12:** Implement a single HostedControl factory with exception-safe local ownership. Create a local `BootstrapCalendar`, configure mode/bounds/state/display month, set its DPI-aware size from `BootstrapCalendarRenderLogic.CalculatePreferredSize(...)`, subscribe internal `SelectionActivated` and `DisplayMonthChanged`, assign `_activeCalendar` only after all setup succeeds, and return it. If any setup step throws, unsubscribe anything already attached, dispose the local calendar, and rethrow.
+- [ ] **Step 13:** Open with the generic shared Dropdown primitive and clean up a failed-open active reference:
 
 ```csharp
-_dropdown.ShowFrom(
-    this,
-    _iconRenderer,
-    this,
-    new Point(0, Height));
+public void ShowDropDown()
+{
+    ThrowIfDisposed();
+    if (_isDropDownOpen || !Enabled)
+    {
+        return;
+    }
+
+    try
+    {
+        _dropdown.ShowFrom(
+            this,
+            _iconRenderer,
+            this,
+            new Point(0, Height));
+    }
+    catch
+    {
+        DetachActiveCalendar();
+        throw;
+    }
+}
 ```
+
+`DetachActiveCalendar()` only unsubscribes and clears the non-owning reference; Dropdown/ToolStrip remains responsible for disposal of a successfully hosted control.
 
 - [ ] **Step 14:** Add lifecycle/focus tests. `Opened` must set `_isDropDownOpen`, expose accessibility `Expanded`, forward one picker `Opened`, and leave `_activeCalendar.Focused == true` after event pumping. `Closed` must unsubscribe/clear `_activeCalendar`, set collapsed state, and forward one picker `Closed`.
 - [ ] **Step 15:** Implement `OnDropDownOpened`/`OnDropDownClosed` in that order. Do not retain a closed hosted-control reference even if the native snapshot is still owned internally by Dropdown.
@@ -848,7 +908,7 @@ _dropdown.ShowFrom(
   - Multiple: picker toggles/updates, remains open.
 - [ ] **Step 17:** Implement hosted `SelectionActivated` handler. Copy the complete hosted logical snapshot into picker model; raise picker `SelectionChanged` only when event args report `Changed=true`; apply close policy from `Completed` and mode. Never infer completion from whether `SelectionChanged` fired.
 - [ ] **Step 18:** Add programmatic-while-open synchronization tests. For `SelectionMode`, bounds, `SelectedDate`, `SetRange`, `SetSelectedDates`, and `ClearSelection`, assert the active hosted calendar immediately matches picker state, popup remains open, and no internal user-activation close occurs. Bound changes also clamp `_lastDisplayMonth`.
-- [ ] **Step 19:** Implement `SynchronizeActiveCalendar()` under `_synchronizingCalendar`. Programmatic synchronization may cause hosted public property events but must never invoke picker user-completion policy; only `SelectionActivated` drives that policy.
+- [ ] **Step 19:** Implement `SynchronizeActiveCalendar()` under `_synchronizingCalendar`. Programmatic synchronization may cause hosted public property/display events but must never invoke picker user-completion policy; only `SelectionActivated` drives that policy. `DisplayMonthChanged` may update the retained logical month during synchronization after bounds clamping, but it must not recurse into state mutation.
 - [ ] **Step 20:** Add trigger tests: click and Enter/Space/F4/Alt+Down open; a second trigger while `_isDropDownOpen` closes; disabled picker does not open. Native Escape/outside remains Dropdown-owned and is verified manually.
 - [ ] **Step 21:** Complete picker accessibility tests: `Expanded`/`Collapsed`, current summary value after selection, `DoDefaultAction` opens/closes, disabled default action is no-op.
 - [ ] **Step 22:** Run picker + Dropdown tests both targets:
@@ -990,7 +1050,7 @@ Dropdown generic opening overload remains internal
 existing Button ShowFrom overload still services SplitButton unchanged
 no fake hidden BootstrapButton used by CalendarPicker
 same-date Single completion uses internal activation signal, not duplicate public event
-picker holds active calendar only while popup is visible
+picker holds active calendar only while popup is visible and cleans failed-open references
 programmatic open-popup synchronization is guarded and non-closing
 keyboard focus lifecycle is deterministic
 calendar/picker accessibility default actions are interactive
@@ -1032,7 +1092,7 @@ Do not create an empty final commit when no fixes are needed.
 - Owner-drawn calendar exposes interactive accessible nav/day children with default actions, hit testing, and sibling navigation while using no per-day WinForms child controls.
 - `BootstrapCalendarPicker` accessibility exposes DropList summary plus expanded/collapsed and Open/Close default-action semantics.
 - `BootstrapCalendarPicker` uses hosted-control `BootstrapDropdown` and the shared internal generic anchored-show primitive; it does not create a new popup engine or fake presentation button.
-- Picker retains `_activeCalendar` only while visible, focuses it on open, unsubscribes/clears it on close, and synchronizes programmatic state while open without triggering user-completion policy.
+- Picker retains `_activeCalendar` only while visible, focuses it on open, cleans it on failed open/close, and synchronizes programmatic state while open without triggering user-completion policy.
 - Existing `BootstrapDropdown.Show()`, plan-002 Button `ShowFrom(...)`, `BootstrapSplitButton`, and native-backed `BootstrapDatePicker` behavior remain green.
 - Single and completed Range picker sessions auto-close; incomplete Range and Multiple follow the specified open policy.
 - Demo, docs, compatibility/testing guidance, changelog/package docs, and public API baseline are updated.
