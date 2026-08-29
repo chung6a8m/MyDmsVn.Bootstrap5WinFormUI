@@ -295,11 +295,11 @@ public sealed class BootstrapSelectDemoForm : Form
         internal DemoSelectProvider()
         {
             _items = new List<BootstrapSelectItem>();
-            for (var i = 1; i <= 48; i++)
+            for (var i = 1; i <= 240; i++)
             {
-                _items.Add(new BootstrapSelectItem(i, "Customer " + i.ToString("00"))
+                _items.Add(new BootstrapSelectItem(i, "Customer " + i.ToString("000"))
                 {
-                    Group = i <= 24 ? "North region" : "South region"
+                    Group = i <= 120 ? "North region" : "South region"
                 });
             }
 
