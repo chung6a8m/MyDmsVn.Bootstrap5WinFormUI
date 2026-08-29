@@ -68,6 +68,16 @@ public partial class BootstrapSelect
         _searchDebouncer.Schedule(SearchDebounce, () => _ = StartRemoteSearchAsync(effectiveText, _dataProvider));
     }
 
+    internal void RequestRemoteNextPage()
+    {
+        _ = LoadRemoteAdditionalPageAsync(retry: false);
+    }
+
+    internal void RetryRemoteLastFailure()
+    {
+        _ = LoadRemoteAdditionalPageAsync(retry: true);
+    }
+
     internal void InvalidateRemoteSearchOnClose()
     {
         _searchDebouncer?.Cancel();
@@ -98,14 +108,54 @@ public partial class BootstrapSelect
             return;
         }
         if (IsDisposed || !ReferenceEquals(provider, _dataProvider) || !controller.IsCurrentGeneration(generation)) return;
-        _dropDownController?.RefreshResults();
-        if (controller.LastError is Exception error)
+        PublishRemoteCompletion(controller, searchText, 1);
+    }
+
+    private async Task LoadRemoteAdditionalPageAsync(bool retry)
+    {
+        var provider = _dataProvider;
+        var controller = _searchController;
+        if (provider is null || controller is null || IsDisposed) return;
+        var generation = controller.Generation;
+        if (!controller.IsCurrentGeneration(generation) || controller.IsLoadingMore) return;
+        var page = retry ? controller.FailedPage : controller.CurrentPage + 1;
+        if (retry)
         {
-            SearchFailed?.Invoke(this, new BootstrapSelectSearchFailedEventArgs(searchText, 1, error));
+            if (controller.FailedPage <= 1) return;
+        }
+        else if (!controller.HasMore || controller.FailedPage > 0 || controller.CurrentPage < 1)
+        {
+            return;
+        }
+
+        SearchStarted?.Invoke(this, new BootstrapSelectSearchEventArgs(controller.SearchText, page));
+        bool completed;
+        try
+        {
+            completed = retry
+                ? await controller.RetryLastFailureAsync(provider, generation)
+                : await controller.LoadNextPageAsync(provider, generation);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (IsDisposed || !ReferenceEquals(provider, _dataProvider) || !controller.IsCurrentGeneration(generation)) return;
+        if (!completed && controller.FailedPage != page) return;
+        PublishRemoteCompletion(controller, controller.SearchText, page);
+    }
+
+    private void PublishRemoteCompletion(BootstrapSelectSearchController controller, string searchText, int page)
+    {
+        _dropDownController?.RefreshResults();
+        if (controller.LastError is Exception error && controller.FailedPage == page)
+        {
+            SearchFailed?.Invoke(this, new BootstrapSelectSearchFailedEventArgs(searchText, page, error));
         }
         else
         {
-            SearchCompleted?.Invoke(this, new BootstrapSelectSearchCompletedEventArgs(searchText, 1, controller.LoadedItems.Count, controller.HasMore));
+            SearchCompleted?.Invoke(this, new BootstrapSelectSearchCompletedEventArgs(searchText, page, controller.LoadedItems.Count, controller.HasMore));
         }
     }
 
