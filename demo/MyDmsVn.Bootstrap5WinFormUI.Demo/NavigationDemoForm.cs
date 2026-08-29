@@ -14,6 +14,7 @@ public sealed class NavigationDemoForm : Form
     private readonly Label _selectionStatus = new Label();
     private readonly ImageList _images = new ImageList();
     private readonly List<BootstrapDropdown> _dropdowns = new List<BootstrapDropdown>();
+    private readonly List<Font> _ownedFonts = new List<Font>();
 
     public NavigationDemoForm()
     {
@@ -62,6 +63,16 @@ public sealed class NavigationDemoForm : Form
         }
 
         base.Dispose(disposing);
+
+        if (disposing)
+        {
+            foreach (var font in _ownedFonts)
+            {
+                font.Dispose();
+            }
+
+            _ownedFonts.Clear();
+        }
     }
 
     private void AddStyleScenario(string title, BootstrapTabStyle style, BootstrapVariant variant, bool fill)
@@ -201,12 +212,69 @@ public sealed class NavigationDemoForm : Form
         AddCommand(stress, "Toggle Light / Dark while open", ToggleTheme, FrameworkIconGlyph.Check);
         AddDropdownSection("Stress / runtime theme", "Open and close repeatedly; use the theme command while the popup is open to verify icon refresh and renderer invalidation.", stressTarget);
 
+        var nestedTarget = CreateDropdownTarget("Nested commands", "Dropdown nested");
+        var nested = CreateDropdown(nestedTarget, BootstrapVariant.Primary);
+        var administration = new BootstrapDropdownItem { Text = "Administration" };
+        var exports = new BootstrapDropdownItem { Text = "Exports" };
+        AddCommand(exports.DropDownItems, "CSV export", () => SetDropdownStatus("Nested depth 3", "CSV export leaf activated."), FrameworkIconGlyph.Check);
+        AddCommand(exports.DropDownItems, "PDF export", () => SetDropdownStatus("Nested depth 3", "PDF export leaf activated."));
+        administration.DropDownItems.Add(exports);
+        administration.DropDownItems.Add(new BootstrapDropdownItem { Text = "Disabled branch", Enabled = false });
+        nested.Items.Add(administration);
+        AddDropdownSection("Nested submenus", "Three levels exercise native Right/Left navigation, submenu arrows, independent margins, and visible leaf-depth status updates.", nestedTarget);
+
+        var hostedTarget = CreateDropdownTarget("Hosted controls", "Dropdown hosted controls");
+        var hosted = CreateDropdown(hostedTarget, BootstrapVariant.Success);
+        hosted.Items.Add(CreateHostedItem(() =>
+        {
+            var check = new CheckBox
+            {
+                AutoSize = true,
+                Text = "Include archived records",
+                AccessibleName = "Hosted include archived option"
+            };
+            check.CheckedChanged += (_, _) => SetDropdownStatus("Hosted control", "Include archived = " + check.Checked + ".");
+            return check;
+        }));
+        hosted.Items.Add(CreateHostedItem(() =>
+        {
+            var action = new BootstrapButton
+            {
+                AutoSize = true,
+                Text = "Hosted framework action",
+                AccessibleName = "Hosted framework action"
+            };
+            action.Click += (_, _) => SetDropdownStatus("Hosted control", "Framework button activated.");
+            return action;
+        }));
+        AddDropdownSection("Hosted native and framework controls", "Each factory must return a fresh control. Returned controls become framework-owned snapshot controls and are disposed with that popup snapshot.", hostedTarget);
+
+        var mixedTarget = CreateDropdownTarget("Mixed composition", "Dropdown mixed composition");
+        var mixed = CreateDropdown(mixedTarget, BootstrapVariant.Info);
+        var workspace = new BootstrapDropdownItem { Text = "Workspace" };
+        AddCommand(workspace.DropDownItems, "Open overview", () => SetDropdownStatus("Mixed", "Nested overview leaf activated."));
+        workspace.DropDownItems.Add(CreateHostedItem(() =>
+        {
+            var editor = new TextBox
+            {
+                AccessibleName = "Hosted workspace note",
+                Text = "Snapshot note",
+                Width = 180
+            };
+            editor.TextChanged += (_, _) => SetDropdownStatus("Mixed hosted editor", "Text length = " + editor.TextLength + ".");
+            return editor;
+        }));
+        mixed.Items.Add(workspace);
+        AddDropdownSection("Mixed nested and hosted content", "A submenu combines leaf commands and a fresh hosted editor; the returned editor becomes a framework-owned snapshot control.", mixedTarget);
+
+        AddSplitButtonScenarios();
+
         var instructions = new Label
         {
             AutoSize = true,
             MaximumSize = new Size(980, 0),
             AccessibleName = "Dropdown manual verification matrix",
-            Text = "Manual Dropdown checks: open target by mouse and keyboard; navigate with Up/Down/Home/End; activate with Enter; close with Escape and outside click; verify disabled/separator rows do not activate; verify checked state changes only through application code; switch Light/Dark while open; test near bottom/right screen edges; repeat at 100/125/150/175/200% DPI and on a secondary monitor when available; repeat open/close to check focus restoration and stale artifacts."
+            Text = "Manual Dropdown and split checks: mouse primary versus chevron, repeated open/close, and outside click. Keyboard Tab/Shift+Tab between split regions; Enter/Space on each; native menu Up/Down/Home/End/Right/Left/Enter/Escape. Focus, edit, and toggle hosted controls, return to menu rows, dismiss outside, then reopen to verify fresh snapshot/factory state. Verify disabled leaf/submenu/host, checked leaf, and split loading. Switch Light/Dark while root/submenu is visible; verify default theme fonts, custom split font persistence, and popup font coherence. Inspect primary/menu accessibility names before and after changing outer Text and AccessibleName. Repeat at 100/125/150/175/200% DPI for arrows, margins, seam, chevron, and custom-font layout. Test bottom/right edges and a secondary monitor. Repeat rebuild/open/close and dispose the form while nested popup is open; check for stale windows, disposed-control exceptions, or increasing GDI artifacts. Inherited Controls may enumerate framework-owned split regions, but application/demo code must not mutate, remove, or dispose them."
         };
         _content.Controls.Add(CreateSection("Dropdown manual verification", "Native-first interaction checks intentionally remain real-desktop verification rather than synthetic SendKeys tests.", instructions));
     }
@@ -253,6 +321,111 @@ public sealed class NavigationDemoForm : Form
         };
         item.Click += (_, _) => action();
         dropdown.Items.Add(item);
+    }
+
+    private static void AddCommand(
+        BootstrapDropdownItemCollection items,
+        string text,
+        Action action,
+        FrameworkIconGlyph? icon = null)
+    {
+        var item = new BootstrapDropdownItem
+        {
+            Text = text,
+            Icon = icon.HasValue ? IconDescriptor.Framework(icon.Value) : null
+        };
+        item.Click += (_, _) => action();
+        items.Add(item);
+    }
+
+    private static BootstrapDropdownItem CreateHostedItem(Func<Control> factory)
+    {
+        return new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = factory
+        };
+    }
+
+    private void AddSplitButtonScenarios()
+    {
+        var split = new BootstrapSplitButton
+        {
+            Text = "Save",
+            AccessibleName = "Split save command",
+            Variant = BootstrapVariant.Primary,
+            Icon = IconDescriptor.Framework(FrameworkIconGlyph.Check),
+            MinimumWidth = 240,
+            Margin = new Padding(0, 4, 8, 4)
+        };
+        split.Click += (_, _) => SetDropdownStatus("Split primary", "Save command activated without opening the menu.");
+        var saveAs = new BootstrapDropdownItem { Text = "Save as" };
+        AddCommand(saveAs.DropDownItems, "Local file", () => SetDropdownStatus("Split nested", "Local file leaf activated."));
+        AddCommand(saveAs.DropDownItems, "Shared workspace", () => SetDropdownStatus("Split nested", "Shared workspace leaf activated."));
+        split.Items.Add(saveAs);
+        split.Items.Add(CreateHostedItem(() =>
+        {
+            var check = new CheckBox
+            {
+                AutoSize = true,
+                Text = "Create backup",
+                AccessibleName = "Hosted split backup option"
+            };
+            check.CheckedChanged += (_, _) => SetDropdownStatus("Split hosted", "Create backup = " + check.Checked + ".");
+            return check;
+        }));
+
+        var loading = new CheckBox
+        {
+            AutoSize = true,
+            Text = "Loading",
+            AccessibleName = "Split loading state",
+            Margin = new Padding(8, 10, 0, 0)
+        };
+        loading.CheckedChanged += (_, _) =>
+        {
+            split.Loading = loading.Checked;
+            split.LoadingText = loading.Checked ? "Saving" : string.Empty;
+            SetDropdownStatus("Split loading", "Loading = " + loading.Checked + ".");
+        };
+        var splitRow = CreateHorizontalRow(split, loading);
+        _content.Controls.Add(CreateSection("Split primary, nested menu, and hosted control", "Primary activation is independent from the chevron. Loading closes the popup and suppresses both regions; hosted factory output becomes framework-owned snapshot content.", splitRow));
+
+        var customFont = new Font("Segoe UI", 12f, FontStyle.Italic);
+        _ownedFonts.Add(customFont);
+        var custom = new BootstrapSplitButton
+        {
+            Text = "Publish",
+            AccessibleName = "Custom font split command",
+            Variant = BootstrapVariant.Success,
+            Font = customFont,
+            Margin = new Padding(0, 4, 8, 4)
+        };
+        custom.Click += (_, _) => SetDropdownStatus("Custom font split", "Publish primary activated.");
+        AddCommand(custom.Items, "Toggle Light / Dark", ToggleTheme, FrameworkIconGlyph.Check);
+        AddCommand(custom.Items, "Publish preview", () => SetDropdownStatus("Custom font split", "Preview leaf activated."));
+        var themeButton = new BootstrapButton
+        {
+            AutoSize = true,
+            Text = "Toggle Light / Dark",
+            AccessibleName = "Custom font split theme toggle",
+            Margin = new Padding(8, 4, 0, 4)
+        };
+        themeButton.Click += (_, _) => ToggleTheme();
+        _content.Controls.Add(CreateSection("Custom-font split across theme changes", "The caller-assigned font stays authoritative for primary, chevron, and popup presentation after later Light/Dark theme switches.", CreateHorizontalRow(custom, themeButton)));
+    }
+
+    private static FlowLayoutPanel CreateHorizontalRow(params Control[] controls)
+    {
+        var row = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = Padding.Empty
+        };
+        row.Controls.AddRange(controls);
+        return row;
     }
 
     private void SetDropdownStatus(string scenario, string message)

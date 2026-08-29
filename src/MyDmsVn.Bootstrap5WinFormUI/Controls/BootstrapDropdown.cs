@@ -21,6 +21,9 @@ public class BootstrapDropdown : Component
     private readonly BootstrapDropdownItemCollection _items;
     private readonly List<Image> _ownedImages = new List<Image>();
     private BootstrapButton? _target;
+    private BootstrapButton? _activePresentationSource;
+    private bool _pendingAppClickedDismissal;
+    private int _appClickedDismissalGeneration;
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private int _minimumWidth;
     private bool _themeSubscribed;
@@ -44,7 +47,6 @@ public class BootstrapDropdown : Component
 
         _dropDown.Opened += OnNativeOpened;
         _dropDown.Closed += OnNativeClosed;
-        _dropDown.ItemClicked += OnNativeItemClicked;
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         _themeSubscribed = true;
     }
@@ -143,9 +145,15 @@ public class BootstrapDropdown : Component
             }
 
             _minimumWidth = value;
-            if (_dropDown.Visible && _target is not null && !_target.IsDisposed)
+            if (_dropDown.Visible)
             {
-                _dropDown.MinimumSize = new Size(ResolveMinimumWidth(value, GetTargetDpi(_target)), 0);
+                var presentationSource = _activePresentationSource ?? _target;
+                if (presentationSource is not null && !presentationSource.IsDisposed)
+                {
+                    _dropDown.MinimumSize = new Size(
+                        ResolveMinimumWidth(value, GetTargetDpi(presentationSource)),
+                        0);
+                }
             }
         }
     }
@@ -168,13 +176,43 @@ public class BootstrapDropdown : Component
     {
         ThrowIfDisposed();
         var target = _target ?? throw new InvalidOperationException("A BootstrapDropdown Target must be assigned before Show is called.");
-        if (_dropDown.Visible || !CanOpen(target))
+        ShowFrom(target, target, new Point(0, target.Height));
+    }
+
+    internal void ShowFrom(BootstrapButton presentationSource, Control anchor, Point location)
+    {
+        ThrowIfDisposed();
+        if (presentationSource is null)
+        {
+            throw new ArgumentNullException(nameof(presentationSource));
+        }
+
+        if (anchor is null)
+        {
+            throw new ArgumentNullException(nameof(anchor));
+        }
+
+        if (_dropDown.Visible ||
+            presentationSource.IsDisposed ||
+            anchor.IsDisposed ||
+            !CanOpen(presentationSource))
         {
             return;
         }
 
-        RebuildNativeItems(target);
-        _dropDown.Show(target, new Point(0, target.Height));
+        ValidateItemTree(_items);
+        try
+        {
+            RebuildNativeItems(presentationSource);
+            _activePresentationSource = presentationSource;
+            _dropDown.Show(anchor, location);
+        }
+        catch
+        {
+            _activePresentationSource = null;
+            ClearNativeItems();
+            throw;
+        }
     }
 
     /// <summary>
@@ -195,7 +233,20 @@ public class BootstrapDropdown : Component
 
     internal static bool CanActivate(BootstrapDropdownItem item)
     {
-        return item.Kind == BootstrapDropdownItemKind.Item && item.Enabled;
+        return item.Kind == BootstrapDropdownItemKind.Item
+            && item.Enabled
+            && item.DropDownItems.Count == 0;
+    }
+
+    internal static void ValidateItemTree(BootstrapDropdownItemCollection items)
+    {
+        if (items is null)
+        {
+            throw new ArgumentNullException(nameof(items));
+        }
+
+        var visited = new HashSet<BootstrapDropdownItem>();
+        ValidateItemLevel(items, visited);
     }
 
     internal void ActivateItem(BootstrapDropdownItem item)
@@ -231,6 +282,7 @@ public class BootstrapDropdown : Component
     {
         if (disposing && !_disposed)
         {
+            ResetPendingAppClickedDismissal();
             if (_dropDown.Visible)
             {
                 _dropDown.Close();
@@ -250,9 +302,9 @@ public class BootstrapDropdown : Component
 
             _dropDown.Opened -= OnNativeOpened;
             _dropDown.Closed -= OnNativeClosed;
-            _dropDown.ItemClicked -= OnNativeItemClicked;
             ClearNativeItems();
             _dropDown.Dispose();
+            _activePresentationSource = null;
             _disposed = true;
         }
 
@@ -262,6 +314,54 @@ public class BootstrapDropdown : Component
     private bool CanOpen(BootstrapButton target)
     {
         return !target.IsDisposed && target.Enabled && !target.Loading && _items.Count > 0;
+    }
+
+    private static void ValidateItemLevel(
+        BootstrapDropdownItemCollection items,
+        HashSet<BootstrapDropdownItem> visited)
+    {
+        foreach (var item in items)
+        {
+            if (!visited.Add(item))
+            {
+                throw new InvalidOperationException(
+                    "A dropdown item instance may appear only once in a dropdown tree.");
+            }
+
+            switch (item.Kind)
+            {
+                case BootstrapDropdownItemKind.Item:
+                    if (item.HostedControlFactory is not null)
+                    {
+                        throw new InvalidOperationException(
+                            "A normal dropdown item cannot define a hosted-control factory.");
+                    }
+
+                    ValidateItemLevel(item.DropDownItems, visited);
+                    break;
+
+                case BootstrapDropdownItemKind.Separator:
+                    if (item.DropDownItems.Count > 0 || item.HostedControlFactory is not null)
+                    {
+                        throw new InvalidOperationException(
+                            "A dropdown separator cannot contain child items or a hosted-control factory.");
+                    }
+
+                    break;
+
+                case BootstrapDropdownItemKind.HostedControl:
+                    if (item.DropDownItems.Count > 0 || item.HostedControlFactory is null)
+                    {
+                        throw new InvalidOperationException(
+                            "A hosted-control item must define a factory and cannot contain child items.");
+                    }
+
+                    break;
+
+                default:
+                    throw new InvalidOperationException("Unsupported dropdown item kind.");
+            }
+        }
     }
 
     private void AttachTarget(BootstrapButton target)
@@ -280,6 +380,11 @@ public class BootstrapDropdown : Component
     {
         var target = _target;
         if (target is null || !ReferenceEquals(sender, target) || target.IsDisposed || !target.Enabled || target.Loading)
+        {
+            return;
+        }
+
+        if (ConsumePendingAppClickedDismissal())
         {
             return;
         }
@@ -318,12 +423,73 @@ public class BootstrapDropdown : Component
 
     private void OnNativeClosed(object? sender, ToolStripDropDownClosedEventArgs e)
     {
+        var presentationSource = _activePresentationSource ?? _target;
+        _activePresentationSource = null;
+
+        if (e.CloseReason == ToolStripDropDownCloseReason.AppClicked &&
+            presentationSource is not null &&
+            !presentationSource.IsDisposed)
+        {
+            ArmPendingAppClickedDismissal(presentationSource);
+        }
+        else
+        {
+            ResetPendingAppClickedDismissal();
+        }
+
         Closed?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnNativeItemClicked(object? sender, ToolStripItemClickedEventArgs e)
+    internal bool ConsumePendingAppClickedDismissal()
     {
-        if (e.ClickedItem?.Tag is BootstrapDropdownItem model)
+        if (!_pendingAppClickedDismissal)
+        {
+            return false;
+        }
+
+        ResetPendingAppClickedDismissal();
+        return true;
+    }
+
+    private void ArmPendingAppClickedDismissal(BootstrapButton presentationSource)
+    {
+        var generation = ++_appClickedDismissalGeneration;
+        _pendingAppClickedDismissal = true;
+
+        if (!presentationSource.IsHandleCreated)
+        {
+            ExpirePendingAppClickedDismissal(generation);
+            return;
+        }
+
+        try
+        {
+            presentationSource.BeginInvoke(
+                (MethodInvoker)(() => ExpirePendingAppClickedDismissal(generation)));
+        }
+        catch (InvalidOperationException)
+        {
+            ExpirePendingAppClickedDismissal(generation);
+        }
+    }
+
+    private void ExpirePendingAppClickedDismissal(int generation)
+    {
+        if (_appClickedDismissalGeneration == generation)
+        {
+            _pendingAppClickedDismissal = false;
+        }
+    }
+
+    private void ResetPendingAppClickedDismissal()
+    {
+        _pendingAppClickedDismissal = false;
+        _appClickedDismissalGeneration++;
+    }
+
+    private void OnNativeLeafClick(object? sender, EventArgs e)
+    {
+        if (sender is ToolStripMenuItem { Tag: BootstrapDropdownItem model })
         {
             ActivateItem(model);
         }
@@ -333,30 +499,120 @@ public class BootstrapDropdown : Component
     {
         ClearNativeItems();
 
-        _dropDown.ShowImageMargin = _items.Any(item =>
-            item.Kind == BootstrapDropdownItemKind.Item && item.Icon is not null);
-        _dropDown.ShowCheckMargin = _items.Any(item =>
-            item.Kind == BootstrapDropdownItemKind.Item && item.Checked);
-
-        foreach (var model in _items)
+        try
         {
-            if (model.Kind == BootstrapDropdownItemKind.Separator)
-            {
-                _dropDown.Items.Add(new ToolStripSeparator());
-                continue;
-            }
+            _dropDown.ShowImageMargin = _items.Any(item =>
+                item.Kind == BootstrapDropdownItemKind.Item && item.Icon is not null);
+            _dropDown.ShowCheckMargin = _items.Any(item =>
+                item.Kind == BootstrapDropdownItemKind.Item && item.Checked);
+            ConfigureNativeLevel(_dropDown, _items);
+            PopulateNativeItems(_dropDown.Items, _items);
+            ApplyPresentation(target, refreshImages: true);
+        }
+        catch
+        {
+            ClearNativeItems();
+            throw;
+        }
+    }
 
-            _dropDown.Items.Add(new ToolStripMenuItem(model.Text)
+    private void PopulateNativeItems(
+        ToolStripItemCollection nativeItems,
+        BootstrapDropdownItemCollection models)
+    {
+        foreach (var model in models)
+        {
+            ToolStripItem? nativeItem = null;
+            try
             {
-                Enabled = model.Enabled,
-                Checked = model.Checked,
-                CheckOnClick = false,
-                Tag = model,
-                AutoSize = true
-            });
+                switch (model.Kind)
+                {
+                    case BootstrapDropdownItemKind.Separator:
+                        nativeItem = new ToolStripSeparator();
+                        break;
+
+                    case BootstrapDropdownItemKind.HostedControl:
+                        nativeItem = CreateHostedControlItem(model);
+                        break;
+
+                    case BootstrapDropdownItemKind.Item:
+                        var menuItem = new ToolStripMenuItem(model.Text)
+                        {
+                            Enabled = model.Enabled,
+                            Checked = model.Checked,
+                            CheckOnClick = false,
+                            Tag = model,
+                            AutoSize = true
+                        };
+
+                        nativeItem = menuItem;
+                        if (model.DropDownItems.Count > 0)
+                        {
+                            ConfigureNativeLevel((ToolStripDropDownMenu)menuItem.DropDown, model.DropDownItems);
+                            PopulateNativeItems(menuItem.DropDownItems, model.DropDownItems);
+                        }
+                        else
+                        {
+                            menuItem.Click += OnNativeLeafClick;
+                        }
+
+                        break;
+
+                    default:
+                        throw new InvalidOperationException("Unsupported dropdown item kind.");
+                }
+
+                nativeItems.Add(nativeItem);
+                nativeItem = null;
+            }
+            finally
+            {
+                nativeItem?.Dispose();
+            }
+        }
+    }
+
+    private void ConfigureNativeLevel(
+        ToolStripDropDownMenu nativeLevel,
+        BootstrapDropdownItemCollection models)
+    {
+        nativeLevel.Renderer = _renderer;
+        nativeLevel.ShowImageMargin = models.Any(item =>
+            item.Kind == BootstrapDropdownItemKind.Item && item.Icon is not null);
+        nativeLevel.ShowCheckMargin = models.Any(item =>
+            item.Kind == BootstrapDropdownItemKind.Item && item.Checked);
+    }
+
+    private static ToolStripControlHost CreateHostedControlItem(BootstrapDropdownItem model)
+    {
+        var factory = model.HostedControlFactory
+            ?? throw new InvalidOperationException("A hosted-control item must define a factory.");
+        var control = factory();
+        if (control is null)
+        {
+            throw new InvalidOperationException("A hosted-control factory returned null.");
         }
 
-        ApplyPresentation(target, refreshImages: true);
+        if (control.IsDisposed)
+        {
+            throw new InvalidOperationException("A hosted-control factory returned a disposed control.");
+        }
+
+        control.Enabled = model.Enabled;
+        try
+        {
+            return new ToolStripControlHost(control)
+            {
+                Enabled = model.Enabled,
+                Tag = model,
+                AutoSize = true
+            };
+        }
+        catch
+        {
+            control.Dispose();
+            throw;
+        }
     }
 
     private void ApplyPresentation(BootstrapButton target, bool refreshImages)
@@ -370,8 +626,31 @@ public class BootstrapDropdown : Component
         _dropDown.BackColor = theme.Colors.Surface;
         _dropDown.ForeColor = theme.Colors.Text;
         _dropDown.MinimumSize = new Size(ResolveMinimumWidth(_minimumWidth, dpi), 0);
+        ApplyPresentationToLevel(_dropDown, target.Font, theme, metrics, applyFont: true);
 
-        foreach (ToolStripItem nativeItem in _dropDown.Items)
+        if (refreshImages)
+        {
+            RefreshOwnedImages(target, dpi, theme, metrics.ImageSize);
+        }
+    }
+
+    private void ApplyPresentationToLevel(
+        ToolStripDropDownMenu nativeLevel,
+        Font font,
+        BootstrapTheme theme,
+        BootstrapDropdownMetrics metrics,
+        bool applyFont)
+    {
+        nativeLevel.Renderer = _renderer;
+        if (applyFont)
+        {
+            nativeLevel.Font = font;
+        }
+
+        nativeLevel.BackColor = theme.Colors.Surface;
+        nativeLevel.ForeColor = theme.Colors.Text;
+
+        foreach (ToolStripItem nativeItem in nativeLevel.Items)
         {
             if (nativeItem is ToolStripSeparator separator)
             {
@@ -380,19 +659,25 @@ public class BootstrapDropdown : Component
                     metrics.ItemVerticalPadding,
                     metrics.SeparatorInset,
                     metrics.ItemVerticalPadding);
-                continue;
+            }
+            else
+            {
+                nativeItem.Padding = new Padding(
+                    metrics.ItemHorizontalPadding,
+                    metrics.ItemVerticalPadding,
+                    metrics.ItemHorizontalPadding,
+                    metrics.ItemVerticalPadding);
             }
 
-            nativeItem.Padding = new Padding(
-                metrics.ItemHorizontalPadding,
-                metrics.ItemVerticalPadding,
-                metrics.ItemHorizontalPadding,
-                metrics.ItemVerticalPadding);
-        }
-
-        if (refreshImages)
-        {
-            RefreshOwnedImages(target, dpi, theme, metrics.ImageSize);
+            if (nativeItem is ToolStripMenuItem menuItem && menuItem.HasDropDownItems)
+            {
+                ApplyPresentationToLevel(
+                    (ToolStripDropDownMenu)menuItem.DropDown,
+                    font,
+                    theme,
+                    metrics,
+                    applyFont: false);
+            }
         }
     }
 
@@ -400,7 +685,7 @@ public class BootstrapDropdown : Component
     {
         ReleaseOwnedImages();
 
-        foreach (ToolStripItem nativeItem in _dropDown.Items)
+        foreach (var nativeItem in EnumerateNativeItems(_dropDown.Items))
         {
             if (nativeItem.Tag is not BootstrapDropdownItem model || model.Icon is null)
             {
@@ -448,7 +733,7 @@ public class BootstrapDropdown : Component
 
     private void ReleaseOwnedImages()
     {
-        foreach (ToolStripItem nativeItem in _dropDown.Items)
+        foreach (var nativeItem in EnumerateNativeItems(_dropDown.Items))
         {
             nativeItem.Image = null;
         }
@@ -459,6 +744,21 @@ public class BootstrapDropdown : Component
         }
 
         _ownedImages.Clear();
+    }
+
+    private static IEnumerable<ToolStripItem> EnumerateNativeItems(ToolStripItemCollection items)
+    {
+        foreach (ToolStripItem item in items)
+        {
+            yield return item;
+            if (item is ToolStripMenuItem menuItem && menuItem.HasDropDownItems)
+            {
+                foreach (var child in EnumerateNativeItems(menuItem.DropDownItems))
+                {
+                    yield return child;
+                }
+            }
+        }
     }
 
     private void ClearNativeItems()
@@ -481,10 +781,26 @@ public class BootstrapDropdown : Component
         }
 
         _renderer.Variant = _variant;
-        if (_dropDown.Visible && _target is not null && !_target.IsDisposed)
+        if (_dropDown.Visible)
         {
-            ApplyPresentation(_target, refreshImages: true);
-            _dropDown.Invalidate();
+            var presentationSource = _activePresentationSource ?? _target;
+            if (presentationSource is not null && !presentationSource.IsDisposed)
+            {
+                ApplyPresentation(presentationSource, refreshImages: true);
+                InvalidateNativeLevels(_dropDown);
+            }
+        }
+    }
+
+    private static void InvalidateNativeLevels(ToolStripDropDownMenu level)
+    {
+        level.Invalidate();
+        foreach (ToolStripItem item in level.Items)
+        {
+            if (item is ToolStripMenuItem menuItem && menuItem.HasDropDownItems)
+            {
+                InvalidateNativeLevels((ToolStripDropDownMenu)menuItem.DropDown);
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Icons;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -9,6 +10,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// </summary>
 public sealed class BootstrapDropdownItem
 {
+    private readonly BootstrapDropdownItemCollection _dropDownItems;
     private string _text;
 
     /// <summary>
@@ -31,6 +33,7 @@ public sealed class BootstrapDropdownItem
         }
 
         Kind = kind;
+        _dropDownItems = new BootstrapDropdownItemCollection();
         _text = string.Empty;
         Enabled = true;
     }
@@ -79,6 +82,21 @@ public sealed class BootstrapDropdownItem
     [Category("Data")]
     [DefaultValue(null)]
     public object? Tag { get; set; }
+
+    /// <summary>
+    /// Gets the stable caller-owned collection of child items displayed as a native submenu.
+    /// </summary>
+    [Category("Data")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Content)]
+    public BootstrapDropdownItemCollection DropDownItems => _dropDownItems;
+
+    /// <summary>
+    /// Gets or sets the factory that creates a fresh hosted control for an effective opening.
+    /// The returned control becomes framework-owned for the lifetime of that native snapshot.
+    /// </summary>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Func<Control>? HostedControlFactory { get; set; }
 
     /// <summary>
     /// Occurs when an enabled command item is activated by the owned native dropdown.
