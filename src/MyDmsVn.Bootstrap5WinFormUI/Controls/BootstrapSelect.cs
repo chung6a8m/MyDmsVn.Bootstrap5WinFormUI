@@ -48,7 +48,19 @@ public class BootstrapSelect : UserControl
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
     }
 
-    /// <summary>Occurs when the logical selection changes.</summary>
+    /// <summary>Occurs before an item is selected and allows the pending selection to be cancelled.</summary>
+    public event EventHandler<BootstrapSelectItemCancelEventArgs>? Selecting;
+
+    /// <summary>Occurs after an item has been selected.</summary>
+    public event EventHandler<BootstrapSelectItemEventArgs>? Selected;
+
+    /// <summary>Occurs before an item is deselected and allows the pending deselection to be cancelled.</summary>
+    public event EventHandler<BootstrapSelectItemCancelEventArgs>? Deselecting;
+
+    /// <summary>Occurs after an item has been deselected.</summary>
+    public event EventHandler<BootstrapSelectItemEventArgs>? Deselected;
+
+    /// <summary>Occurs after one logical selection mutation or selection batch completes.</summary>
     public event EventHandler? SelectionChanged;
 
     /// <summary>Gets or sets single or multiple selection behavior.</summary>
@@ -59,14 +71,37 @@ public class BootstrapSelect : UserControl
         get => _selectionMode;
         set
         {
-            if (!Enum.IsDefined(typeof(BootstrapSelectMode), value)) throw new ArgumentOutOfRangeException(nameof(value));
-            if (_selectionMode == value) return;
+            if (!Enum.IsDefined(typeof(BootstrapSelectMode), value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported BootstrapSelect selection mode.");
+            }
+
+            if (_selectionMode == value)
+            {
+                return;
+            }
+
             var mutation = _selectionState.PreviewModeChange(value);
-            var changedSelection = mutation.RemovedItems.Count > 0;
+            for (var i = 0; i < mutation.RemovedItems.Count; i++)
+            {
+                if (!CanDeselect(mutation.RemovedItems[i], BootstrapSelectChangeReason.ModeChange))
+                {
+                    return;
+                }
+            }
+
             _selectionState.Apply(mutation);
             _selectionMode = value;
+            for (var i = 0; i < mutation.RemovedItems.Count; i++)
+            {
+                OnDeselected(mutation.RemovedItems[i], BootstrapSelectChangeReason.ModeChange);
+            }
+
             Invalidate();
-            if (changedSelection) SelectionChanged?.Invoke(this, EventArgs.Empty);
+            if (mutation.RemovedItems.Count > 0)
+            {
+                OnSelectionChanged();
+            }
         }
     }
 
@@ -75,17 +110,45 @@ public class BootstrapSelect : UserControl
     [Category("Data")]
     public BootstrapSelectItemCollection Items { get; }
 
-    /// <summary>Gets the first selected item, or null when empty.</summary>
+    /// <summary>Gets or sets the single logical selected item; assigning null clears the selection.</summary>
     [Browsable(false)]
-    public BootstrapSelectItem? SelectedItem => _selectionState.SelectedItems.Count == 0 ? null : _selectionState.SelectedItems[0];
+    public BootstrapSelectItem? SelectedItem
+    {
+        get => _selectionState.SelectedItems.Count == 0 ? null : _selectionState.SelectedItems[0];
+        set
+        {
+            if (value is null)
+            {
+                ClearSelectionCore(BootstrapSelectChangeReason.Programmatic);
+            }
+            else
+            {
+                SelectCore(value, BootstrapSelectChangeReason.Programmatic);
+            }
+        }
+    }
 
     /// <summary>Gets selected items in logical selection order.</summary>
     [Browsable(false)]
     public IReadOnlyList<BootstrapSelectItem> SelectedItems => _selectionState.SelectedItems;
 
-    /// <summary>Gets the first selected logical value, or null when empty.</summary>
+    /// <summary>Gets or sets the single logical selected value; assigning null clears the selection.</summary>
     [Browsable(false)]
-    public object? SelectedValue => SelectedItem?.Value;
+    public object? SelectedValue
+    {
+        get => SelectedItem?.Value;
+        set
+        {
+            if (value is null)
+            {
+                ClearSelectionCore(BootstrapSelectChangeReason.Programmatic);
+            }
+            else
+            {
+                SelectValue(value);
+            }
+        }
+    }
 
     /// <summary>Gets selected logical values in selection order.</summary>
     [Browsable(false)]
@@ -94,7 +157,11 @@ public class BootstrapSelect : UserControl
         get
         {
             var values = new List<object>(_selectionState.SelectedItems.Count);
-            for (var i = 0; i < _selectionState.SelectedItems.Count; i++) values.Add(_selectionState.SelectedItems[i].Value);
+            for (var i = 0; i < _selectionState.SelectedItems.Count; i++)
+            {
+                values.Add(_selectionState.SelectedItems[i].Value);
+            }
+
             return new ReadOnlyCollection<object>(values);
         }
     }
@@ -106,12 +173,24 @@ public class BootstrapSelect : UserControl
         get => _valueComparer;
         set
         {
-            if (value is null) throw new ArgumentNullException(nameof(value));
-            if (ReferenceEquals(_valueComparer, value)) return;
+            if (value is null)
+            {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            if (ReferenceEquals(_valueComparer, value))
+            {
+                return;
+            }
+
             var snapshot = new List<BootstrapSelectItem>(_selectionState.SelectedItems);
             _valueComparer = value;
             _selectionState = new BootstrapSelectSelectionState(_selectionMode, _valueComparer);
-            for (var i = 0; i < snapshot.Count; i++) _selectionState.TrySelect(snapshot[i], BootstrapSelectChangeReason.Programmatic);
+            for (var i = 0; i < snapshot.Count; i++)
+            {
+                _selectionState.TrySelect(snapshot[i], BootstrapSelectChangeReason.Programmatic);
+            }
+
             Invalidate();
         }
     }
@@ -122,7 +201,11 @@ public class BootstrapSelect : UserControl
     public string Placeholder
     {
         get => _placeholder;
-        set { _placeholder = value ?? throw new ArgumentNullException(nameof(value)); Invalidate(); }
+        set
+        {
+            _placeholder = value ?? throw new ArgumentNullException(nameof(value));
+            Invalidate();
+        }
     }
 
     /// <summary>Gets or sets whether a clear action is available when selection exists.</summary>
@@ -131,7 +214,16 @@ public class BootstrapSelect : UserControl
     public bool AllowClear
     {
         get => _allowClear;
-        set { if (_allowClear == value) return; _allowClear = value; Invalidate(); }
+        set
+        {
+            if (_allowClear == value)
+            {
+                return;
+            }
+
+            _allowClear = value;
+            Invalidate();
+        }
     }
 
     /// <summary>Gets or sets whether custom values may be created.</summary>
@@ -166,7 +258,15 @@ public class BootstrapSelect : UserControl
     public int MinimumSearchLength
     {
         get => _minimumSearchLength;
-        set { if (value < 0) throw new ArgumentOutOfRangeException(nameof(value)); _minimumSearchLength = value; }
+        set
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Minimum search length cannot be negative.");
+            }
+
+            _minimumSearchLength = value;
+        }
     }
 
     /// <summary>Gets or sets the async-search debounce duration.</summary>
@@ -174,7 +274,15 @@ public class BootstrapSelect : UserControl
     public TimeSpan SearchDebounce
     {
         get => _searchDebounce;
-        set { if (value < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(value)); _searchDebounce = value; }
+        set
+        {
+            if (value < TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Search debounce cannot be negative.");
+            }
+
+            _searchDebounce = value;
+        }
     }
 
     /// <summary>Gets or sets the requested async page size.</summary>
@@ -183,7 +291,15 @@ public class BootstrapSelect : UserControl
     public int PageSize
     {
         get => _pageSize;
-        set { if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value)); _pageSize = value; }
+        set
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Page size must be positive.");
+            }
+
+            _pageSize = value;
+        }
     }
 
     /// <summary>Gets or sets popup width in logical pixels; zero selects automatic owner-relative width.</summary>
@@ -192,7 +308,15 @@ public class BootstrapSelect : UserControl
     public int DropDownWidth
     {
         get => _dropDownWidth;
-        set { if (value < 0) throw new ArgumentOutOfRangeException(nameof(value)); _dropDownWidth = value; }
+        set
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Drop-down width cannot be negative.");
+            }
+
+            _dropDownWidth = value;
+        }
     }
 
     /// <summary>Gets or sets maximum popup height in logical pixels.</summary>
@@ -201,7 +325,15 @@ public class BootstrapSelect : UserControl
     public int MaxDropDownHeight
     {
         get => _maxDropDownHeight;
-        set { if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value)); _maxDropDownHeight = value; }
+        set
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Maximum drop-down height must be positive.");
+            }
+
+            _maxDropDownHeight = value;
+        }
     }
 
     /// <summary>Gets or sets the maximum visible chip rows before overflow is applied.</summary>
@@ -210,7 +342,16 @@ public class BootstrapSelect : UserControl
     public int MaximumSelectionRows
     {
         get => _maximumSelectionRows;
-        set { if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value)); _maximumSelectionRows = value; Invalidate(); }
+        set
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Maximum selection rows must be positive.");
+            }
+
+            _maximumSelectionRows = value;
+            Invalidate();
+        }
     }
 
     /// <summary>Gets or sets validation presentation.</summary>
@@ -219,7 +360,12 @@ public class BootstrapSelect : UserControl
     public BootstrapValidationState ValidationState
     {
         get => _validationState;
-        set { BootstrapTextBoxRenderLogic.ValidateState(value); _validationState = value; Invalidate(); }
+        set
+        {
+            BootstrapTextBoxRenderLogic.ValidateState(value);
+            _validationState = value;
+            Invalidate();
+        }
     }
 
     /// <summary>Gets or sets logical corner radius; -1 uses the current theme radius.</summary>
@@ -228,7 +374,16 @@ public class BootstrapSelect : UserControl
     public int BorderRadius
     {
         get => _borderRadius;
-        set { if (value < -1) throw new ArgumentOutOfRangeException(nameof(value)); _borderRadius = value; Invalidate(); }
+        set
+        {
+            if (value < -1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Border radius must be -1 or non-negative.");
+            }
+
+            _borderRadius = value;
+            Invalidate();
+        }
     }
 
     /// <summary>Gets or sets the local-mode matcher. Caller-provided matchers remain caller-owned.</summary>
@@ -244,27 +399,231 @@ public class BootstrapSelect : UserControl
     public IBootstrapSelectRenderer Renderer
     {
         get => _renderer;
-        set { _renderer = value ?? throw new ArgumentNullException(nameof(value)); Invalidate(); }
+        set
+        {
+            _renderer = value ?? throw new ArgumentNullException(nameof(value));
+            Invalidate();
+        }
     }
 
     /// <summary>Gets or sets the optional synchronous custom-value factory.</summary>
     [Browsable(false)]
     public Func<string, BootstrapSelectItem?>? CustomValueFactory { get; set; }
 
+    /// <summary>Selects an item using logical value identity.</summary>
+    /// <returns>true when the logical selection changed; otherwise false.</returns>
+    public bool Select(BootstrapSelectItem item)
+    {
+        return SelectCore(item ?? throw new ArgumentNullException(nameof(item)), BootstrapSelectChangeReason.Programmatic);
+    }
+
+    /// <summary>Selects the local item whose logical value matches the supplied value.</summary>
+    /// <returns>true when a matching value exists and the logical selection changed; otherwise false.</returns>
+    public bool SelectValue(object value)
+    {
+        if (value is null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+
+        var item = FindLocalItemByValue(value);
+        return item is not null && SelectCore(item, BootstrapSelectChangeReason.Programmatic);
+    }
+
+    /// <summary>Deselects an item using logical value identity.</summary>
+    /// <returns>true when the logical selection changed; otherwise false.</returns>
+    public bool Deselect(BootstrapSelectItem item)
+    {
+        if (item is null)
+        {
+            throw new ArgumentNullException(nameof(item));
+        }
+
+        return DeselectCore(item.Value, BootstrapSelectChangeReason.Programmatic);
+    }
+
+    /// <summary>Deselects the selected item whose logical value matches the supplied value.</summary>
+    /// <returns>true when the logical selection changed; otherwise false.</returns>
+    public bool DeselectValue(object value)
+    {
+        if (value is null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+
+        return DeselectCore(value, BootstrapSelectChangeReason.Programmatic);
+    }
+
+    /// <summary>Clears all deselections that are not cancelled by a Deselecting handler.</summary>
+    public void ClearSelection()
+    {
+        ClearSelectionCore(BootstrapSelectChangeReason.Clear);
+    }
+
+    internal bool SelectCore(BootstrapSelectItem item, BootstrapSelectChangeReason reason)
+    {
+        var mutation = _selectionState.PreviewSelect(item, reason);
+        if (!mutation.Changed)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < mutation.RemovedItems.Count; i++)
+        {
+            if (!CanDeselect(mutation.RemovedItems[i], reason))
+            {
+                return false;
+            }
+        }
+
+        for (var i = 0; i < mutation.AddedItems.Count; i++)
+        {
+            if (!CanSelect(mutation.AddedItems[i], reason))
+            {
+                return false;
+            }
+        }
+
+        _selectionState.Apply(mutation);
+        for (var i = 0; i < mutation.RemovedItems.Count; i++)
+        {
+            OnDeselected(mutation.RemovedItems[i], reason);
+        }
+
+        for (var i = 0; i < mutation.AddedItems.Count; i++)
+        {
+            OnSelected(mutation.AddedItems[i], reason);
+        }
+
+        Invalidate();
+        OnSelectionChanged();
+        return true;
+    }
+
+    internal bool DeselectCore(object value, BootstrapSelectChangeReason reason)
+    {
+        var mutation = _selectionState.PreviewRemove(value, reason);
+        if (!mutation.Changed)
+        {
+            return false;
+        }
+
+        var item = mutation.RemovedItems[0];
+        if (!CanDeselect(item, reason))
+        {
+            return false;
+        }
+
+        _selectionState.Apply(mutation);
+        OnDeselected(item, reason);
+        Invalidate();
+        OnSelectionChanged();
+        return true;
+    }
+
+    internal void ClearSelectionCore(BootstrapSelectChangeReason reason)
+    {
+        if (_selectionState.SelectedItems.Count == 0)
+        {
+            return;
+        }
+
+        var snapshot = new List<BootstrapSelectItem>(_selectionState.SelectedItems);
+        var changed = false;
+        for (var i = 0; i < snapshot.Count; i++)
+        {
+            var item = snapshot[i];
+            if (!CanDeselect(item, reason))
+            {
+                continue;
+            }
+
+            var mutation = _selectionState.PreviewRemove(item.Value, reason);
+            if (!mutation.Changed)
+            {
+                continue;
+            }
+
+            _selectionState.Apply(mutation);
+            OnDeselected(item, reason);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            Invalidate();
+            OnSelectionChanged();
+        }
+    }
+
     internal BootstrapSelectHitTestInfo HitTestSelectionSurface(Point point)
     {
         var layout = CreateSelectionLayout();
-        if (!layout.ClearBounds.IsEmpty && layout.ClearBounds.Contains(point)) return new BootstrapSelectHitTestInfo(BootstrapSelectHitTarget.Clear, null, layout.ClearBounds);
-        if (layout.ArrowBounds.Contains(point)) return new BootstrapSelectHitTestInfo(BootstrapSelectHitTarget.Arrow, null, layout.ArrowBounds);
+        if (!layout.ClearBounds.IsEmpty && layout.ClearBounds.Contains(point))
+        {
+            return new BootstrapSelectHitTestInfo(BootstrapSelectHitTarget.Clear, null, layout.ClearBounds);
+        }
+
+        if (layout.ArrowBounds.Contains(point))
+        {
+            return new BootstrapSelectHitTestInfo(BootstrapSelectHitTarget.Arrow, null, layout.ArrowBounds);
+        }
+
         for (var i = 0; i < layout.Chips.Count; i++)
         {
             var chip = layout.Chips[i];
-            if (chip.RemoveBounds.Contains(point)) return new BootstrapSelectHitTestInfo(BootstrapSelectHitTarget.ChipRemove, chip.Item, chip.RemoveBounds);
-            if (chip.Bounds.Contains(point)) return new BootstrapSelectHitTestInfo(BootstrapSelectHitTarget.Chip, chip.Item, chip.Bounds);
+            if (chip.RemoveBounds.Contains(point))
+            {
+                return new BootstrapSelectHitTestInfo(BootstrapSelectHitTarget.ChipRemove, chip.Item, chip.RemoveBounds);
+            }
+
+            if (chip.Bounds.Contains(point))
+            {
+                return new BootstrapSelectHitTestInfo(BootstrapSelectHitTarget.Chip, chip.Item, chip.Bounds);
+            }
         }
+
         return ClientRectangle.Contains(point)
             ? new BootstrapSelectHitTestInfo(BootstrapSelectHitTarget.Content, null, ClientRectangle)
             : new BootstrapSelectHitTestInfo(BootstrapSelectHitTarget.None, null, Rectangle.Empty);
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (!Enabled || e.Button != MouseButtons.Left)
+        {
+            return;
+        }
+
+        Focus();
+        var hit = HitTestSelectionSurface(e.Location);
+        if (hit.Target == BootstrapSelectHitTarget.Clear)
+        {
+            ClearSelectionCore(BootstrapSelectChangeReason.Clear);
+        }
+        else if (hit.Target == BootstrapSelectHitTarget.ChipRemove && hit.Item is not null)
+        {
+            DeselectCore(hit.Item.Value, BootstrapSelectChangeReason.ChipRemove);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (Enabled && e.KeyCode == Keys.Delete && _allowClear && _selectionMode == BootstrapSelectMode.Single)
+        {
+            ClearSelectionCore(BootstrapSelectChangeReason.Clear);
+            e.Handled = true;
+        }
+        else if (Enabled && e.KeyCode == Keys.Back && _selectionMode == BootstrapSelectMode.Multiple && _selectionState.SelectedItems.Count > 0)
+        {
+            DeselectCore(_selectionState.SelectedItems[_selectionState.SelectedItems.Count - 1].Value, BootstrapSelectChangeReason.ChipRemove);
+            e.Handled = true;
+        }
+
+        base.OnKeyDown(e);
     }
 
     /// <inheritdoc />
@@ -304,8 +663,54 @@ public class BootstrapSelect : UserControl
     /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
-        if (disposing) BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+        if (disposing)
+        {
+            BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+        }
+
         base.Dispose(disposing);
+    }
+
+    private bool CanSelect(BootstrapSelectItem item, BootstrapSelectChangeReason reason)
+    {
+        var args = new BootstrapSelectItemCancelEventArgs(item, reason);
+        Selecting?.Invoke(this, args);
+        return !args.Cancel;
+    }
+
+    private bool CanDeselect(BootstrapSelectItem item, BootstrapSelectChangeReason reason)
+    {
+        var args = new BootstrapSelectItemCancelEventArgs(item, reason);
+        Deselecting?.Invoke(this, args);
+        return !args.Cancel;
+    }
+
+    private void OnSelected(BootstrapSelectItem item, BootstrapSelectChangeReason reason)
+    {
+        Selected?.Invoke(this, new BootstrapSelectItemEventArgs(item, reason));
+    }
+
+    private void OnDeselected(BootstrapSelectItem item, BootstrapSelectChangeReason reason)
+    {
+        Deselected?.Invoke(this, new BootstrapSelectItemEventArgs(item, reason));
+    }
+
+    private void OnSelectionChanged()
+    {
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private BootstrapSelectItem? FindLocalItemByValue(object value)
+    {
+        for (var i = 0; i < Items.Count; i++)
+        {
+            if (_valueComparer.Equals(Items[i].Value, value))
+            {
+                return Items[i];
+            }
+        }
+
+        return null;
     }
 
     private BootstrapSelectSelectionLayoutResult CreateSelectionLayout()
@@ -332,7 +737,11 @@ public class BootstrapSelect : UserControl
 
     private void OnItemsChanged()
     {
-        for (var i = 0; i < Items.Count; i++) _selectionState.RefreshSelectedItem(Items[i]);
+        for (var i = 0; i < Items.Count; i++)
+        {
+            _selectionState.RefreshSelectedItem(Items[i]);
+        }
+
         Invalidate();
     }
 
