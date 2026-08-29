@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -80,24 +77,29 @@ public sealed class BootstrapSelectDemoForm : Form
         {
             Width = 340,
             Placeholder = "Choose a customer...",
+            AllowClear = true,
             AccessibleName = "Local customer select"
         };
         single.Items.Add(new BootstrapSelectItem(1, "Contoso"));
         single.Items.Add(new BootstrapSelectItem(2, "Fabrikam"));
         single.Items.Add(new BootstrapSelectItem(3, "Northwind"));
         single.Items.Add(new BootstrapSelectItem(4, "Adventure Works") { Disabled = true });
+        single.Items.Add(new BootstrapSelectItem(
+            5,
+            "Tailspin Toys — a deliberately long customer caption used to verify ellipsis and popup width behavior"));
         _singleStatus.AutoSize = true;
         _singleStatus.Text = "Selected: none";
         single.SelectionChanged += (_, _) =>
             _singleStatus.Text = "Selected: " + (single.SelectedItem?.Text ?? "none");
-        AddScenario(grid, "Single / local search", single, _singleStatus,
-            "Type to filter. Disabled results remain visible but cannot be newly selected.");
+        AddScenario(grid, "Single / local search / clear", single, _singleStatus,
+            "Type to filter, select the long row, then use the clear affordance. Disabled results remain visible but cannot be newly selected.");
 
         var multiple = new BootstrapSelect
         {
             Width = 420,
             SelectionMode = BootstrapSelectMode.Multiple,
             Placeholder = "Choose products...",
+            AllowClear = true,
             AllowCustomValues = true,
             MaximumSelectionRows = 3,
             AccessibleName = "Grouped multi-select with custom values"
@@ -109,7 +111,9 @@ public sealed class BootstrapSelectDemoForm : Form
         multiple.CustomValueFactory = text =>
         {
             var normalized = text.Trim();
-            return normalized.Length == 0 ? null : new BootstrapSelectItem("custom:" + normalized.ToLowerInvariant(), normalized);
+            return normalized.Length == 0
+                ? null
+                : new BootstrapSelectItem("custom:" + normalized.ToLowerInvariant(), normalized);
         };
         multiple.Select(multiple.Items[0]);
         multiple.Select(multiple.Items[2]);
@@ -117,7 +121,7 @@ public sealed class BootstrapSelectDemoForm : Form
         UpdateMultipleStatus(multiple, _multipleStatus);
         multiple.SelectionChanged += (_, _) => UpdateMultipleStatus(multiple, _multipleStatus);
         AddScenario(grid, "Multiple / groups / custom values", multiple, _multipleStatus,
-            "Selected values render as chips. Type a new exact value to get a Create action; partial matches do not suppress it.");
+            "Selected values render as chips. Remove/clear chips, search groups, and type a new exact value to get a Create action.");
 
         var validated = new BootstrapSelect
         {
@@ -129,7 +133,9 @@ public sealed class BootstrapSelectDemoForm : Form
         validated.Items.Add(new BootstrapSelectItem(10, "Invalid until selected"));
         validated.Items.Add(new BootstrapSelectItem(20, "Another value"));
         validated.SelectionChanged += (_, _) =>
-            validated.ValidationState = validated.SelectedItem is null ? BootstrapValidationState.Invalid : BootstrapValidationState.Valid;
+            validated.ValidationState = validated.SelectedItem is null
+                ? BootstrapValidationState.Invalid
+                : BootstrapValidationState.Valid;
         AddScenario(grid, "Validation / explicit radius", validated, null,
             "The outer shell follows the shared validation/focus priority while popup results keep normal theme colors.");
 
@@ -144,36 +150,39 @@ public sealed class BootstrapSelectDemoForm : Form
         {
             Width = 420,
             Placeholder = "Search remote customers...",
-            DataProvider = new DemoSelectProvider(),
+            DataProvider = new BootstrapSelectDemoProvider(),
             SearchDebounce = TimeSpan.FromMilliseconds(180),
             MinimumSearchLength = 0,
-            PageSize = 8,
+            PageSize = 20,
             DropDownWidth = 460,
             AccessibleName = "Async paged customer select"
         };
         _asyncSingleStatus.AutoSize = true;
         _asyncSingleStatus.Text = "Open and type quickly to exercise debounce/cancellation/latest-query wins.";
-        asyncSingle.SearchStarted += (_, e) => _asyncSingleStatus.Text = "Loading query page...";
-        asyncSingle.SearchCompleted += (_, e) => _asyncSingleStatus.Text = "Loaded results. Scroll near the end to request the next page.";
-        asyncSingle.SearchFailed += (_, e) => _asyncSingleStatus.Text = "Provider failure: " + e.Error.Message;
+        asyncSingle.SearchStarted += (_, _) => _asyncSingleStatus.Text = "Loading query page...";
+        asyncSingle.SearchCompleted += (_, _) =>
+            _asyncSingleStatus.Text = "Loaded results. Scroll near the end to request the next 20-row page.";
+        asyncSingle.SearchFailed += (_, e) =>
+            _asyncSingleStatus.Text = "Provider failure: " + e.Error.Message;
         asyncSingle.SelectionChanged += (_, _) =>
             _asyncSingleStatus.Text = "Selected: " + (asyncSingle.SelectedItem?.Text ?? "none");
         AddScenario(grid, "Async single / delayed provider / paging", asyncSingle, _asyncSingleStatus,
-            "The provider has more than 200 deterministic in-memory rows. The control owns debounce, cancellation, stale-generation rejection, paging and selection snapshots.");
+            "The provider has 300+ deterministic in-memory rows. The control owns debounce, cancellation, stale-generation rejection, paging and selection snapshots.");
 
         var asyncMultiple = new BootstrapSelect
         {
             Width = 460,
             SelectionMode = BootstrapSelectMode.Multiple,
             Placeholder = "Search paged results...",
-            DataProvider = new DemoSelectProvider(),
+            DataProvider = new BootstrapSelectDemoProvider(),
             SearchDebounce = TimeSpan.FromMilliseconds(120),
-            PageSize = 6,
+            PageSize = 20,
             MaximumSelectionRows = 3,
             AccessibleName = "Async multiple customer select"
         };
+        asyncMultiple.Select(new BootstrapSelectItem(1, "Customer 001") { Group = "North region" });
         _asyncMultipleStatus.AutoSize = true;
-        _asyncMultipleStatus.Text = "Type 'fail-first' for a one-shot page-1 error, or 'retry' and scroll to page 2 for a later-page retry.";
+        _asyncMultipleStatus.Text = "Customer 001 is preselected. Change queries to verify the selected snapshot survives; use 'fail-first', 'retry', and 'race' for error/race scenarios.";
         asyncMultiple.SearchFailed += (_, e) =>
             _asyncMultipleStatus.Text = "Expected demo failure on page " + e.Page + ". Activate the retry row.";
         asyncMultiple.SearchCompleted += (_, e) =>
@@ -187,11 +196,33 @@ public sealed class BootstrapSelectDemoForm : Form
         {
             if (asyncMultiple.SelectedItems.Count > 0)
             {
-                _asyncMultipleStatus.Text = asyncMultiple.SelectedItems.Count + " selected across current/previous result pages.";
+                _asyncMultipleStatus.Text = asyncMultiple.SelectedItems.Count
+                    + " selected across current/previous result pages.";
             }
         };
-        AddScenario(grid, "Async multiple / failure + retry", asyncMultiple, _asyncMultipleStatus,
+        AddScenario(grid, "Async multiple / retained selection / retry", asyncMultiple, _asyncMultipleStatus,
             "Search 'fail-first' to retry page 1, 'retry' to retry a later page, or 'race' and type rapidly to exercise stale-result protection.");
+
+        var placementHost = new Panel
+        {
+            Size = new Size(600, 150),
+            Margin = Padding.Empty,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+        var placementSelect = new BootstrapSelect
+        {
+            Width = 300,
+            Location = new Point(285, 100),
+            Anchor = AnchorStyles.Right | AnchorStyles.Bottom,
+            Placeholder = "Open near lower/right edge...",
+            AccessibleName = "Lower-right placement select"
+        };
+        placementSelect.Items.Add(new BootstrapSelectItem("bottom", "Bottom-start preferred"));
+        placementSelect.Items.Add(new BootstrapSelectItem("flip", "Flip above when lower space is constrained"));
+        placementSelect.Items.Add(new BootstrapSelectItem("shift", "Shift inside the monitor working area"));
+        placementHost.Controls.Add(placementSelect);
+        AddScenario(grid, "Placement / lower-right edge", placementHost, null,
+            "Move the demo window toward the lower-right of a monitor, then open this anchored Select to observe shared overlay flip/shift behavior.");
 
         var note = new Label
         {
@@ -223,7 +254,12 @@ public sealed class BootstrapSelectDemoForm : Form
         return grid;
     }
 
-    private static void AddScenario(TableLayoutPanel grid, string title, Control control, Control? status, string note)
+    private static void AddScenario(
+        TableLayoutPanel grid,
+        string title,
+        Control control,
+        Control? status,
+        string note)
     {
         var row = grid.RowCount++;
         grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -285,86 +321,5 @@ public sealed class BootstrapSelectDemoForm : Form
         _localSection.ForeColor = theme.Colors.Text;
         _asyncSection.ForeColor = theme.Colors.Text;
         Invalidate(true);
-    }
-
-    private sealed class DemoSelectProvider : IBootstrapSelectDataProvider
-    {
-        private readonly List<BootstrapSelectItem> _items;
-        private int _firstPageFailureIssued;
-        private int _retryFailureIssued;
-
-        internal DemoSelectProvider()
-        {
-            _items = new List<BootstrapSelectItem>();
-            for (var i = 1; i <= 240; i++)
-            {
-                _items.Add(new BootstrapSelectItem(i, "Customer " + i.ToString("000"))
-                {
-                    Group = i <= 120 ? "North region" : "South region"
-                });
-            }
-
-            for (var i = 1; i <= 36; i++)
-            {
-                _items.Add(new BootstrapSelectItem(800 + i, "Fail-first sample " + i.ToString("00"))
-                {
-                    Group = "First-page retry samples"
-                });
-            }
-
-            for (var i = 1; i <= 48; i++)
-            {
-                _items.Add(new BootstrapSelectItem(1000 + i, "Retry sample " + i.ToString("00"))
-                {
-                    Group = "Later-page retry samples"
-                });
-            }
-
-            for (var i = 1; i <= 24; i++)
-            {
-                _items.Add(new BootstrapSelectItem(2000 + i, "Race sample " + i.ToString("00"))
-                {
-                    Group = "Race samples"
-                });
-            }
-        }
-
-        public async Task<BootstrapSelectPage> SearchAsync(BootstrapSelectQuery query, CancellationToken cancellationToken)
-        {
-            var searchText = query.SearchText.Trim();
-            var delay = searchText.StartsWith("race", StringComparison.OrdinalIgnoreCase)
-                ? Math.Max(80, 520 - (searchText.Length * 70))
-                : 260;
-
-            if (searchText.StartsWith("race", StringComparison.OrdinalIgnoreCase))
-            {
-                await Task.Delay(delay).ConfigureAwait(false);
-            }
-            else
-            {
-                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-            }
-
-            if (string.Equals(searchText, "fail-first", StringComparison.OrdinalIgnoreCase)
-                && query.Page == 1
-                && Interlocked.Exchange(ref _firstPageFailureIssued, 1) == 0)
-            {
-                throw new InvalidOperationException("Demo page-1 failure. Activate the retry row to rerun the same query.");
-            }
-
-            if (string.Equals(searchText, "retry", StringComparison.OrdinalIgnoreCase)
-                && query.Page == 2
-                && Interlocked.Exchange(ref _retryFailureIssued, 1) == 0)
-            {
-                throw new InvalidOperationException("Demo page-2 failure. Activate the retry row to continue.");
-            }
-
-            var filtered = _items
-                .Where(item => searchText.Length == 0 || item.Text.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
-                .ToList();
-            var start = (query.Page - 1) * query.PageSize;
-            var pageItems = filtered.Skip(start).Take(query.PageSize).ToList();
-            return new BootstrapSelectPage(pageItems, start + pageItems.Count < filtered.Count);
-        }
     }
 }
