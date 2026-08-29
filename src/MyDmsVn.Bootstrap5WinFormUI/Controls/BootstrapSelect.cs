@@ -191,6 +191,8 @@ public partial class BootstrapSelect : UserControl
                 _selectionState.TrySelect(snapshot[i], BootstrapSelectChangeReason.Programmatic);
             }
 
+            ResetRemoteSearchController();
+            RefreshAndRestartRemoteSearchIfOpen();
             Invalidate();
         }
     }

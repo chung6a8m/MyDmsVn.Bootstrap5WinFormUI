@@ -28,13 +28,9 @@ public partial class BootstrapSelect
         set
         {
             if (ReferenceEquals(_dataProvider, value)) return;
+            ResetRemoteSearchController();
             _dataProvider = value;
-            CancelRemoteSearch();
-            if (_dropDownController?.IsOpen == true)
-            {
-                _dropDownController.RefreshResults();
-                if (value is not null) NotifyPopupSearchTextChanged(_dropDownController.CurrentSearchText);
-            }
+            RefreshAndRestartRemoteSearchIfOpen();
         }
     }
 
@@ -92,10 +88,9 @@ public partial class BootstrapSelect
 
     internal void DisposeSearchInfrastructure()
     {
+        ResetRemoteSearchController();
         _searchDebouncer?.Dispose();
         _searchDebouncer = null;
-        _searchController?.Dispose();
-        _searchController = null;
     }
 
     private async Task StartRemoteSearchAsync(string searchText, IBootstrapSelectDataProvider? provider)
@@ -181,5 +176,19 @@ public partial class BootstrapSelect
     {
         _searchDebouncer?.Cancel();
         _searchController?.Invalidate();
+    }
+
+    private void ResetRemoteSearchController()
+    {
+        _searchDebouncer?.Cancel();
+        _searchController?.Dispose();
+        _searchController = null;
+    }
+
+    private void RefreshAndRestartRemoteSearchIfOpen()
+    {
+        if (_dropDownController?.IsOpen != true) return;
+        _dropDownController.RefreshResults();
+        if (_dataProvider is not null) NotifyPopupSearchTextChanged(_dropDownController.CurrentSearchText);
     }
 }

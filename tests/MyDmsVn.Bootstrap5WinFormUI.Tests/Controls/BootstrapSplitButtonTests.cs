@@ -297,6 +297,11 @@ public sealed class BootstrapSplitButtonTests
     [Test]
     public void AppClickedCloseSuppressesSameTurnChevronClickAndExpiresOnNextMessageTurn()
     {
+        RunOnIsolatedStaThread(AppClickedCloseSuppressesSameTurnChevronClickAndExpiresOnNextMessageTurnCore);
+    }
+
+    private static void AppClickedCloseSuppressesSameTurnChevronClickAndExpiresOnNextMessageTurnCore()
+    {
         using var split = CreateSplitButton();
         GetProperty<BootstrapDropdownItemCollection>(split, "Items").Add(
             new BootstrapDropdownItem { Text = "Action" });
@@ -332,6 +337,30 @@ public sealed class BootstrapSplitButtonTests
             Assert.That(opened, Is.EqualTo(2));
             Assert.That(closed, Is.EqualTo(1));
         }));
+    }
+
+    private static void RunOnIsolatedStaThread(Action action)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception error)
+            {
+                failure = error;
+            }
+        })
+        {
+            IsBackground = true
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+
+        Assert.That(thread.Join(TimeSpan.FromSeconds(30)), Is.True, "Isolated SplitButton STA thread timed out.");
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     [Test]

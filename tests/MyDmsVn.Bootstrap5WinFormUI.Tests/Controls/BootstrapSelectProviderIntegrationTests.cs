@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -12,13 +13,18 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 
 [TestFixture]
 [Apartment(ApartmentState.STA)]
+[NonParallelizable]
 public sealed class BootstrapSelectProviderIntegrationTests
 {
     [Test]
     public void AsyncProviderMergeAndSelectedSnapshotRefreshStayOnOwningUiThread()
     {
+        RunOnIsolatedWinFormsThread(AsyncProviderMergeAndSelectedSnapshotRefreshStayOnOwningUiThreadCore);
+    }
+
+    private static void AsyncProviderMergeAndSelectedSnapshotRefreshStayOnOwningUiThreadCore()
+    {
         var uiThreadId = Thread.CurrentThread.ManagedThreadId;
-        using var synchronizationContext = new SynchronizationContextScope(new WindowsFormsSynchronizationContext());
         var comparer = new RecordingComparer();
         var provider = new ThreadPoolProvider(new BootstrapSelectItem("id", "Updated"));
         using var form = new Form();
@@ -33,6 +39,8 @@ public sealed class BootstrapSelectProviderIntegrationTests
         form.Controls.Add(select);
         form.Show();
         Application.DoEvents();
+        using var winFormsContext = new WindowsFormsSynchronizationContext();
+        using var synchronizationContext = new SynchronizationContextScope(winFormsContext);
 
         var completed = 0;
         var failed = 0;
@@ -51,6 +59,125 @@ public sealed class BootstrapSelectProviderIntegrationTests
             Assert.That(completed, Is.EqualTo(1));
             Assert.That(failed, Is.Zero);
         }));
+    }
+
+    [Test]
+    public void ReplacingProviderClearsOldRowsAndIgnoresLateCompletion()
+    {
+        RunOnIsolatedWinFormsThread(ReplacingProviderClearsOldRowsAndIgnoresLateCompletionCore);
+    }
+
+    private static void ReplacingProviderClearsOldRowsAndIgnoresLateCompletionCore()
+    {
+        var providerA = new BootstrapSelectControlledProvider(honorCancellation: false);
+        var providerB = new BootstrapSelectControlledProvider(honorCancellation: false);
+        using var form = new Form();
+        using var select = new BootstrapSelect { SearchDebounce = TimeSpan.FromMilliseconds(100), DataProvider = providerA };
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+        using var winFormsContext = new WindowsFormsSynchronizationContext();
+        using var synchronizationContext = new SynchronizationContextScope(winFormsContext);
+
+        select.OpenDropDownInternal();
+        PumpUntil(() => providerA.Queries.Count == 1, TimeSpan.FromSeconds(5));
+        providerA.Complete(string.Empty, 1, new[] { new BootstrapSelectItem("old", "Provider A") }, hasMore: true);
+        PumpUntil(() => select.VisibleResultItemTextsForTest.SequenceEqual(new[] { "Provider A" }), TimeSpan.FromSeconds(5));
+
+        select.RequestRemoteNextPage();
+        PumpUntil(() => providerA.Queries.Count == 2, TimeSpan.FromSeconds(5));
+        select.DataProvider = providerB;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.VisibleResultItemTextsForTest, Is.Empty);
+            Assert.That(select.ActivateHighlightedResultForTest(), Is.False);
+        }));
+
+        providerA.Complete(string.Empty, 2, new[] { new BootstrapSelectItem("late", "Late Provider A") });
+        PumpUntil(() => providerB.Queries.Count == 1, TimeSpan.FromSeconds(5));
+        Assert.That(select.VisibleResultItemTextsForTest, Is.Empty);
+
+        providerB.Complete(string.Empty, 1, new[] { new BootstrapSelectItem("new", "Provider B") });
+        PumpUntil(() => select.VisibleResultItemTextsForTest.SequenceEqual(new[] { "Provider B" }), TimeSpan.FromSeconds(5));
+
+        Assert.That(select.ActivateHighlightedResultForTest(), Is.True);
+        Assert.That(select.SelectedValue, Is.EqualTo("new"));
+    }
+
+    [Test]
+    public void ReplacingValueComparerRestartsPagingAndUsesNewIdentityRules()
+    {
+        RunOnIsolatedWinFormsThread(ReplacingValueComparerRestartsPagingAndUsesNewIdentityRulesCore);
+    }
+
+    private static void ReplacingValueComparerRestartsPagingAndUsesNewIdentityRulesCore()
+    {
+        var provider = new BootstrapSelectControlledProvider(honorCancellation: false);
+        using var form = new Form();
+        using var select = new BootstrapSelect
+        {
+            SelectionMode = BootstrapSelectMode.Multiple,
+            SearchDebounce = TimeSpan.Zero,
+            DataProvider = provider
+        };
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+        using var winFormsContext = new WindowsFormsSynchronizationContext();
+        using var synchronizationContext = new SynchronizationContextScope(winFormsContext);
+
+        select.OpenDropDownInternal();
+        PumpUntil(() => provider.Queries.Count == 1, TimeSpan.FromSeconds(5));
+        provider.Complete(string.Empty, 1, new[] { new BootstrapSelectItem("ABC", "Upper") }, hasMore: true);
+        PumpUntil(() => select.VisibleResultItemTextsForTest.SequenceEqual(new[] { "Upper" }), TimeSpan.FromSeconds(5));
+        select.SelectedItem = new BootstrapSelectItem("ABC", "Selected snapshot");
+        Assert.That(select.IsDropDownOpenForTest, Is.True);
+
+        var queryCountBeforeComparerChange = provider.Queries.Count;
+        select.ValueComparer = new OrdinalIgnoreCaseObjectComparer();
+        PumpUntil(
+            () => provider.Queries.Count > queryCountBeforeComparerChange && provider.Queries.Last().Page == 1,
+            TimeSpan.FromSeconds(5));
+        var restartedPageOneIndex = provider.Queries.Count - 1;
+        provider.Complete(string.Empty, 1, new[] { new BootstrapSelectItem("ABC", "Upper refreshed") }, hasMore: true);
+        PumpUntil(() => select.VisibleResultItemTextsForTest.SequenceEqual(new[] { "Upper refreshed" }), TimeSpan.FromSeconds(5));
+
+        select.RequestRemoteNextPage();
+        PumpUntil(
+            () => provider.Queries.Skip(restartedPageOneIndex + 1).Any(query => query.Page == 2),
+            TimeSpan.FromSeconds(5));
+        provider.Complete(string.Empty, 2, new[] { new BootstrapSelectItem("abc", "Lower refreshed") });
+        PumpUntil(() => select.VisibleResultItemTextsForTest.SequenceEqual(new[] { "Lower refreshed" }), TimeSpan.FromSeconds(5));
+
+        Assert.That(select.SelectedItems, Has.Count.EqualTo(1));
+        Assert.That(select.SelectedItem!.Text, Is.EqualTo("Lower refreshed"));
+        Assert.That(select.ActivateHighlightedResultForTest(), Is.True);
+        Assert.That(select.SelectedItems, Is.Empty);
+    }
+
+    private static void RunOnIsolatedWinFormsThread(Action action)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception error)
+            {
+                failure = error;
+            }
+        })
+        {
+            IsBackground = true
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+
+        Assert.That(thread.Join(TimeSpan.FromSeconds(30)), Is.True, "Isolated WinForms integration thread timed out.");
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     private static void PumpUntil(Func<bool> condition, TimeSpan timeout)
@@ -90,19 +217,16 @@ public sealed class BootstrapSelectProviderIntegrationTests
     private sealed class SynchronizationContextScope : IDisposable
     {
         private readonly SynchronizationContext? _previous;
-        private readonly IDisposable? _owned;
 
         internal SynchronizationContextScope(SynchronizationContext current)
         {
             _previous = SynchronizationContext.Current;
-            _owned = current as IDisposable;
             SynchronizationContext.SetSynchronizationContext(current);
         }
 
         public void Dispose()
         {
             SynchronizationContext.SetSynchronizationContext(_previous);
-            _owned?.Dispose();
         }
     }
 
@@ -133,6 +257,19 @@ public sealed class BootstrapSelectProviderIntegrationTests
         internal void Clear()
         {
             lock (_gate) _threadIds.Clear();
+        }
+    }
+
+    private sealed class OrdinalIgnoreCaseObjectComparer : IEqualityComparer<object>
+    {
+        public new bool Equals(object? x, object? y)
+        {
+            return string.Equals(x as string, y as string, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public int GetHashCode(object value)
+        {
+            return StringComparer.OrdinalIgnoreCase.GetHashCode((string)value);
         }
     }
 }
