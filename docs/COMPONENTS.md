@@ -646,53 +646,58 @@ Behavior:
 
 Manual verification: choose **Navigation / Tabs** in the integrated demo. Exercise Tabs/Pills/Underline with mouse, Tab/arrow/Ctrl+Tab keyboard paths, Fill on/off, all eight variants, native ImageList/ImageKey/ImageIndex, tooltip text, disabled pages, long labels, and live `SelectedIndexChanged` status. Switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling. Confirm headers stay aligned/unclipped, focus remains visible, selection/page identity remains native, and native overflow controls remain usable when headers exceed available width.
 
-## BootstrapDropdown
+## BootstrapDropdown and BootstrapSplitButton
 
-Responsibility: provide a Bootstrap-inspired command dropdown while delegating popup behavior to native WinForms `ToolStripDropDownMenu` semantics.
-
-Stage 7 of the component-expansion roadmap finalizes the public concepts as:
+Responsibility: provide native WinForms command menus with recursive submenus and snapshot-hosted controls, plus a connected two-region split command that reuses the same Dropdown infrastructure.
 
 ```text
-BootstrapDropdownItemKind: Item | Separator
+BootstrapDropdownItemKind: Item | Separator | HostedControl
+BootstrapDropdownItem.DropDownItems
+BootstrapDropdownItem.HostedControlFactory
 
-BootstrapDropdownItem
-BootstrapDropdownItem.Kind
-BootstrapDropdownItem.Text
-BootstrapDropdownItem.Icon
-BootstrapDropdownItem.Enabled
-BootstrapDropdownItem.Checked
-BootstrapDropdownItem.Tag
-BootstrapDropdownItem.Click
-
-BootstrapDropdownItemCollection : Collection<BootstrapDropdownItem>
-
-BootstrapDropdown : Component
-BootstrapDropdown.Target
-BootstrapDropdown.Items
-BootstrapDropdown.Variant
-BootstrapDropdown.MinimumWidth
-BootstrapDropdown.Opened
-BootstrapDropdown.Closed
-BootstrapDropdown.Show()
-BootstrapDropdown.Close()
+BootstrapSplitButton : Control
+BootstrapSplitButton.Text / Variant / Outline / ButtonSize
+BootstrapSplitButton.Icon / IconPosition / IconRenderer / BorderRadius
+BootstrapSplitButton.Loading / LoadingText
+BootstrapSplitButton.Items / MinimumWidth
+BootstrapSplitButton.Opened / Closed
+BootstrapSplitButton.ShowDropDown() / CloseDropDown()
 ```
 
-Behavior:
+Dropdown behavior:
 
-- `BootstrapDropdown` is a non-visual component that owns exactly one native `ToolStripDropDownMenu` and one internal `BootstrapDropdownRenderer`. The caller owns the `BootstrapButton` assigned to `Target` and every public `BootstrapDropdownItem` model.
-- `BootstrapDropdownItemKind` has exactly `Item` and `Separator`. `Kind` is immutable after construction and invalid enum values are rejected. Normal item construction defaults to empty text, `Enabled = true`, `Checked = false`, `Icon = null`, and `Tag = null`; `Text` normalizes `null` to an empty string.
-- `Items` is one stable `BootstrapDropdownItemCollection`. It preserves order and rejects null insertions/replacements; the collection has no live change-notification or popup-binding engine.
-- Each successful `Show()` rebuilds a short-lived native item snapshot from the current public model. Changes made while the menu is closed are therefore reflected on the next opening; the framework does not keep a second synchronized command model while the popup is open.
-- `Target` defaults to `null`; `Variant` defaults to `Primary`; `MinimumWidth` defaults to `0`. A negative `MinimumWidth` or undefined `Variant` is rejected. `Show()` without a target is an explicit error, while empty items, a disabled target, a loading target, or a disposed target produce no popup transition.
-- Target activation toggles the native popup only while the target is enabled and not loading. Replacing or disposing the target closes any open popup and detaches the old handlers. Dropdown never disposes a caller-owned target.
-- Enabled normal-item activation raises that model item's `Click` exactly once. Disabled items and separators do not activate. `Checked` is presentation state only and is copied into the native snapshot with `CheckOnClick = false`; the framework never auto-toggles the model. Application code may update `Checked` in `Click`, and the next `Show()` reflects the new state.
-- Native `ToolStripDropDownMenu` remains authoritative for AutoClose, outside-click dismissal, focus/message-loop behavior, Up/Down/Home/End/Enter/Escape navigation, and working-area/screen placement. `Opened` and `Closed` forward real native transitions from the owned popup rather than synthetic component state changes.
-- `Variant` controls semantic accent/check/selection presentation through the internal renderer. `MinimumWidth` is a logical-pixel minimum scaled for the target DPI before each opening; native measurement may still make the menu wider for content.
-- Optional item icons remain source-neutral `IconDescriptor` values. Dropdown renders snapshot bitmaps through the current `Target.IconRenderer`; generated bitmaps are framework-owned and disposed on rebuild, theme refresh, and component disposal. A runtime theme change refreshes renderer/icon presentation for an already-open popup without replacing the public item model.
-- Dropdown deliberately does not expose `BorderRadius`, custom popup chrome, arbitrary hosted controls, submenus, split-button behavior, nested command trees, live synchronization while open, custom placement hooks, a popup `Form`, a second focus/keyboard engine, timer, or animation API. ComboBox and later DatePicker controls retain their own native semantic popup architectures rather than automatically reusing Dropdown.
-- Designer construction is parameterless and requires no application bootstrap. Disposal detaches target/theme/native handlers, disposes generated images and the owned native popup, and never disposes caller-owned item models, icon descriptors/renderers, or target controls.
+- Every effective opening validates the entire model by reference identity and builds a recursive native snapshot. An item instance may appear only once, which rejects cycles and shared-node graphs. Normal items may have children but no hosted factory; separators have neither children nor a factory; hosted items require a factory and cannot have children.
+- A normal item with children is a submenu parent and never dispatches its own `Click`. Only enabled normal leaves activate. Native `ToolStripDropDownMenu` / `ToolStripMenuItem` retain Right/Left/Up/Down/Home/End/Enter/Escape, focus, AutoClose, outside-click dismissal, and working-area placement behavior.
+- Each submenu level receives the framework renderer, current theme/font, and independently computed image/check margins. Icons and checked state are snapshot presentation; theme changes refresh every open level without mutating the caller-owned model.
+- `HostedControlFactory` runs for each effective snapshot and must return a fresh, non-null, non-disposed `Control`. Once returned, that control is owned by the framework's native snapshot and is disposed when its `ToolStripControlHost`/snapshot is rebuilt, closed, or disposed. Callers retain ownership only of the factory and model item.
+- Snapshot creation is transactional: invalid trees or invalid factory results fail opening and dispose partial native rows/controls/images. Public items remain the source of truth; there is no live collection-binding engine.
+- Classic `Target` behavior and `Show()` remain supported. The internal anchored path used by composite controls is not public and does not assign `Target`. `MinimumWidth`, theme, font, and icon renderer continue to use the active presentation button while a popup is visible.
 
-Manual verification: choose **Navigation / Tabs** in the integrated demo and exercise the Dropdown basic/icon/state/long/stress scenarios. Verify target mouse and Enter/Space activation, Up/Down/Home/End plus item Enter, Escape/outside-click dismissal, checked/disabled/separator policy, runtime item mutation between openings, target replacement/disposal, and repeated Light/Dark switches. Repeat near bottom/right working-area edges, on a secondary monitor when available, and at 100/125/150/175/200% real Windows scaling. Repeated open/close/theme-switch cycles must not leave stale images, duplicate events, or disposed-GDI exceptions.
+Split-button behavior:
+
+- The primary region raises the outer inherited `Click` and never opens the menu. The chevron region toggles the owned Dropdown; `ShowDropDown()` / `CloseDropDown()` use the same real native lifecycle, and outer `Opened` / `Closed` events use the split control as sender.
+- The popup request anchors below the full split bounds, while primary appearance supplies font/icon rendering. While open the chevron is selected. Empty, disabled, loading, disposed, or already-open states are safe no-ops; disabling the split or setting `Loading = true` closes first and prevents further opening.
+- `Items` is the owned Dropdown's stable model collection. `Variant` and `MinimumWidth` stay synchronized, including a live minimum-width update while open. The two focusable child regions use shared connected-button seam/corner logic and preserve native Enter/Space activation and Tab/Shift+Tab traversal.
+- `Font` is inherited rather than shadowed. Until a caller assigns a font, both regions follow the current theme font; a caller-assigned font remains authoritative across later theme changes and also supplies popup presentation. Region accessibility names resolve dynamically from the outer `AccessibleName`, falling back to `Text`; the chevron appends “menu”.
+- No strongly typed child accessors are exported. Inherited WinForms `Controls` can still enumerate the two implementation regions, but they are framework-owned and callers must not mutate, remove, reparent, or dispose them. Parent disposal closes/disposes the owned Dropdown explicitly and lets base `Control` dispose child regions exactly once.
+
+Example:
+
+```csharp
+var split = new BootstrapSplitButton { Text = "Save", AccessibleName = "Save document" };
+var saveAs = new BootstrapDropdownItem { Text = "Save as" };
+var local = new BootstrapDropdownItem { Text = "Local file" };
+local.Click += (_, _) => SaveLocal();
+saveAs.DropDownItems.Add(local);
+split.Items.Add(saveAs);
+split.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+{
+    HostedControlFactory = () => new CheckBox { Text = "Create backup", AutoSize = true }
+});
+split.Click += (_, _) => Save();
+```
+
+Manual verification: use the **Navigation / Tabs** nested/hosted/mixed and split scenarios. Cover mouse routing, region focus and keyboard paths, submenu navigation, hosted-control focus/edit/dismiss/reopen, disabled/checked/loading states, Light/Dark while nested menus are visible, caller-font persistence, dynamic accessibility names, 100–200% DPI seams/arrows/margins, monitor edges, and repeated rebuild/disposal while open.
 
 ## BootstrapToast and BootstrapToastContainer
 
