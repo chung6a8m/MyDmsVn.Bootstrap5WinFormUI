@@ -80,7 +80,7 @@ public partial class BootstrapSelect
     internal bool ActivateResultRow(BootstrapSelectResultRow row, BootstrapSelectChangeReason reason)
     {
         if (row is null) throw new ArgumentNullException(nameof(row));
-        if (row.Kind == BootstrapSelectResultRowKind.LoadMoreError)
+        if (row.Kind == BootstrapSelectResultRowKind.Error || row.Kind == BootstrapSelectResultRowKind.LoadMoreError)
         {
             RetryRemoteLastFailure();
             return true;
