@@ -6,6 +6,7 @@ using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using NUnit.Framework;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 
@@ -141,5 +142,60 @@ public sealed class BootstrapPopoverTests
         Assert.That(popover.Target, Is.Null);
         content.Dispose();
         Assert.That(popover.Content, Is.Null);
+    }
+
+    [Test]
+    public void FiveHundredOpenCloseCyclesReuseContentAndBalanceNativeEvents()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        using var form = new Form { Size = new Size(500, 400) };
+        using var target = new Button { Location = new Point(100, 100), Size = new Size(100, 32), Text = "Open" };
+        using var content = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false
+        };
+        content.Controls.Add(new TextBox { Width = 180, Text = "Persistent" });
+        form.Controls.Add(target);
+        using var popover = new BootstrapPopover { Target = target, Content = content };
+        var opened = 0;
+        var closed = 0;
+        popover.Opened += (_, _) => opened++;
+        popover.Closed += (_, _) => closed++;
+
+        try
+        {
+            form.Show();
+            Application.DoEvents();
+            for (var cycle = 0; cycle < 500; cycle++)
+            {
+                popover.Show();
+                Application.DoEvents();
+                popover.Hide();
+                Application.DoEvents();
+                if (cycle % 50 == 0)
+                {
+                    var mode = BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light
+                        ? BootstrapThemeMode.Dark
+                        : BootstrapThemeMode.Light;
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                }
+            }
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(opened, Is.EqualTo(500));
+                Assert.That(closed, Is.EqualTo(500));
+                Assert.That(popover.IsOpen, Is.False);
+                Assert.That(popover.Content, Is.SameAs(content));
+                Assert.That(content.IsDisposed, Is.False);
+            }));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
     }
 }
