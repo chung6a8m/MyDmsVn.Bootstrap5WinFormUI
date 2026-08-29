@@ -399,6 +399,7 @@ public class BootstrapDropdown : Component
                 item.Kind == BootstrapDropdownItemKind.Item && item.Icon is not null);
             _dropDown.ShowCheckMargin = _items.Any(item =>
                 item.Kind == BootstrapDropdownItemKind.Item && item.Checked);
+            ConfigureNativeLevel(_dropDown, _items);
             PopulateNativeItems(_dropDown.Items, _items);
             ApplyPresentation(target, refreshImages: true);
         }
@@ -441,6 +442,7 @@ public class BootstrapDropdown : Component
                         nativeItem = menuItem;
                         if (model.DropDownItems.Count > 0)
                         {
+                            ConfigureNativeLevel((ToolStripDropDownMenu)menuItem.DropDown, model.DropDownItems);
                             PopulateNativeItems(menuItem.DropDownItems, model.DropDownItems);
                         }
                         else
@@ -462,6 +464,17 @@ public class BootstrapDropdown : Component
                 nativeItem?.Dispose();
             }
         }
+    }
+
+    private void ConfigureNativeLevel(
+        ToolStripDropDownMenu nativeLevel,
+        BootstrapDropdownItemCollection models)
+    {
+        nativeLevel.Renderer = _renderer;
+        nativeLevel.ShowImageMargin = models.Any(item =>
+            item.Kind == BootstrapDropdownItemKind.Item && item.Icon is not null);
+        nativeLevel.ShowCheckMargin = models.Any(item =>
+            item.Kind == BootstrapDropdownItemKind.Item && item.Checked);
     }
 
     private static ToolStripControlHost CreateHostedControlItem(BootstrapDropdownItem model)
@@ -507,8 +520,31 @@ public class BootstrapDropdown : Component
         _dropDown.BackColor = theme.Colors.Surface;
         _dropDown.ForeColor = theme.Colors.Text;
         _dropDown.MinimumSize = new Size(ResolveMinimumWidth(_minimumWidth, dpi), 0);
+        ApplyPresentationToLevel(_dropDown, target.Font, theme, metrics, applyFont: true);
 
-        foreach (ToolStripItem nativeItem in _dropDown.Items)
+        if (refreshImages)
+        {
+            RefreshOwnedImages(target, dpi, theme, metrics.ImageSize);
+        }
+    }
+
+    private void ApplyPresentationToLevel(
+        ToolStripDropDownMenu nativeLevel,
+        Font font,
+        BootstrapTheme theme,
+        BootstrapDropdownMetrics metrics,
+        bool applyFont)
+    {
+        nativeLevel.Renderer = _renderer;
+        if (applyFont)
+        {
+            nativeLevel.Font = font;
+        }
+
+        nativeLevel.BackColor = theme.Colors.Surface;
+        nativeLevel.ForeColor = theme.Colors.Text;
+
+        foreach (ToolStripItem nativeItem in nativeLevel.Items)
         {
             if (nativeItem is ToolStripSeparator separator)
             {
@@ -517,19 +553,25 @@ public class BootstrapDropdown : Component
                     metrics.ItemVerticalPadding,
                     metrics.SeparatorInset,
                     metrics.ItemVerticalPadding);
-                continue;
+            }
+            else
+            {
+                nativeItem.Padding = new Padding(
+                    metrics.ItemHorizontalPadding,
+                    metrics.ItemVerticalPadding,
+                    metrics.ItemHorizontalPadding,
+                    metrics.ItemVerticalPadding);
             }
 
-            nativeItem.Padding = new Padding(
-                metrics.ItemHorizontalPadding,
-                metrics.ItemVerticalPadding,
-                metrics.ItemHorizontalPadding,
-                metrics.ItemVerticalPadding);
-        }
-
-        if (refreshImages)
-        {
-            RefreshOwnedImages(target, dpi, theme, metrics.ImageSize);
+            if (nativeItem is ToolStripMenuItem menuItem && menuItem.HasDropDownItems)
+            {
+                ApplyPresentationToLevel(
+                    (ToolStripDropDownMenu)menuItem.DropDown,
+                    font,
+                    theme,
+                    metrics,
+                    applyFont: false);
+            }
         }
     }
 
@@ -537,7 +579,7 @@ public class BootstrapDropdown : Component
     {
         ReleaseOwnedImages();
 
-        foreach (ToolStripItem nativeItem in _dropDown.Items)
+        foreach (var nativeItem in EnumerateNativeItems(_dropDown.Items))
         {
             if (nativeItem.Tag is not BootstrapDropdownItem model || model.Icon is null)
             {
@@ -585,7 +627,7 @@ public class BootstrapDropdown : Component
 
     private void ReleaseOwnedImages()
     {
-        foreach (ToolStripItem nativeItem in _dropDown.Items)
+        foreach (var nativeItem in EnumerateNativeItems(_dropDown.Items))
         {
             nativeItem.Image = null;
         }
@@ -596,6 +638,21 @@ public class BootstrapDropdown : Component
         }
 
         _ownedImages.Clear();
+    }
+
+    private static IEnumerable<ToolStripItem> EnumerateNativeItems(ToolStripItemCollection items)
+    {
+        foreach (ToolStripItem item in items)
+        {
+            yield return item;
+            if (item is ToolStripMenuItem menuItem && menuItem.HasDropDownItems)
+            {
+                foreach (var child in EnumerateNativeItems(menuItem.DropDownItems))
+                {
+                    yield return child;
+                }
+            }
+        }
     }
 
     private void ClearNativeItems()
@@ -621,7 +678,19 @@ public class BootstrapDropdown : Component
         if (_dropDown.Visible && _target is not null && !_target.IsDisposed)
         {
             ApplyPresentation(_target, refreshImages: true);
-            _dropDown.Invalidate();
+            InvalidateNativeLevels(_dropDown);
+        }
+    }
+
+    private static void InvalidateNativeLevels(ToolStripDropDownMenu level)
+    {
+        level.Invalidate();
+        foreach (ToolStripItem item in level.Items)
+        {
+            if (item is ToolStripMenuItem menuItem && menuItem.HasDropDownItems)
+            {
+                InvalidateNativeLevels((ToolStripDropDownMenu)menuItem.DropDown);
+            }
         }
     }
 

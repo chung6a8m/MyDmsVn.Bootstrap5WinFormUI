@@ -655,6 +655,127 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void DropdownRecursivePresentationComputesMarginsIndependentlyPerLevel()
+    {
+        var button = new BootstrapButton { Text = "Menu" };
+        using var form = CreateHost(button);
+        using var dropdown = new BootstrapDropdown { Target = button };
+        var parent = new BootstrapDropdownItem { Text = "Parent" };
+        parent.DropDownItems.Add(new BootstrapDropdownItem
+        {
+            Text = "Child icon",
+            Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus)
+        });
+        dropdown.Items.Add(parent);
+
+        dropdown.Show();
+        Application.DoEvents();
+        var root = GetNativeDropDown(dropdown);
+        var parentNative = (ToolStripMenuItem)root.Items[0];
+        var childLevel = (ToolStripDropDownMenu)parentNative.DropDown;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(root.ShowImageMargin, Is.False);
+            Assert.That(root.ShowCheckMargin, Is.False);
+            Assert.That(childLevel.ShowImageMargin, Is.True);
+            Assert.That(childLevel.ShowCheckMargin, Is.False);
+            Assert.That(childLevel.Renderer, Is.SameAs(root.Renderer));
+        }));
+
+        dropdown.Close();
+        Application.DoEvents();
+        dropdown.Items.Clear();
+        var rootIconParent = new BootstrapDropdownItem
+        {
+            Text = "Root icon",
+            Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus)
+        };
+        rootIconParent.DropDownItems.Add(new BootstrapDropdownItem { Text = "Plain child" });
+        dropdown.Items.Add(rootIconParent);
+
+        dropdown.Show();
+        Application.DoEvents();
+        root = GetNativeDropDown(dropdown);
+        childLevel = (ToolStripDropDownMenu)((ToolStripMenuItem)root.Items[0]).DropDown;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(root.ShowImageMargin, Is.True);
+            Assert.That(childLevel.ShowImageMargin, Is.False);
+            Assert.That(childLevel.ShowCheckMargin, Is.False);
+        }));
+    }
+
+    [Test]
+    public void DropdownThemeRefreshesRecursiveIconsWithoutRecreatingHostedControls()
+    {
+        var button = new BootstrapButton { Text = "Menu" };
+        var renderer = new RecordingIconRenderer();
+        button.IconRenderer = renderer;
+        using var form = CreateHost(button);
+        using var dropdown = new BootstrapDropdown { Target = button };
+        var hostedFactoryCalls = 0;
+        var rootModel = new BootstrapDropdownItem
+        {
+            Text = "Root",
+            Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus)
+        };
+        var childModel = new BootstrapDropdownItem
+        {
+            Text = "Child",
+            Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus)
+        };
+        var grandchildModel = new BootstrapDropdownItem
+        {
+            Text = "Grandchild",
+            Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus)
+        };
+        childModel.DropDownItems.Add(grandchildModel);
+        childModel.DropDownItems.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () =>
+            {
+                hostedFactoryCalls++;
+                return new TextBox { Text = "Caller state" };
+            }
+        });
+        rootModel.DropDownItems.Add(childModel);
+        dropdown.Items.Add(rootModel);
+
+        dropdown.Show();
+        Application.DoEvents();
+        var nativeRoot = GetNativeDropDown(dropdown);
+        var nativeRootItem = (ToolStripMenuItem)nativeRoot.Items[0];
+        var nativeChildItem = (ToolStripMenuItem)nativeRootItem.DropDownItems[0];
+        var nativeGrandchildItem = (ToolStripMenuItem)nativeChildItem.DropDownItems[0];
+        var nativeHost = (ToolStripControlHost)nativeChildItem.DropDownItems[1];
+        var hostedControl = nativeHost.Control;
+        var initialImages = new[]
+        {
+            nativeRootItem.Image,
+            nativeChildItem.Image,
+            nativeGrandchildItem.Image
+        };
+
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(renderer.RenderCount, Is.EqualTo(6));
+            Assert.That(hostedFactoryCalls, Is.EqualTo(1));
+            Assert.That(nativeHost.Control, Is.SameAs(hostedControl));
+            Assert.That(((TextBox)hostedControl).Text, Is.EqualTo("Caller state"));
+            Assert.That(nativeRootItem.Image, Is.Not.Null.And.Not.SameAs(initialImages[0]));
+            Assert.That(nativeChildItem.Image, Is.Not.Null.And.Not.SameAs(initialImages[1]));
+            Assert.That(nativeGrandchildItem.Image, Is.Not.Null.And.Not.SameAs(initialImages[2]));
+            Assert.That(((ToolStripDropDownMenu)nativeRootItem.DropDown).Renderer, Is.SameAs(nativeRoot.Renderer));
+            Assert.That(((ToolStripDropDownMenu)nativeChildItem.DropDown).Renderer, Is.SameAs(nativeRoot.Renderer));
+        }));
+    }
+
+    [Test]
     public void DropdownShowNoOpsForEmptyDisabledAndLoadingTargets()
     {
         var button = new BootstrapButton { Text = "Menu" };
