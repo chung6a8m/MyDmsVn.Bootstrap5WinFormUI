@@ -92,6 +92,58 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void NativeSubmenuCharacterizationPreservesHierarchyAndNestedLeafActivation()
+    {
+        using var menu = new ToolStripDropDownMenu();
+        var parent = new ToolStripMenuItem("Parent");
+        var leaf = new ToolStripMenuItem("Leaf");
+        var clicks = 0;
+        leaf.Click += (_, _) => clicks++;
+
+        parent.DropDownItems.Add(leaf);
+        menu.Items.Add(parent);
+        leaf.PerformClick();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(menu.Items[0], Is.SameAs(parent));
+            Assert.That(parent.DropDownItems.Count, Is.EqualTo(1));
+            Assert.That(parent.DropDownItems[0], Is.SameAs(leaf));
+            Assert.That(clicks, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void NativeToolStripControlHostCharacterizationDisposesHostedControl()
+    {
+        var hostedControl = new DisposalTrackingControl();
+        var host = new ToolStripControlHost(hostedControl);
+
+        host.Dispose();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(hostedControl.IsDisposed, Is.True);
+            Assert.That(hostedControl.DisposeCount, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void NativeCompositeControlCharacterizationLetsBaseDisposeOwnChildDisposal()
+    {
+        var composite = new BaseOwnedCompositeControl();
+        var child = composite.TrackedChild;
+
+        composite.Dispose();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(child.IsDisposed, Is.True);
+            Assert.That(child.DisposeCount, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
     public void ItemModelDefaultsNormalizeTextAndRejectUndefinedKind()
     {
         var item = new BootstrapDropdownItem();
@@ -539,6 +591,32 @@ public sealed class BootstrapDropdownTests
             using var brush = new SolidBrush(color);
             graphics.FillRectangle(brush, bounds);
             return true;
+        }
+    }
+
+    private sealed class BaseOwnedCompositeControl : Control
+    {
+        public BaseOwnedCompositeControl()
+        {
+            TrackedChild = new DisposalTrackingControl();
+            Controls.Add(TrackedChild);
+        }
+
+        public DisposalTrackingControl TrackedChild { get; }
+    }
+
+    private sealed class DisposalTrackingControl : Control
+    {
+        public int DisposeCount { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && !IsDisposed)
+            {
+                DisposeCount++;
+            }
+
+            base.Dispose(disposing);
         }
     }
 }
