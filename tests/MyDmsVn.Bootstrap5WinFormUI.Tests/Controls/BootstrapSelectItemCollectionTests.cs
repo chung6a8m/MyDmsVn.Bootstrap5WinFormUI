@@ -14,7 +14,7 @@ public sealed class BootstrapSelectItemCollectionTests
         var one = new BootstrapSelectItem(1, "One");
         var two = new BootstrapSelectItem(2, "Two");
 
-        Assert.That(() => items.Add(null!), Throws.TypeOf<ArgumentNullException>());
+        Assert.That((Action)(() => items.Add(null!)), Throws.TypeOf<ArgumentNullException>());
 
         items.Add(one);
         items.Add(two);
@@ -26,7 +26,7 @@ public sealed class BootstrapSelectItemCollectionTests
             Assert.That(items[1], Is.SameAs(two));
         }));
 
-        Assert.That(() => items[0] = null!, Throws.TypeOf<ArgumentNullException>());
+        Assert.That((Action)(() => items[0] = null!), Throws.TypeOf<ArgumentNullException>());
     }
 
     [Test]
@@ -55,8 +55,8 @@ public sealed class BootstrapSelectItemCollectionTests
         items.Add(new BootstrapSelectItem(1, "One"));
         changes = 0;
 
-        Assert.That(() => items.Add(null!), Throws.TypeOf<ArgumentNullException>());
-        Assert.That(() => items[0] = null!, Throws.TypeOf<ArgumentNullException>());
+        Assert.That((Action)(() => items.Add(null!)), Throws.TypeOf<ArgumentNullException>());
+        Assert.That((Action)(() => items[0] = null!), Throws.TypeOf<ArgumentNullException>());
         Assert.That(changes, Is.Zero);
     }
 }
