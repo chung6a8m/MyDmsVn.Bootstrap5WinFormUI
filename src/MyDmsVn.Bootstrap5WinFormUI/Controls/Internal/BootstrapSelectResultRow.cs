@@ -1,0 +1,70 @@
+using System;
+
+namespace MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
+
+internal enum BootstrapSelectResultRowKind
+{
+    GroupHeader = 0,
+    Item = 1,
+    CreateValue = 2,
+    Loading = 3,
+    LoadMoreError = 4,
+    Empty = 5,
+    Instruction = 6,
+    Error = 7
+}
+
+internal sealed class BootstrapSelectResultRow
+{
+    private BootstrapSelectResultRow(
+        BootstrapSelectResultRowKind kind,
+        BootstrapSelectItem? item,
+        string text,
+        bool isSelected)
+    {
+        Kind = kind;
+        Item = item;
+        Text = text ?? throw new ArgumentNullException(nameof(text));
+        IsSelected = isSelected;
+    }
+
+    internal BootstrapSelectResultRowKind Kind { get; }
+    internal BootstrapSelectItem? Item { get; }
+    internal string Text { get; }
+    internal bool IsSelected { get; }
+
+    internal static BootstrapSelectResultRow GroupHeader(string text)
+    {
+        if (text is null)
+        {
+            throw new ArgumentNullException(nameof(text));
+        }
+
+        return new BootstrapSelectResultRow(BootstrapSelectResultRowKind.GroupHeader, null, text, false);
+    }
+
+    internal static BootstrapSelectResultRow ItemRow(BootstrapSelectItem item, bool isSelected)
+    {
+        if (item is null)
+        {
+            throw new ArgumentNullException(nameof(item));
+        }
+
+        return new BootstrapSelectResultRow(BootstrapSelectResultRowKind.Item, item, item.Text, isSelected);
+    }
+
+    internal static BootstrapSelectResultRow Message(BootstrapSelectResultRowKind kind, string text)
+    {
+        if (kind == BootstrapSelectResultRowKind.GroupHeader || kind == BootstrapSelectResultRowKind.Item)
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Use the dedicated group-header or item-row factory for selectable result content.");
+        }
+
+        if (text is null)
+        {
+            throw new ArgumentNullException(nameof(text));
+        }
+
+        return new BootstrapSelectResultRow(kind, null, text, false);
+    }
+}
