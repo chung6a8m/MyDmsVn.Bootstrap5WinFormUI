@@ -11,8 +11,8 @@ public sealed class BootstrapSelectItemTests
     [Test]
     public void ConstructorRequiresNonNullValueAndText()
     {
-        Assert.That(() => new BootstrapSelectItem(null!, "Alpha"), Throws.TypeOf<ArgumentNullException>());
-        Assert.That(() => new BootstrapSelectItem(1, null!), Throws.TypeOf<ArgumentNullException>());
+        Assert.That((Action)(() => new BootstrapSelectItem(null!, "Alpha")), Throws.TypeOf<ArgumentNullException>());
+        Assert.That((Action)(() => new BootstrapSelectItem(1, null!)), Throws.TypeOf<ArgumentNullException>());
     }
 
     [Test]
