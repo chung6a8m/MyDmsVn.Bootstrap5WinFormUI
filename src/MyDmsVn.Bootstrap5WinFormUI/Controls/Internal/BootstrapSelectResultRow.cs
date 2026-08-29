@@ -56,9 +56,9 @@ internal sealed class BootstrapSelectResultRow
 
     internal static BootstrapSelectResultRow Message(BootstrapSelectResultRowKind kind, string text)
     {
-        if (kind == BootstrapSelectResultRowKind.GroupHeader || kind == BootstrapSelectResultRowKind.Item || kind == BootstrapSelectResultRowKind.CreateValue)
+        if (kind == BootstrapSelectResultRowKind.GroupHeader || kind == BootstrapSelectResultRowKind.Item)
         {
-            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Use the dedicated row factory for selectable result content.");
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Use the dedicated row factory for item or group content.");
         }
         if (text is null) throw new ArgumentNullException(nameof(text));
         return new BootstrapSelectResultRow(kind, null, text, false);
