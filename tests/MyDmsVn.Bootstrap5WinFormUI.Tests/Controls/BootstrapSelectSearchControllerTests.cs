@@ -46,7 +46,7 @@ public sealed class BootstrapSelectSearchControllerTests
 
         controller.BeginQuery("ab", 20);
         Assert.That(provider.Tokens[0].IsCancellationRequested, Is.True);
-        Assert.ThrowsAsync<OperationCanceledException>(async () => await taskA);
+        Assert.ThrowsAsync<OperationCanceledException>((AsyncTestDelegate)(async () => await taskA));
     }
 
     [Test]
