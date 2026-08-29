@@ -36,17 +36,25 @@ public sealed class BootstrapSelectDemoContractTests
         var asyncMultiple = selects.Single(select =>
             select.DataProvider is not null &&
             select.SelectionMode == BootstrapSelectMode.Multiple);
+        var placementSelect = selects.Single(select =>
+            select.AccessibleName == "Lower-right placement select");
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(localSingle.Items, Has.Count.GreaterThanOrEqualTo(4));
+            Assert.That(localSingle.Items, Has.Count.GreaterThanOrEqualTo(5));
+            Assert.That(localSingle.AllowClear, Is.True);
             Assert.That(localSingle.Items.Any(item => item.Disabled), Is.True);
+            Assert.That(localSingle.Items.Any(item => item.Text.Length > 60), Is.True);
             Assert.That(localMultiple.AllowCustomValues, Is.True);
             Assert.That(localMultiple.Items.Any(item => !string.IsNullOrEmpty(item.Group)), Is.True);
-            Assert.That(asyncSingle.PageSize, Is.GreaterThan(0));
-            Assert.That(asyncMultiple.PageSize, Is.GreaterThan(0));
+            Assert.That(asyncSingle.PageSize, Is.EqualTo(20));
+            Assert.That(asyncMultiple.PageSize, Is.EqualTo(20));
+            Assert.That(asyncMultiple.SelectedValues, Does.Contain(1));
+            Assert.That(placementSelect.Anchor & AnchorStyles.Right, Is.EqualTo(AnchorStyles.Right));
+            Assert.That(placementSelect.Anchor & AnchorStyles.Bottom, Is.EqualTo(AnchorStyles.Bottom));
             Assert.That(labels.Any(text => text.IndexOf("rapid", StringComparison.OrdinalIgnoreCase) >= 0), Is.True);
             Assert.That(labels.Any(text => text.IndexOf("retry", StringComparison.OrdinalIgnoreCase) >= 0), Is.True);
+            Assert.That(labels.Any(text => text.IndexOf("flip", StringComparison.OrdinalIgnoreCase) >= 0), Is.True);
         }));
     }
 
