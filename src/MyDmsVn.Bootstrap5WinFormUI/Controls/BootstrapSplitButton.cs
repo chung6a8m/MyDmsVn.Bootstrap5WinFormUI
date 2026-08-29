@@ -591,6 +591,11 @@ public class BootstrapSplitButton : Control
 
     private void OnDropDownButtonClick(object? sender, EventArgs e)
     {
+        if (_dropdown.ConsumePendingAppClickedDismissal())
+        {
+            return;
+        }
+
         if (_dropDownOpen)
         {
             CloseDropDown();

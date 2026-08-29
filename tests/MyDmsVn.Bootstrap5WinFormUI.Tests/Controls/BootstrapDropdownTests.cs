@@ -832,6 +832,43 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void AppClickedCloseSuppressesSameTurnTargetClickAndExpiresOnNextMessageTurn()
+    {
+        var button = new BootstrapButton { Text = "Menu" };
+        using var form = CreateHost(button);
+        using var dropdown = new BootstrapDropdown { Target = button };
+        dropdown.Items.Add(new BootstrapDropdownItem { Text = "Action" });
+        var native = GetNativeDropDown(dropdown);
+        var opened = 0;
+        var closed = 0;
+        dropdown.Opened += (_, _) => opened++;
+        dropdown.Closed += (_, _) => closed++;
+
+        dropdown.Show();
+        Application.DoEvents();
+        native.Close(ToolStripDropDownCloseReason.AppClicked);
+        button.PerformClick();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.Visible, Is.False);
+            Assert.That(opened, Is.EqualTo(1));
+            Assert.That(closed, Is.EqualTo(1));
+        }));
+
+        Application.DoEvents();
+        button.PerformClick();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.Visible, Is.True);
+            Assert.That(opened, Is.EqualTo(2));
+            Assert.That(closed, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
     public void DropdownInternalAnchorOpensWithoutChangingPublicTargetAndForwardsLifecycle()
     {
         var presentationSource = new BootstrapButton { Text = "Presentation" };

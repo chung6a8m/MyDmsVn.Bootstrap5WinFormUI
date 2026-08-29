@@ -22,6 +22,8 @@ public class BootstrapDropdown : Component
     private readonly List<Image> _ownedImages = new List<Image>();
     private BootstrapButton? _target;
     private BootstrapButton? _activePresentationSource;
+    private bool _pendingAppClickedDismissal;
+    private int _appClickedDismissalGeneration;
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private int _minimumWidth;
     private bool _themeSubscribed;
@@ -280,6 +282,7 @@ public class BootstrapDropdown : Component
     {
         if (disposing && !_disposed)
         {
+            ResetPendingAppClickedDismissal();
             if (_dropDown.Visible)
             {
                 _dropDown.Close();
@@ -381,6 +384,11 @@ public class BootstrapDropdown : Component
             return;
         }
 
+        if (ConsumePendingAppClickedDismissal())
+        {
+            return;
+        }
+
         if (_dropDown.Visible)
         {
             Close();
@@ -415,8 +423,68 @@ public class BootstrapDropdown : Component
 
     private void OnNativeClosed(object? sender, ToolStripDropDownClosedEventArgs e)
     {
+        var presentationSource = _activePresentationSource ?? _target;
         _activePresentationSource = null;
+
+        if (e.CloseReason == ToolStripDropDownCloseReason.AppClicked &&
+            presentationSource is not null &&
+            !presentationSource.IsDisposed)
+        {
+            ArmPendingAppClickedDismissal(presentationSource);
+        }
+        else
+        {
+            ResetPendingAppClickedDismissal();
+        }
+
         Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    internal bool ConsumePendingAppClickedDismissal()
+    {
+        if (!_pendingAppClickedDismissal)
+        {
+            return false;
+        }
+
+        ResetPendingAppClickedDismissal();
+        return true;
+    }
+
+    private void ArmPendingAppClickedDismissal(BootstrapButton presentationSource)
+    {
+        var generation = ++_appClickedDismissalGeneration;
+        _pendingAppClickedDismissal = true;
+
+        if (!presentationSource.IsHandleCreated)
+        {
+            ExpirePendingAppClickedDismissal(generation);
+            return;
+        }
+
+        try
+        {
+            presentationSource.BeginInvoke(
+                (MethodInvoker)(() => ExpirePendingAppClickedDismissal(generation)));
+        }
+        catch (InvalidOperationException)
+        {
+            ExpirePendingAppClickedDismissal(generation);
+        }
+    }
+
+    private void ExpirePendingAppClickedDismissal(int generation)
+    {
+        if (_appClickedDismissalGeneration == generation)
+        {
+            _pendingAppClickedDismissal = false;
+        }
+    }
+
+    private void ResetPendingAppClickedDismissal()
+    {
+        _pendingAppClickedDismissal = false;
+        _appClickedDismissalGeneration++;
     }
 
     private void OnNativeLeafClick(object? sender, EventArgs e)

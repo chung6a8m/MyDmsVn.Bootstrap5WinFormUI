@@ -295,6 +295,71 @@ public sealed class BootstrapSplitButtonTests
     }
 
     [Test]
+    public void AppClickedCloseSuppressesSameTurnChevronClickAndExpiresOnNextMessageTurn()
+    {
+        using var split = CreateSplitButton();
+        GetProperty<BootstrapDropdownItemCollection>(split, "Items").Add(
+            new BootstrapDropdownItem { Text = "Action" });
+        using var form = CreateHost(split);
+        var (_, menu) = GetRegions(split);
+        var native = GetNativeDropDown(GetOwnedDropdown(split));
+        var opened = 0;
+        var closed = 0;
+        AddEventHandler(split, "Opened", (_, _) => opened++);
+        AddEventHandler(split, "Closed", (_, _) => closed++);
+
+        InvokePublic(split, "ShowDropDown");
+        Application.DoEvents();
+        native.Close(ToolStripDropDownCloseReason.AppClicked);
+        menu.PerformClick();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.Visible, Is.False);
+            Assert.That(menu.Selected, Is.False);
+            Assert.That(opened, Is.EqualTo(1));
+            Assert.That(closed, Is.EqualTo(1));
+        }));
+
+        Application.DoEvents();
+        menu.PerformClick();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.Visible, Is.True);
+            Assert.That(menu.Selected, Is.True);
+            Assert.That(opened, Is.EqualTo(2));
+            Assert.That(closed, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void AppClickedSuppressionIsSafeWhenOwnerIsDisposedBeforeDeferredExpiry()
+    {
+        var split = CreateSplitButton();
+        GetProperty<BootstrapDropdownItemCollection>(split, "Items").Add(
+            new BootstrapDropdownItem { Text = "Action" });
+        using var form = CreateHost(split);
+        var dropdown = GetOwnedDropdown(split);
+        var native = GetNativeDropDown(dropdown);
+        var closed = 0;
+        AddEventHandler(split, "Closed", (_, _) => closed++);
+
+        InvokePublic(split, "ShowDropDown");
+        Application.DoEvents();
+        InvokeNativeClosed(dropdown, native, ToolStripDropDownCloseReason.AppClicked);
+        split.Dispose();
+
+        Assert.DoesNotThrow((Action)Application.DoEvents);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(closed, Is.EqualTo(2));
+            Assert.That(native.IsDisposed, Is.True);
+        }));
+    }
+
+    [Test]
     public void DropdownOpeningUsesOuterSplitAsFullWidthAnchor()
     {
         using var split = CreateSplitButton();
@@ -435,6 +500,18 @@ public sealed class BootstrapSplitButtonTests
         return (ToolStripDropDownMenu)field!.GetValue(dropdown)!;
     }
 
+    private static void InvokeNativeClosed(
+        BootstrapDropdown dropdown,
+        ToolStripDropDownMenu native,
+        ToolStripDropDownCloseReason closeReason)
+    {
+        var method = typeof(BootstrapDropdown).GetMethod(
+            "OnNativeClosed",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null);
+        Invoke(method!, dropdown, native, new ToolStripDropDownClosedEventArgs(closeReason));
+    }
+
     private static void AddEventHandler(Control target, string name, EventHandler handler)
     {
         var eventInfo = target.GetType().GetEvent(name, BindingFlags.Public | BindingFlags.Instance);
@@ -456,11 +533,11 @@ public sealed class BootstrapSplitButtonTests
         return (T)Invoke(method!, target)!;
     }
 
-    private static object? Invoke(MethodInfo method, object target)
+    private static object? Invoke(MethodInfo method, object target, params object?[] arguments)
     {
         try
         {
-            return method.Invoke(target, Array.Empty<object>());
+            return method.Invoke(target, arguments);
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
