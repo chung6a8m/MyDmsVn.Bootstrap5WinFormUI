@@ -198,6 +198,11 @@ public sealed class MainForm : Form
             () => new AdvancedInputsDemoForm());
 
         AddPage(
+            "Select",
+            "Select2-style single/multiple selection, grouping, custom values, async providers, paging, retry, keyboard, and accessibility scenarios.",
+            () => new BootstrapSelectDemoForm());
+
+        AddPage(
             "Cards",
             "Themed surfaces with Header/Body/Footer composition, borders, radius, and shadow states.",
             () => new TextBoxCardDemoForm());

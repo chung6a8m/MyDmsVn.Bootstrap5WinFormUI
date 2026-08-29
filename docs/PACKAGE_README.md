@@ -11,11 +11,13 @@ The library is native WinForms. It does not require a browser, WebView, Bootstra
 
 ## Included foundation controls
 
-`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapSplitButton`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapComboBox`, `BootstrapDatePicker`, `BootstrapDropdown`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabControl`, `BootstrapToast`, and `BootstrapToastContainer`, plus shared Theme, Rendering, DPI, Animation, and Icon infrastructure.
+`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapSplitButton`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapComboBox`, `BootstrapSelect`, `BootstrapDatePicker`, `BootstrapDropdown`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabControl`, `BootstrapToast`, and `BootstrapToastContainer`, plus shared Theme, Rendering, DPI, Animation, Icon, and Overlay infrastructure.
 
 `BootstrapNumericBox` is a native-backed numeric input. It owns one borderless WinForms `NumericUpDown` and forwards `Value`, `Minimum`, `Maximum`, `Increment`, `DecimalPlaces`, `ThousandsSeparator`, and `ReadOnly` directly, while the framework owns the themed shell, validation/focus rendering, DPI layout, single public tab stop, and `BorderRadius`. Native range exceptions, spin buttons, Up/Down keys, mouse wheel, parsing, and formatting semantics remain native.
 
 `BootstrapComboBox` derives directly from WinForms `ComboBox`. Native `Items`, `DataSource`, `DisplayMember`, `ValueMember`, selection, editable text, autocomplete, keyboard/drop-down behavior, and events remain authoritative. The framework owns fixed-height owner-draw presentation, validation/focus border rendering, theme/DPI integration, `BorderRadius`, and an optional control-level `LeadingIcon`. The editable child, arrow button, hit-testing, and popup remain WinForms/OS-owned; no framework item wrapper or custom popup is introduced.
+
+`BootstrapSelect` is the separate Select2-style selector for managed searchable selection scenarios. It owns its `BootstrapSelectItem` model, single/multiple selection state, chip presentation, grouping, local matching, optional custom values, and a managed result popup that reuses the framework overlay placement engine. `BootstrapSelectItem.Value` is the non-null logical identity. Remote/service-backed lookup is supplied through the transport-agnostic `IBootstrapSelectDataProvider`; the control owns debounce, cancellation, stale-generation rejection, paging, first/later-page retry, deduplication, and selected snapshots. The core package adds no HTTP/database dependency. `Matcher` and `Renderer` are replaceable application-owned extension points.
 
 `BootstrapDatePicker` owns exactly one native WinForms `DateTimePicker`. `Value`, `MinDate`, `MaxDate`, `Format`, `CustomFormat`, `ShowCheckBox`, and `Checked` forward directly to that native control; localized display, calendar popup, keyboard navigation, range normalization, checkbox behavior, and native exceptions remain authoritative. The wrapper owns only the Bootstrap-themed validation/focus shell, `BorderRadius`, DPI-aware layout, the single public tab stop, and theme-created font lifecycle. Stage 9 intentionally does not expose `ShowUpDown`, nullable-date state, a replacement `MonthCalendar`/popup, custom parsing/culture APIs, timers, animation, or native-window hacks.
 
@@ -121,6 +123,25 @@ customerCombo.SelectedIndexChanged += (_, _) =>
     // SelectedValue / SelectedItem remain the inherited native ComboBox values.
 };
 
+// Use BootstrapSelect instead of BootstrapComboBox when the application needs
+// Select2-style search, multiple chips, groups, custom values, or remote paging.
+var productSelect = new BootstrapSelect
+{
+    SelectionMode = BootstrapSelectMode.Multiple,
+    Placeholder = "Choose products...",
+    AllowCustomValues = true,
+    MaximumSelectionRows = 3
+};
+productSelect.Items.Add(new BootstrapSelectItem("crm", "CRM Suite") { Group = "Business Apps" });
+productSelect.Items.Add(new BootstrapSelectItem("erp", "ERP Core") { Group = "Business Apps" });
+productSelect.CustomValueFactory = text =>
+{
+    var normalized = text.Trim();
+    return normalized.Length == 0
+        ? null
+        : new BootstrapSelectItem("custom:" + normalized.ToLowerInvariant(), normalized);
+};
+
 var dueDate = new BootstrapDatePicker
 {
     MinDate = new DateTime(2026, 1, 1),
@@ -206,11 +227,13 @@ pagination.PageChanged += (_, _) =>
 };
 ```
 
+For service-backed Select scenarios, assign an `IBootstrapSelectDataProvider` and return one-based `BootstrapSelectPage` results. The control owns debounce, cancellation, paging/retry, race rejection, result deduplication, and selected snapshots; the provider remains application-owned and transport-agnostic.
+
 Before `ShowToast`, the application owns the Toast instance and may configure or dispose it. After a successful `ShowToast`, the container owns its lifecycle. Use `Dismiss()` or `DismissAll()` to request dismissal rather than manually removing/discarding an owned Toast.
 
-Runtime Light/Dark switching is handled through `BootstrapThemeManager`. NumericBox, ComboBox, DatePicker, Dropdown, Badge, Alert, Toast, ToastContainer, and TabControl directly update their semantic presentation through the existing theme lifecycle; Dropdown also regenerates any owned native menu icon bitmaps while open using the target button's current renderer and DPI. Pagination inherits theme behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children; Tooltip resolves the current theme only when its native Popup/Draw events execute. None introduces a separate theme service.
+Runtime Light/Dark switching is handled through `BootstrapThemeManager`. NumericBox, ComboBox, Select, DatePicker, Dropdown, Badge, Alert, Toast, ToastContainer, and TabControl directly update their semantic presentation through the existing theme lifecycle; Select also refreshes its managed selection/popup surfaces and uses the shared overlay/DPI infrastructure. Dropdown regenerates owned native menu icon bitmaps while open using the target button's current renderer and DPI. Pagination inherits theme behavior from its composed `BootstrapButtonGroup` / `BootstrapButton` children; Tooltip resolves the current theme only when its native Popup/Draw events execute. None introduces a separate theme service.
 
-The integrated demo exposes NumericBox, ComboBox, and DatePicker under **Advanced Inputs**. The shared **Navigation / Tabs** page contains Dropdown basic/icon/state/long/stress plus nested, hosted, mixed, split-primary/loading, and custom-font/theme scenarios; no separate Dropdown route is added. Its manual matrix covers submenu/host keyboard focus, accessibility, DPI seams/arrows, monitor placement, and repeated snapshot disposal. The shared **Feedback** page demonstrates Toast manual/auto-hide notifications, icon/multiline content, FIFO burst queueing, all four placements, rapid dismissal, disabled presentation, `DismissAll()`, reduced-motion behavior, and 100-toast lifecycle stress.
+The integrated demo exposes NumericBox, ComboBox, and DatePicker under **Advanced Inputs**, and exposes `BootstrapSelect` on the dedicated **Select** page. Select scenarios cover local single search, multiple chips, groups, custom values, validation, a deterministic 300+ row async provider, infinite paging, first-page retry, later-page retry, and rapid-typing stale-result protection. DatePicker scenarios cover native Long/Short/Time, custom date and date-time formats, optional unchecked checkbox, constrained range, validation, disabled state, explicit radius, and live `ValueChanged`; the native calendar popup and localized rendering remain WinForms/OS-owned. ComboBox scenarios include unbound and bound items, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` autocomplete, long text, optional leading icons, validation, disabled state, explicit radius, and native selection feedback. The shared **Navigation / Tabs** page contains Dropdown basic/icon/state/long/stress plus nested, hosted, mixed, split-primary/loading, and custom-font/theme scenarios; no separate Dropdown route is added. Its manual matrix covers submenu/host keyboard focus, accessibility, DPI seams/arrows, monitor placement, and repeated snapshot disposal. The shared **Feedback** page demonstrates Toast manual/auto-hide notifications, icon/multiline content, FIFO burst queueing, all four placements, rapid dismissal, disabled presentation, `DismissAll()`, reduced-motion behavior, and 100-toast lifecycle stress.
 
 ## Icons
 
@@ -218,8 +241,10 @@ The core package contains source-neutral icon contracts and built-in Segoe MDL2/
 
 ## Release candidate status
 
-`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. Advanced Dropdown adds the `HostedControl` enum member, recursive/factory item properties, and `BootstrapSplitButton`; consumers with exhaustive switches over `BootstrapDropdownItemKind` must handle the additive member. The compatibility fingerprint is re-reviewed whenever an exported surface is added, while the assembly compatibility version remains `1.0.0.0`.
+`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. Advanced Dropdown adds the `HostedControl` enum member, recursive/factory item properties, and `BootstrapSplitButton`; `BootstrapSelect` adds its separate managed select/model/provider/matcher/renderer family. Consumers with exhaustive switches over `BootstrapDropdownItemKind` must handle the additive member. The compatibility fingerprint is re-reviewed whenever an exported surface is added, while the assembly compatibility version remains `1.0.0.0`.
 
 The package is a release candidate, not an automatic NuGet.org publication.
 
 Project source and full documentation: https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI
+
+BootstrapSelect guide: https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI/blob/main/docs/BOOTSTRAP_SELECT.md

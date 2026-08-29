@@ -19,6 +19,7 @@ public sealed class IntegratedDemoApplicationTests
         "Buttons / Groups / Toolbar",
         "Inputs",
         "Advanced Inputs",
+        "Select",
         "Cards",
         "Feedback",
         "Collapse / Accordion",
@@ -100,6 +101,24 @@ public sealed class IntegratedDemoApplicationTests
             embeddedForms.Any(child => child.GetType().Name == "AdvancedInputsDemoForm" && !child.TopLevel),
             Is.True,
             "Advanced input stages should share one reusable integrated demo page.");
+    }
+
+    [Test]
+    public void SelectingSelectNavigationEmbedsBootstrapSelectDemoInMainWindow()
+    {
+        using var form = new MainForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var sidebar = FindControls<BootstrapSidebar>(form).Single();
+        sidebar.SelectedItem = sidebar.Items.Single(item => item.Text == "Select");
+        form.PerformLayout();
+
+        var embeddedForms = FindControls<Form>(form).ToArray();
+        Assert.That(
+            embeddedForms.Any(child => child.GetType().Name == "BootstrapSelectDemoForm" && !child.TopLevel),
+            Is.True,
+            "BootstrapSelect scenarios should be reachable from the integrated demo navigation.");
     }
 
     [Test]

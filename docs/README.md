@@ -17,14 +17,15 @@ This directory contains the authoritative development documentation for `MyDmsVn
 11. [PUBLIC_API_BASELINE.md](PUBLIC_API_BASELINE.md) — frozen v1 exported/protected API fingerprint and compatibility policy.
 12. [RELEASING.md](RELEASING.md) — RC creation, package validation, CI artifacts, manual matrix, and stable-promotion process.
 13. [PACKAGE_README.md](PACKAGE_README.md) — self-contained README embedded in the NuGet package.
-14. [PHASE8_HARDENING.md](PHASE8_HARDENING.md) — post-review hardening notes for TextBox keyboard event forwarding and Card decoration-safe layout.
-15. [PHASE9_BOOTSTRAP_COLLAPSE.md](PHASE9_BOOTSTRAP_COLLAPSE.md) — finalized Collapse contract, height measurement/reversal behavior, tests, and manual verification matrix.
-16. [PHASE11_BOOTSTRAP_PROGRESS_BAR.md](PHASE11_BOOTSTRAP_PROGRESS_BAR.md) — finalized ProgressBar range, formatting, animation, indeterminate, lifecycle, tests, and manual verification contract.
-17. [PHASE12_BOOTSTRAP_SIDEBAR.md](PHASE12_BOOTSTRAP_SIDEBAR.md) — finalized Sidebar navigation, nested Collapse, keyboard/focus, animation, accessibility, tests, and manual verification contract.
-18. [PHASE13_BOOTSTRAP_DATA_GRID_VIEW.md](PHASE13_BOOTSTRAP_DATA_GRID_VIEW.md) — finalized DataGridView theming, native-behavior boundary, empty/loading states, tests, demo, and large-row manual performance gate.
-19. [PHASE14_INTEGRATED_DEMO.md](PHASE14_INTEGRATED_DEMO.md) — integrated application shell, required navigation pages, retained foundation diagnostics, lifecycle, automated checks, and manual verification matrix.
-20. [PHASE15_HARDENING_AND_API_REVIEW.md](PHASE15_HARDENING_AND_API_REVIEW.md) — foundation-wide DPI/theme/animation/lifetime/API hardening, compiler and XML-documentation gates, verification results, and known release limitations.
-21. [PHASE16_RELEASE_PREPARATION.md](PHASE16_RELEASE_PREPARATION.md) — package/version metadata, v1 API freeze, release tooling, CI RC artifact, and stable-release manual gates.
+14. [BOOTSTRAP_SELECT.md](BOOTSTRAP_SELECT.md) — Select2-style `BootstrapSelect` local/async usage, identity, grouping/custom values, matcher/renderer extension points, retry, keyboard/accessibility, ownership, and desktop verification matrix.
+15. [PHASE8_HARDENING.md](PHASE8_HARDENING.md) — post-review hardening notes for TextBox keyboard event forwarding and Card decoration-safe layout.
+16. [PHASE9_BOOTSTRAP_COLLAPSE.md](PHASE9_BOOTSTRAP_COLLAPSE.md) — finalized Collapse contract, height measurement/reversal behavior, tests, and manual verification matrix.
+17. [PHASE11_BOOTSTRAP_PROGRESS_BAR.md](PHASE11_BOOTSTRAP_PROGRESS_BAR.md) — finalized ProgressBar range, formatting, animation, indeterminate, lifecycle, tests, and manual verification contract.
+18. [PHASE12_BOOTSTRAP_SIDEBAR.md](PHASE12_BOOTSTRAP_SIDEBAR.md) — finalized Sidebar navigation, nested Collapse, keyboard/focus, animation, accessibility, tests, and manual verification contract.
+19. [PHASE13_BOOTSTRAP_DATA_GRID_VIEW.md](PHASE13_BOOTSTRAP_DATA_GRID_VIEW.md) — finalized DataGridView theming, native-behavior boundary, empty/loading states, tests, demo, and large-row manual performance gate.
+20. [PHASE14_INTEGRATED_DEMO.md](PHASE14_INTEGRATED_DEMO.md) — integrated application shell, required navigation pages, retained foundation diagnostics, lifecycle, automated checks, and manual verification matrix.
+21. [PHASE15_HARDENING_AND_API_REVIEW.md](PHASE15_HARDENING_AND_API_REVIEW.md) — foundation-wide DPI/theme/animation/lifetime/API hardening, compiler and XML-documentation gates, verification results, and known release limitations.
+22. [PHASE16_RELEASE_PREPARATION.md](PHASE16_RELEASE_PREPARATION.md) — package/version metadata, v1 API freeze, release tooling, CI RC artifact, and stable-release manual gates.
 
 Release-facing changes are summarized in the root [CHANGELOG.md](../CHANGELOG.md).
 
