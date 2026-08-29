@@ -45,8 +45,8 @@ public sealed class BootstrapSelectDemoContractTests
             Assert.That(localMultiple.Items.Any(item => !string.IsNullOrEmpty(item.Group)), Is.True);
             Assert.That(asyncSingle.PageSize, Is.GreaterThan(0));
             Assert.That(asyncMultiple.PageSize, Is.GreaterThan(0));
-            Assert.That(labels.Any(text => text.Contains("rapid", StringComparison.OrdinalIgnoreCase)), Is.True);
-            Assert.That(labels.Any(text => text.Contains("retry", StringComparison.OrdinalIgnoreCase)), Is.True);
+            Assert.That(labels.Any(text => text.IndexOf("rapid", StringComparison.OrdinalIgnoreCase) >= 0), Is.True);
+            Assert.That(labels.Any(text => text.IndexOf("retry", StringComparison.OrdinalIgnoreCase) >= 0), Is.True);
         }));
     }
 
@@ -69,19 +69,15 @@ public sealed class BootstrapSelectDemoContractTests
             .GetResult();
         Assert.That(largePage.Items, Has.Count.GreaterThanOrEqualTo(200));
 
-        Assert.That(
-            () => providers[1]
-                .SearchAsync(new BootstrapSelectQuery("fail-first", 1, 20), CancellationToken.None)
-                .GetAwaiter()
-                .GetResult(),
-            Throws.TypeOf<InvalidOperationException>());
+        Assert.Throws<InvalidOperationException>(() => providers[1]
+            .SearchAsync(new BootstrapSelectQuery("fail-first", 1, 20), CancellationToken.None)
+            .GetAwaiter()
+            .GetResult());
 
-        Assert.That(
-            () => providers[1]
-                .SearchAsync(new BootstrapSelectQuery("retry", 2, 20), CancellationToken.None)
-                .GetAwaiter()
-                .GetResult(),
-            Throws.TypeOf<InvalidOperationException>());
+        Assert.Throws<InvalidOperationException>(() => providers[1]
+            .SearchAsync(new BootstrapSelectQuery("retry", 2, 20), CancellationToken.None)
+            .GetAwaiter()
+            .GetResult());
     }
 
     private static IEnumerable<T> FindControls<T>(Control root)
