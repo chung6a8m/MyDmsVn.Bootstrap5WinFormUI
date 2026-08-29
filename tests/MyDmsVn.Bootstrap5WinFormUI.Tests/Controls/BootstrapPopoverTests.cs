@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -15,6 +16,15 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapPopoverTests
 {
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRectangle
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     [Test]
     public void DefaultsMatchInteractivePopoverContract()
     {
@@ -145,6 +155,173 @@ public sealed class BootstrapPopoverTests
     }
 
     [Test]
+    public void FocusableRootContentReceivesFocusWhenPopoverOpens()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var target = new Button { Location = new Point(20, 20), Size = new Size(100, 30) };
+        using var content = new TextBox { Size = new Size(160, 24) };
+        using var popover = new BootstrapPopover { Target = target, Content = content };
+        form.Controls.Add(target);
+
+        try
+        {
+            form.Show();
+            form.Activate();
+            popover.Show();
+            Application.DoEvents();
+
+            Assert.That(content.Focused, Is.True);
+        }
+        finally
+        {
+            popover.Hide();
+        }
+    }
+
+    [Test]
+    public void NestedContentFocusUsesTabOrderAndSkipsIneligibleControls()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var target = new Button { Location = new Point(20, 20), Size = new Size(100, 30) };
+        using var content = new Panel { Size = new Size(220, 120) };
+        using var later = new TextBox { TabIndex = 5, Location = new Point(10, 80) };
+        using var expected = new TextBox { TabIndex = 3, Location = new Point(10, 50) };
+        using var hidden = new TextBox { TabIndex = 0, Visible = false };
+        using var disabled = new TextBox { TabIndex = 1, Enabled = false };
+        using var noTabStop = new TextBox { TabIndex = 2, TabStop = false };
+        content.Controls.Add(later);
+        content.Controls.Add(expected);
+        content.Controls.Add(hidden);
+        content.Controls.Add(disabled);
+        content.Controls.Add(noTabStop);
+        using var popover = new BootstrapPopover { Target = target, Content = content };
+        form.Controls.Add(target);
+
+        try
+        {
+            form.Show();
+            form.Activate();
+            popover.Show();
+            Application.DoEvents();
+
+            Assert.That(expected.Focused, Is.True);
+        }
+        finally
+        {
+            popover.Hide();
+        }
+    }
+
+    [Test]
+    public void TargetReplacementAssignedFromClosedSurvivesOriginalTargetDisposal()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        var original = new Button { Location = new Point(20, 20), Size = new Size(100, 30) };
+        using var replacement = new Button { Location = new Point(140, 20), Size = new Size(100, 30) };
+        using var content = new Panel { Size = new Size(160, 60) };
+        using var popover = new BootstrapPopover { Target = original, Content = content };
+        form.Controls.Add(original);
+        form.Controls.Add(replacement);
+        popover.Closed += (_, _) => popover.Target = replacement;
+
+        form.Show();
+        popover.Show();
+        Application.DoEvents();
+        original.Dispose();
+        Application.DoEvents();
+
+        Assert.That(popover.Target, Is.SameAs(replacement));
+    }
+
+    [Test]
+    public void ContentReplacementAssignedFromClosedSurvivesOriginalContentDisposal()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var target = new Button { Location = new Point(20, 20), Size = new Size(100, 30) };
+        var original = new Panel { Size = new Size(160, 60) };
+        using var replacement = new TextBox { Size = new Size(180, 24) };
+        using var popover = new BootstrapPopover { Target = target, Content = original };
+        form.Controls.Add(target);
+        popover.Closed += (_, _) => popover.Content = replacement;
+
+        form.Show();
+        popover.Show();
+        Application.DoEvents();
+        original.Dispose();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(popover.Content, Is.SameAs(replacement));
+            Assert.That(replacement.Parent, Is.Not.Null);
+            Assert.That(replacement.IsDisposed, Is.False);
+        }));
+    }
+
+    [Test]
+    public void NoneAndFlipPreserveActualPopoverWindowGeometryAtWorkingAreaEdges()
+    {
+        var workingArea = Screen.PrimaryScreen!.WorkingArea;
+        using var form = new Form
+        {
+            Bounds = new Rectangle(workingArea.Right - 100, workingArea.Top, 100, 100),
+            FormBorderStyle = FormBorderStyle.None,
+            ShowInTaskbar = false,
+            StartPosition = FormStartPosition.Manual
+        };
+        using var target = new Button { Location = new Point(60, 0), Size = new Size(40, 30) };
+        using var content = new Label
+        {
+            AutoSize = true,
+            Text = "Popover content with measurable preferred size"
+        };
+        using var popover = new BootstrapPopover
+        {
+            Target = target,
+            Content = content,
+            Placement = BootstrapOverlayPlacement.Right,
+            CollisionBehavior = BootstrapOverlayCollisionBehavior.None,
+            Offset = 0,
+            BoundaryPadding = 0,
+            ContentPadding = Padding.Empty
+        };
+        form.Controls.Add(target);
+
+        try
+        {
+            form.Show();
+            popover.Show();
+            Application.DoEvents();
+            var nativePopup = content.TopLevelControl;
+            Assert.That(nativePopup, Is.TypeOf<BootstrapOverlayDropDown>());
+            var size = nativePopup!.Size;
+            var anchor = target.RectangleToScreen(target.ClientRectangle);
+            Assert.That(GetActualBounds(nativePopup.Handle), Is.EqualTo(new Rectangle(
+                anchor.Right,
+                anchor.Top + ((anchor.Height - size.Height) / 2),
+                size.Width,
+                size.Height)));
+
+            popover.Hide();
+            popover.Placement = BootstrapOverlayPlacement.TopStart;
+            popover.CollisionBehavior = BootstrapOverlayCollisionBehavior.Flip;
+            popover.Show();
+            Application.DoEvents();
+            size = nativePopup.Size;
+            anchor = target.RectangleToScreen(target.ClientRectangle);
+            Assert.That(GetActualBounds(nativePopup.Handle), Is.EqualTo(new Rectangle(
+                anchor.Left,
+                anchor.Bottom,
+                size.Width,
+                size.Height)));
+        }
+        finally
+        {
+            popover.Hide();
+        }
+    }
+
+    [Test]
     public void FiveHundredOpenCloseCyclesReuseContentAndBalanceNativeEvents()
     {
         var originalTheme = BootstrapThemeManager.CurrentTheme;
@@ -198,4 +375,14 @@ public sealed class BootstrapPopoverTests
             BootstrapThemeManager.CurrentTheme = originalTheme;
         }
     }
+
+    private static Rectangle GetActualBounds(IntPtr handle)
+    {
+        Assert.That(GetWindowRect(handle, out var bounds), Is.True);
+        return Rectangle.FromLTRB(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr handle, out NativeRectangle bounds);
 }

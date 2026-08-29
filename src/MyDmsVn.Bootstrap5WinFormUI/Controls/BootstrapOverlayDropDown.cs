@@ -10,6 +10,9 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
     private readonly BootstrapOverlaySurface _surface;
     private readonly ToolStripControlHost _host;
     private Region? _ownedRegion;
+    private Rectangle _requestedBounds;
+    private int _boundsGeneration;
+    private bool _boundsCorrectionQueued;
 
     public BootstrapOverlayDropDown(BootstrapOverlaySurface surface)
     {
@@ -34,21 +37,19 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
 
     public void ShowAt(Rectangle screenBounds)
     {
+        RecordRequestedBounds(screenBounds);
         ApplyBounds(screenBounds);
         Show(screenBounds.Location);
-        if (IsHandleCreated)
-        {
-            BootstrapOverlayWindowBounds.TrySetBounds(Handle, screenBounds);
-        }
+        ApplyRequestedWindowBounds();
+        QueueBoundsCorrection();
     }
 
     public void MoveTo(Rectangle screenBounds)
     {
+        RecordRequestedBounds(screenBounds);
         ApplyBounds(screenBounds);
-        if (IsHandleCreated)
-        {
-            BootstrapOverlayWindowBounds.TrySetBounds(Handle, screenBounds);
-        }
+        ApplyRequestedWindowBounds();
+        QueueBoundsCorrection();
     }
 
     protected override bool ProcessCmdKey(ref Message m, Keys keyData)
@@ -66,6 +67,8 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
     {
         if (disposing)
         {
+            _boundsGeneration++;
+            _boundsCorrectionQueued = false;
             EscapeRequested = null;
             Region = null;
             _ownedRegion?.Dispose();
@@ -90,5 +93,57 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
         _ownedRegion = next;
         Region = next;
         previous?.Dispose();
+    }
+
+    private void RecordRequestedBounds(Rectangle screenBounds)
+    {
+        _requestedBounds = screenBounds;
+        _boundsGeneration++;
+    }
+
+    private void ApplyRequestedWindowBounds()
+    {
+        if (IsHandleCreated && !_requestedBounds.IsEmpty)
+        {
+            BootstrapOverlayWindowBounds.TrySetBounds(Handle, _requestedBounds);
+        }
+    }
+
+    private void QueueBoundsCorrection()
+    {
+        if (_boundsCorrectionQueued || !IsHandleCreated || IsDisposed)
+        {
+            return;
+        }
+
+        _boundsCorrectionQueued = true;
+        var generation = _boundsGeneration;
+        try
+        {
+            BeginInvoke((Action)(() =>
+            {
+                _boundsCorrectionQueued = false;
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                if (generation != _boundsGeneration)
+                {
+                    QueueBoundsCorrection();
+                    return;
+                }
+
+                ApplyRequestedWindowBounds();
+            }));
+        }
+        catch (ObjectDisposedException)
+        {
+            _boundsCorrectionQueued = false;
+        }
+        catch (InvalidOperationException)
+        {
+            _boundsCorrectionQueued = false;
+        }
     }
 }

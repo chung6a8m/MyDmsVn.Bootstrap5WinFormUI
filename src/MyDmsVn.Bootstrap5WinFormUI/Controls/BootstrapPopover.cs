@@ -351,27 +351,29 @@ public class BootstrapPopover : Component
 
     private void OnTargetDisposed(object? sender, EventArgs e)
     {
-        if (!ReferenceEquals(sender, _target))
+        var disposedTarget = sender as Control;
+        if (disposedTarget is null || !ReferenceEquals(disposedTarget, _target))
         {
             return;
         }
 
-        Hide();
-        DetachTargetHandlers(_target);
+        DetachTargetHandlers(disposedTarget);
         _target = null;
+        Hide();
     }
 
     private void OnContentDisposed(object? sender, EventArgs e)
     {
-        if (!ReferenceEquals(sender, _content))
+        var disposedContent = sender as Control;
+        if (disposedContent is null || !ReferenceEquals(disposedContent, _content))
         {
             return;
         }
 
-        Hide();
-        _content!.Disposed -= OnContentDisposed;
+        disposedContent.Disposed -= OnContentDisposed;
         _surface.DetachContent();
         _content = null;
+        Hide();
     }
 
     private void OnDropDownOpened(object? sender, EventArgs e)
@@ -420,13 +422,14 @@ public class BootstrapPopover : Component
             return null;
         }
 
-        foreach (Control child in parent.Controls)
+        if (parent.Visible && parent.Enabled && parent.TabStop && parent.CanSelect)
         {
-            if (child.Visible && child.Enabled && child.TabStop && child.CanSelect)
-            {
-                return child;
-            }
+            return parent;
+        }
 
+        Control? child = null;
+        while ((child = parent.GetNextControl(child, true)) is not null)
+        {
             var descendant = FindFirstFocusable(child);
             if (descendant is not null)
             {
