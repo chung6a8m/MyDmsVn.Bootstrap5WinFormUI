@@ -101,6 +101,7 @@ public partial class BootstrapSelect
     {
     }
 
+    /// <inheritdoc />
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
@@ -112,12 +113,14 @@ public partial class BootstrapSelect
         Disposed += OnPopupOwnerDisposed;
     }
 
+    /// <inheritdoc />
     protected override void OnVisibleChanged(EventArgs e)
     {
         base.OnVisibleChanged(e);
         if (!Visible) CloseDropDownInternal(false);
     }
 
+    /// <inheritdoc />
     protected override void OnEnabledChanged(EventArgs e)
     {
         base.OnEnabledChanged(e);
