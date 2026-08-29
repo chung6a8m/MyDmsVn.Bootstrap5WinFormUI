@@ -53,7 +53,7 @@ public sealed class BootstrapSelectInteractionTests
         select.Selecting += (_, e) => { if (e.Item.Value.Equals(2)) e.Cancel = true; };
         Assert.That(select.Select(new BootstrapSelectItem(2, "Beta")), Is.False);
         Assert.That(select.SelectedItems, Is.Empty);
-        Assert.That(events, Is.Empty);
+        Assert.That(events, Is.EqualTo(new[] { "Selecting:Programmatic" }));
     }
 
     [Test]
