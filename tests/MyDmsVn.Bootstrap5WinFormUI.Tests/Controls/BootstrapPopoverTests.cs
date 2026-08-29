@@ -1,0 +1,388 @@
+using System;
+using System.ComponentModel;
+using System.Drawing;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using NUnit.Framework;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
+
+namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
+
+[TestFixture]
+[Apartment(ApartmentState.STA)]
+[NonParallelizable]
+public sealed class BootstrapPopoverTests
+{
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRectangle
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [Test]
+    public void DefaultsMatchInteractivePopoverContract()
+    {
+        using var popover = new BootstrapPopover();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(popover.Target, Is.Null);
+            Assert.That(popover.Content, Is.Null);
+            Assert.That(popover.Trigger, Is.EqualTo(BootstrapPopoverTrigger.Click));
+            Assert.That(popover.Placement, Is.EqualTo(BootstrapOverlayPlacement.Auto));
+            Assert.That(popover.CollisionBehavior, Is.EqualTo(BootstrapOverlayCollisionBehavior.FlipAndShift));
+            Assert.That(popover.Offset, Is.EqualTo(8));
+            Assert.That(popover.BoundaryPadding, Is.EqualTo(8));
+            Assert.That(popover.ContentPadding, Is.EqualTo(new Padding(12, 8, 12, 8)));
+            Assert.That(popover.BorderRadius, Is.EqualTo(-1));
+            Assert.That(popover.CloseOnEscape, Is.True);
+            Assert.That(popover.CloseOnClickOutside, Is.True);
+            Assert.That(popover.IsOpen, Is.False);
+        }));
+    }
+
+    [Test]
+    public void ContainerConstructorAddsOnlyPopoverWrapperAndRejectsNull()
+    {
+        using var container = new Container();
+        using var popover = new BootstrapPopover(container);
+
+        Assert.That(container.Components.Cast<IComponent>(), Does.Contain(popover));
+        Assert.Throws<ArgumentNullException>((Action)(() => new BootstrapPopover(null!)));
+    }
+
+    [Test]
+    public void ShowRequiresConfiguredLiveTargetAndContent()
+    {
+        using var popover = new BootstrapPopover();
+        using var target = new Button();
+        using var content = new Panel();
+
+        Assert.Throws<InvalidOperationException>((Action)popover.Show);
+        popover.Target = target;
+        Assert.Throws<InvalidOperationException>((Action)popover.Show);
+        popover.Target = null;
+        popover.Content = content;
+        Assert.Throws<InvalidOperationException>((Action)popover.Show);
+    }
+
+    [Test]
+    public void ContentAssignmentRejectsDisposedOrParentedControls()
+    {
+        using var popover = new BootstrapPopover();
+        var disposed = new Panel();
+        disposed.Dispose();
+        using var parent = new Panel();
+        using var parented = new Panel();
+        parent.Controls.Add(parented);
+
+        Assert.Throws<ArgumentException>((Action)(() => popover.Content = disposed));
+        Assert.Throws<InvalidOperationException>((Action)(() => popover.Content = parented));
+        Assert.That(popover.Content, Is.Null);
+    }
+
+    [Test]
+    public void ReplacingContentDetachesOldContentWithoutDisposingEitherControl()
+    {
+        using var popover = new BootstrapPopover();
+        using var first = new Panel();
+        using var second = new Panel();
+        var firstDisposed = 0;
+        var secondDisposed = 0;
+        first.Disposed += (_, _) => firstDisposed++;
+        second.Disposed += (_, _) => secondDisposed++;
+
+        popover.Content = first;
+        Assert.That(first.Parent, Is.Not.Null);
+        popover.Content = second;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(first.Parent, Is.Null);
+            Assert.That(second.Parent, Is.Not.Null);
+            Assert.That(firstDisposed, Is.Zero);
+            Assert.That(secondDisposed, Is.Zero);
+        }));
+    }
+
+    [Test]
+    public void DisposeDoesNotDisposeCallerOwnedTargetOrContent()
+    {
+        using var target = new Button();
+        using var content = new Panel();
+        var targetDisposed = 0;
+        var contentDisposed = 0;
+        target.Disposed += (_, _) => targetDisposed++;
+        content.Disposed += (_, _) => contentDisposed++;
+        var popover = new BootstrapPopover { Target = target, Content = content };
+
+        popover.Dispose();
+        popover.Dispose();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(targetDisposed, Is.Zero);
+            Assert.That(contentDisposed, Is.Zero);
+            Assert.That(content.Parent, Is.Null);
+        }));
+    }
+
+    [Test]
+    public void ExternalTargetOrContentDisposalClearsReferenceAndHideIsIdempotent()
+    {
+        using var popover = new BootstrapPopover();
+        var target = new Button();
+        var content = new Panel();
+        popover.Target = target;
+        popover.Content = content;
+
+        Assert.DoesNotThrow((Action)(() =>
+        {
+            popover.Hide();
+            popover.Hide();
+        }));
+
+        target.Dispose();
+        Assert.That(popover.Target, Is.Null);
+        content.Dispose();
+        Assert.That(popover.Content, Is.Null);
+    }
+
+    [Test]
+    public void FocusableRootContentReceivesFocusWhenPopoverOpens()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var target = new Button { Location = new Point(20, 20), Size = new Size(100, 30) };
+        using var content = new TextBox { Size = new Size(160, 24) };
+        using var popover = new BootstrapPopover { Target = target, Content = content };
+        form.Controls.Add(target);
+
+        try
+        {
+            form.Show();
+            form.Activate();
+            popover.Show();
+            Application.DoEvents();
+
+            Assert.That(content.Focused, Is.True);
+        }
+        finally
+        {
+            popover.Hide();
+        }
+    }
+
+    [Test]
+    public void NestedContentFocusUsesTabOrderAndSkipsIneligibleControls()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var target = new Button { Location = new Point(20, 20), Size = new Size(100, 30) };
+        using var content = new Panel { Size = new Size(220, 120) };
+        using var later = new TextBox { TabIndex = 5, Location = new Point(10, 80) };
+        using var expected = new TextBox { TabIndex = 3, Location = new Point(10, 50) };
+        using var hidden = new TextBox { TabIndex = 0, Visible = false };
+        using var disabled = new TextBox { TabIndex = 1, Enabled = false };
+        using var noTabStop = new TextBox { TabIndex = 2, TabStop = false };
+        content.Controls.Add(later);
+        content.Controls.Add(expected);
+        content.Controls.Add(hidden);
+        content.Controls.Add(disabled);
+        content.Controls.Add(noTabStop);
+        using var popover = new BootstrapPopover { Target = target, Content = content };
+        form.Controls.Add(target);
+
+        try
+        {
+            form.Show();
+            form.Activate();
+            popover.Show();
+            Application.DoEvents();
+
+            Assert.That(expected.Focused, Is.True);
+        }
+        finally
+        {
+            popover.Hide();
+        }
+    }
+
+    [Test]
+    public void TargetReplacementAssignedFromClosedSurvivesOriginalTargetDisposal()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        var original = new Button { Location = new Point(20, 20), Size = new Size(100, 30) };
+        using var replacement = new Button { Location = new Point(140, 20), Size = new Size(100, 30) };
+        using var content = new Panel { Size = new Size(160, 60) };
+        using var popover = new BootstrapPopover { Target = original, Content = content };
+        form.Controls.Add(original);
+        form.Controls.Add(replacement);
+        popover.Closed += (_, _) => popover.Target = replacement;
+
+        form.Show();
+        popover.Show();
+        Application.DoEvents();
+        original.Dispose();
+        Application.DoEvents();
+
+        Assert.That(popover.Target, Is.SameAs(replacement));
+    }
+
+    [Test]
+    public void ContentReplacementAssignedFromClosedSurvivesOriginalContentDisposal()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var target = new Button { Location = new Point(20, 20), Size = new Size(100, 30) };
+        var original = new Panel { Size = new Size(160, 60) };
+        using var replacement = new TextBox { Size = new Size(180, 24) };
+        using var popover = new BootstrapPopover { Target = target, Content = original };
+        form.Controls.Add(target);
+        popover.Closed += (_, _) => popover.Content = replacement;
+
+        form.Show();
+        popover.Show();
+        Application.DoEvents();
+        original.Dispose();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(popover.Content, Is.SameAs(replacement));
+            Assert.That(replacement.Parent, Is.Not.Null);
+            Assert.That(replacement.IsDisposed, Is.False);
+        }));
+    }
+
+    [Test]
+    public void NoneAndFlipPreserveActualPopoverWindowGeometryAtWorkingAreaEdges()
+    {
+        var workingArea = Screen.PrimaryScreen!.WorkingArea;
+        using var form = new Form
+        {
+            Bounds = new Rectangle(workingArea.Right - 100, workingArea.Top, 100, 100),
+            FormBorderStyle = FormBorderStyle.None,
+            ShowInTaskbar = false,
+            StartPosition = FormStartPosition.Manual
+        };
+        using var target = new Button { Location = new Point(60, 0), Size = new Size(40, 30) };
+        using var content = new Label
+        {
+            AutoSize = true,
+            Text = "Popover content with measurable preferred size"
+        };
+        using var popover = new BootstrapPopover
+        {
+            Target = target,
+            Content = content,
+            Placement = BootstrapOverlayPlacement.Right,
+            CollisionBehavior = BootstrapOverlayCollisionBehavior.None,
+            Offset = 0,
+            BoundaryPadding = 0,
+            ContentPadding = Padding.Empty
+        };
+        form.Controls.Add(target);
+
+        try
+        {
+            form.Show();
+            popover.Show();
+            Application.DoEvents();
+            var nativePopup = content.TopLevelControl;
+            Assert.That(nativePopup, Is.TypeOf<BootstrapOverlayDropDown>());
+            var size = nativePopup!.Size;
+            var anchor = target.RectangleToScreen(target.ClientRectangle);
+            Assert.That(GetActualBounds(nativePopup.Handle), Is.EqualTo(new Rectangle(
+                anchor.Right,
+                anchor.Top + ((anchor.Height - size.Height) / 2),
+                size.Width,
+                size.Height)));
+
+            popover.Hide();
+            popover.Placement = BootstrapOverlayPlacement.TopStart;
+            popover.CollisionBehavior = BootstrapOverlayCollisionBehavior.Flip;
+            popover.Show();
+            Application.DoEvents();
+            size = nativePopup.Size;
+            anchor = target.RectangleToScreen(target.ClientRectangle);
+            Assert.That(GetActualBounds(nativePopup.Handle), Is.EqualTo(new Rectangle(
+                anchor.Left,
+                anchor.Bottom,
+                size.Width,
+                size.Height)));
+        }
+        finally
+        {
+            popover.Hide();
+        }
+    }
+
+    [Test]
+    public void FiveHundredOpenCloseCyclesReuseContentAndBalanceNativeEvents()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        using var form = new Form { Size = new Size(500, 400) };
+        using var target = new Button { Location = new Point(100, 100), Size = new Size(100, 32), Text = "Open" };
+        using var content = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false
+        };
+        content.Controls.Add(new TextBox { Width = 180, Text = "Persistent" });
+        form.Controls.Add(target);
+        using var popover = new BootstrapPopover { Target = target, Content = content };
+        var opened = 0;
+        var closed = 0;
+        popover.Opened += (_, _) => opened++;
+        popover.Closed += (_, _) => closed++;
+
+        try
+        {
+            form.Show();
+            Application.DoEvents();
+            for (var cycle = 0; cycle < 500; cycle++)
+            {
+                popover.Show();
+                Application.DoEvents();
+                popover.Hide();
+                Application.DoEvents();
+                if (cycle % 50 == 0)
+                {
+                    var mode = BootstrapThemeManager.CurrentTheme.Mode == BootstrapThemeMode.Light
+                        ? BootstrapThemeMode.Dark
+                        : BootstrapThemeMode.Light;
+                    BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+                }
+            }
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(opened, Is.EqualTo(500));
+                Assert.That(closed, Is.EqualTo(500));
+                Assert.That(popover.IsOpen, Is.False);
+                Assert.That(popover.Content, Is.SameAs(content));
+                Assert.That(content.IsDisposed, Is.False);
+            }));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
+    }
+
+    private static Rectangle GetActualBounds(IntPtr handle)
+    {
+        Assert.That(GetWindowRect(handle, out var bounds), Is.True);
+        return Rectangle.FromLTRB(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr handle, out NativeRectangle bounds);
+}

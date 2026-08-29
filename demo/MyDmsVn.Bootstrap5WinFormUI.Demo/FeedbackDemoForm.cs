@@ -32,6 +32,12 @@ public sealed class FeedbackDemoForm : Form
     private readonly BootstrapTooltip _defaultTooltip;
     private readonly BootstrapTooltip _semanticTooltip;
     private readonly BootstrapTooltip _customTooltip;
+    private readonly BootstrapTooltip _managedTopTooltip;
+    private readonly BootstrapTooltip _managedBottomEndTooltip;
+    private readonly BootstrapTooltip _managedAutoTooltip;
+    private readonly BootstrapPopover _interactivePopover;
+    private readonly FlowLayoutPanel _interactivePopoverContent;
+    private readonly Label _popoverStatus = new Label();
     private int _toastSequence;
 
     public FeedbackDemoForm()
@@ -46,6 +52,27 @@ public sealed class FeedbackDemoForm : Form
         {
             CustomColor = Color.FromArgb(111, 66, 193)
         };
+        _managedTopTooltip = new BootstrapTooltip(_components)
+        {
+            Positioning = BootstrapTooltipPositioning.Managed,
+            Placement = BootstrapOverlayPlacement.Top,
+            CollisionBehavior = BootstrapOverlayCollisionBehavior.FlipAndShift
+        };
+        _managedBottomEndTooltip = new BootstrapTooltip(_components)
+        {
+            Positioning = BootstrapTooltipPositioning.Managed,
+            Placement = BootstrapOverlayPlacement.BottomEnd,
+            CollisionBehavior = BootstrapOverlayCollisionBehavior.FlipAndShift
+        };
+        _managedAutoTooltip = new BootstrapTooltip(_components)
+        {
+            Positioning = BootstrapTooltipPositioning.Managed,
+            Placement = BootstrapOverlayPlacement.Auto,
+            CollisionBehavior = BootstrapOverlayCollisionBehavior.FlipAndShift
+        };
+        _interactivePopover = new BootstrapPopover(_components);
+        _interactivePopoverContent = CreateInteractivePopoverContent();
+        _interactivePopover.Content = _interactivePopoverContent;
 
         Text = "Feedback Components Demo";
         StartPosition = FormStartPosition.CenterParent;
@@ -73,6 +100,10 @@ public sealed class FeedbackDemoForm : Form
         {
             BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
             _components.Dispose();
+            if (!_interactivePopoverContent.IsDisposed)
+            {
+                _interactivePopoverContent.Dispose();
+            }
         }
 
         base.Dispose(disposing);
@@ -191,6 +222,10 @@ public sealed class FeedbackDemoForm : Form
         var customTarget = CreateTooltipTarget("Custom color", "Custom tooltip target");
         var multilineTarget = CreateTooltipTarget("Multiline", "Multiline tooltip target");
         var longTarget = CreateTooltipTarget("Long text", "Long tooltip target");
+        var managedTopTarget = CreateTooltipTarget("Managed Top", "Managed Top tooltip target");
+        var managedBottomEndTarget = CreateTooltipTarget("Managed BottomEnd", "Managed BottomEnd tooltip target");
+        var managedAutoTarget = CreateTooltipTarget("Managed Auto near edge", "Managed Auto tooltip target");
+        var nativeBaselineTarget = CreateTooltipTarget("Native baseline", "Native baseline tooltip target");
         _defaultTooltip.SetToolTip(defaultTarget, "Default BootstrapTooltip using the Dark semantic variant.");
         _defaultTooltip.SetToolTip(secondDefaultTarget, "The same BootstrapTooltip instance serves this second control.");
         _semanticTooltip.SetToolTip(semanticTarget, "Semantic Info tooltip resolved from the current theme.");
@@ -199,13 +234,23 @@ public sealed class FeedbackDemoForm : Form
         _defaultTooltip.SetToolTip(
             longTarget,
             "This deliberately long tooltip caption demonstrates native positioning with owner-drawn presentation while preserving the complete single-line caption without framework auto-wrap policy.");
+        _managedTopTooltip.SetToolTip(managedTopTarget, "Managed Top with FlipAndShift collision handling.");
+        _managedBottomEndTooltip.SetToolTip(managedBottomEndTarget, "Managed BottomEnd preserves logical alignment and shifts near edges.");
+        _managedAutoTooltip.SetToolTip(managedAutoTarget, "Managed Auto chooses the least-overflow side deterministically.");
+        _defaultTooltip.SetToolTip(nativeBaselineTarget, "Native positioning baseline remains the backward-compatible default.");
         targets.Controls.Add(defaultTarget);
         targets.Controls.Add(secondDefaultTarget);
         targets.Controls.Add(semanticTarget);
         targets.Controls.Add(customTarget);
         targets.Controls.Add(multilineTarget);
         targets.Controls.Add(longTarget);
+        targets.Controls.Add(managedTopTarget);
+        targets.Controls.Add(managedBottomEndTarget);
+        targets.Controls.Add(managedAutoTarget);
+        targets.Controls.Add(nativeBaselineTarget);
         stack.Controls.Add(targets);
+        stack.Controls.Add(CreateTooltipCollisionSandbox());
+        stack.Controls.Add(CreatePopoverDemoRow());
         stack.Controls.Add(new Label
         {
             AutoSize = true,
@@ -215,6 +260,102 @@ public sealed class FeedbackDemoForm : Form
         stack.Controls.Add(CreateTooltipTimingRow());
         group.Controls.Add(stack);
         _content.Controls.Add(group);
+    }
+
+    private Panel CreateTooltipCollisionSandbox()
+    {
+        var sandbox = new Panel
+        {
+            Size = new Size(760, 150),
+            BorderStyle = BorderStyle.FixedSingle,
+            Margin = new Padding(3, 6, 3, 8),
+            AccessibleName = "Tooltip edge collision sandbox"
+        };
+        var topLeft = CreateTooltipTarget("Top flips", "Top edge tooltip target");
+        topLeft.Location = new Point(4, 4);
+        var topRight = CreateTooltipTarget("Auto", "Auto edge tooltip target");
+        topRight.Location = new Point(680, 4);
+        var bottomLeft = CreateTooltipTarget("Bottom flips", "Bottom edge tooltip target");
+        bottomLeft.Location = new Point(4, 115);
+        var bottomRight = CreateTooltipTarget("Wide shift", "Wide shift tooltip target");
+        bottomRight.Location = new Point(670, 115);
+        _managedTopTooltip.SetToolTip(topLeft, "Top placement should flip when the monitor working area has no room above.");
+        _managedAutoTooltip.SetToolTip(topRight, "Auto near a corner selects the best visible side.");
+        _managedBottomEndTooltip.SetToolTip(bottomLeft, "BottomEnd flips to TopEnd when needed.");
+        _managedBottomEndTooltip.SetToolTip(bottomRight, "A deliberately wide managed tooltip shifts on its cross axis to remain inside the padded working area.");
+        sandbox.Controls.Add(topLeft);
+        sandbox.Controls.Add(topRight);
+        sandbox.Controls.Add(bottomLeft);
+        sandbox.Controls.Add(bottomRight);
+        return sandbox;
+    }
+
+    private FlowLayoutPanel CreatePopoverDemoRow()
+    {
+        var row = CreateBadgeRow();
+        var target = CreateTooltipTarget("Open interactive Popover", "Interactive Popover target");
+        _interactivePopover.Target = target;
+        var placement = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 100,
+            AccessibleName = "Popover placement"
+        };
+        placement.Items.AddRange(new object[] { "Auto", "Top", "Bottom", "Left", "Right" });
+        placement.SelectedIndex = 0;
+        placement.SelectedIndexChanged += (_, _) =>
+            _interactivePopover.Placement = (BootstrapOverlayPlacement)Enum.Parse(typeof(BootstrapOverlayPlacement), placement.SelectedItem!.ToString()!);
+        var collision = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 110,
+            AccessibleName = "Popover collision behavior"
+        };
+        collision.Items.AddRange(new object[] { "None", "Flip", "Shift", "FlipAndShift" });
+        collision.SelectedIndex = 3;
+        collision.SelectedIndexChanged += (_, _) =>
+            _interactivePopover.CollisionBehavior = (BootstrapOverlayCollisionBehavior)Enum.Parse(typeof(BootstrapOverlayCollisionBehavior), collision.SelectedItem!.ToString()!);
+        var outside = new CheckBox { AutoSize = true, Text = "Outside close", Checked = true, AccessibleName = "Popover outside close" };
+        outside.CheckedChanged += (_, _) => _interactivePopover.CloseOnClickOutside = outside.Checked;
+        var escape = new CheckBox { AutoSize = true, Text = "Escape close", Checked = true, AccessibleName = "Popover escape close" };
+        escape.CheckedChanged += (_, _) => _interactivePopover.CloseOnEscape = escape.Checked;
+        _popoverStatus.AutoSize = true;
+        _popoverStatus.AccessibleName = "Popover interaction status";
+        _popoverStatus.Text = "Popover action not used yet.";
+        row.Controls.Add(target);
+        row.Controls.Add(placement);
+        row.Controls.Add(collision);
+        row.Controls.Add(outside);
+        row.Controls.Add(escape);
+        row.Controls.Add(_popoverStatus);
+        return row;
+    }
+
+    private FlowLayoutPanel CreateInteractivePopoverContent()
+    {
+        var content = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            MinimumSize = new Size(280, 0),
+            AccessibleName = "Interactive Popover content"
+        };
+        var heading = new Label { AutoSize = true, Text = "Interactive settings", AccessibleName = "Popover heading" };
+        var editor = new TextBox { Width = 240, Text = "Draft value", AccessibleName = "Popover text editor" };
+        var checkBox = new CheckBox { AutoSize = true, Text = "Enable option", AccessibleName = "Popover option" };
+        var commands = CreateBadgeRow();
+        var apply = CreateActionButton("Apply", "Popover apply action", (_, _) =>
+            _popoverStatus.Text = checkBox.Checked ? "Popover value applied with option." : "Popover value applied.");
+        var close = CreateActionButton("Close", "Popover close action", (_, _) => _interactivePopover.Hide());
+        commands.Controls.Add(apply);
+        commands.Controls.Add(close);
+        content.Controls.Add(heading);
+        content.Controls.Add(editor);
+        content.Controls.Add(checkBox);
+        content.Controls.Add(commands);
+        return content;
     }
 
     private void AddToastsSection()

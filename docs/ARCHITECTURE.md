@@ -91,6 +91,21 @@ The diagram shows conceptual dependencies, not necessarily direct assembly refer
 
 `BootstrapDropdown` is a native command-popup composition. It depends on a caller-owned `BootstrapButton` only as target/anchor and as the source of `IIconRenderer`; it owns exactly one native `ToolStripDropDownMenu` plus one internal `BootstrapDropdownRenderer`. It does not replace ComboBox popup behavior, create a custom top-level form, install global hooks, or introduce a second message loop.
 
+Tooltip and Popover share one pure overlay placement foundation:
+
+```text
+Controls (BootstrapTooltip / BootstrapPopover)
+        +--> Rendering/BootstrapOverlayPlacementEngine
+        +--> existing Theme + Rendering + DPI helpers
+
+BootstrapPopover only
+        +--> internal ToolStripDropDown overlay host
+```
+
+`BootstrapOverlayPlacementEngine` consumes only screen-pixel geometry, placement/collision values, and RTL state. It cannot depend on concrete controls, `Screen`, themes, handles, or DPI scaling. Tooltip keeps one native `ToolTip`; only Popover uses the internal interactive host. A narrow Compatibility helper reads and corrects native overlay window rectangles without caching HWNDs: Popover reapplies the engine rectangle after `ToolStripDropDown` layout, while managed Tooltip obtains the current native Tooltip HWND from the owner-draw `Graphics` DC and applies the current request immediately after that paint completes. Invalid handles during teardown are no-ops.
+
+The runtime adapter preserves the engine contract exactly. `CollisionBehavior.None` may place an overlay outside the selected monitor working area, and `Flip` changes to the exact opposite side without an implicit cross-axis shift. Native window correction does not activate the overlay or change its Z-order.
+
 ## 5. Foundation responsibilities
 
 ### 5.1 Compatibility
@@ -249,6 +264,8 @@ ComboBox follows the same deterministic ownership rule: it subscribes once for s
 
 Dropdown subscribes once because an open native popup can outlive the target click that created its current snapshot. Theme changes while open regenerate only framework-owned menu images and invalidate/reapply token presentation. A closed Dropdown has no native rows to synchronize; its next opening resolves the current theme. Disposal removes the static subscription.
 
+Popover subscribes to the static theme event only while open. Closing/disposal removes that handler and the target/ancestor tracker. Tooltip continues resolving theme at popup/draw time without a static subscription.
+
 ## 8. Animation lifecycle
 
 A consumer starts animation only when it can render useful frames. On hide/dispose, it pauses/stops or releases the animation according to component semantics.
@@ -280,6 +297,8 @@ NumericBox owns its native `NumericUpDown` through normal WinForms containment a
 ComboBox owns no application items, `DataSource`, binding manager, popup window, native child window, or caller font. Paint-time `Brush`, `Pen`, `GraphicsPath`, and `Graphics` instances are scoped and disposed immediately; the only cross-lifetime resource is its framework-created theme font plus the deterministic theme subscription.
 
 Dropdown owns its one `ToolStripDropDownMenu`, transient native snapshot items, generated icon bitmaps, native event subscriptions, and theme subscription. It never owns the caller's `BootstrapButton`, `BootstrapDropdownItem` instances, icon descriptors, or icon renderer. Rebuild/theme refresh clears native image references before disposing bitmaps so ToolStrip cannot retain disposed image objects.
+
+Popover owns its internal surface, `ToolStripControlHost`, `ToolStripDropDown`, rounded regions, and open-only subscriptions. It never owns or disposes `Target` or `Content`; content is detached before owned popup infrastructure is disposed.
 
 ## 10. Designer architecture
 

@@ -1,8 +1,10 @@
 using System;
 using System.ComponentModel;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Compatibility;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -22,6 +24,16 @@ public class BootstrapTooltip : Component, IExtenderProvider
     private Color _customColor = Color.Empty;
     private int _borderRadius = -1;
     private Padding _contentPadding = CreateDefaultContentPadding();
+    private readonly HashSet<Control> _associatedControls = new HashSet<Control>();
+    private BootstrapTooltipPositioning _positioning = BootstrapTooltipPositioning.Native;
+    private BootstrapOverlayPlacement _placement = BootstrapOverlayPlacement.Top;
+    private BootstrapOverlayCollisionBehavior _collisionBehavior = BootstrapOverlayCollisionBehavior.FlipAndShift;
+    private int _offset = 6;
+    private int _boundaryPadding = 8;
+    private Control? _managedVisibleControl;
+    private Rectangle? _managedPopupBounds;
+    private int _managedPositionGeneration;
+    private bool _managedPositionQueued;
 
     /// <summary>
     /// Initializes a designer-safe tooltip extender that owns one native WinForms <see cref="ToolTip"/> instance.
@@ -118,6 +130,100 @@ public class BootstrapTooltip : Component, IExtenderProvider
     }
 
     /// <summary>
+    /// Gets or sets whether native or framework-managed popup placement is used.
+    /// </summary>
+    [Category("Behavior")]
+    [Description("Selects native WinForms placement or explicit framework-managed placement.")]
+    [DefaultValue(BootstrapTooltipPositioning.Native)]
+    public BootstrapTooltipPositioning Positioning
+    {
+        get => _positioning;
+        set
+        {
+            ValidatePositioning(value);
+            if (_positioning == value)
+            {
+                return;
+            }
+
+            _positioning = value;
+            if (value == BootstrapTooltipPositioning.Managed)
+            {
+                AttachManagedHandlersToAssociatedControls();
+            }
+            else
+            {
+                HideManagedTooltip(_managedVisibleControl);
+                DetachManagedHandlersFromAssociatedControls();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the preferred placement used by managed positioning.
+    /// </summary>
+    [Category("Behavior")]
+    [Description("Selects the preferred side and alignment for managed tooltip placement.")]
+    [DefaultValue(BootstrapOverlayPlacement.Top)]
+    public BootstrapOverlayPlacement Placement
+    {
+        get => _placement;
+        set
+        {
+            ValidatePlacement(value);
+            _placement = value;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the collision correction used by managed positioning.
+    /// </summary>
+    [Category("Behavior")]
+    [Description("Selects flip and shift collision behavior for managed tooltip placement.")]
+    [DefaultValue(BootstrapOverlayCollisionBehavior.FlipAndShift)]
+    public BootstrapOverlayCollisionBehavior CollisionBehavior
+    {
+        get => _collisionBehavior;
+        set
+        {
+            ValidateCollisionBehavior(value);
+            _collisionBehavior = value;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the non-negative logical 96-DPI gap between the target and managed tooltip.
+    /// </summary>
+    [Category("Layout")]
+    [Description("Sets the logical gap between the managed tooltip and its target.")]
+    [DefaultValue(6)]
+    public int Offset
+    {
+        get => _offset;
+        set
+        {
+            ValidateNonNegative(value, nameof(value), "Tooltip offset cannot be negative.");
+            _offset = value;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the non-negative logical 96-DPI inset from the current screen working area.
+    /// </summary>
+    [Category("Layout")]
+    [Description("Sets the logical collision inset from the current screen working area.")]
+    [DefaultValue(8)]
+    public int BoundaryPadding
+    {
+        get => _boundaryPadding;
+        set
+        {
+            ValidateNonNegative(value, nameof(value), "Tooltip boundary padding cannot be negative.");
+            _boundaryPadding = value;
+        }
+    }
+
+    /// <summary>
     /// Gets or sets the native delay, in milliseconds, before the tooltip first appears.
     /// </summary>
     [Category("Behavior")]
@@ -200,6 +306,20 @@ public class BootstrapTooltip : Component, IExtenderProvider
         }
 
         _toolTip.SetToolTip(control, caption);
+        if (caption.Length == 0)
+        {
+            HideManagedTooltip(control);
+            DetachManagedTargetHandlers(control);
+            _associatedControls.Remove(control);
+        }
+        else
+        {
+            _associatedControls.Add(control);
+            if (_positioning == BootstrapTooltipPositioning.Managed)
+            {
+                AttachManagedTargetHandlers(control);
+            }
+        }
     }
 
     /// <summary>
@@ -223,6 +343,9 @@ public class BootstrapTooltip : Component, IExtenderProvider
         if (disposing && !_disposed)
         {
             _disposed = true;
+            HideManagedTooltip(_managedVisibleControl);
+            DetachManagedHandlersFromAssociatedControls();
+            _associatedControls.Clear();
             _toolTip.Popup -= OnToolTipPopup;
             _toolTip.Draw -= OnToolTipDraw;
             _toolTip.Dispose();
@@ -239,17 +362,151 @@ public class BootstrapTooltip : Component, IExtenderProvider
             return;
         }
 
-        var caption = _toolTip.GetToolTip(associatedControl);
+        var caption = _toolTip.GetToolTip(associatedControl) ?? string.Empty;
+        var popupSize = MeasurePopupSize(associatedControl, caption);
+        e.ToolTipSize = popupSize;
+
+        if (_positioning == BootstrapTooltipPositioning.Native)
+        {
+            _managedPopupBounds = null;
+            _managedVisibleControl = null;
+            return;
+        }
+
+        _managedVisibleControl = associatedControl;
+        _managedPopupBounds = CalculateManagedPopupBounds(associatedControl, popupSize);
+        unchecked
+        {
+            _managedPositionGeneration++;
+        }
+
+        _managedPositionQueued = false;
+    }
+
+    private Size MeasurePopupSize(Control associatedControl, string caption)
+    {
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = GetControlDpi(associatedControl);
         using var font = CreateFont(theme.Typography.BodySmall);
         var measuredText = TextRenderer.MeasureText(caption, font, Size.Empty, ToolTipTextFlags);
         var metrics = BootstrapTooltipRenderLogic.ResolveMetrics(theme.Metrics, _contentPadding, _borderRadius, dpi);
-        e.ToolTipSize = BootstrapTooltipRenderLogic.CalculatePopupSize(measuredText, metrics);
+        return BootstrapTooltipRenderLogic.CalculatePopupSize(measuredText, metrics);
+    }
+
+    private Rectangle CalculateManagedPopupBounds(Control control, Size popupSize)
+    {
+        var anchorBounds = control.RectangleToScreen(control.ClientRectangle);
+        var dpi = GetControlDpi(control);
+        var request = new BootstrapOverlayPlacementRequest(
+            anchorBounds,
+            popupSize,
+            Screen.FromRectangle(anchorBounds).WorkingArea,
+            _placement,
+            _collisionBehavior,
+            DpiScaler.Scale(_offset, dpi),
+            DpiScaler.Scale(_boundaryPadding, dpi),
+            control.RightToLeft == RightToLeft.Yes);
+        return BootstrapOverlayPlacementEngine.Compute(request).Bounds;
+    }
+
+    private void AttachManagedHandlersToAssociatedControls()
+    {
+        var controls = new List<Control>(_associatedControls);
+        foreach (var control in controls)
+        {
+            if (control.IsDisposed)
+            {
+                _associatedControls.Remove(control);
+            }
+            else
+            {
+                AttachManagedTargetHandlers(control);
+            }
+        }
+    }
+
+    private void DetachManagedHandlersFromAssociatedControls()
+    {
+        foreach (var control in _associatedControls)
+        {
+            DetachManagedTargetHandlers(control);
+        }
+    }
+
+    private void AttachManagedTargetHandlers(Control control)
+    {
+        DetachManagedTargetHandlers(control);
+        control.MouseLeave += OnManagedTargetMouseLeave;
+        control.MouseDown += OnManagedTargetMouseDown;
+        control.VisibleChanged += OnManagedTargetVisibleChanged;
+        control.Disposed += OnManagedTargetDisposed;
+    }
+
+    private void DetachManagedTargetHandlers(Control control)
+    {
+        control.MouseLeave -= OnManagedTargetMouseLeave;
+        control.MouseDown -= OnManagedTargetMouseDown;
+        control.VisibleChanged -= OnManagedTargetVisibleChanged;
+        control.Disposed -= OnManagedTargetDisposed;
+    }
+
+    private void OnManagedTargetMouseLeave(object? sender, EventArgs e)
+    {
+        HideManagedTooltip(sender as Control);
+    }
+
+    private void OnManagedTargetMouseDown(object? sender, MouseEventArgs e)
+    {
+        HideManagedTooltip(sender as Control);
+    }
+
+    private void OnManagedTargetVisibleChanged(object? sender, EventArgs e)
+    {
+        var control = sender as Control;
+        if (control is not null && !control.Visible)
+        {
+            HideManagedTooltip(control);
+        }
+    }
+
+    private void OnManagedTargetDisposed(object? sender, EventArgs e)
+    {
+        var control = sender as Control;
+        if (control is null)
+        {
+            return;
+        }
+
+        HideManagedTooltip(control);
+        DetachManagedTargetHandlers(control);
+        _associatedControls.Remove(control);
+    }
+
+    private void HideManagedTooltip(Control? control)
+    {
+        if (control is null || !ReferenceEquals(control, _managedVisibleControl))
+        {
+            return;
+        }
+
+        _managedVisibleControl = null;
+        _managedPopupBounds = null;
+        unchecked
+        {
+            _managedPositionGeneration++;
+        }
+
+        _managedPositionQueued = false;
+
+        if (!_disposed && !control.IsDisposed)
+        {
+            _toolTip.Hide(control);
+        }
     }
 
     private void OnToolTipDraw(object? sender, DrawToolTipEventArgs e)
     {
+        ApplyManagedPopupBounds(e);
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = GetControlDpi(e.AssociatedControl);
         var palette = BootstrapTooltipRenderLogic.ResolvePalette(theme.Colors, _variant, _customColor);
@@ -301,6 +558,59 @@ public class BootstrapTooltip : Component, IExtenderProvider
             ToolTipTextFlags);
     }
 
+    private void ApplyManagedPopupBounds(DrawToolTipEventArgs e)
+    {
+        if (_disposed ||
+            _positioning != BootstrapTooltipPositioning.Managed ||
+            !_managedPopupBounds.HasValue ||
+            !ReferenceEquals(e.AssociatedControl, _managedVisibleControl))
+        {
+            return;
+        }
+
+        var windowHandle = BootstrapOverlayWindowBounds.GetWindowHandle(e.Graphics);
+        var requestedBounds = _managedPopupBounds.Value;
+        if (BootstrapOverlayWindowBounds.TryGetBounds(windowHandle, out var actualBounds) && actualBounds == requestedBounds)
+        {
+            return;
+        }
+
+        if (_managedPositionQueued || e.AssociatedControl is null || !e.AssociatedControl.IsHandleCreated)
+        {
+            return;
+        }
+
+        var control = e.AssociatedControl;
+        var generation = _managedPositionGeneration;
+        _managedPositionQueued = true;
+        try
+        {
+            control.BeginInvoke((Action)(() => ApplyQueuedManagedPopupBounds(control, windowHandle, requestedBounds, generation)));
+        }
+        catch (InvalidOperationException)
+        {
+            _managedPositionQueued = false;
+        }
+    }
+
+    private void ApplyQueuedManagedPopupBounds(Control control, IntPtr windowHandle, Rectangle requestedBounds, int generation)
+    {
+        if (_disposed ||
+            generation != _managedPositionGeneration ||
+            _positioning != BootstrapTooltipPositioning.Managed ||
+            !ReferenceEquals(control, _managedVisibleControl) ||
+            !_managedPopupBounds.HasValue ||
+            _managedPopupBounds.Value != requestedBounds ||
+            control.IsDisposed ||
+            !control.Visible)
+        {
+            return;
+        }
+
+        _managedPositionQueued = false;
+        BootstrapOverlayWindowBounds.TrySetBounds(windowHandle, requestedBounds);
+    }
+
     private static Padding CreateDefaultContentPadding()
     {
         var metrics = BootstrapThemeMetrics.Default;
@@ -332,6 +642,38 @@ public class BootstrapTooltip : Component, IExtenderProvider
         if (padding.Left < 0 || padding.Top < 0 || padding.Right < 0 || padding.Bottom < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(padding), padding, "Tooltip content padding cannot contain negative edges.");
+        }
+    }
+
+    private static void ValidatePositioning(BootstrapTooltipPositioning positioning)
+    {
+        if (positioning < BootstrapTooltipPositioning.Native || positioning > BootstrapTooltipPositioning.Managed)
+        {
+            throw new ArgumentOutOfRangeException(nameof(positioning), positioning, "Unsupported tooltip positioning mode.");
+        }
+    }
+
+    private static void ValidatePlacement(BootstrapOverlayPlacement placement)
+    {
+        if (placement < BootstrapOverlayPlacement.Auto || placement > BootstrapOverlayPlacement.RightEnd)
+        {
+            throw new ArgumentOutOfRangeException(nameof(placement), placement, "Unsupported overlay placement.");
+        }
+    }
+
+    private static void ValidateCollisionBehavior(BootstrapOverlayCollisionBehavior collisionBehavior)
+    {
+        if (collisionBehavior < BootstrapOverlayCollisionBehavior.None || collisionBehavior > BootstrapOverlayCollisionBehavior.FlipAndShift)
+        {
+            throw new ArgumentOutOfRangeException(nameof(collisionBehavior), collisionBehavior, "Unsupported overlay collision behavior.");
+        }
+    }
+
+    private static void ValidateNonNegative(int value, string parameterName, string message)
+    {
+        if (value < 0)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, value, message);
         }
     }
 }

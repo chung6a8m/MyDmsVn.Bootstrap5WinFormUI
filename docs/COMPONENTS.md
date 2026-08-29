@@ -539,7 +539,7 @@ Manual verification: choose **Feedback** in the integrated demo. Compare all eig
 
 ## BootstrapTooltip
 
-Responsibility: provide Bootstrap-inspired tooltip presentation while preserving the native WinForms `ToolTip` association, popup-placement, delay, and lifecycle model.
+Responsibility: provide Bootstrap-inspired text-only tooltip presentation while preserving native association, delay, drawing, and lifecycle behavior. Native placement remains the default; managed placement is opt-in.
 
 Stage 3 of the component-expansion roadmap finalizes the public concepts as:
 
@@ -555,6 +555,11 @@ BootstrapTooltip.ReshowDelay
 BootstrapTooltip.AutoPopDelay
 BootstrapTooltip.Active
 BootstrapTooltip.ShowAlways
+BootstrapTooltip.Positioning
+BootstrapTooltip.Placement
+BootstrapTooltip.CollisionBehavior
+BootstrapTooltip.Offset
+BootstrapTooltip.BoundaryPadding
 BootstrapTooltip.CanExtend(object)
 BootstrapTooltip.SetToolTip(Control, string)
 BootstrapTooltip.GetToolTip(Control)
@@ -562,7 +567,9 @@ BootstrapTooltip.GetToolTip(Control)
 
 Behavior:
 
-- `BootstrapTooltip` owns exactly one native WinForms `ToolTip`; it does not subclass `ToolTip`, create a custom popup `Form`, introduce overlay/queue infrastructure, or implement a second scheduling model.
+- `BootstrapTooltip` owns exactly one native WinForms `ToolTip`; it does not subclass `ToolTip`, create a custom popup `Form`, expose public Show/Hide, accept focusable content, or implement a second scheduler.
+- `Positioning = Native` is the backward-compatible default. `Managed` retains native association, timing, popup notification, owner drawing, and lifetime. Popup measures and records the shared placement-engine result; Draw obtains the current native Tooltip HWND from its graphics DC and queues the exact rectangle for immediately after the current paint. This avoids paint reentrancy and does not cancel or reissue the native popup.
+- Managed positioning supports Auto and explicit Top/Bottom/Left/Right alignment families, None/Flip/Shift/FlipAndShift, logical Offset and BoundaryPadding, RTL Start/End, negative desktop coordinates, and deterministic overflow handling. `None` may overflow the working area, while `Flip` changes only to the exact opposite side without an implicit cross-axis shift.
 - The wrapper is an extender provider through `[ProvideProperty("ToolTip", typeof(Control))]`. `CanExtend` accepts WinForms `Control` instances, while `SetToolTip`/`GetToolTip` delegate association storage to the native ToolTip as the single source of truth. Empty captions remove the native association and explicit newline characters are preserved.
 - The parameterless constructor is designer-safe. `BootstrapTooltip(IContainer)` adds only the wrapper to the supplied container; the inner native ToolTip remains privately owned and is disposed exactly once by the wrapper.
 - The native ToolTip is configured internally with `OwnerDraw = true` and `IsBalloon = false`. Those implementation details, the native ToolTip itself, Popup/Draw events, `Show`/`Hide`, animation/fading/title/icon APIs, and other unplanned native surface are not re-exposed.
@@ -572,9 +579,38 @@ Behavior:
 - Popup measurement and Draw rendering resolve `BootstrapThemeManager.CurrentTheme` at event time instead of subscribing to `ThemeChanged`. Text uses the current `Typography.BodySmall`; temporary fonts and all GDI resources are scoped to the event.
 - `BootstrapTooltipRenderLogic`, `BootstrapTooltipPalette`, and `BootstrapTooltipRenderMetrics` remain internal pure helpers. They reuse `BootstrapVariantColorResolver`, `ColorUtil`, `DpiScaler`, `RoundedPath`, and `CornerRadius`; popup sizing and text-bounds calculations clamp malformed/tiny geometry without negative sizes.
 - Content padding, border width, and radius scale from the associated control's `DeviceDpi`, falling back to 96 DPI when necessary. The framework does not impose automatic word wrapping: owner-drawn measurement/rendering uses `TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding`, while explicit newlines remain supported.
-- Disposal detaches the owned native Popup/Draw handlers, disposes the native ToolTip idempotently, and adds no static theme subscription or other process-lifetime root.
+- Mouse leave/down, target hiding or disposal, switching to Native positioning, and component disposal invalidate the pending managed request before native Hide/teardown. A queued bounds correction validates its request generation and never starts a second popup. Disposal detaches the owned native Popup/Draw handlers, disposes the native ToolTip idempotently, and adds no static theme subscription or other process-lifetime root.
 
 Manual verification: stay on **Feedback** and hover the default Dark, same-instance second target, semantic Info, custom-color, multiline, and long-caption examples. Change Initial/Reshow/Auto-pop delays and Active/Show always live. Switch Light/Dark while the page stays open and repeat at 100/125/150/175/200% real Windows scaling. Confirm native popup positioning/timing remains intact, explicit newlines render, long captions are not framework-wrapped, padding/border/radius scale cleanly, and the same Tooltip can serve multiple controls.
+
+## BootstrapPopover
+
+Responsibility: host arbitrary focusable caller content in a non-modal Bootstrap-inspired native popup without changing Tooltip semantics.
+
+Public concepts:
+
+```text
+BootstrapPopover.Target / Content
+BootstrapPopover.Trigger
+BootstrapPopover.Placement / CollisionBehavior
+BootstrapPopover.Offset / BoundaryPadding
+BootstrapPopover.ContentPadding / BorderRadius
+BootstrapPopover.CloseOnEscape / CloseOnClickOutside
+BootstrapPopover.IsOpen
+BootstrapPopover.Opened / Closed
+BootstrapPopover.Show() / Hide() / Toggle()
+```
+
+Behavior:
+
+- Target and Content are caller-owned and never disposed by Popover. Content must be live and unparented when assigned; it is parented to the private surface while assigned, detached when replaced/disposed, and cannot be replaced while open.
+- Click trigger toggles from Target activation; Manual has no target Click subscription. External Target/Content disposal first detaches and clears the exact disposed object, then closes, so a replacement assigned reentrantly from `Closed` remains attached and subscribed.
+- Placement/collision semantics are identical to managed Tooltip through the pure internal engine. Logical spacing is scaled at target DPI before screen-pixel computation against `Screen.FromRectangle(anchor).WorkingArea`; `None` may overflow and `Flip` does not add cross-axis shifting.
+- The host is one internal `ToolStripDropDown` plus `ToolStripControlHost` and themed rounded surface. It applies the engine's exact position and size directly to the current native HWND after WinForms show/layout and during movement. No custom Form, global hook, timer, animation engine, or public native host is introduced.
+- Native AutoClose owns outside-click dismissal. Escape restores focus to a live Target; outside-click does not steal focus back. Focus selection checks the Content root first, then follows each container's native tab order while skipping invisible, disabled, non-tab-stop, or non-selectable controls.
+- An open-only tracker follows Target/ancestor/form movement, scrolling, parent/visibility/disposal, theme, and current DPI signals. Close/disposal removes every transient/static subscription.
+
+Manual verification: use the Feedback edge sandbox and interactive content. Verify keyboard/content interaction, Escape/outside-click focus, placement/collision changes, form movement, ancestor scrolling, Light/Dark, 100–200% DPI, mixed-DPI and negative-coordinate monitors, and repeated open/close without losing caller content state.
 
 ## BootstrapTabControl
 
