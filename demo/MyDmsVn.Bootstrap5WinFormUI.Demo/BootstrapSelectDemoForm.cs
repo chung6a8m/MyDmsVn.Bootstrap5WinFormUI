@@ -159,7 +159,7 @@ public sealed class BootstrapSelectDemoForm : Form
         asyncSingle.SelectionChanged += (_, _) =>
             _asyncSingleStatus.Text = "Selected: " + (asyncSingle.SelectedItem?.Text ?? "none");
         AddScenario(grid, "Async single / delayed provider / paging", asyncSingle, _asyncSingleStatus,
-            "The provider is transport-agnostic. The control owns debounce, cancellation, stale-generation rejection, paging and selection snapshots.");
+            "The provider has more than 200 deterministic in-memory rows. The control owns debounce, cancellation, stale-generation rejection, paging and selection snapshots.");
 
         var asyncMultiple = new BootstrapSelect
         {
@@ -173,7 +173,7 @@ public sealed class BootstrapSelectDemoForm : Form
             AccessibleName = "Async multiple customer select"
         };
         _asyncMultipleStatus.AutoSize = true;
-        _asyncMultipleStatus.Text = "Type 'retry', then scroll to page 2: the demo provider fails once and the retry row reloads the same page.";
+        _asyncMultipleStatus.Text = "Type 'fail-first' for a one-shot page-1 error, or 'retry' and scroll to page 2 for a later-page retry.";
         asyncMultiple.SearchFailed += (_, e) =>
             _asyncMultipleStatus.Text = "Expected demo failure on page " + e.Page + ". Activate the retry row.";
         asyncMultiple.SearchCompleted += (_, e) =>
@@ -191,13 +191,13 @@ public sealed class BootstrapSelectDemoForm : Form
             }
         };
         AddScenario(grid, "Async multiple / failure + retry", asyncMultiple, _asyncMultipleStatus,
-            "Search 'retry' to exercise later-page failure/retry. Search 'race' and type rapidly to exercise stale-result protection.");
+            "Search 'fail-first' to retry page 1, 'retry' to retry a later page, or 'race' and type rapidly to exercise stale-result protection.");
 
         var note = new Label
         {
             AutoSize = true,
             MaximumSize = new Size(850, 0),
-            Text = "Manual matrix: switch Light/Dark in the integrated header; test keyboard-only open/search/navigation/select/deselect/clear/close; move the host near screen edges; and repeat at 100%, 125%, 150%, and 200% Windows scaling."
+            Text = "Manual matrix: switch Light/Dark in the integrated header; test keyboard-only open/search/navigation/select/deselect/clear/close and Vietnamese IME input; move the host near screen edges and across monitors; repeat at 100%, 125%, 150%, and 200% Windows scaling."
         };
         grid.Controls.Add(note, 0, grid.RowCount);
         grid.SetColumnSpan(note, 2);
@@ -290,6 +290,7 @@ public sealed class BootstrapSelectDemoForm : Form
     private sealed class DemoSelectProvider : IBootstrapSelectDataProvider
     {
         private readonly List<BootstrapSelectItem> _items;
+        private int _firstPageFailureIssued;
         private int _retryFailureIssued;
 
         internal DemoSelectProvider()
@@ -303,15 +304,23 @@ public sealed class BootstrapSelectDemoForm : Form
                 });
             }
 
-            for (var i = 1; i <= 18; i++)
+            for (var i = 1; i <= 36; i++)
             {
-                _items.Add(new BootstrapSelectItem(1000 + i, "Retry sample " + i.ToString("00"))
+                _items.Add(new BootstrapSelectItem(800 + i, "Fail-first sample " + i.ToString("00"))
                 {
-                    Group = "Retry samples"
+                    Group = "First-page retry samples"
                 });
             }
 
-            for (var i = 1; i <= 12; i++)
+            for (var i = 1; i <= 48; i++)
+            {
+                _items.Add(new BootstrapSelectItem(1000 + i, "Retry sample " + i.ToString("00"))
+                {
+                    Group = "Later-page retry samples"
+                });
+            }
+
+            for (var i = 1; i <= 24; i++)
             {
                 _items.Add(new BootstrapSelectItem(2000 + i, "Race sample " + i.ToString("00"))
                 {
@@ -334,6 +343,13 @@ public sealed class BootstrapSelectDemoForm : Form
             else
             {
                 await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (string.Equals(searchText, "fail-first", StringComparison.OrdinalIgnoreCase)
+                && query.Page == 1
+                && Interlocked.Exchange(ref _firstPageFailureIssued, 1) == 0)
+            {
+                throw new InvalidOperationException("Demo page-1 failure. Activate the retry row to rerun the same query.");
             }
 
             if (string.Equals(searchText, "retry", StringComparison.OrdinalIgnoreCase)
