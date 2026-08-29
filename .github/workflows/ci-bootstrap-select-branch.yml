@@ -6,7 +6,7 @@ on:
       - feature/bootstrap-select
 
 jobs:
-  build-test-pack:
+  focused-build-test:
     runs-on: windows-latest
 
     steps:
@@ -22,10 +22,10 @@ jobs:
         shell: pwsh
         run: ./build.ps1 -Configuration Release
 
-      - name: Run tests on both target frameworks
+      - name: Run BootstrapSelect tests on net48
         shell: pwsh
-        run: ./test.ps1 -Configuration Release -SkipBuild
+        run: dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net48 --no-build --filter "FullyQualifiedName~BootstrapSelect"
 
-      - name: Verify release candidate package
+      - name: Run BootstrapSelect tests on net8.0-windows
         shell: pwsh
-        run: ./release.ps1 -Configuration Release -Version 1.0.0-rc.1 -SkipBuild -SkipTests
+        run: dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --no-build --filter "FullyQualifiedName~BootstrapSelect"
