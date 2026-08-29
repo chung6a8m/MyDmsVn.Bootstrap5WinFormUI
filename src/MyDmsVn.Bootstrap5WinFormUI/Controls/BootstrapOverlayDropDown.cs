@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Compatibility;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
@@ -35,12 +36,19 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
     {
         ApplyBounds(screenBounds);
         Show(screenBounds.Location);
+        if (IsHandleCreated)
+        {
+            BootstrapOverlayWindowBounds.TrySetBounds(Handle, screenBounds);
+        }
     }
 
     public void MoveTo(Rectangle screenBounds)
     {
         ApplyBounds(screenBounds);
-        Location = screenBounds.Location;
+        if (IsHandleCreated)
+        {
+            BootstrapOverlayWindowBounds.TrySetBounds(Handle, screenBounds);
+        }
     }
 
     protected override bool ProcessCmdKey(ref Message m, Keys keyData)

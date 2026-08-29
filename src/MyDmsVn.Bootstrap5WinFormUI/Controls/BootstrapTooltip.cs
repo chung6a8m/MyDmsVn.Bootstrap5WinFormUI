@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Compatibility;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -29,8 +30,10 @@ public class BootstrapTooltip : Component, IExtenderProvider
     private BootstrapOverlayCollisionBehavior _collisionBehavior = BootstrapOverlayCollisionBehavior.FlipAndShift;
     private int _offset = 6;
     private int _boundaryPadding = 8;
-    private bool _managedShowInProgress;
     private Control? _managedVisibleControl;
+    private Rectangle? _managedPopupBounds;
+    private int _managedPositionGeneration;
+    private bool _managedPositionQueued;
 
     /// <summary>
     /// Initializes a designer-safe tooltip extender that owns one native WinForms <see cref="ToolTip"/> instance.
@@ -363,13 +366,21 @@ public class BootstrapTooltip : Component, IExtenderProvider
         var popupSize = MeasurePopupSize(associatedControl, caption);
         e.ToolTipSize = popupSize;
 
-        if (_positioning == BootstrapTooltipPositioning.Native || _managedShowInProgress)
+        if (_positioning == BootstrapTooltipPositioning.Native)
         {
+            _managedPopupBounds = null;
+            _managedVisibleControl = null;
             return;
         }
 
-        e.Cancel = true;
-        QueueManagedShow(associatedControl, caption, popupSize);
+        _managedVisibleControl = associatedControl;
+        _managedPopupBounds = CalculateManagedPopupBounds(associatedControl, popupSize);
+        unchecked
+        {
+            _managedPositionGeneration++;
+        }
+
+        _managedPositionQueued = false;
     }
 
     private Size MeasurePopupSize(Control associatedControl, string caption)
@@ -382,38 +393,7 @@ public class BootstrapTooltip : Component, IExtenderProvider
         return BootstrapTooltipRenderLogic.CalculatePopupSize(measuredText, metrics);
     }
 
-    private void QueueManagedShow(Control control, string caption, Size popupSize)
-    {
-        if (_disposed || control.IsDisposed || !control.IsHandleCreated || caption.Length == 0)
-        {
-            return;
-        }
-
-        try
-        {
-            control.BeginInvoke((Action)(() =>
-            {
-                if (_disposed || _positioning != BootstrapTooltipPositioning.Managed || control.IsDisposed || !control.Visible)
-                {
-                    return;
-                }
-
-                var currentCaption = _toolTip.GetToolTip(control) ?? string.Empty;
-                if (!string.Equals(currentCaption, caption, StringComparison.Ordinal))
-                {
-                    return;
-                }
-
-                ShowManagedTooltip(control, caption, popupSize);
-            }));
-        }
-        catch (InvalidOperationException)
-        {
-            // Handle teardown raced the posted managed show.
-        }
-    }
-
-    private void ShowManagedTooltip(Control control, string caption, Size popupSize)
+    private Rectangle CalculateManagedPopupBounds(Control control, Size popupSize)
     {
         var anchorBounds = control.RectangleToScreen(control.ClientRectangle);
         var dpi = GetControlDpi(control);
@@ -426,19 +406,7 @@ public class BootstrapTooltip : Component, IExtenderProvider
             DpiScaler.Scale(_offset, dpi),
             DpiScaler.Scale(_boundaryPadding, dpi),
             control.RightToLeft == RightToLeft.Yes);
-        var result = BootstrapOverlayPlacementEngine.Compute(request);
-        var relativePoint = control.PointToClient(result.Bounds.Location);
-
-        _managedShowInProgress = true;
-        try
-        {
-            _toolTip.Show(caption, control, relativePoint, _toolTip.AutoPopDelay);
-            _managedVisibleControl = control;
-        }
-        finally
-        {
-            _managedShowInProgress = false;
-        }
+        return BootstrapOverlayPlacementEngine.Compute(request).Bounds;
     }
 
     private void AttachManagedHandlersToAssociatedControls()
@@ -521,16 +489,24 @@ public class BootstrapTooltip : Component, IExtenderProvider
             return;
         }
 
-        if (!control.IsDisposed)
+        _managedVisibleControl = null;
+        _managedPopupBounds = null;
+        unchecked
+        {
+            _managedPositionGeneration++;
+        }
+
+        _managedPositionQueued = false;
+
+        if (!_disposed && !control.IsDisposed)
         {
             _toolTip.Hide(control);
         }
-
-        _managedVisibleControl = null;
     }
 
     private void OnToolTipDraw(object? sender, DrawToolTipEventArgs e)
     {
+        ApplyManagedPopupBounds(e);
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = GetControlDpi(e.AssociatedControl);
         var palette = BootstrapTooltipRenderLogic.ResolvePalette(theme.Colors, _variant, _customColor);
@@ -580,6 +556,59 @@ public class BootstrapTooltip : Component, IExtenderProvider
             textBounds,
             palette.Foreground,
             ToolTipTextFlags);
+    }
+
+    private void ApplyManagedPopupBounds(DrawToolTipEventArgs e)
+    {
+        if (_disposed ||
+            _positioning != BootstrapTooltipPositioning.Managed ||
+            !_managedPopupBounds.HasValue ||
+            !ReferenceEquals(e.AssociatedControl, _managedVisibleControl))
+        {
+            return;
+        }
+
+        var windowHandle = BootstrapOverlayWindowBounds.GetWindowHandle(e.Graphics);
+        var requestedBounds = _managedPopupBounds.Value;
+        if (BootstrapOverlayWindowBounds.TryGetBounds(windowHandle, out var actualBounds) && actualBounds == requestedBounds)
+        {
+            return;
+        }
+
+        if (_managedPositionQueued || e.AssociatedControl is null || !e.AssociatedControl.IsHandleCreated)
+        {
+            return;
+        }
+
+        var control = e.AssociatedControl;
+        var generation = _managedPositionGeneration;
+        _managedPositionQueued = true;
+        try
+        {
+            control.BeginInvoke((Action)(() => ApplyQueuedManagedPopupBounds(control, windowHandle, requestedBounds, generation)));
+        }
+        catch (InvalidOperationException)
+        {
+            _managedPositionQueued = false;
+        }
+    }
+
+    private void ApplyQueuedManagedPopupBounds(Control control, IntPtr windowHandle, Rectangle requestedBounds, int generation)
+    {
+        if (_disposed ||
+            generation != _managedPositionGeneration ||
+            _positioning != BootstrapTooltipPositioning.Managed ||
+            !ReferenceEquals(control, _managedVisibleControl) ||
+            !_managedPopupBounds.HasValue ||
+            _managedPopupBounds.Value != requestedBounds ||
+            control.IsDisposed ||
+            !control.Visible)
+        {
+            return;
+        }
+
+        _managedPositionQueued = false;
+        BootstrapOverlayWindowBounds.TrySetBounds(windowHandle, requestedBounds);
     }
 
     private static Padding CreateDefaultContentPadding()

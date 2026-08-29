@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -16,6 +17,15 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapTooltipTests
 {
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRectangle
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     private BootstrapTheme? _originalTheme;
 
     [SetUp]
@@ -294,6 +304,138 @@ public sealed class BootstrapTooltipTests
         }));
     }
 
+    [Test]
+    public void ManagedPopupFollowedByMouseLeaveDoesNotPostASecondNativeShow()
+    {
+        AssertManagedPopupInvalidation((_, target) => target.RaiseMouseLeave());
+    }
+
+    [Test]
+    public void ManagedPopupFollowedByMouseDownDoesNotPostASecondNativeShow()
+    {
+        AssertManagedPopupInvalidation((_, target) => target.RaiseMouseDown());
+    }
+
+    [Test]
+    public void ManagedPopupFollowedByVisibilityRoundTripDoesNotPostASecondNativeShow()
+    {
+        AssertManagedPopupInvalidation((_, target) =>
+        {
+            target.Visible = false;
+            target.Visible = true;
+        });
+    }
+
+    [Test]
+    public void ManagedPopupFollowedByPositioningRoundTripDoesNotPostASecondNativeShow()
+    {
+        AssertManagedPopupInvalidation((tooltip, _) =>
+        {
+            tooltip.Positioning = BootstrapTooltipPositioning.Native;
+            tooltip.Positioning = BootstrapTooltipPositioning.Managed;
+        });
+    }
+
+    private static void AssertManagedPopupInvalidation(Action<BootstrapTooltip, ManagedTargetProbeControl> invalidate)
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var target = new ManagedTargetProbeControl { Size = new Size(100, 30) };
+        using var tooltip = new BootstrapTooltip { Positioning = BootstrapTooltipPositioning.Managed };
+        form.Controls.Add(target);
+        tooltip.SetToolTip(target, "Managed");
+        form.Show();
+        form.Activate();
+        Application.DoEvents();
+        var native = GetInnerToolTip(tooltip);
+        var nativePopupCount = 0;
+        native.Popup += (_, _) => nativePopupCount++;
+        var popup = new PopupEventArgs(form, target, false, new Size(80, 24));
+
+        InvokePrivate(tooltip, "OnToolTipPopup", native, popup);
+        invalidate(tooltip, target);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(popup.Cancel, Is.False);
+            Assert.That(nativePopupCount, Is.Zero);
+        }));
+    }
+
+    [Test]
+    public void ManagedPositioningAppliesEngineBoundsToActualNativeTooltipWindow()
+    {
+        var workingArea = Screen.PrimaryScreen!.WorkingArea;
+        using var form = new Form
+        {
+            Bounds = new Rectangle(workingArea.Right - 80, workingArea.Top + 160, 80, 60),
+            FormBorderStyle = FormBorderStyle.None,
+            ShowInTaskbar = false,
+            StartPosition = FormStartPosition.Manual,
+            TopMost = true
+        };
+        using var target = new Button { Dock = DockStyle.Fill };
+        using var tooltip = new BootstrapTooltip
+        {
+            Positioning = BootstrapTooltipPositioning.Managed,
+            Placement = BootstrapOverlayPlacement.Right,
+            CollisionBehavior = BootstrapOverlayCollisionBehavior.None,
+            Offset = 0,
+            BoundaryPadding = 0,
+            InitialDelay = 1,
+            ShowAlways = true
+        };
+        form.Controls.Add(target);
+        tooltip.SetToolTip(target, "Managed edge tooltip");
+        var native = GetInnerToolTip(tooltip);
+        var actualBounds = Rectangle.Empty;
+        var expectedBounds = Rectangle.Empty;
+        var captureQueued = false;
+        native.Popup += (_, e) =>
+        {
+            var anchor = target.RectangleToScreen(target.ClientRectangle);
+            expectedBounds = new Rectangle(
+                anchor.Right,
+                anchor.Top + ((anchor.Height - e.ToolTipSize.Height) / 2),
+                e.ToolTipSize.Width,
+                e.ToolTipSize.Height);
+        };
+        native.Draw += (_, e) =>
+        {
+            var windowHandle = GetWindowHandle(e.Graphics);
+            if (captureQueued)
+            {
+                return;
+            }
+
+            captureQueued = true;
+            target.BeginInvoke((Action)(() =>
+            {
+                actualBounds = GetWindowBounds(windowHandle);
+                native.Hide(target);
+                form.Close();
+            }));
+        };
+        form.Shown += (_, _) =>
+        {
+            form.Activate();
+            Cursor.Position = target.PointToScreen(new Point(target.Width / 2, target.Height / 2));
+            SendMessage(target.Handle, 0x0200, IntPtr.Zero, CreateMouseLParam(target.Width / 2, target.Height / 2));
+        };
+
+        var originalCursorPosition = Cursor.Position;
+        try
+        {
+            form.ShowDialog();
+        }
+        finally
+        {
+            Cursor.Position = originalCursorPosition;
+        }
+
+        Assert.That(actualBounds, Is.EqualTo(expectedBounds));
+    }
+
     private static ToolTip GetInnerToolTip(BootstrapTooltip tooltip)
     {
         var field = typeof(BootstrapTooltip).GetField("_toolTip", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -307,5 +449,61 @@ public sealed class BootstrapTooltipTests
         Assert.That(eventField, Is.Not.Null);
         var handler = eventField!.GetValue(null) as Delegate;
         return handler?.GetInvocationList().Length ?? 0;
+    }
+
+    private static void InvokePrivate(object instance, string methodName, params object?[] arguments)
+    {
+        var method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null);
+        method!.Invoke(instance, arguments);
+    }
+
+    private static IntPtr GetWindowHandle(Graphics graphics)
+    {
+        var hdc = graphics.GetHdc();
+        try
+        {
+            var handle = WindowFromDC(hdc);
+            Assert.That(handle, Is.Not.EqualTo(IntPtr.Zero));
+            return handle;
+        }
+        finally
+        {
+            graphics.ReleaseHdc(hdc);
+        }
+    }
+
+    private static Rectangle GetWindowBounds(IntPtr handle)
+    {
+        Assert.That(GetWindowRect(handle, out var bounds), Is.True);
+        return Rectangle.FromLTRB(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+    }
+
+    private sealed class ManagedTargetProbeControl : Control
+    {
+        public void RaiseMouseLeave()
+        {
+            OnMouseLeave(EventArgs.Empty);
+        }
+
+        public void RaiseMouseDown()
+        {
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, 1, 1, 0));
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromDC(IntPtr hdc);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr handle, out NativeRectangle bounds);
+
+    private static IntPtr CreateMouseLParam(int x, int y)
+    {
+        return (IntPtr)((y << 16) | (x & 0xffff));
     }
 }
