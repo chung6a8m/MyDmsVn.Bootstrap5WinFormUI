@@ -85,7 +85,7 @@ public sealed class BootstrapCalendarPickerTests
 
         foreach (var key in keys)
         {
-            SendKeys.SendWait(ToSendKeysSequence(key));
+            SendHostedKey(probe, key);
             Application.DoEvents();
         }
 
@@ -158,26 +158,18 @@ public sealed class BootstrapCalendarPickerTests
         SendMessage(control.Handle, 0x0202, IntPtr.Zero, lParam);
     }
 
-    private static string ToSendKeysSequence(Keys key)
+    private static void SendHostedKey(Control control, Keys key)
     {
-        return key switch
-        {
-            Keys.Left => "{LEFT}",
-            Keys.Right => "{RIGHT}",
-            Keys.Up => "{UP}",
-            Keys.Down => "{DOWN}",
-            Keys.PageUp => "{PGUP}",
-            Keys.PageDown => "{PGDN}",
-            Keys.Home => "{HOME}",
-            Keys.End => "{END}",
-            Keys.Enter => "{ENTER}",
-            Keys.Space => " ",
-            _ => throw new ArgumentOutOfRangeException(nameof(key), key, "Unsupported hosted-control key.")
-        };
+        Assert.That(PostMessage(control.Handle, 0x0100, (IntPtr)(int)key, IntPtr.Zero), Is.True);
+        Assert.That(PostMessage(control.Handle, 0x0101, (IntPtr)(int)key, IntPtr.Zero), Is.True);
     }
 
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PostMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
 
     private static IntPtr CreateMouseLParam(int x, int y)
     {
