@@ -62,9 +62,11 @@ public class BootstrapSelect : UserControl
             if (!Enum.IsDefined(typeof(BootstrapSelectMode), value)) throw new ArgumentOutOfRangeException(nameof(value));
             if (_selectionMode == value) return;
             var mutation = _selectionState.PreviewModeChange(value);
+            var changedSelection = mutation.RemovedItems.Count > 0;
             _selectionState.Apply(mutation);
             _selectionMode = value;
             Invalidate();
+            if (changedSelection) SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
