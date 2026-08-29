@@ -237,6 +237,159 @@ public sealed class BootstrapSplitButtonTests
         }));
     }
 
+    [Test]
+    public void MenuRegionAndPublicMethodsShareDropdownLifecycleWithoutRaisingPrimaryClick()
+    {
+        using var split = CreateSplitButton();
+        split.Text = "Save";
+        var items = GetProperty<BootstrapDropdownItemCollection>(split, "Items");
+        var nestedClicks = 0;
+        var parent = new BootstrapDropdownItem { Text = "More" };
+        var leaf = new BootstrapDropdownItem { Text = "Save as" };
+        leaf.Click += (_, _) => nestedClicks++;
+        parent.DropDownItems.Add(leaf);
+        items.Add(parent);
+        using var form = CreateHost(split);
+        var (primary, menu) = GetRegions(split);
+        var dropdown = GetOwnedDropdown(split);
+        var native = GetNativeDropDown(dropdown);
+        var primaryClicks = 0;
+        var opened = 0;
+        var closed = 0;
+        object? openedSender = null;
+        object? closedSender = null;
+        split.Click += (_, _) => primaryClicks++;
+        AddEventHandler(split, "Opened", (sender, _) => { opened++; openedSender = sender; });
+        AddEventHandler(split, "Closed", (sender, _) => { closed++; closedSender = sender; });
+
+        primary.PerformClick();
+        Application.DoEvents();
+        Assert.That(native.Visible, Is.False);
+
+        menu.PerformClick();
+        Application.DoEvents();
+        Assert.That(native.Visible, Is.True);
+        menu.PerformClick();
+        Application.DoEvents();
+        Assert.That(native.Visible, Is.False);
+
+        InvokePublic(split, "ShowDropDown");
+        Application.DoEvents();
+        var nativeParent = (ToolStripMenuItem)native.Items[0];
+        var nativeLeaf = (ToolStripMenuItem)nativeParent.DropDownItems[0];
+        nativeLeaf.PerformClick();
+        Application.DoEvents();
+        InvokePublic(split, "CloseDropDown");
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(primaryClicks, Is.EqualTo(1));
+            Assert.That(nestedClicks, Is.EqualTo(1));
+            Assert.That(opened, Is.EqualTo(2));
+            Assert.That(closed, Is.EqualTo(2));
+            Assert.That(openedSender, Is.SameAs(split));
+            Assert.That(closedSender, Is.SameAs(split));
+            Assert.That(dropdown.Target, Is.Null);
+        }));
+    }
+
+    [Test]
+    public void DropdownOpeningUsesOuterSplitAsFullWidthAnchor()
+    {
+        using var split = CreateSplitButton();
+        split.Size = new Size(240, 44);
+
+        var anchor = InvokePrivate<Control>(split, "ResolveDropDownAnchor");
+        var location = InvokePrivate<Point>(split, "ResolveDropDownLocation");
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(anchor, Is.SameAs(split));
+            Assert.That(location, Is.EqualTo(new Point(0, split.Height)));
+        }));
+    }
+
+    [Test]
+    public void EmptyDisabledAndLoadingStatesDoNotOpenAndRuntimeStateClosesAnOpenMenu()
+    {
+        using var split = CreateSplitButton();
+        using var form = CreateHost(split);
+        var (_, menu) = GetRegions(split);
+        var dropdown = GetOwnedDropdown(split);
+        var native = GetNativeDropDown(dropdown);
+        var opened = 0;
+        AddEventHandler(split, "Opened", (_, _) => opened++);
+
+        menu.PerformClick();
+        InvokePublic(split, "ShowDropDown");
+        Application.DoEvents();
+        Assert.That(native.Visible, Is.False);
+
+        GetProperty<BootstrapDropdownItemCollection>(split, "Items").Add(
+            new BootstrapDropdownItem { Text = "Action" });
+        menu.PerformClick();
+        Application.DoEvents();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.Visible, Is.True);
+            Assert.That(menu.Selected, Is.True);
+        }));
+
+        SetProperty(split, "MinimumWidth", 230);
+        Assert.That(
+            native.MinimumSize.Width,
+            Is.EqualTo(BootstrapDropdown.ResolveMinimumWidth(230, menu.DeviceDpi)));
+
+        SetProperty(split, "Loading", true);
+        Application.DoEvents();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.Visible, Is.False);
+            Assert.That(menu.Selected, Is.False);
+            Assert.That(menu.Enabled, Is.False);
+        }));
+        menu.PerformClick();
+        InvokePublic(split, "ShowDropDown");
+        Application.DoEvents();
+        Assert.That(opened, Is.EqualTo(1));
+
+        SetProperty(split, "Loading", false);
+        InvokePublic(split, "ShowDropDown");
+        Application.DoEvents();
+        Assert.That(native.Visible, Is.True);
+        split.Enabled = false;
+        Application.DoEvents();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.Visible, Is.False);
+            Assert.That(menu.Selected, Is.False);
+        }));
+    }
+
+    [Test]
+    public void ParentDisposalOwnsChildAndDropdownCleanupWithoutASecondChildPath()
+    {
+        var split = CreateSplitButton();
+        var children = split.Controls.Cast<Control>().ToArray();
+        var dropdown = GetOwnedDropdown(split);
+        GetProperty<BootstrapDropdownItemCollection>(split, "Items").Add(
+            new BootstrapDropdownItem { Text = "Action" });
+        using var form = CreateHost(split);
+        InvokePublic(split, "ShowDropDown");
+        Application.DoEvents();
+
+        Assert.DoesNotThrow((Action)(() => split.Dispose()));
+        Assert.DoesNotThrow((Action)(() => split.Dispose()));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(children.All(child => child.IsDisposed), Is.True);
+            Assert.That(GetNativeDropDown(dropdown).IsDisposed, Is.True);
+        }));
+        Assert.Throws<ObjectDisposedException>((Action)(() => dropdown.Show()));
+    }
+
     private static Control CreateSplitButton()
     {
         var type = typeof(BootstrapButton).Assembly.GetType(
@@ -251,6 +404,69 @@ public sealed class BootstrapSplitButtonTests
         Assert.That(buttons.Length, Is.EqualTo(2));
         var menu = buttons.Single(button => button.Icon?.Value == FrameworkIconGlyph.ChevronDown.ToString());
         return (buttons.Single(button => !ReferenceEquals(button, menu)), menu);
+    }
+
+    private static Form CreateHost(Control control)
+    {
+        var form = new Form
+        {
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(300, 240),
+            Size = new Size(600, 360)
+        };
+        control.Location = new Point(40, 40);
+        form.Controls.Add(control);
+        form.Show();
+        Application.DoEvents();
+        return form;
+    }
+
+    private static BootstrapDropdown GetOwnedDropdown(Control split)
+    {
+        var field = split.GetType().GetField("_dropdown", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null);
+        return (BootstrapDropdown)field!.GetValue(split)!;
+    }
+
+    private static ToolStripDropDownMenu GetNativeDropDown(BootstrapDropdown dropdown)
+    {
+        var field = typeof(BootstrapDropdown).GetField("_dropDown", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null);
+        return (ToolStripDropDownMenu)field!.GetValue(dropdown)!;
+    }
+
+    private static void AddEventHandler(Control target, string name, EventHandler handler)
+    {
+        var eventInfo = target.GetType().GetEvent(name, BindingFlags.Public | BindingFlags.Instance);
+        Assert.That(eventInfo, Is.Not.Null, $"Missing event {name}.");
+        eventInfo!.AddEventHandler(target, handler);
+    }
+
+    private static void InvokePublic(Control target, string name)
+    {
+        var method = target.GetType().GetMethod(name, BindingFlags.Public | BindingFlags.Instance);
+        Assert.That(method, Is.Not.Null, $"Missing method {name}.");
+        Invoke(method!, target);
+    }
+
+    private static T InvokePrivate<T>(Control target, string name)
+    {
+        var method = target.GetType().GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.That(method, Is.Not.Null, $"Missing private method {name}.");
+        return (T)Invoke(method!, target)!;
+    }
+
+    private static object? Invoke(MethodInfo method, object target)
+    {
+        try
+        {
+            return method.Invoke(target, Array.Empty<object>());
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+            throw;
+        }
     }
 
     private static T GetProperty<T>(object target, string name)

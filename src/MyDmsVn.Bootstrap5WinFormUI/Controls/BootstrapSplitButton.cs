@@ -36,6 +36,7 @@ public class BootstrapSplitButton : Control
     private bool _performingLayout;
     private bool _synchronizingFont;
     private bool _callerCustomFont;
+    private bool _dropDownOpen;
     private bool _disposed;
 
     /// <summary>
@@ -251,6 +252,11 @@ public class BootstrapSplitButton : Control
                 return;
             }
 
+            if (value)
+            {
+                CloseDropDown();
+            }
+
             _loading = value;
             _primaryButton.Loading = value;
             UpdateRegionEnabledState();
@@ -317,6 +323,12 @@ public class BootstrapSplitButton : Control
     /// </summary>
     public void ShowDropDown()
     {
+        if (_disposed || IsDisposed || Disposing || !Enabled || _loading || Items.Count == 0 || _dropDownOpen)
+        {
+            return;
+        }
+
+        _dropdown.ShowFrom(_primaryButton, ResolveDropDownAnchor(), ResolveDropDownLocation());
     }
 
     /// <summary>
@@ -385,6 +397,11 @@ public class BootstrapSplitButton : Control
         base.OnEnabledChanged(e);
         if (_initialized)
         {
+            if (!Enabled)
+            {
+                CloseDropDown();
+            }
+
             UpdateRegionEnabledState();
         }
     }
@@ -430,6 +447,7 @@ public class BootstrapSplitButton : Control
     {
         if (disposing && !_disposed)
         {
+            CloseDropDown();
             _primaryButton.Click -= OnPrimaryButtonClick;
             _primaryButton.FontChanged -= OnPrimaryButtonFontChanged;
             _dropDownButton.Click -= OnDropDownButtonClick;
@@ -525,6 +543,16 @@ public class BootstrapSplitButton : Control
         _dropDownButton.Enabled = Enabled && !_loading;
     }
 
+    private Control ResolveDropDownAnchor()
+    {
+        return this;
+    }
+
+    private Point ResolveDropDownLocation()
+    {
+        return new Point(0, Height);
+    }
+
     private void MirrorPrimaryFont()
     {
         if (!_initialized || _callerCustomFont || _synchronizingFont || _primaryButton.IsDisposed)
@@ -563,6 +591,13 @@ public class BootstrapSplitButton : Control
 
     private void OnDropDownButtonClick(object? sender, EventArgs e)
     {
+        if (_dropDownOpen)
+        {
+            CloseDropDown();
+            return;
+        }
+
+        ShowDropDown();
     }
 
     private void OnPrimaryButtonFontChanged(object? sender, EventArgs e)
@@ -572,11 +607,15 @@ public class BootstrapSplitButton : Control
 
     private void OnDropdownOpened(object? sender, EventArgs e)
     {
+        _dropDownOpen = true;
+        _dropDownButton.Selected = true;
         Opened?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnDropdownClosed(object? sender, EventArgs e)
     {
+        _dropDownOpen = false;
+        _dropDownButton.Selected = false;
         Closed?.Invoke(this, EventArgs.Empty);
     }
 
