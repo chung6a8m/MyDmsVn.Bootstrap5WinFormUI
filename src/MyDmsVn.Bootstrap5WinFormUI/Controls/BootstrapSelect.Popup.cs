@@ -94,6 +94,7 @@ public partial class BootstrapSelect
 
     internal void NotifyDropDownClosed()
     {
+        InvalidateRemoteSearchOnClose();
         DropDownClosed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -166,6 +167,7 @@ public partial class BootstrapSelect
 
     private void OnPopupOwnerDisposed(object? sender, EventArgs e)
     {
+        DisposeSearchInfrastructure();
         _dropDownController?.Dispose();
         _dropDownController = null;
     }

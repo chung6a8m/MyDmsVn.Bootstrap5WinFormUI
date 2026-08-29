@@ -31,6 +31,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     internal int CreationCount => _creationCount;
     internal Rectangle CurrentBounds => _currentBounds;
     internal BootstrapSelectDropDownContent? Content => _content;
+    internal string CurrentSearchText => _content?.SearchText ?? string.Empty;
 
     internal void Open()
     {
@@ -41,7 +42,6 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
             _content?.FocusSearch();
             return;
         }
-
         if (_owner.IsDisposed || !_owner.Enabled || !_owner.Visible || !_owner.IsHandleCreated) return;
         EnsureCreated();
         RefreshResults();
@@ -53,6 +53,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         _dropDown!.ShowAt(_currentBounds);
         _content!.FocusSearch();
         _owner.NotifyDropDownOpened();
+        _owner.NotifyPopupSearchTextChanged(_content.SearchText);
     }
 
     internal void Close(bool restoreFocus)
@@ -73,7 +74,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     internal void RefreshResults()
     {
         if (_content is null) return;
-        _content.SetResults(_owner.BuildCurrentLocalResultSet(_content.SearchEnabled ? _content.SearchText : string.Empty));
+        _content.SetResults(_owner.BuildCurrentPopupResultSet(_content.SearchEnabled ? _content.SearchText : string.Empty));
     }
 
     internal void SetSearchText(string text)
@@ -128,18 +129,13 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     {
         ThrowIfDisposed();
         if (_dropDown is not null) return;
-
         _content = new BootstrapSelectDropDownContent();
         _content.SearchTextChanged += OnSearchTextChanged;
         _content.RowActivated += OnRowActivated;
         _content.EscapeRequested += () => Close(true);
         _content.TabRequested += () => Close(false);
         _content.NearEndRequested += () => _owner.NotifyNearEndRequested();
-        _surface = new BootstrapOverlaySurface
-        {
-            LogicalContentPadding = Padding.Empty,
-            LogicalBorderRadius = _owner.BorderRadius
-        };
+        _surface = new BootstrapOverlaySurface { LogicalContentPadding = Padding.Empty, LogicalBorderRadius = _owner.BorderRadius };
         _surface.AttachContent(_content);
         _dropDown = new BootstrapOverlayDropDown(_surface)
         {
@@ -177,6 +173,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
 
     private void OnSearchTextChanged(string text)
     {
+        _owner.NotifyPopupSearchTextChanged(text);
         RefreshResults();
         if (_isOpen) Reposition();
     }
@@ -192,7 +189,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
 
     private void OnItemsChanged()
     {
-        if (_isOpen) RefreshResults();
+        if (_isOpen && _owner.DataProvider is null) RefreshResults();
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
