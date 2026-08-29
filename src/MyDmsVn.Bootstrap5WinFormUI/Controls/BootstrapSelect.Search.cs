@@ -127,7 +127,7 @@ public partial class BootstrapSelect
         var page = retry ? controller.FailedPage : controller.CurrentPage + 1;
         if (retry)
         {
-            if (controller.FailedPage <= 1) return;
+            if (controller.FailedPage < 1) return;
         }
         else if (!controller.HasMore || controller.FailedPage > 0 || controller.CurrentPage < 1)
         {
