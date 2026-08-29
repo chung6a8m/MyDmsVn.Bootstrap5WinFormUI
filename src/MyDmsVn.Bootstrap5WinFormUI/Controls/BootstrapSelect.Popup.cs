@@ -79,6 +79,11 @@ public partial class BootstrapSelect
     internal bool ActivateResultRow(BootstrapSelectResultRow row, BootstrapSelectChangeReason reason)
     {
         if (row is null) throw new ArgumentNullException(nameof(row));
+        if (row.Kind == BootstrapSelectResultRowKind.LoadMoreError)
+        {
+            RetryRemoteLastFailure();
+            return true;
+        }
         if (row.Kind != BootstrapSelectResultRowKind.Item || row.Item is null || row.Item.Disabled) return false;
         if (SelectionMode == BootstrapSelectMode.Multiple && row.IsSelected)
         {
@@ -100,6 +105,7 @@ public partial class BootstrapSelect
 
     internal void NotifyNearEndRequested()
     {
+        RequestRemoteNextPage();
     }
 
     /// <inheritdoc />
