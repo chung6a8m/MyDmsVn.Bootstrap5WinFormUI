@@ -56,6 +56,7 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapTextBox`
 - `BootstrapNumericBox`
 - `BootstrapComboBox`
+- `BootstrapSelect`
 - `BootstrapDatePicker`
 - `BootstrapDropdown`
 - `BootstrapCard`
@@ -76,9 +77,11 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 
 ## Integrated demo
 
-The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Advanced Inputs, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, Pagination, and Navigation / Tabs. Light/Dark switching and Reduced motion remain available while navigating.
+The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Advanced Inputs, Select, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, Pagination, and Navigation / Tabs. Light/Dark switching and Reduced motion remain available while navigating.
 
 The Advanced Inputs page is the shared native-backed input showcase. Stage 5 adds `BootstrapNumericBox` examples for integer/default values, decimal formatting/increments, thousands separators, signed ranges, validation states, read-only behavior, disabled behavior, and live `ValueChanged` feedback. Stage 6 extends the same page with `BootstrapComboBox` examples for native unbound and bound items, `DisplayMember` / `ValueMember`, editable `DropDown`, selection-only `DropDownList`, native autocomplete, long text/ellipsis, optional leading icons, validation, disabled state, explicit radius, and live native selection feedback. Stage 9 adds `BootstrapDatePicker` Long/Short/Time and custom date/date-time formats, optional unchecked checkbox, constrained range, valid/invalid, disabled, explicit-radius, and live `ValueChanged` scenarios. ComboBox popup chrome and DatePicker calendar/localized rendering remain WinForms/OS-owned.
+
+The Select page demonstrates the dedicated Select2-style `BootstrapSelect`: local single search, multiple chips, grouping, custom values, validation, asynchronous transport-agnostic providers, delayed responses, infinite paging, later-page failure/retry, first-page retry, rapid-typing stale-result protection, keyboard/accessibility behavior, Light/Dark switching, and the real-Windows 100–200% DPI verification matrix.
 
 The Feedback page hosts the component-expansion feedback controls. `BootstrapBadge` covers semantic, pill/custom/disabled, and long-text states; `BootstrapAlert` adds all semantic variants, optional icons, native keyboard-accessible dismissal, multiline/disabled/custom-radius states, and restore cycles; `BootstrapTooltip` adds default Dark, semantic and custom-color owner-drawn popups, explicit multiline/long captions, one Tooltip associated with multiple controls, and live native timing/state forwarding. Stage 8 adds an application-placed `BootstrapToastContainer` with manual and auto-hide Toasts, icon/multiline content, a burst of eight notifications that demonstrates FIFO/max-visible queueing, `DismissAll()`, all four placements, rapid show/dismiss, disabled presentation, and a 100-toast lifecycle/resource stress action. The page remains the shared runtime Light/Dark, Reduced motion, and real-Windows 100–200% DPI verification surface.
 
@@ -88,7 +91,7 @@ The Navigation / Tabs page demonstrates `BootstrapTabControl` using native `TabP
 
 Earlier Rendering / DPI, Icons, and Animation diagnostics remain available below the Theme navigation item.
 
-See [Phase 14 — Integrated Demo Application](docs/PHASE14_INTEGRATED_DEMO.md) for the original navigation contract and manual verification matrix, and [Component contracts](docs/COMPONENTS.md) for current component behavior.
+See [Phase 14 — Integrated Demo Application](docs/PHASE14_INTEGRATED_DEMO.md) for the original navigation contract, [BootstrapSelect guide](docs/BOOTSTRAP_SELECT.md) for the Select2-style selector contract, and [Component contracts](docs/COMPONENTS.md) for current component behavior.
 
 ## Native ComboBox usage
 
@@ -111,6 +114,26 @@ customerCombo.SelectedIndexChanged += (_, _) =>
 ```
 
 No framework item wrapper is required. `Items`, `DataSource`, `DisplayMember`, `ValueMember`, `SelectedIndex`, `SelectedItem`, `SelectedValue`, autocomplete, keyboard behavior, and native selection/drop-down events are inherited from `ComboBox`.
+
+## Select2-style BootstrapSelect usage
+
+`BootstrapSelect` is a separate managed selection control for Select2-style scenarios. It uses `BootstrapSelectItem.Value` as logical identity and supports local single/multiple search, groups, custom values, and asynchronous paged providers without adding network dependencies to the UI library.
+
+```csharp
+var customerSelect = new BootstrapSelect
+{
+    Placeholder = "Choose a customer...",
+    SelectionMode = BootstrapSelectMode.Multiple,
+    SearchEnabled = true,
+    MaximumSelectionRows = 3
+};
+
+customerSelect.Items.Add(new BootstrapSelectItem(1, "Contoso") { Group = "Preferred" });
+customerSelect.Items.Add(new BootstrapSelectItem(2, "Fabrikam") { Group = "Preferred" });
+customerSelect.Items.Add(new BootstrapSelectItem(3, "Northwind"));
+```
+
+Set `DataProvider` to an `IBootstrapSelectDataProvider` for remote/service-backed search. The control owns debounce, cancellation, stale-generation rejection, paging, retry, deduplication, and selection snapshots; the provider only returns `BootstrapSelectPage` instances. See [docs/BOOTSTRAP_SELECT.md](docs/BOOTSTRAP_SELECT.md) for local/async examples, custom-value semantics, keyboard/accessibility behavior, ownership, theme/DPI/RTL rules, and the manual validation matrix.
 
 ## Native DatePicker usage
 
@@ -255,6 +278,8 @@ NumericBox is likewise native-backed: `BootstrapNumericBox` owns one borderless 
 
 ComboBox stays even closer to native WinForms: `BootstrapComboBox` derives directly from `ComboBox`, uses fixed-height owner draw only for framework-controlled item/closed-selection presentation, adds validation/focus shell rendering and an optional control-level `LeadingIcon`, and deliberately leaves binding, selection, autocomplete, edit child, arrow button, popup lifecycle, keyboard behavior, and native events authoritative. It adds no custom popup, parallel item model, timer, reflection into private WinForms internals, or external dependency.
 
+BootstrapSelect is the separate managed selector for richer selection workflows. It reuses the shared overlay placement/collision engine, theme/DPI/rendering infrastructure, and source-neutral renderer contract while keeping provider transport outside the UI library. Local and provider result modes do not merge; selection identity is value-based; async requests are debounced/cancellable/generation-safe; paging and retry stay internal control state; selected snapshots survive page/query replacement; and custom values are opt-in. Caller-supplied providers, matchers, renderers, items, and tags remain caller-owned.
+
 DatePicker follows the NumericBox wrapper pattern around exactly one native `DateTimePicker`. Native date state, range rules, localized display, checkbox semantics, keyboard navigation, and calendar popup remain authoritative; the wrapper owns one tab stop, shared validation/focus shell rendering, theme-created font lifecycle, and DPI-scaled layout. It introduces no `MonthCalendar`, custom popup `Form`, nullable-date model, `ShowUpDown` proxy, parsing engine, culture property, timer, animation scheduler, Win32 hook, or external dependency.
 
 Dropdown uses a separate native-first command-menu pattern: `BootstrapDropdown : Component` owns one `ToolStripDropDownMenu` and one internal theme renderer, while the application owns its `BootstrapButton` target and `BootstrapDropdownItem` models. Each opening builds a short-lived native snapshot; native ToolStrip owns focus, keyboard, dismissal and screen placement. The framework owns target wiring, command dispatch, token-based rendering, DPI sizing, icon bitmap generation, theme refresh, and deterministic cleanup. It introduces no top-level custom form, global hook, timer, animation scheduler, submenu model, live collection synchronization, or external dependency.
@@ -274,6 +299,7 @@ The primary sources of truth are:
 - [Development plan](docs/DEVELOPMENT_PLAN.md)
 - [Design system](docs/DESIGN_SYSTEM.md)
 - [Component contracts](docs/COMPONENTS.md)
+- [BootstrapSelect guide](docs/BOOTSTRAP_SELECT.md)
 - [Compatibility rules](docs/COMPATIBILITY.md)
 - [Testing strategy](docs/TESTING.md)
 - [Development/contribution guide](docs/CONTRIBUTING.md)
@@ -283,7 +309,7 @@ The primary sources of truth are:
 
 ## Status
 
-Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, Stage 6 `BootstrapComboBox`, Stage 7 `BootstrapDropdown`, Stage 8 `BootstrapToast` / `BootstrapToastContainer`, and Stage 9 `BootstrapDatePicker` are now documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
+Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, Stage 6 `BootstrapComboBox`, Stage 7 `BootstrapDropdown`, Stage 8 `BootstrapToast` / `BootstrapToastContainer`, Stage 9 `BootstrapDatePicker`, and the dedicated Select2-style `BootstrapSelect` are documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
 
 The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 
