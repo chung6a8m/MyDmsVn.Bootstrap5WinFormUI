@@ -102,7 +102,9 @@ BootstrapPopover only
         +--> internal ToolStripDropDown overlay host
 ```
 
-`BootstrapOverlayPlacementEngine` consumes only screen-pixel geometry, placement/collision values, and RTL state. It cannot depend on concrete controls, `Screen`, themes, handles, or DPI scaling. Tooltip keeps one native `ToolTip`; only Popover uses the internal interactive host.
+`BootstrapOverlayPlacementEngine` consumes only screen-pixel geometry, placement/collision values, and RTL state. It cannot depend on concrete controls, `Screen`, themes, handles, or DPI scaling. Tooltip keeps one native `ToolTip`; only Popover uses the internal interactive host. A narrow Compatibility helper reads and corrects native overlay window rectangles without caching HWNDs: Popover reapplies the engine rectangle after `ToolStripDropDown` layout, while managed Tooltip obtains the current native Tooltip HWND from the owner-draw `Graphics` DC and applies the current request immediately after that paint completes. Invalid handles during teardown are no-ops.
+
+The runtime adapter preserves the engine contract exactly. `CollisionBehavior.None` may place an overlay outside the selected monitor working area, and `Flip` changes to the exact opposite side without an implicit cross-axis shift. Native window correction does not activate the overlay or change its Z-order.
 
 ## 5. Foundation responsibilities
 
