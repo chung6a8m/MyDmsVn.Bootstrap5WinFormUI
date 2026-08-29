@@ -28,6 +28,8 @@ public class BootstrapPopover : Component
     private bool _closeOnEscape = true;
     private bool _closeOnClickOutside = true;
     private bool _restoreFocusAfterClose;
+    private BootstrapOverlayAnchorTracker? _anchorTracker;
+    private bool _themeSubscribed;
 
     /// <summary>
     /// Initializes a designer-safe interactive popover with an owned native overlay host.
@@ -329,6 +331,7 @@ public class BootstrapPopover : Component
             DetachTargetHandlers(_target);
             _target = null;
             DetachContent();
+            StopOpenLifecycle();
             _dropDown.Opened -= OnDropDownOpened;
             _dropDown.Closed -= OnDropDownClosed;
             _dropDown.EscapeRequested = null;
@@ -373,12 +376,14 @@ public class BootstrapPopover : Component
 
     private void OnDropDownOpened(object? sender, EventArgs e)
     {
+        StartOpenLifecycle();
         FocusFirstContentControl();
         Opened?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnDropDownClosed(object? sender, ToolStripDropDownClosedEventArgs e)
     {
+        StopOpenLifecycle();
         Closed?.Invoke(this, EventArgs.Empty);
         if (_restoreFocusAfterClose)
         {
@@ -441,6 +446,50 @@ public class BootstrapPopover : Component
 
         ApplyCurrentThemeAndDpi(_target);
         _dropDown.MoveTo(CalculatePopupBounds(_target, _surface.GetPreferredSize(Size.Empty)));
+    }
+
+    private void RepositionOpenPopover()
+    {
+        var target = _target;
+        if (target is null || target.IsDisposed || !target.Visible || !_dropDown.Visible)
+        {
+            Hide();
+            return;
+        }
+
+        ApplyCurrentThemeAndDpi(target);
+        _dropDown.MoveTo(CalculatePopupBounds(target, _surface.GetPreferredSize(Size.Empty)));
+    }
+
+    private void StartOpenLifecycle()
+    {
+        StopOpenLifecycle();
+        var target = _target;
+        if (target is null || target.IsDisposed)
+        {
+            return;
+        }
+
+        _anchorTracker = new BootstrapOverlayAnchorTracker(target, RepositionOpenPopover, Hide);
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
+        _themeSubscribed = true;
+    }
+
+    private void StopOpenLifecycle()
+    {
+        _anchorTracker?.Dispose();
+        _anchorTracker = null;
+        if (_themeSubscribed)
+        {
+            BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+            _themeSubscribed = false;
+        }
+    }
+
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        RepositionOpenPopover();
+        _surface.Invalidate();
     }
 
     private void ApplyCurrentThemeAndDpi(Control target)
