@@ -207,6 +207,64 @@ public sealed class FeedbackDemoFormTests
         Assert.That(disposeCounts.Values, Is.All.EqualTo(1));
     }
 
+    [Test]
+    public void FeedbackDemoCoversManagedPlacementAndInteractivePopover()
+    {
+        using var form = new FeedbackDemoForm();
+        form.CreateControl();
+        form.PerformLayout();
+        var tooltips = GetTooltipComponents(form);
+        var popovers = typeof(FeedbackDemoForm)
+            .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Where(field => field.FieldType == typeof(BootstrapPopover))
+            .Select(field => (BootstrapPopover?)field.GetValue(form))
+            .Where(popover => popover is not null)
+            .Cast<BootstrapPopover>()
+            .ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(tooltips.Any(tooltip => tooltip.Positioning == BootstrapTooltipPositioning.Managed), Is.True);
+            Assert.That(tooltips.Any(tooltip => tooltip.Positioning == BootstrapTooltipPositioning.Managed && tooltip.Placement == BootstrapOverlayPlacement.Auto), Is.True);
+            Assert.That(tooltips.Any(tooltip => tooltip.Positioning == BootstrapTooltipPositioning.Managed && tooltip.Placement != BootstrapOverlayPlacement.Auto), Is.True);
+            Assert.That(popovers, Has.Length.EqualTo(1));
+            Assert.That(popovers[0].Content, Is.Not.Null);
+            Assert.That(FindControls<Button>(popovers[0].Content!).Any(button => button.TabStop), Is.True);
+            Assert.That(FindControls<TextBox>(popovers[0].Content!).Any(textBox => textBox.TabStop), Is.True);
+        }));
+
+        var action = FindControls<Button>(popovers[0].Content!).Single(button => button.AccessibleName == "Popover apply action");
+        var status = FindControls<Label>(form).Single(label => label.AccessibleName == "Popover interaction status");
+        action.PerformClick();
+        Assert.That(status.Text, Does.Contain("applied"));
+    }
+
+    [Test]
+    public void FeedbackDemoDisposesPopoverBeforeItsCallerOwnedContentExactlyOnce()
+    {
+        var form = new FeedbackDemoForm();
+        var popover = typeof(FeedbackDemoForm)
+            .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Where(field => field.FieldType == typeof(BootstrapPopover))
+            .Select(field => (BootstrapPopover?)field.GetValue(form))
+            .Single(value => value is not null)!;
+        var content = popover.Content!;
+        var popoverDisposed = 0;
+        var contentDisposed = 0;
+        popover.Disposed += (_, _) => popoverDisposed++;
+        content.Disposed += (_, _) => contentDisposed++;
+
+        form.Dispose();
+        form.Dispose();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(popoverDisposed, Is.EqualTo(1));
+            Assert.That(contentDisposed, Is.EqualTo(1));
+            Assert.That(content.Parent, Is.Null);
+        }));
+    }
+
     private static BootstrapTooltip[] GetTooltipComponents(FeedbackDemoForm form)
     {
         return typeof(FeedbackDemoForm)
