@@ -69,6 +69,7 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapBadge`
 - `BootstrapAlert`
 - `BootstrapTooltip`
+- `BootstrapPopover`
 - `BootstrapTabControl`
 - `BootstrapToast`
 - `BootstrapToastContainer`
@@ -169,6 +170,31 @@ actions.Items.Add(new BootstrapDropdownItem { Text = "Unavailable", Enabled = fa
 
 The target and public item models remain caller-owned. Native WinForms owns menu focus, keyboard navigation, AutoClose/outside-click dismissal, and working-area placement. `Checked` is presentation state only and is changed only by application code. Icons use the target button's current `IconRenderer`, theme color, and DPI; generated native menu images are owned and disposed by the Dropdown.
 
+## Managed Tooltip and interactive Popover usage
+
+Native Tooltip positioning remains the default. Opt into deterministic placement only where explicit collision behavior is needed:
+
+```csharp
+var tooltip = new BootstrapTooltip
+{
+    Positioning = BootstrapTooltipPositioning.Managed,
+    Placement = BootstrapOverlayPlacement.Top,
+    CollisionBehavior = BootstrapOverlayCollisionBehavior.FlipAndShift
+};
+tooltip.SetToolTip(saveButton, "Save changes");
+```
+
+Interactive content belongs in a Popover. The application owns both target and initially unparented content; Popover reparents but never disposes either:
+
+```csharp
+var popover = new BootstrapPopover
+{
+    Target = optionsButton,
+    Content = optionsPanel,
+    Placement = BootstrapOverlayPlacement.Auto
+};
+```
+
 ## Toast notification usage
 
 `BootstrapToastContainer` is an application-placed WinForms host. It does not create a global notification service or a framework-owned top-level window. Configure a `BootstrapToast`, then transfer ownership when showing it:
@@ -219,7 +245,9 @@ Badge extends the same hardened foundations as a primitive visual control: it re
 
 Alert reuses those same rendering/theme primitives plus the source-neutral icon infrastructure. It owns one private native WinForms dismiss button, one deterministic theme subscription/theme-created font lifecycle, and no timeout, timer, overlay, floating host, queue manager, or Toast behavior.
 
-Tooltip is a thin `Component + IExtenderProvider` wrapper over one owned native WinForms `ToolTip`. Native association, popup placement and delay semantics remain native; the framework owns only owner-drawn Bootstrap-inspired presentation. It resolves the current theme at popup/draw time, DPI-scales padding/border/radius through the shared rendering foundation, adds no timer or static theme subscription, and keeps the native `ToolTip` private.
+Tooltip remains a thin wrapper over one native WinForms `ToolTip`. Native association, timing, and owner drawing remain authoritative. Native placement is backward-compatible by default; managed placement reissues the same native Tooltip at bounds computed by the shared pure overlay engine. It adds no timer, interactive Tooltip content, public Show/Hide API, or static theme subscription.
+
+Popover is the separate interactive surface. It uses an internal `ToolStripDropDown` host, caller-owned content, and the same placement engine. Transient anchor/theme subscriptions exist only while open and are removed on close/disposal.
 
 Tabs remain native-backed: `BootstrapTabControl` derives from WinForms `TabControl`, preserves `TabPage`, `TabPages`, selection/events, focus/keyboard, native images/tooltips, and overflow behavior, and custom-paints only the native header rectangles. Header metrics reuse Theme/DPI/Rendering helpers; the control owns one deterministic theme subscription/theme-created font lifecycle and introduces no timer, animation engine, page wrapper, custom window, or external package.
 

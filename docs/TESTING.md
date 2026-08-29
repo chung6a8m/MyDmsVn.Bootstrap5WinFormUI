@@ -658,3 +658,11 @@ Stage 8 participates in the Phase 16 public/protected API fingerprint gate. The 
 
 Both `net48` and `net8.0-windows` must pass the focused Toast/Feedback/demo suite, shared Animation/Alert regressions, and the complete test suite before Stage 8 is considered complete.
 
+## 13. Overlay placement and Popover verification
+
+Pure tests cover all explicit placements, deterministic Auto selection, exact-opposite Flip, cross-axis Shift, FlipAndShift ordering, RTL Start/End, padded boundaries, oversized popups, negative coordinates, saturation, and invalid values on both TFMs.
+
+STA tests cover Tooltip native-default compatibility and managed properties; surface/host ownership; Popover Target/Content/trigger/focus/open-close behavior; anchor/form/scroll tracking; transient theme subscriptions; external disposal; and repeated cleanup. Tooltip remains text-only with one native `ToolTip`; Popover content remains caller-owned.
+
+Manual Feedback verification covers native-versus-managed Tooltip timing and edge placement, interactive Popover keyboard/content behavior, Escape/outside-click focus, movement without Opened/Closed churn, Light/Dark reflow, real Windows 96/120/144/168/192 DPI, mixed-DPI and negative-coordinate monitors, and at least 500 combined popup cycles while observing USER/GDI handles and event subscriptions.
+

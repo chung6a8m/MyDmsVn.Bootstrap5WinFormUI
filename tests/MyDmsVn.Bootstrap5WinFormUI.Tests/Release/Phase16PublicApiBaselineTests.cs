@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using NUnit.Framework;
 
@@ -12,7 +13,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "b8c1cde896505856249b97c0b90f254861782d1835be3abb8aed305811202e24";
+    private const string ApprovedV1Fingerprint = "83574b5a78bd563ccbe641845b1a1a0c9e2eee1e0f717fba0ecf25cf89f35ba8";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -32,6 +33,24 @@ public sealed class Phase16PublicApiBaselineTests
     public void V1CompatibilityAssemblyVersionIsStable()
     {
         Assert.That(typeof(BootstrapButton).Assembly.GetName().Version, Is.EqualTo(new Version(1, 0, 0, 0)));
+    }
+
+    [Test]
+    public void OverlayApiExportsOnlyTheReviewedPublicContract()
+    {
+        var assembly = typeof(BootstrapPopover).Assembly;
+        var exportedNames = assembly.GetExportedTypes().Select(type => type.FullName).ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(typeof(BootstrapPopover).GetProperty(nameof(BootstrapPopover.Content))!.PropertyType, Is.EqualTo(typeof(Control)));
+            Assert.That(typeof(BootstrapTooltip).GetMethod("Show", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(BootstrapTooltip).GetMethod("Hide", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Rendering.BootstrapOverlayPlacementEngine"));
+            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Rendering.BootstrapOverlayPlacementRequest"));
+            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapOverlayDropDown"));
+            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapOverlaySurface"));
+        }));
     }
 
     private static string BuildApiSurface(Assembly assembly)
