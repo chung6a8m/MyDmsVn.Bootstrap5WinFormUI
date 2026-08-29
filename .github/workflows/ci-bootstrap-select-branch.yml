@@ -41,3 +41,7 @@ jobs:
       - name: Review public API fingerprint on net48
         shell: pwsh
         run: dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net48 --no-build --filter "FullyQualifiedName~Phase16PublicApiBaselineTests.ExportedApiMatchesApprovedV1Baseline"
+
+      - name: Verify release candidate package
+        shell: pwsh
+        run: ./release.ps1 -Configuration Release -Version 1.0.0-rc.1 -SkipBuild -SkipTests -OutputDirectory artifacts/release-bootstrap-select-ci
