@@ -80,12 +80,7 @@ internal sealed class BootstrapSelectSearchController : IDisposable
         catch (Exception error)
         {
             if (!IsCurrentGeneration(generation)) return;
-            _state.CurrentPage = 0;
-            _state.HasMore = false;
-            _state.LoadedItems.Clear();
-            _state.LastError = error;
-            _failedPage = 1;
-            _state.Results = BootstrapSelectResultSet.SingleMessage(BootstrapSelectResultRowKind.Error, error.Message);
+            PublishFirstPageFailure(error);
         }
     }
 
@@ -105,7 +100,7 @@ internal sealed class BootstrapSelectSearchController : IDisposable
     {
         ThrowIfDisposed();
         if (provider is null) throw new ArgumentNullException(nameof(provider));
-        if (!IsCurrentGeneration(generation) || _failedPage <= 1 || _isLoadingMore)
+        if (!IsCurrentGeneration(generation) || _failedPage < 1 || _isLoadingMore)
         {
             return Task.FromResult(false);
         }
@@ -140,6 +135,7 @@ internal sealed class BootstrapSelectSearchController : IDisposable
             var page = await provider.SearchAsync(query, cancellation.Token).ConfigureAwait(false);
             if (page is null) throw new InvalidOperationException("BootstrapSelect data providers must return a non-null page.");
             if (!IsCurrentGeneration(generation)) return false;
+            if (pageNumber == 1) _state.LoadedItems.Clear();
             MergeItems(page.Items);
             PublishSuccess(pageNumber, page.HasMore);
             return true;
@@ -151,15 +147,32 @@ internal sealed class BootstrapSelectSearchController : IDisposable
         catch (Exception error)
         {
             if (!IsCurrentGeneration(generation)) return false;
-            _state.LastError = error;
-            _failedPage = pageNumber;
-            _state.Results = BuildLoadMoreErrorResults(error);
+            if (pageNumber == 1)
+            {
+                PublishFirstPageFailure(error);
+            }
+            else
+            {
+                _state.LastError = error;
+                _failedPage = pageNumber;
+                _state.Results = BuildLoadMoreErrorResults(error);
+            }
             return false;
         }
         finally
         {
             if (IsCurrentGeneration(generation)) _isLoadingMore = false;
         }
+    }
+
+    private void PublishFirstPageFailure(Exception error)
+    {
+        _state.CurrentPage = 0;
+        _state.HasMore = false;
+        _state.LoadedItems.Clear();
+        _state.LastError = error;
+        _failedPage = 1;
+        _state.Results = BootstrapSelectResultSet.SingleMessage(BootstrapSelectResultRowKind.Error, error.Message);
     }
 
     private void MergeItems(IReadOnlyList<BootstrapSelectItem> items)
