@@ -234,7 +234,9 @@ internal sealed class BootstrapSelectResultsView : Control
     private static bool IsSelectable(BootstrapSelectResultRow row)
     {
         if (row.Kind == BootstrapSelectResultRowKind.Item) return row.Item is not null && !row.Item.Disabled;
-        return row.Kind == BootstrapSelectResultRowKind.CreateValue || row.Kind == BootstrapSelectResultRowKind.LoadMoreError;
+        return row.Kind == BootstrapSelectResultRowKind.CreateValue
+            || row.Kind == BootstrapSelectResultRowKind.Error
+            || row.Kind == BootstrapSelectResultRowKind.LoadMoreError;
     }
 
     private bool SetHighlightedIndex(int index)
