@@ -66,7 +66,7 @@ public sealed class BootstrapDatePickerReviewRegressionTests
     [Test]
     public void LayoutExpandsWrapperBeforeLayingOutFixedHeightNativePicker()
     {
-        using var largeFont = new Font(SystemFonts.MessageBoxFont.FontFamily, 24f);
+        using var largeFont = new Font("Segoe UI", 24f);
         using var input = new BootstrapDatePicker
         {
             Font = largeFont,
