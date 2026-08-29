@@ -44,7 +44,6 @@ public class BootstrapDropdown : Component
 
         _dropDown.Opened += OnNativeOpened;
         _dropDown.Closed += OnNativeClosed;
-        _dropDown.ItemClicked += OnNativeItemClicked;
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         _themeSubscribed = true;
     }
@@ -196,7 +195,9 @@ public class BootstrapDropdown : Component
 
     internal static bool CanActivate(BootstrapDropdownItem item)
     {
-        return item.Kind == BootstrapDropdownItemKind.Item && item.Enabled;
+        return item.Kind == BootstrapDropdownItemKind.Item
+            && item.Enabled
+            && item.DropDownItems.Count == 0;
     }
 
     internal static void ValidateItemTree(BootstrapDropdownItemCollection items)
@@ -262,7 +263,6 @@ public class BootstrapDropdown : Component
 
             _dropDown.Opened -= OnNativeOpened;
             _dropDown.Closed -= OnNativeClosed;
-            _dropDown.ItemClicked -= OnNativeItemClicked;
             ClearNativeItems();
             _dropDown.Dispose();
             _disposed = true;
@@ -381,9 +381,9 @@ public class BootstrapDropdown : Component
         Closed?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnNativeItemClicked(object? sender, ToolStripItemClickedEventArgs e)
+    private void OnNativeLeafClick(object? sender, EventArgs e)
     {
-        if (e.ClickedItem?.Tag is BootstrapDropdownItem model)
+        if (sender is ToolStripMenuItem { Tag: BootstrapDropdownItem model })
         {
             ActivateItem(model);
         }
@@ -393,30 +393,107 @@ public class BootstrapDropdown : Component
     {
         ClearNativeItems();
 
-        _dropDown.ShowImageMargin = _items.Any(item =>
-            item.Kind == BootstrapDropdownItemKind.Item && item.Icon is not null);
-        _dropDown.ShowCheckMargin = _items.Any(item =>
-            item.Kind == BootstrapDropdownItemKind.Item && item.Checked);
-
-        foreach (var model in _items)
+        try
         {
-            if (model.Kind == BootstrapDropdownItemKind.Separator)
-            {
-                _dropDown.Items.Add(new ToolStripSeparator());
-                continue;
-            }
+            _dropDown.ShowImageMargin = _items.Any(item =>
+                item.Kind == BootstrapDropdownItemKind.Item && item.Icon is not null);
+            _dropDown.ShowCheckMargin = _items.Any(item =>
+                item.Kind == BootstrapDropdownItemKind.Item && item.Checked);
+            PopulateNativeItems(_dropDown.Items, _items);
+            ApplyPresentation(target, refreshImages: true);
+        }
+        catch
+        {
+            ClearNativeItems();
+            throw;
+        }
+    }
 
-            _dropDown.Items.Add(new ToolStripMenuItem(model.Text)
+    private void PopulateNativeItems(
+        ToolStripItemCollection nativeItems,
+        BootstrapDropdownItemCollection models)
+    {
+        foreach (var model in models)
+        {
+            ToolStripItem? nativeItem = null;
+            try
             {
-                Enabled = model.Enabled,
-                Checked = model.Checked,
-                CheckOnClick = false,
-                Tag = model,
-                AutoSize = true
-            });
+                switch (model.Kind)
+                {
+                    case BootstrapDropdownItemKind.Separator:
+                        nativeItem = new ToolStripSeparator();
+                        break;
+
+                    case BootstrapDropdownItemKind.HostedControl:
+                        nativeItem = CreateHostedControlItem(model);
+                        break;
+
+                    case BootstrapDropdownItemKind.Item:
+                        var menuItem = new ToolStripMenuItem(model.Text)
+                        {
+                            Enabled = model.Enabled,
+                            Checked = model.Checked,
+                            CheckOnClick = false,
+                            Tag = model,
+                            AutoSize = true
+                        };
+
+                        nativeItem = menuItem;
+                        if (model.DropDownItems.Count > 0)
+                        {
+                            PopulateNativeItems(menuItem.DropDownItems, model.DropDownItems);
+                        }
+                        else
+                        {
+                            menuItem.Click += OnNativeLeafClick;
+                        }
+
+                        break;
+
+                    default:
+                        throw new InvalidOperationException("Unsupported dropdown item kind.");
+                }
+
+                nativeItems.Add(nativeItem);
+                nativeItem = null;
+            }
+            finally
+            {
+                nativeItem?.Dispose();
+            }
+        }
+    }
+
+    private static ToolStripControlHost CreateHostedControlItem(BootstrapDropdownItem model)
+    {
+        var factory = model.HostedControlFactory
+            ?? throw new InvalidOperationException("A hosted-control item must define a factory.");
+        var control = factory();
+        if (control is null)
+        {
+            throw new InvalidOperationException("A hosted-control factory returned null.");
         }
 
-        ApplyPresentation(target, refreshImages: true);
+        if (control.IsDisposed)
+        {
+            throw new InvalidOperationException("A hosted-control factory returned a disposed control.");
+        }
+
+        control.Enabled = model.Enabled;
+        try
+        {
+            return new ToolStripControlHost(control)
+            {
+                Enabled = model.Enabled,
+                Tag = model,
+                AutoSize = true
+            };
+        }
+        catch
+        {
+            control.Dispose();
+            throw;
+        }
     }
 
     private void ApplyPresentation(BootstrapButton target, bool refreshImages)

@@ -487,6 +487,174 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void DropdownRecursiveSnapshotTreatsParentsAsNavigationAndActivatesNestedLeavesOnce()
+    {
+        var button = new BootstrapButton { Text = "Menu" };
+        using var form = CreateHost(button);
+        using var dropdown = new BootstrapDropdown { Target = button };
+        var parent = new BootstrapDropdownItem { Text = "Parent" };
+        var leaf = new BootstrapDropdownItem { Text = "Leaf", Checked = true };
+        var disabled = new BootstrapDropdownItem { Text = "Disabled", Enabled = false };
+        var parentClicks = 0;
+        var leafClicks = 0;
+        var disabledClicks = 0;
+        parent.Click += (_, _) => parentClicks++;
+        leaf.Click += (_, _) => leafClicks++;
+        disabled.Click += (_, _) => disabledClicks++;
+        parent.DropDownItems.Add(leaf);
+        parent.DropDownItems.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator));
+        parent.DropDownItems.Add(disabled);
+        dropdown.Items.Add(parent);
+
+        dropdown.Show();
+        Application.DoEvents();
+        var nativeRoot = GetNativeDropDown(dropdown);
+        var nativeParent = (ToolStripMenuItem)nativeRoot.Items[0];
+        var nativeLeaf = (ToolStripMenuItem)nativeParent.DropDownItems[0];
+        var nativeDisabled = (ToolStripMenuItem)nativeParent.DropDownItems[2];
+
+        nativeParent.PerformClick();
+        nativeDisabled.PerformClick();
+        nativeLeaf.PerformClick();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(BootstrapDropdown.CanActivate(parent), Is.False);
+            Assert.That(BootstrapDropdown.CanActivate(leaf), Is.True);
+            Assert.That(nativeParent.Tag, Is.SameAs(parent));
+            Assert.That(nativeLeaf.Tag, Is.SameAs(leaf));
+            Assert.That(nativeParent.DropDownItems[1], Is.TypeOf<ToolStripSeparator>());
+            Assert.That(parentClicks, Is.Zero);
+            Assert.That(leafClicks, Is.EqualTo(1));
+            Assert.That(disabledClicks, Is.Zero);
+            Assert.That(leaf.Checked, Is.True);
+        }));
+    }
+
+    [Test]
+    public void DropdownHostedControlFactoryBuildsFreshOwnedControlPerEffectiveOpening()
+    {
+        var button = new BootstrapButton { Text = "Menu" };
+        using var form = CreateHost(button);
+        var dropdown = new BootstrapDropdown { Target = button };
+        var created = new System.Collections.Generic.List<DisposalTrackingControl>();
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () =>
+            {
+                var control = new DisposalTrackingControl();
+                created.Add(control);
+                return control;
+            }
+        });
+
+        dropdown.Show();
+        Application.DoEvents();
+        var firstHost = (ToolStripControlHost)GetNativeDropDown(dropdown).Items[0];
+        dropdown.Close();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(created.Count, Is.EqualTo(1));
+            Assert.That(firstHost.Control, Is.SameAs(created[0]));
+            Assert.That(created[0].IsDisposed, Is.False);
+        }));
+
+        dropdown.Show();
+        Application.DoEvents();
+        dropdown.Close();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(created.Count, Is.EqualTo(2));
+            Assert.That(created[0].IsDisposed, Is.True);
+            Assert.That(created[0].DisposeCount, Is.EqualTo(1));
+            Assert.That(created[1].IsDisposed, Is.False);
+        }));
+
+        dropdown.Dispose();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(created[1].IsDisposed, Is.True);
+            Assert.That(created[1].DisposeCount, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void DropdownDisabledHostedItemDisablesBothHostAndCreatedControl()
+    {
+        var button = new BootstrapButton { Text = "Menu" };
+        using var form = CreateHost(button);
+        using var dropdown = new BootstrapDropdown { Target = button };
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            Enabled = false,
+            HostedControlFactory = () => new TextBox()
+        });
+
+        dropdown.Show();
+        Application.DoEvents();
+        var host = (ToolStripControlHost)GetNativeDropDown(dropdown).Items[0];
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(host.Enabled, Is.False);
+            Assert.That(host.Control.Enabled, Is.False);
+        }));
+    }
+
+    [Test]
+    public void DropdownFactoryFailureDisposesPartialSnapshotAndDoesNotOpen()
+    {
+        var button = new BootstrapButton { Text = "Menu" };
+        using var form = CreateHost(button);
+        using var dropdown = new BootstrapDropdown { Target = button };
+        var first = new DisposalTrackingControl();
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => first
+        });
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => null!
+        });
+        var opened = 0;
+        dropdown.Opened += (_, _) => opened++;
+
+        Assert.Throws<InvalidOperationException>((Action)(() => dropdown.Show()));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(opened, Is.Zero);
+            Assert.That(first.IsDisposed, Is.True);
+            Assert.That(first.DisposeCount, Is.EqualTo(1));
+            Assert.That(GetNativeDropDown(dropdown).Items, Is.Empty);
+        }));
+    }
+
+    [Test]
+    public void DropdownFactoryRejectsAlreadyDisposedControlBeforeOpening()
+    {
+        var button = new BootstrapButton { Text = "Menu" };
+        using var form = CreateHost(button);
+        using var dropdown = new BootstrapDropdown { Target = button };
+        var disposed = new DisposalTrackingControl();
+        disposed.Dispose();
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => disposed
+        });
+        var opened = 0;
+        dropdown.Opened += (_, _) => opened++;
+
+        Assert.Throws<InvalidOperationException>((Action)(() => dropdown.Show()));
+        Assert.That(opened, Is.Zero);
+    }
+
+    [Test]
     public void DropdownShowNoOpsForEmptyDisabledAndLoadingTargets()
     {
         var button = new BootstrapButton { Text = "Menu" };
