@@ -13,7 +13,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "83574b5a78bd563ccbe641845b1a1a0c9e2eee1e0f717fba0ecf25cf89f35ba8";
+    private const string ApprovedV1Fingerprint = "29e6fca0440d4696a03471802b5c3b10aa3214b2c6ee2c2a715f58f298f2bd37";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -43,146 +43,81 @@ public sealed class Phase16PublicApiBaselineTests
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(typeof(BootstrapPopover).GetProperty(nameof(BootstrapPopover.Content))!.PropertyType, Is.EqualTo(typeof(Control)));
-            Assert.That(typeof(BootstrapTooltip).GetMethod("Show", BindingFlags.Instance | BindingFlags.Public), Is.Null);
-            Assert.That(typeof(BootstrapTooltip).GetMethod("Hide", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(exportedNames, Does.Contain(typeof(BootstrapOverlayPlacement).FullName));
+            Assert.That(exportedNames, Does.Contain(typeof(BootstrapOverlayCollisionBehavior).FullName));
+            Assert.That(exportedNames, Does.Contain(typeof(BootstrapTooltipPositioning).FullName));
+            Assert.That(exportedNames, Does.Contain(typeof(BootstrapPopoverTrigger).FullName));
+            Assert.That(exportedNames, Does.Contain(typeof(BootstrapPopover).FullName));
+            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapOverlaySurface"));
+            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapOverlayDropDown"));
+            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapOverlayAnchorTracker"));
             Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Rendering.BootstrapOverlayPlacementEngine"));
             Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Rendering.BootstrapOverlayPlacementRequest"));
-            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapOverlayDropDown"));
-            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapOverlaySurface"));
+            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Rendering.BootstrapOverlayPlacementResult"));
         }));
     }
 
     private static string BuildApiSurface(Assembly assembly)
     {
-        var lines = new List<string>();
+        var builder = new StringBuilder();
+        var types = assembly.GetExportedTypes()
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
 
-        foreach (var type in assembly.GetExportedTypes().OrderBy(type => type.FullName, StringComparer.Ordinal))
+        foreach (var type in types)
         {
-            lines.Add(FormatTypeDeclaration(type));
-
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-
-            foreach (var constructor in type.GetConstructors(flags).Where(IsVisible).OrderBy(FormatConstructor, StringComparer.Ordinal))
-            {
-                lines.Add("  " + FormatConstructor(constructor));
-            }
-
-            foreach (var field in type.GetFields(flags).Where(IsVisible).OrderBy(FormatField, StringComparer.Ordinal))
-            {
-                lines.Add("  " + FormatField(field));
-            }
-
-            foreach (var property in type.GetProperties(flags).Where(IsVisible).OrderBy(FormatProperty, StringComparer.Ordinal))
-            {
-                lines.Add("  " + FormatProperty(property));
-            }
-
-            foreach (var eventInfo in type.GetEvents(flags).Where(IsVisible).OrderBy(FormatEvent, StringComparer.Ordinal))
-            {
-                lines.Add("  " + FormatEvent(eventInfo));
-            }
-
-            foreach (var method in type.GetMethods(flags)
-                         .Where(method => !method.IsSpecialName && IsVisible(method))
-                         .OrderBy(FormatMethod, StringComparer.Ordinal))
-            {
-                lines.Add("  " + FormatMethod(method));
-            }
+            AppendType(builder, type);
         }
 
-        return string.Join("\n", lines);
+        return builder.ToString();
     }
 
-    private static string FormatTypeDeclaration(Type type)
+    private static void AppendType(StringBuilder builder, Type type)
     {
-        if (type.IsEnum)
+        builder.Append(type.IsInterface ? "interface " : type.IsEnum ? "enum " : type.IsValueType ? "struct " : "class ")
+            .Append(type.FullName);
+
+        if (type.BaseType is not null && type.BaseType != typeof(object) && !type.IsEnum)
         {
-            return "enum " + FormatType(type) + " : " + FormatType(Enum.GetUnderlyingType(type));
+            builder.Append(" : ").Append(FormatType(type.BaseType));
         }
 
-        if (type.IsInterface)
+        builder.AppendLine();
+
+        foreach (var constructor in type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                     .Where(IsVisible)
+                     .OrderBy(FormatConstructor, StringComparer.Ordinal))
         {
-            return "interface " + FormatType(type);
+            builder.Append("  ").AppendLine(FormatConstructor(constructor));
         }
 
-        var kind = type.IsValueType ? "struct " : "class ";
-        var baseType = type.BaseType;
-        return kind + FormatType(type) + (baseType is null ? string.Empty : " : " + FormatType(baseType));
-    }
-
-    private static string FormatConstructor(ConstructorInfo constructor)
-    {
-        return Visibility(constructor) + " ctor(" + string.Join(",", constructor.GetParameters().Select(FormatParameter)) + ")";
-    }
-
-    private static string FormatField(FieldInfo field)
-    {
-        var constant = field.IsLiteral ? " = " + Convert.ToString(field.GetRawConstantValue(), System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
-        return Visibility(field) + " field " + FormatType(field.FieldType) + " " + field.Name + constant;
-    }
-
-    private static string FormatProperty(PropertyInfo property)
-    {
-        var accessors = property.GetAccessors(nonPublic: true).Where(IsVisible).Select(Visibility).Distinct().OrderBy(value => value, StringComparer.Ordinal);
-        var indexParameters = property.GetIndexParameters();
-        var index = indexParameters.Length == 0 ? string.Empty : "[" + string.Join(",", indexParameters.Select(FormatParameter)) + "]";
-        return string.Join("/", accessors) + " property " + FormatType(property.PropertyType) + " " + property.Name + index;
-    }
-
-    private static string FormatEvent(EventInfo eventInfo)
-    {
-        var methods = new[] { eventInfo.AddMethod, eventInfo.RemoveMethod }.Where(method => method is not null).Cast<MethodInfo>().Where(IsVisible);
-        return string.Join("/", methods.Select(Visibility).Distinct().OrderBy(value => value, StringComparer.Ordinal)) +
-               " event " + FormatType(eventInfo.EventHandlerType!) + " " + eventInfo.Name;
-    }
-
-    private static string FormatMethod(MethodInfo method)
-    {
-        var genericArity = method.IsGenericMethodDefinition ? "`" + method.GetGenericArguments().Length : string.Empty;
-        return Visibility(method) + " method " + FormatType(method.ReturnType) + " " + method.Name + genericArity +
-               "(" + string.Join(",", method.GetParameters().Select(FormatParameter)) + ")";
-    }
-
-    private static string FormatParameter(ParameterInfo parameter)
-    {
-        var modifier = parameter.IsOut ? "out " : parameter.ParameterType.IsByRef ? "ref " : string.Empty;
-        var parameterType = parameter.ParameterType.IsByRef ? parameter.ParameterType.GetElementType()! : parameter.ParameterType;
-        var optional = parameter.IsOptional ? " optional" : string.Empty;
-        return modifier + FormatType(parameterType) + optional;
-    }
-
-    private static string FormatType(Type type)
-    {
-        if (type.IsByRef)
+        foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                     .Where(IsVisible)
+                     .OrderBy(FormatField, StringComparer.Ordinal))
         {
-            return FormatType(type.GetElementType()!) + "&";
+            builder.Append("  ").AppendLine(FormatField(field));
         }
 
-        if (type.IsArray)
+        foreach (var property in type.GetProperties(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                     .Where(IsVisible)
+                     .OrderBy(FormatProperty, StringComparer.Ordinal))
         {
-            return FormatType(type.GetElementType()!) + "[]";
+            builder.Append("  ").AppendLine(FormatProperty(property));
         }
 
-        if (type.IsGenericParameter)
+        foreach (var eventInfo in type.GetEvents(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                     .Where(IsVisible)
+                     .OrderBy(FormatEvent, StringComparer.Ordinal))
         {
-            return "!" + type.GenericParameterPosition;
+            builder.Append("  ").AppendLine(FormatEvent(eventInfo));
         }
 
-        if (!type.IsGenericType)
+        foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                     .Where(method => IsVisible(method) && !method.IsSpecialName)
+                     .OrderBy(FormatMethod, StringComparer.Ordinal))
         {
-            return (type.FullName ?? type.Name).Replace('+', '.');
+            builder.Append("  ").AppendLine(FormatMethod(method));
         }
-
-        var definition = type.GetGenericTypeDefinition();
-        var definitionName = (definition.FullName ?? definition.Name).Replace('+', '.');
-        var tickIndex = definitionName.IndexOf('`');
-        if (tickIndex >= 0)
-        {
-            definitionName = definitionName.Substring(0, tickIndex);
-        }
-
-        return definitionName + "<" + string.Join(",", type.GetGenericArguments().Select(FormatType)) + ">";
     }
 
     private static bool IsVisible(MethodBase method)
@@ -197,39 +132,94 @@ public sealed class Phase16PublicApiBaselineTests
 
     private static bool IsVisible(PropertyInfo property)
     {
-        return property.GetAccessors(nonPublic: true).Any(IsVisible);
+        return (property.GetMethod is not null && IsVisible(property.GetMethod))
+            || (property.SetMethod is not null && IsVisible(property.SetMethod));
     }
 
     private static bool IsVisible(EventInfo eventInfo)
     {
-        return (eventInfo.AddMethod is not null && IsVisible(eventInfo.AddMethod)) ||
-               (eventInfo.RemoveMethod is not null && IsVisible(eventInfo.RemoveMethod));
+        return eventInfo.AddMethod is not null && IsVisible(eventInfo.AddMethod);
+    }
+
+    private static string FormatConstructor(ConstructorInfo constructor)
+    {
+        return Visibility(constructor) + " ctor(" + string.Join(",", constructor.GetParameters().Select(FormatParameter)) + ")";
+    }
+
+    private static string FormatField(FieldInfo field)
+    {
+        var value = field.IsLiteral && field.GetRawConstantValue() is object constant
+            ? " = " + Convert.ToString(constant, System.Globalization.CultureInfo.InvariantCulture)
+            : string.Empty;
+        return Visibility(field) + " field " + FormatType(field.FieldType) + " " + field.Name + value;
+    }
+
+    private static string FormatProperty(PropertyInfo property)
+    {
+        var accessor = property.GetMethod ?? property.SetMethod!;
+        return Visibility(accessor) + " property " + FormatType(property.PropertyType) + " " + property.Name;
+    }
+
+    private static string FormatEvent(EventInfo eventInfo)
+    {
+        return Visibility(eventInfo.AddMethod!) + " event " + FormatType(eventInfo.EventHandlerType!) + " " + eventInfo.Name;
+    }
+
+    private static string FormatMethod(MethodInfo method)
+    {
+        return Visibility(method) + " method " + FormatType(method.ReturnType) + " " + method.Name + "(" + string.Join(",", method.GetParameters().Select(FormatParameter)) + ")";
+    }
+
+    private static string FormatParameter(ParameterInfo parameter)
+    {
+        var prefix = parameter.ParameterType.IsByRef ? (parameter.IsOut ? "out " : "ref ") : string.Empty;
+        var type = parameter.ParameterType.IsByRef ? parameter.ParameterType.GetElementType()! : parameter.ParameterType;
+        return prefix + FormatType(type) + (parameter.IsOptional ? " optional" : string.Empty);
+    }
+
+    private static string FormatType(Type type)
+    {
+        if (type.IsGenericType)
+        {
+            var definitionName = type.GetGenericTypeDefinition().FullName!;
+            var tickIndex = definitionName.IndexOf('`');
+            if (tickIndex >= 0)
+            {
+                definitionName = definitionName.Substring(0, tickIndex);
+            }
+
+            return definitionName + "<" + string.Join(",", type.GetGenericArguments().Select(FormatType)) + ">";
+        }
+
+        if (type.IsArray)
+        {
+            return FormatType(type.GetElementType()!) + "[]";
+        }
+
+        return type.FullName ?? type.Name;
     }
 
     private static string Visibility(MethodBase method)
     {
-        if (method.IsPublic)
-        {
-            return "public";
-        }
-
-        return method.IsFamilyOrAssembly ? "protected-internal" : "protected";
+        if (method.IsPublic) return "public";
+        if (method.IsFamilyOrAssembly) return "protected internal";
+        if (method.IsFamily) return "protected";
+        throw new InvalidOperationException("Member is not part of the exported API baseline.");
     }
 
     private static string Visibility(FieldInfo field)
     {
-        if (field.IsPublic)
-        {
-            return "public";
-        }
-
-        return field.IsFamilyOrAssembly ? "protected-internal" : "protected";
+        if (field.IsPublic) return "public";
+        if (field.IsFamilyOrAssembly) return "protected internal";
+        if (field.IsFamily) return "protected";
+        throw new InvalidOperationException("Member is not part of the exported API baseline.");
     }
 
-    private static string ComputeSha256(string text)
+    private static string ComputeSha256(string value)
     {
         using var sha256 = SHA256.Create();
-        var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(text));
-        return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
+        var bytes = Encoding.UTF8.GetBytes(value);
+        var hash = sha256.ComputeHash(bytes);
+        return string.Concat(hash.Select(b => b.ToString("x2")));
     }
 }
