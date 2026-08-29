@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -35,7 +37,7 @@ public sealed class BootstrapCalendarPickerTests
 
         dropdown.Show();
         Application.DoEvents();
-        probe!.RaiseClick();
+        SendHostedClick(probe!);
         Application.DoEvents();
 
         Assert.Multiple((Action)(() =>
@@ -43,7 +45,7 @@ public sealed class BootstrapCalendarPickerTests
             Assert.That(opened, Is.EqualTo(1));
             Assert.That(closed, Is.Zero);
             Assert.That(focusedAfterOpened, Is.True);
-            Assert.That(probe.Focused, Is.True);
+            Assert.That(probe!.Focused, Is.True);
             Assert.That(probe.ClickCount, Is.EqualTo(1));
         }));
     }
@@ -83,8 +85,7 @@ public sealed class BootstrapCalendarPickerTests
 
         foreach (var key in keys)
         {
-            Assert.That(probe.RaiseIsInputKey(key), Is.True, $"{key} must remain input for a hosted calendar control.");
-            probe.RaiseKeyDown(key);
+            SendKeys.SendWait(ToSendKeysSequence(key));
             Application.DoEvents();
         }
 
@@ -92,7 +93,7 @@ public sealed class BootstrapCalendarPickerTests
         {
             Assert.That(focusSucceeded, Is.True);
             Assert.That(probe.Focused, Is.True);
-            Assert.That(probe.InputKeys, Is.EqualTo(keys));
+            Assert.That(probe.InputKeys.Distinct(), Is.EqualTo(keys));
             Assert.That(probe.KeyDownKeys, Is.EqualTo(keys));
             Assert.That(opened, Is.EqualTo(1));
             Assert.That(closed, Is.Zero);
@@ -149,6 +150,40 @@ public sealed class BootstrapCalendarPickerTests
         return form;
     }
 
+    private static void SendHostedClick(Control control)
+    {
+        var center = new Point(control.Width / 2, control.Height / 2);
+        var lParam = CreateMouseLParam(center.X, center.Y);
+        SendMessage(control.Handle, 0x0201, (IntPtr)1, lParam);
+        SendMessage(control.Handle, 0x0202, IntPtr.Zero, lParam);
+    }
+
+    private static string ToSendKeysSequence(Keys key)
+    {
+        return key switch
+        {
+            Keys.Left => "{LEFT}",
+            Keys.Right => "{RIGHT}",
+            Keys.Up => "{UP}",
+            Keys.Down => "{DOWN}",
+            Keys.PageUp => "{PGUP}",
+            Keys.PageDown => "{PGDN}",
+            Keys.Home => "{HOME}",
+            Keys.End => "{END}",
+            Keys.Enter => "{ENTER}",
+            Keys.Space => " ",
+            _ => throw new ArgumentOutOfRangeException(nameof(key), key, "Unsupported hosted-control key.")
+        };
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
+
+    private static IntPtr CreateMouseLParam(int x, int y)
+    {
+        return (IntPtr)((y << 16) | (x & 0xffff));
+    }
+
     private sealed class FocusableHostedProbe : Control
     {
         private static readonly HashSet<Keys> CalendarKeys = new()
@@ -177,21 +212,6 @@ public sealed class BootstrapCalendarPickerTests
         public List<Keys> InputKeys { get; } = new();
 
         public List<Keys> KeyDownKeys { get; } = new();
-
-        public void RaiseClick()
-        {
-            OnClick(EventArgs.Empty);
-        }
-
-        public bool RaiseIsInputKey(Keys keyData)
-        {
-            return IsInputKey(keyData);
-        }
-
-        public void RaiseKeyDown(Keys keyData)
-        {
-            OnKeyDown(new KeyEventArgs(keyData));
-        }
 
         protected override bool IsInputKey(Keys keyData)
         {
