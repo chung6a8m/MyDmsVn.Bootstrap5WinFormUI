@@ -58,6 +58,52 @@ public sealed class BootstrapTooltipTests
     }
 
     [Test]
+    public void ManagedPositioningDefaultsAreBackwardCompatible()
+    {
+        using var tooltip = new BootstrapTooltip();
+        var native = GetInnerToolTip(tooltip);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(tooltip.Positioning, Is.EqualTo(BootstrapTooltipPositioning.Native));
+            Assert.That(tooltip.Placement, Is.EqualTo(BootstrapOverlayPlacement.Top));
+            Assert.That(tooltip.CollisionBehavior, Is.EqualTo(BootstrapOverlayCollisionBehavior.FlipAndShift));
+            Assert.That(tooltip.Offset, Is.EqualTo(6));
+            Assert.That(tooltip.BoundaryPadding, Is.EqualTo(8));
+            Assert.That(native.OwnerDraw, Is.True);
+            Assert.That(native.IsBalloon, Is.False);
+        }));
+    }
+
+    [Test]
+    public void ManagedPositioningPropertiesRejectInvalidValuesBeforeMutation()
+    {
+        using var tooltip = new BootstrapTooltip
+        {
+            Positioning = BootstrapTooltipPositioning.Managed,
+            Placement = BootstrapOverlayPlacement.BottomEnd,
+            CollisionBehavior = BootstrapOverlayCollisionBehavior.Shift,
+            Offset = 9,
+            BoundaryPadding = 11
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => tooltip.Positioning = (BootstrapTooltipPositioning)99));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => tooltip.Placement = (BootstrapOverlayPlacement)99));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => tooltip.CollisionBehavior = (BootstrapOverlayCollisionBehavior)99));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => tooltip.Offset = -1));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => tooltip.BoundaryPadding = -1));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(tooltip.Positioning, Is.EqualTo(BootstrapTooltipPositioning.Managed));
+            Assert.That(tooltip.Placement, Is.EqualTo(BootstrapOverlayPlacement.BottomEnd));
+            Assert.That(tooltip.CollisionBehavior, Is.EqualTo(BootstrapOverlayCollisionBehavior.Shift));
+            Assert.That(tooltip.Offset, Is.EqualTo(9));
+            Assert.That(tooltip.BoundaryPadding, Is.EqualTo(11));
+        }));
+    }
+
+    [Test]
     public void ComponentProvidesToolTipExtenderOnlyToControls()
     {
         using var tooltip = new BootstrapTooltip();
@@ -230,7 +276,7 @@ public sealed class BootstrapTooltipTests
         var type = typeof(BootstrapTooltip);
         var forbiddenProperties = new[]
         {
-            "OwnerDraw", "IsBalloon", "AutomaticDelay", "UseAnimation", "UseFading", "ToolTipTitle", "ToolTipIcon", "NativeToolTip"
+            "OwnerDraw", "IsBalloon", "AutomaticDelay", "UseAnimation", "UseFading", "ToolTipTitle", "ToolTipIcon", "NativeToolTip", "Content"
         };
         var forbiddenMethods = new[] { "Show", "Hide" };
 
