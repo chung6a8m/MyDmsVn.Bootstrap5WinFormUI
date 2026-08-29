@@ -173,6 +173,7 @@ public class BootstrapDropdown : Component
             return;
         }
 
+        ValidateItemTree(_items);
         RebuildNativeItems(target);
         _dropDown.Show(target, new Point(0, target.Height));
     }
@@ -196,6 +197,17 @@ public class BootstrapDropdown : Component
     internal static bool CanActivate(BootstrapDropdownItem item)
     {
         return item.Kind == BootstrapDropdownItemKind.Item && item.Enabled;
+    }
+
+    internal static void ValidateItemTree(BootstrapDropdownItemCollection items)
+    {
+        if (items is null)
+        {
+            throw new ArgumentNullException(nameof(items));
+        }
+
+        var visited = new HashSet<BootstrapDropdownItem>();
+        ValidateItemLevel(items, visited);
     }
 
     internal void ActivateItem(BootstrapDropdownItem item)
@@ -262,6 +274,54 @@ public class BootstrapDropdown : Component
     private bool CanOpen(BootstrapButton target)
     {
         return !target.IsDisposed && target.Enabled && !target.Loading && _items.Count > 0;
+    }
+
+    private static void ValidateItemLevel(
+        BootstrapDropdownItemCollection items,
+        HashSet<BootstrapDropdownItem> visited)
+    {
+        foreach (var item in items)
+        {
+            if (!visited.Add(item))
+            {
+                throw new InvalidOperationException(
+                    "A dropdown item instance may appear only once in a dropdown tree.");
+            }
+
+            switch (item.Kind)
+            {
+                case BootstrapDropdownItemKind.Item:
+                    if (item.HostedControlFactory is not null)
+                    {
+                        throw new InvalidOperationException(
+                            "A normal dropdown item cannot define a hosted-control factory.");
+                    }
+
+                    ValidateItemLevel(item.DropDownItems, visited);
+                    break;
+
+                case BootstrapDropdownItemKind.Separator:
+                    if (item.DropDownItems.Count > 0 || item.HostedControlFactory is not null)
+                    {
+                        throw new InvalidOperationException(
+                            "A dropdown separator cannot contain child items or a hosted-control factory.");
+                    }
+
+                    break;
+
+                case BootstrapDropdownItemKind.HostedControl:
+                    if (item.DropDownItems.Count > 0 || item.HostedControlFactory is null)
+                    {
+                        throw new InvalidOperationException(
+                            "A hosted-control item must define a factory and cannot contain child items.");
+                    }
+
+                    break;
+
+                default:
+                    throw new InvalidOperationException("Unsupported dropdown item kind.");
+            }
+        }
     }
 
     private void AttachTarget(BootstrapButton target)

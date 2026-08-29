@@ -2,6 +2,8 @@ using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -343,6 +345,115 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void DropdownTreeValidationRejectsSeparatorChildrenAndFactory()
+    {
+        var separatorWithChild = new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator);
+        separatorWithChild.DropDownItems.Add(new BootstrapDropdownItem());
+        var separatorWithFactory = new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator)
+        {
+            HostedControlFactory = () => new TextBox()
+        };
+
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            ValidateItemTreeViaInternalSeam(CollectionOf(separatorWithChild))));
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            ValidateItemTreeViaInternalSeam(CollectionOf(separatorWithFactory))));
+    }
+
+    [Test]
+    public void DropdownTreeValidationRejectsMalformedHostedControlItems()
+    {
+        var missingFactory = new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl);
+        var withChildren = new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => new TextBox()
+        };
+        withChildren.DropDownItems.Add(new BootstrapDropdownItem());
+
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            ValidateItemTreeViaInternalSeam(CollectionOf(missingFactory))));
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            ValidateItemTreeViaInternalSeam(CollectionOf(withChildren))));
+    }
+
+    [Test]
+    public void DropdownTreeValidationRejectsFactoryOnNormalItem()
+    {
+        var item = new BootstrapDropdownItem
+        {
+            HostedControlFactory = () => new TextBox()
+        };
+
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            ValidateItemTreeViaInternalSeam(CollectionOf(item))));
+    }
+
+    [Test]
+    public void DropdownTreeValidationRejectsDuplicateInstancesAndCycles()
+    {
+        var duplicate = new BootstrapDropdownItem();
+        var duplicates = new BootstrapDropdownItemCollection { duplicate, duplicate };
+
+        var directCycle = new BootstrapDropdownItem();
+        directCycle.DropDownItems.Add(directCycle);
+
+        var indirectRoot = new BootstrapDropdownItem();
+        var indirectChild = new BootstrapDropdownItem();
+        indirectRoot.DropDownItems.Add(indirectChild);
+        indirectChild.DropDownItems.Add(indirectRoot);
+
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            ValidateItemTreeViaInternalSeam(duplicates)));
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            ValidateItemTreeViaInternalSeam(CollectionOf(directCycle))));
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            ValidateItemTreeViaInternalSeam(CollectionOf(indirectRoot))));
+    }
+
+    [Test]
+    public void DropdownTreeValidationAcceptsValidMixedDepthTree()
+    {
+        var root = new BootstrapDropdownItem { Text = "Root" };
+        var child = new BootstrapDropdownItem { Text = "Child" };
+        child.DropDownItems.Add(new BootstrapDropdownItem { Text = "Leaf" });
+        child.DropDownItems.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator));
+        child.DropDownItems.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => new TextBox()
+        });
+        root.DropDownItems.Add(child);
+
+        Assert.DoesNotThrow((Action)(() =>
+            ValidateItemTreeViaInternalSeam(CollectionOf(root))));
+    }
+
+    [Test]
+    public void DropdownShowValidatesBeforeReplacingClosedNativeSnapshot()
+    {
+        var button = new BootstrapButton { Text = "Menu" };
+        using var form = CreateHost(button);
+        using var dropdown = new BootstrapDropdown { Target = button };
+        dropdown.Items.Add(new BootstrapDropdownItem { Text = "Valid" });
+        dropdown.Show();
+        Application.DoEvents();
+        dropdown.Close();
+        Application.DoEvents();
+        var nativeDropDown = GetNativeDropDown(dropdown);
+        var originalNativeItem = nativeDropDown.Items[0];
+
+        dropdown.Items[0].HostedControlFactory = () => new TextBox();
+
+        Assert.Throws<InvalidOperationException>((Action)(() => dropdown.Show()));
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(nativeDropDown.Visible, Is.False);
+            Assert.That(nativeDropDown.Items.Count, Is.EqualTo(1));
+            Assert.That(nativeDropDown.Items[0], Is.SameAs(originalNativeItem));
+            Assert.That(originalNativeItem.IsDisposed, Is.False);
+        }));
+    }
+
+    [Test]
     public void DropdownActivationDispatchesOnlyEnabledCommandsAndNeverTogglesChecked()
     {
         using var dropdown = new BootstrapDropdown();
@@ -634,6 +745,35 @@ public sealed class BootstrapDropdownTests
         form.Show();
         Application.DoEvents();
         return form;
+    }
+
+    private static BootstrapDropdownItemCollection CollectionOf(BootstrapDropdownItem item)
+    {
+        return new BootstrapDropdownItemCollection { item };
+    }
+
+    private static void ValidateItemTreeViaInternalSeam(BootstrapDropdownItemCollection items)
+    {
+        var method = typeof(BootstrapDropdown).GetMethod(
+            "ValidateItemTree",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null, "BootstrapDropdown must expose the planned internal validation seam.");
+
+        try
+        {
+            method!.Invoke(null, new object[] { items });
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+        }
+    }
+
+    private static ToolStripDropDownMenu GetNativeDropDown(BootstrapDropdown dropdown)
+    {
+        var field = typeof(BootstrapDropdown).GetField("_dropDown", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null);
+        return (ToolStripDropDownMenu)field!.GetValue(dropdown)!;
     }
 
     private sealed class RecordingIconRenderer : IIconRenderer
