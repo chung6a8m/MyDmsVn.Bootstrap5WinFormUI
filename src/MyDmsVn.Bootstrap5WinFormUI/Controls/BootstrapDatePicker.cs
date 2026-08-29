@@ -327,6 +327,52 @@ public class BootstrapDatePicker : UserControl
 
     private int EffectiveDpi => DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
 
+    private bool ShouldSerializeValue()
+    {
+        return ShouldSerializeNativeProperty(nameof(DateTimePicker.Value));
+    }
+
+    private void ResetValue()
+    {
+        ResetNativeProperty(nameof(DateTimePicker.Value));
+    }
+
+    private bool ShouldSerializeMinDate()
+    {
+        return ShouldSerializeNativeProperty(nameof(DateTimePicker.MinDate));
+    }
+
+    private void ResetMinDate()
+    {
+        ResetNativeProperty(nameof(DateTimePicker.MinDate));
+    }
+
+    private bool ShouldSerializeMaxDate()
+    {
+        return ShouldSerializeNativeProperty(nameof(DateTimePicker.MaxDate));
+    }
+
+    private void ResetMaxDate()
+    {
+        ResetNativeProperty(nameof(DateTimePicker.MaxDate));
+    }
+
+    private bool ShouldSerializeNativeProperty(string propertyName)
+    {
+        return GetNativePropertyDescriptor(propertyName).ShouldSerializeValue(_picker);
+    }
+
+    private void ResetNativeProperty(string propertyName)
+    {
+        GetNativePropertyDescriptor(propertyName).ResetValue(_picker);
+    }
+
+    private PropertyDescriptor GetNativePropertyDescriptor(string propertyName)
+    {
+        return TypeDescriptor.GetProperties(_picker)[propertyName]
+            ?? throw new InvalidOperationException($"Native DateTimePicker property '{propertyName}' was not found.");
+    }
+
     private void OnPickerValueChanged(object? sender, EventArgs e)
     {
         ValueChanged?.Invoke(this, e);
@@ -438,9 +484,16 @@ public class BootstrapDatePicker : UserControl
             BootstrapThemeManager.CurrentTheme.Metrics,
             EffectiveDpi,
             _borderRadius);
+        var nativePreferredHeight = GetNativePreferredHeight();
+        var minimumHeight = nativePreferredHeight + (metrics.ShellPadding * 2);
+        if (ClientSize.Height < minimumHeight)
+        {
+            Height = minimumHeight;
+        }
+
         _picker.Bounds = BootstrapDatePickerRenderLogic.CalculateNativeBounds(
             ClientSize,
-            GetNativePreferredHeight(),
+            nativePreferredHeight,
             metrics);
     }
 
