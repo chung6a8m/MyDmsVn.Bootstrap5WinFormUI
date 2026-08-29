@@ -51,7 +51,13 @@ public partial class BootstrapSelect
         {
             return BootstrapSelectResultSet.SingleMessage(BootstrapSelectResultRowKind.Loading, "Loading...");
         }
-        return _searchController.Results;
+
+        var result = _searchController.Results;
+        if (_searchController.CurrentPage >= 1)
+        {
+            result = BootstrapSelectResultBuilder.AppendCreateValue(result, _searchController.LoadedItems, effectiveText, AllowCustomValues);
+        }
+        return result;
     }
 
     internal void NotifyPopupSearchTextChanged(string searchText)
