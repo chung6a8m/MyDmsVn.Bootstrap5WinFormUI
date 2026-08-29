@@ -15,15 +15,15 @@ public sealed class BootstrapOverlayPlacementEngineTests
         yield return Case(BootstrapOverlayPlacement.Top, 110, 50);
         yield return Case(BootstrapOverlayPlacement.TopStart, 100, 50);
         yield return Case(BootstrapOverlayPlacement.TopEnd, 120, 50);
-        yield return Case(BootstrapOverlayPlacement.Bottom, 110, 150);
-        yield return Case(BootstrapOverlayPlacement.BottomStart, 100, 150);
-        yield return Case(BootstrapOverlayPlacement.BottomEnd, 120, 150);
-        yield return Case(BootstrapOverlayPlacement.Left, 30, 100);
-        yield return Case(BootstrapOverlayPlacement.LeftStart, 30, 100);
-        yield return Case(BootstrapOverlayPlacement.LeftEnd, 30, 100);
-        yield return Case(BootstrapOverlayPlacement.Right, 170, 100);
-        yield return Case(BootstrapOverlayPlacement.RightStart, 170, 100);
-        yield return Case(BootstrapOverlayPlacement.RightEnd, 170, 100);
+        yield return Case(BootstrapOverlayPlacement.Bottom, 110, 160);
+        yield return Case(BootstrapOverlayPlacement.BottomStart, 100, 160);
+        yield return Case(BootstrapOverlayPlacement.BottomEnd, 120, 160);
+        yield return Case(BootstrapOverlayPlacement.Left, 40, 105);
+        yield return Case(BootstrapOverlayPlacement.LeftStart, 40, 100);
+        yield return Case(BootstrapOverlayPlacement.LeftEnd, 40, 110);
+        yield return Case(BootstrapOverlayPlacement.Right, 180, 105);
+        yield return Case(BootstrapOverlayPlacement.RightStart, 180, 100);
+        yield return Case(BootstrapOverlayPlacement.RightEnd, 180, 110);
     }
 
     [TestCaseSource(nameof(ExplicitPlacements))]
@@ -55,7 +55,7 @@ public sealed class BootstrapOverlayPlacementEngineTests
     public void FlipUsesExactOppositeAndShiftChangesOnlyCrossAxis()
     {
         var result = Compute(
-            new Rectangle(460, 5, 30, 30),
+            new Rectangle(470, 5, 30, 30),
             new Size(100, 50),
             new Rectangle(0, 0, 500, 500),
             BootstrapOverlayPlacement.TopEnd,
