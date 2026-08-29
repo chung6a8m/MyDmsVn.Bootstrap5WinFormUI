@@ -232,7 +232,6 @@ public sealed class BootstrapSelectDemoForm : Form
         {
             AutoSize = true,
             Text = title,
-            Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold),
             Margin = new Padding(0, 8, 12, 18)
         };
 
