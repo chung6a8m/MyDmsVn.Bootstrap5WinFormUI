@@ -52,14 +52,17 @@ public sealed class NavigationDemoFormTests
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(dropdowns.Length, Is.EqualTo(5));
+            Assert.That(dropdowns.Length, Is.EqualTo(8));
             Assert.That(byTargetName.Keys, Is.SupersetOf(new[]
             {
                 "Dropdown basic",
                 "Dropdown icons",
                 "Dropdown states",
                 "Dropdown long menu",
-                "Dropdown stress"
+                "Dropdown stress",
+                "Dropdown nested",
+                "Dropdown hosted controls",
+                "Dropdown mixed composition"
             }));
 
             Assert.That(byTargetName["Dropdown basic"].Items.Count, Is.EqualTo(3));
@@ -77,7 +80,59 @@ public sealed class NavigationDemoFormTests
             Assert.That(byTargetName["Dropdown long menu"].Items.Any(item => item.Text.Length > 50), Is.True);
 
             Assert.That(byTargetName["Dropdown stress"].Items.Any(item => item.Text.IndexOf("Toggle Light / Dark", StringComparison.Ordinal) >= 0), Is.True);
+            Assert.That(HasLeafAtDepth(byTargetName["Dropdown nested"].Items, 3), Is.True);
+
+            var hostedItems = Flatten(byTargetName["Dropdown hosted controls"].Items)
+                .Where(item => item.Kind == BootstrapDropdownItemKind.HostedControl)
+                .ToArray();
+            Assert.That(hostedItems.Length, Is.GreaterThanOrEqualTo(2));
+            foreach (var hostedItem in hostedItems)
+            {
+                using var first = hostedItem.HostedControlFactory!();
+                using var second = hostedItem.HostedControlFactory!();
+                Assert.That(second, Is.Not.SameAs(first));
+            }
+
+            var mixed = byTargetName["Dropdown mixed composition"].Items;
+            Assert.That(Flatten(mixed).Any(item => item.DropDownItems.Count > 0), Is.True);
+            Assert.That(Flatten(mixed).Any(item => item.Kind == BootstrapDropdownItemKind.HostedControl), Is.True);
             Assert.That(Descendants(form).OfType<Label>().Any(label => label.AccessibleName == "Dropdown manual verification matrix"), Is.True);
+        }));
+    }
+
+    [Test]
+    public void DemoCoversSplitPrimaryNestedHostedLoadingThemeFontAndAccessibilityScenarios()
+    {
+        using var form = new NavigationDemoForm();
+        var splits = Descendants(form).OfType<BootstrapSplitButton>().ToArray();
+        var byAccessibleName = splits.ToDictionary(split => split.AccessibleName!, StringComparer.Ordinal);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(splits.Length, Is.EqualTo(2));
+            Assert.That(byAccessibleName.Keys, Is.SupersetOf(new[]
+            {
+                "Split save command",
+                "Custom font split command"
+            }));
+
+            var composed = byAccessibleName["Split save command"];
+            Assert.That(Flatten(composed.Items).Any(item => item.DropDownItems.Count > 0), Is.True);
+            Assert.That(Flatten(composed.Items).Any(item => item.Kind == BootstrapDropdownItemKind.HostedControl), Is.True);
+            Assert.That(Descendants(form).OfType<CheckBox>().Any(check => check.AccessibleName == "Split loading state"), Is.True);
+
+            var customFont = byAccessibleName["Custom font split command"];
+            Assert.That(customFont.Font.SizeInPoints, Is.GreaterThan(10f));
+            Assert.That(Flatten(customFont.Items).Any(item => item.Text.IndexOf("Light / Dark", StringComparison.Ordinal) >= 0), Is.True);
+
+            var matrix = Descendants(form).OfType<Label>()
+                .Single(label => label.AccessibleName == "Dropdown manual verification matrix")
+                .Text;
+            Assert.That(matrix, Does.Contain("Tab/Shift+Tab"));
+            Assert.That(matrix, Does.Contain("Right/Left"));
+            Assert.That(matrix, Does.Contain("hosted controls").IgnoreCase);
+            Assert.That(matrix, Does.Contain("AccessibleName"));
+            Assert.That(matrix, Does.Contain("inherited Controls").IgnoreCase);
         }));
     }
 
@@ -107,5 +162,45 @@ public sealed class NavigationDemoFormTests
                 yield return nested;
             }
         }
+    }
+
+    private static IEnumerable<BootstrapDropdownItem> Flatten(BootstrapDropdownItemCollection items)
+    {
+        foreach (var item in items)
+        {
+            yield return item;
+            foreach (var child in Flatten(item.DropDownItems))
+            {
+                yield return child;
+            }
+        }
+    }
+
+    private static bool HasLeafAtDepth(BootstrapDropdownItemCollection items, int requiredDepth)
+    {
+        return HasLeafAtDepth(items, requiredDepth, 1);
+    }
+
+    private static bool HasLeafAtDepth(
+        BootstrapDropdownItemCollection items,
+        int requiredDepth,
+        int currentDepth)
+    {
+        foreach (var item in items)
+        {
+            if (item.Kind == BootstrapDropdownItemKind.Item &&
+                item.DropDownItems.Count == 0 &&
+                currentDepth >= requiredDepth)
+            {
+                return true;
+            }
+
+            if (HasLeafAtDepth(item.DropDownItems, requiredDepth, currentDepth + 1))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

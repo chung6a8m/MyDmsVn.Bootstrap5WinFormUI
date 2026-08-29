@@ -13,7 +13,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "29e6fca0440d4696a03471802b5c3b10aa3214b2c6ee2c2a715f58f298f2bd37";
+    private const string ApprovedV1Fingerprint = "f586623a5061308a6f09e179bfb65a74ad82f68d5fd5e94fe16e84d2a8a48faa";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -50,6 +50,50 @@ public sealed class Phase16PublicApiBaselineTests
             Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Rendering.BootstrapOverlayPlacementRequest"));
             Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapOverlayDropDown"));
             Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapOverlaySurface"));
+        }));
+    }
+
+    [Test]
+    public void AdvancedDropdownApiExportsOnlyTheReviewedPublicContract()
+    {
+        var assembly = typeof(BootstrapDropdown).Assembly;
+        var exportedNames = assembly.GetExportedTypes().Select(type => type.FullName).ToArray();
+        var splitProperties = typeof(BootstrapSplitButton)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Select(property => property.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        var splitMethods = typeof(BootstrapSplitButton)
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Where(method => !method.IsSpecialName)
+            .Select(method => method.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(Enum.GetValues(typeof(BootstrapDropdownItemKind)), Is.EqualTo(new[]
+            {
+                BootstrapDropdownItemKind.Item,
+                BootstrapDropdownItemKind.Separator,
+                BootstrapDropdownItemKind.HostedControl
+            }));
+            Assert.That(typeof(BootstrapDropdownItem).GetProperty(nameof(BootstrapDropdownItem.DropDownItems)), Is.Not.Null);
+            Assert.That(typeof(BootstrapDropdownItem).GetProperty(nameof(BootstrapDropdownItem.HostedControlFactory)), Is.Not.Null);
+            Assert.That(splitProperties, Is.EqualTo(new[]
+            {
+                "BorderRadius", "ButtonSize", "Icon", "IconPosition", "IconRenderer", "Items",
+                "Loading", "LoadingText", "MinimumWidth", "Outline", "Text", "Variant"
+            }));
+            Assert.That(splitMethods, Is.EqualTo(new[] { "CloseDropDown", "GetPreferredSize", "ShowDropDown" }));
+            Assert.That(typeof(BootstrapSplitButton).GetEvents(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+                .Select(eventInfo => eventInfo.Name).OrderBy(name => name, StringComparer.Ordinal),
+                Is.EqualTo(new[] { "Closed", "Opened" }));
+            Assert.That(typeof(BootstrapSplitButton).GetProperty("Font", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly), Is.Null);
+            Assert.That(typeof(BootstrapSplitButton).GetProperty("AccessibleName", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly), Is.Null);
+            Assert.That(splitProperties.Any(name => name.IndexOf("Button", StringComparison.Ordinal) >= 0 && name != "ButtonSize"), Is.False);
+            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapConnectedButtonLayoutLogic"));
+            Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDropdownRenderer"));
         }));
     }
 

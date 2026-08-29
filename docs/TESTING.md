@@ -152,8 +152,10 @@ BootstrapDropdown Stage 7 pure tests cover:
 - Undefined variants and null theme-color inputs rejected before usable palette output
 - Logical 96/120/144/168/192 DPI scaling for horizontal/vertical item padding, icon size, separator inset, and border width through `DpiScaler`
 - Null metric inputs and non-positive DPI rejection
-- `BootstrapDropdownItemKind` accepting only `Item` and `Separator`
-- Null text normalization, immutable kind, default enabled/unchecked state, item sender identity for `Click`, and null-safe collection insertion/replacement
+- `BootstrapDropdownItemKind` accepting only `Item`, `Separator`, and `HostedControl`; consumers with exhaustive enum switches must handle the additive member
+- Null text normalization, immutable kind, stable child collections, default enabled/unchecked state, item sender identity for leaf `Click`, and null-safe collection insertion/replacement
+- Reference-identity tree validation: duplicate/shared/cyclic nodes, normal-item factories, separator children/factories, and hosted items missing factories or containing children are rejected before native snapshot creation
+- Recursive snapshot structure, leaf-only activation, per-level image/check margins, connected split seam/corner resolution, full-width split anchor request, and narrow/tiny bounds containment
 
 BootstrapDatePicker Stage 9 pure tests cover:
 
@@ -291,6 +293,14 @@ BootstrapDropdown Stage 7 STA tests verify:
 - Repeated open/close/theme-switch cycles without duplicate event delivery, stale image use, or disposed-object failures
 - Integrated Navigation demo coverage for basic/icon/state/long/stress scenarios while retaining exactly one shared Navigation route
 
+Advanced Dropdown and `BootstrapSplitButton` STA tests additionally verify:
+
+- Recursive native submenu snapshots, disabled parents/leaves, nested leaf sender/event count, renderer/theme/font propagation, per-level margins, and recursive icon refresh/disposal
+- Hosted factories creating fresh controls per snapshot, rejection of null/disposed results, partial-build cleanup, native `ToolStripControlHost` ownership, repeated rebuild/disposal, and mixed nested/hosted composition
+- Split primary-versus-chevron routing, public show/close parity, outer lifecycle sender, full-width anchor request, chevron selected state, live `MinimumWidth`, and empty/disabled/loading suppression
+- Two native-focusable button regions with Tab/Shift+Tab and Enter/Space semantics, inherited custom-font persistence, dynamic primary/menu accessibility names, and no strongly typed child accessors
+- Parent disposal closes and disposes the owned Dropdown while base `Control` remains the single child-control disposal owner
+
 ### 2.3 Demo/manual visual tests
 
 A demo application is required because not all rendering quality is productively asserted with pixels.
@@ -334,7 +344,7 @@ For BootstrapNumericBox Stage 5, choose **Advanced Inputs**. Verify integer/defa
 
 For BootstrapComboBox Stage 6, stay on **Advanced Inputs**. Verify unbound items, a bound object list using `DisplayMember`/`ValueMember`, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` with `ListItems`, long text/ellipsis, leading-icon and no-icon comparison, Valid/Invalid, disabled, and explicit radius examples. Exercise the native arrow and popup plus Up/Down/Enter/Escape, free typing, Tab/Shift+Tab, selected-value changes, and runtime Light/Dark switching without losing binding or selection. Repeat at 100/125/150/175/200% real Windows scaling. Native editable child, arrow button, and popup chrome may remain OS-themed/square; the framework must not replace them merely for visual uniformity.
 
-For BootstrapDropdown Stage 7, use the **Navigation / Tabs** page and the basic/icon/state/long/stress dropdown scenarios. Verify target mouse and Enter/Space activation; native Up/Down/Home/End navigation; item Enter activation; Escape and outside-click dismissal; checked, disabled, separator, long-text and empty-collection behavior; and item `Click` mutation reflected on the next opening. Switch Light/Dark while the popup is open and between openings. Open near bottom/right working-area edges and on a secondary monitor when available to confirm native placement remains authoritative. Repeat at 100/125/150/175/200% real Windows scaling and run repeated open/close/theme-switch cycles while checking focus restoration, stale artifacts, duplicate events, and GDI/image exceptions. No custom submenu, split-button, arbitrary-content, rounded-popup-host, placement, or animation behavior is expected in Stage 7.
+For BootstrapDropdown and `BootstrapSplitButton`, use the **Navigation / Tabs** basic/icon/state/long/stress/nested/hosted/mixed/split scenarios. Verify primary versus chevron mouse routing, Tab/Shift+Tab between regions, Enter/Space on each region, native Up/Down/Home/End/Right/Left/Enter/Escape submenu navigation, and outside-click dismissal. Focus/edit/toggle hosted controls, navigate back to menu rows, dismiss, reopen, and confirm the documented fresh-snapshot policy. Cover disabled leaves/submenus/hosts, checked leaves, split loading, Light/Dark changes while root/submenus are visible, default and caller-owned fonts, and primary/menu accessibility names before/after outer `Text` and `AccessibleName` changes. Repeat at 100/125/150/175/200% real Windows scaling and at bottom/right/secondary-monitor edges. Stress repeated open/close/rebuild, hosted disposal, and form disposal while nested content is open; check focus restoration, stale windows, duplicate events, GDI growth, and disposed-object failures. Inherited split `Controls` are observable but must not be mutated or disposed by application code.
 
 BootstrapDatePicker Stage 9 STA tests verify:
 
@@ -467,7 +477,7 @@ NumericBox owns one public tab stop while its private native editor has `TabStop
 
 ComboBox remains a native `ComboBox`, so it retains one native focus/input path rather than a wrapper redirect. Test `DropDownList` and editable `DropDown`, native arrow/popup open-close, Up/Down/Enter/Escape, free typing, autocomplete, Tab/Shift+Tab traversal, disabled/re-enabled behavior, bound/unbound selection, and native selection/dropdown events. Framework presentation changes must never synthesize those events or create a second selection state.
 
-Dropdown interaction begins on its caller-owned `BootstrapButton` target and transfers to native `ToolStripDropDownMenu` behavior while open. Test target mouse/Enter/Space activation, Up/Down/Home/End navigation, item Enter, Escape, outside-click dismissal, disabled/separator rows, and target disabled/loading suppression. `Checked` is display state rather than a toggle policy: activation may let application code mutate the model, but the framework itself never flips it. No second focus, keyboard, placement, split-button, or submenu interaction engine is introduced.
+Dropdown interaction begins on its caller-owned `BootstrapButton` target or one of the split button's two native-focusable regions and transfers to native `ToolStripDropDownMenu` behavior while open. Test primary/chevron Enter/Space routing, Tab/Shift+Tab region traversal, recursive native menu keys, hosted-control focus return, Escape/outside dismissal, disabled rows, and loading suppression. `Checked` is display state rather than a toggle policy. Advanced composition still introduces no second focus, keyboard, placement, or animation engine.
 
 ## 6. Animation matrix
 

@@ -348,29 +348,22 @@ public class BootstrapButtonGroup : Panel
         if (buttons.Count == 1)
         {
             var radius = ResolveLogicalRadius(buttons[0]);
-            buttons[0].GroupCornerRadius = new CornerRadius(radius);
+            buttons[0].GroupCornerRadius = BootstrapConnectedButtonLayoutLogic.ResolveCornerRadius(
+                _orientation,
+                0,
+                1,
+                radius);
             return;
         }
 
         for (var i = 0; i < buttons.Count; i++)
         {
             var radius = ResolveLogicalRadius(buttons[i]);
-            if (_orientation == Orientation.Horizontal)
-            {
-                buttons[i].GroupCornerRadius = i == 0
-                    ? new CornerRadius(radius, 0f, 0f, radius)
-                    : (i == buttons.Count - 1
-                        ? new CornerRadius(0f, radius, radius, 0f)
-                        : CornerRadius.Empty);
-            }
-            else
-            {
-                buttons[i].GroupCornerRadius = i == 0
-                    ? new CornerRadius(radius, radius, 0f, 0f)
-                    : (i == buttons.Count - 1
-                        ? new CornerRadius(0f, 0f, radius, radius)
-                        : CornerRadius.Empty);
-            }
+            buttons[i].GroupCornerRadius = BootstrapConnectedButtonLayoutLogic.ResolveCornerRadius(
+                _orientation,
+                i,
+                buttons.Count,
+                radius);
         }
     }
 
@@ -514,7 +507,9 @@ public class BootstrapButtonGroup : Panel
     private int GetSeamOverlap()
     {
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        return Math.Max(1, DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.BorderWidth, dpi));
+        return BootstrapConnectedButtonLayoutLogic.ResolveSeamOverlap(
+            BootstrapThemeManager.CurrentTheme.Metrics,
+            dpi);
     }
 
     private static void ValidateOrientation(Orientation value)

@@ -59,6 +59,7 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapSelect`
 - `BootstrapDatePicker`
 - `BootstrapDropdown`
+- `BootstrapSplitButton`
 - `BootstrapCard`
 - `BootstrapCollapse`
 - `BootstrapAccordion`
@@ -87,7 +88,7 @@ The Feedback page hosts the component-expansion feedback controls. `BootstrapBad
 
 The Pagination page demonstrates bounded numeric windows, ellipses, navigation visibility, size variants, boundary/zero-item states, and application-owned DataGrid paging. `BootstrapPagination` itself does not own or slice a data source.
 
-The Navigation / Tabs page demonstrates `BootstrapTabControl` using native `TabPage` composition and selection with Bootstrap-inspired Tabs, Pills, and Underline header styles. It includes uniform Fill sizing, all semantic variants, `ImageList`/`ImageKey`/`ImageIndex`, native tooltip text, disabled pages, long labels, and live `SelectedIndexChanged` feedback. Stage 7 extends the same page with `BootstrapDropdown` basic, icon, checked/disabled/separator, long-caption/minimum-width, and stress/theme scenarios without adding a second navigation route. The page also records the real-desktop native keyboard, outside-click, screen-edge, multi-monitor, and 100–200% DPI verification matrix.
+The Navigation / Tabs page demonstrates native-backed Tabs plus Dropdown basic/icon/state/long/stress, recursive submenu, hosted-control, mixed-composition, and `BootstrapSplitButton` scenarios without adding a second navigation route. It records the real-desktop mouse/keyboard, accessibility, custom-font, outside-click, screen-edge, multi-monitor, lifetime, and 100–200% DPI verification matrix.
 
 Earlier Rendering / DPI, Icons, and Animation diagnostics remain available below the Theme navigation item.
 
@@ -189,9 +190,37 @@ create.Click += (_, _) => CreateRecord();
 actions.Items.Add(create);
 actions.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.Separator));
 actions.Items.Add(new BootstrapDropdownItem { Text = "Unavailable", Enabled = false });
+
+var more = new BootstrapDropdownItem { Text = "More" };
+var export = new BootstrapDropdownItem { Text = "Export" };
+export.Click += (_, _) => ExportRecord();
+more.DropDownItems.Add(export);
+actions.Items.Add(more);
+
+actions.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+{
+    // A fresh control is required for each snapshot; Dropdown owns it after return.
+    HostedControlFactory = () => new CheckBox { Text = "Include archived", AutoSize = true }
+});
 ```
 
-The target and public item models remain caller-owned. Native WinForms owns menu focus, keyboard navigation, AutoClose/outside-click dismissal, and working-area placement. `Checked` is presentation state only and is changed only by application code. Icons use the target button's current `IconRenderer`, theme color, and DPI; generated native menu images are owned and disposed by the Dropdown.
+The target and public item models remain caller-owned. Native WinForms owns menu/submenu focus, keyboard navigation, AutoClose/outside-click dismissal, and working-area placement. Returned hosted controls become framework-owned snapshot controls. Trees reject duplicate/shared/cyclic item instances and invalid kind/factory/child combinations before opening.
+
+`BootstrapSplitButton` provides an independent primary action plus a chevron menu using the same item model:
+
+```csharp
+var save = new BootstrapSplitButton
+{
+    Text = "Save",
+    AccessibleName = "Save document",
+    Variant = BootstrapVariant.Primary,
+    MinimumWidth = 200
+};
+save.Click += (_, _) => SaveDocument();
+save.Items.Add(more);
+```
+
+The popup anchors below the full split bounds. Loading/disabled state closes and suppresses the menu. `Font` and `AccessibleName` remain inherited: a caller font persists across theme changes, and both internal focus regions resolve accessible names dynamically. Inherited `Controls` can enumerate those regions, but they are framework-owned and unsupported for caller mutation or disposal.
 
 ## Managed Tooltip and interactive Popover usage
 
@@ -282,7 +311,7 @@ BootstrapSelect is the separate managed selector for richer selection workflows.
 
 DatePicker follows the NumericBox wrapper pattern around exactly one native `DateTimePicker`. Native date state, range rules, localized display, checkbox semantics, keyboard navigation, and calendar popup remain authoritative; the wrapper owns one tab stop, shared validation/focus shell rendering, theme-created font lifecycle, and DPI-scaled layout. It introduces no `MonthCalendar`, custom popup `Form`, nullable-date model, `ShowUpDown` proxy, parsing engine, culture property, timer, animation scheduler, Win32 hook, or external dependency.
 
-Dropdown uses a separate native-first command-menu pattern: `BootstrapDropdown : Component` owns one `ToolStripDropDownMenu` and one internal theme renderer, while the application owns its `BootstrapButton` target and `BootstrapDropdownItem` models. Each opening builds a short-lived native snapshot; native ToolStrip owns focus, keyboard, dismissal and screen placement. The framework owns target wiring, command dispatch, token-based rendering, DPI sizing, icon bitmap generation, theme refresh, and deterministic cleanup. It introduces no top-level custom form, global hook, timer, animation scheduler, submenu model, live collection synchronization, or external dependency.
+Dropdown uses a native-first command-menu pattern: each opening validates and recursively snapshots caller-owned item models into native menu/submenu rows and optional `ToolStripControlHost` content. Native ToolStrip owns focus, keyboard, dismissal, and screen placement; the framework owns rendering, generated images, hosted snapshot controls, theme refresh, and cleanup. `BootstrapSplitButton` composes that infrastructure with two connected `BootstrapButton` regions and adds no custom popup form, global hook, timer, animation scheduler, live collection synchronization, or external dependency.
 
 Toast reuses the existing feedback palette/layout rules shared with Alert, source-neutral icon rendering, `BootstrapAnimation` finite transitions, DPI helpers, and theme typography. `BootstrapToastContainer` owns FIFO queueing, max-visible enforcement, placement/reflow, and deterministic Toast disposal; each Toast owns only its semantic auto-hide countdown after enter completion. Reduced motion completes transitions immediately without changing configured delays. No top-level notification `Form`, global/static Toast manager, second feedback palette, public timer/scheduler seam, or external dependency is introduced.
 

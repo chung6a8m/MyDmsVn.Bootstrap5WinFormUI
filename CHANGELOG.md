@@ -32,7 +32,7 @@ All notable release-facing changes to this project are documented here.
 
 ### Changed
 
-- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, `BootstrapTabControl`, `BootstrapNumericBox`, `BootstrapComboBox`, `BootstrapDropdown`, `BootstrapToastPlacement`, `BootstrapToast`, `BootstrapToastContainer`, `BootstrapDatePicker`, and `BootstrapSelect` public families. Select search/popup/layout/controller infrastructure remains internal, existing exported signatures are unchanged, `AssemblyVersion` remains `1.0.0.0`, and the approved fingerprint is `29e6fca0440d4696a03471802b5c3b10aa3214b2c6ee2c2a715f58f298f2bd37`.
+- Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, `BootstrapTabControl`, `BootstrapNumericBox`, `BootstrapComboBox`, advanced `BootstrapDropdown` / `BootstrapSplitButton`, `BootstrapToastPlacement`, `BootstrapToast`, `BootstrapToastContainer`, `BootstrapDatePicker`, and `BootstrapSelect` public families. Advanced Dropdown and Select implementation helpers remain internal, existing exported signatures are unchanged, `AssemblyVersion` remains `1.0.0.0`, and the approved combined fingerprint is `f586623a5061308a6f09e179bfb65a74ad82f68d5fd5e94fe16e84d2a8a48faa`.
 
 ## [1.0.0-rc.1] - 2026-08-28
 

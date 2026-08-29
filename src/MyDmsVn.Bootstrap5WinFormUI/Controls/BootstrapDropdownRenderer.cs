@@ -198,6 +198,79 @@ internal sealed class BootstrapDropdownRenderer : ToolStripRenderer
         }
     }
 
+    protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
+    {
+        var rectangle = e.ArrowRectangle;
+        if (rectangle.Width <= 0 || rectangle.Height <= 0)
+        {
+            return;
+        }
+
+        var theme = BootstrapThemeManager.CurrentTheme;
+        var item = e.Item;
+        var palette = ResolvePalette(
+            theme.Colors,
+            _variant,
+            item?.Enabled ?? true,
+            item?.Selected ?? false);
+        var centerX = rectangle.Left + (rectangle.Width / 2f);
+        var centerY = rectangle.Top + (rectangle.Height / 2f);
+        var halfWidth = Math.Max(2f, rectangle.Width * 0.22f);
+        var halfHeight = Math.Max(2f, rectangle.Height * 0.28f);
+        PointF[] points;
+
+        switch (e.Direction)
+        {
+            case ArrowDirection.Left:
+                points = new[]
+                {
+                    new PointF(centerX + halfWidth, centerY - halfHeight),
+                    new PointF(centerX - halfWidth, centerY),
+                    new PointF(centerX + halfWidth, centerY + halfHeight)
+                };
+                break;
+
+            case ArrowDirection.Up:
+                points = new[]
+                {
+                    new PointF(centerX - halfWidth, centerY + halfHeight),
+                    new PointF(centerX, centerY - halfHeight),
+                    new PointF(centerX + halfWidth, centerY + halfHeight)
+                };
+                break;
+
+            case ArrowDirection.Down:
+                points = new[]
+                {
+                    new PointF(centerX - halfWidth, centerY - halfHeight),
+                    new PointF(centerX, centerY + halfHeight),
+                    new PointF(centerX + halfWidth, centerY - halfHeight)
+                };
+                break;
+
+            default:
+                points = new[]
+                {
+                    new PointF(centerX - halfWidth, centerY - halfHeight),
+                    new PointF(centerX + halfWidth, centerY),
+                    new PointF(centerX - halfWidth, centerY + halfHeight)
+                };
+                break;
+        }
+
+        var oldSmoothingMode = e.Graphics.SmoothingMode;
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        try
+        {
+            using var brush = new SolidBrush(palette.Foreground);
+            e.Graphics.FillPolygon(brush, points);
+        }
+        finally
+        {
+            e.Graphics.SmoothingMode = oldSmoothingMode;
+        }
+    }
+
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
     {
         var theme = BootstrapThemeManager.CurrentTheme;
