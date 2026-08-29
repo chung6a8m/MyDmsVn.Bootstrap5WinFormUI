@@ -45,7 +45,7 @@ public sealed class BootstrapDatePickerTests
         Assert.Multiple((Action)(() =>
         {
             Assert.That(native.Value, Is.InRange(before, after));
-            Assert.That(native.MinDate, Is.EqualTo(new DateTime(1753, 1, 1)));
+            Assert.That(native.MinDate, Is.EqualTo(DateTimePicker.MinimumDateTime));
             Assert.That(native.Format, Is.EqualTo(DateTimePickerFormat.Long));
             Assert.That(native.CustomFormat, Is.Null);
             Assert.That(native.ShowCheckBox, Is.False);
