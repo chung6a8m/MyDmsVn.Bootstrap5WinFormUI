@@ -71,6 +71,7 @@ public partial class BootstrapSelect
         }
 
         var result = BootstrapSelectResultBuilder.BuildLocal(Items, effectiveText, Matcher, IsItemSelected);
+        result = BootstrapSelectResultBuilder.AppendCreateValue(result, Items, effectiveText, AllowCustomValues);
         return result.Rows.Count == 0
             ? BootstrapSelectResultSet.SingleMessage(BootstrapSelectResultRowKind.Empty, "No results found.")
             : result;
@@ -83,6 +84,12 @@ public partial class BootstrapSelect
         {
             RetryRemoteLastFailure();
             return true;
+        }
+        if (row.Kind == BootstrapSelectResultRowKind.CreateValue)
+        {
+            if (!AllowCustomValues || row.CustomValueText is null || CustomValueFactory is null) return false;
+            var item = CustomValueFactory(row.CustomValueText);
+            return item is not null && SelectCore(item, BootstrapSelectChangeReason.CustomValue);
         }
         if (row.Kind != BootstrapSelectResultRowKind.Item || row.Item is null || row.Item.Disabled) return false;
         if (SelectionMode == BootstrapSelectMode.Multiple && row.IsSelected)
