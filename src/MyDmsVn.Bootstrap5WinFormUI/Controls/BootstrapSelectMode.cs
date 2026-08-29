@@ -1,7 +1,7 @@
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 /// <summary>
-/// Defines whether a <see cref="BootstrapSelect"/> permits one or multiple logical selections.
+/// Defines whether a <c>BootstrapSelect</c> permits one or multiple logical selections.
 /// </summary>
 public enum BootstrapSelectMode
 {

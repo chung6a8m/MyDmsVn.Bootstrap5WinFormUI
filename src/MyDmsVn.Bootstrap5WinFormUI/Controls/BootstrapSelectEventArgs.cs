@@ -3,9 +3,7 @@ using System.ComponentModel;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
-/// <summary>
-/// Provides data for a completed item-level <see cref="BootstrapSelect"/> selection change.
-/// </summary>
+/// <summary>Provides data for a completed item-level <c>BootstrapSelect</c> selection change.</summary>
 public sealed class BootstrapSelectItemEventArgs : EventArgs
 {
     internal BootstrapSelectItemEventArgs(BootstrapSelectItem item, BootstrapSelectChangeReason reason)
@@ -15,20 +13,14 @@ public sealed class BootstrapSelectItemEventArgs : EventArgs
         Reason = reason;
     }
 
-    /// <summary>
-    /// Gets the caller-owned item affected by the change.
-    /// </summary>
+    /// <summary>Gets the caller-owned item affected by the change.</summary>
     public BootstrapSelectItem Item { get; }
 
-    /// <summary>
-    /// Gets the origin of the change.
-    /// </summary>
+    /// <summary>Gets the origin of the change.</summary>
     public BootstrapSelectChangeReason Reason { get; }
 }
 
-/// <summary>
-/// Provides cancellable data for an item-level <see cref="BootstrapSelect"/> selection change.
-/// </summary>
+/// <summary>Provides cancellable data for an item-level <c>BootstrapSelect</c> selection change.</summary>
 public sealed class BootstrapSelectItemCancelEventArgs : CancelEventArgs
 {
     internal BootstrapSelectItemCancelEventArgs(BootstrapSelectItem item, BootstrapSelectChangeReason reason)
@@ -38,14 +30,10 @@ public sealed class BootstrapSelectItemCancelEventArgs : CancelEventArgs
         Reason = reason;
     }
 
-    /// <summary>
-    /// Gets the caller-owned item affected by the pending change.
-    /// </summary>
+    /// <summary>Gets the caller-owned item affected by the pending change.</summary>
     public BootstrapSelectItem Item { get; }
 
-    /// <summary>
-    /// Gets the origin of the pending change.
-    /// </summary>
+    /// <summary>Gets the origin of the pending change.</summary>
     public BootstrapSelectChangeReason Reason { get; }
 }
 
