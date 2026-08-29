@@ -1,0 +1,126 @@
+name: BootstrapSelect Components Doc Patch
+
+on:
+  push:
+    branches:
+      - feature/bootstrap-select
+    paths:
+      - .github/workflows/patch-bootstrap-select-components.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-components-doc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Insert BootstrapSelect component contract
+        shell: pwsh
+        run: |
+          $path = 'docs/COMPONENTS.md'
+          $content = Get-Content -Path $path -Raw
+          if ($content.Contains('## BootstrapSelect')) {
+            Write-Host 'BootstrapSelect contract already present.'
+            exit 0
+          }
+
+          $marker = '## BootstrapCard'
+          if (-not $content.Contains($marker)) {
+            throw "Expected marker '$marker' was not found."
+          }
+
+          $section = @'
+          ## BootstrapSelect
+
+          Responsibility: provide a dedicated Select2-style managed selector for searchable single/multiple selection, chips, grouping, custom values, and asynchronous paged lookup without changing the native-backed `BootstrapComboBox` contract.
+
+          The finalized public concepts are:
+
+          ```text
+          BootstrapSelect : UserControl
+          BootstrapSelectMode: Single | Multiple
+          BootstrapSelectChangeReason
+          BootstrapSelectItem / BootstrapSelectItemCollection
+          BootstrapSelectQuery / BootstrapSelectPage
+          IBootstrapSelectDataProvider
+          IBootstrapSelectMatcher / BootstrapSelectTextMatcher
+          IBootstrapSelectRenderer / BootstrapSelectRenderer
+          BootstrapSelectRenderState and render contexts
+
+          BootstrapSelect.SelectionMode
+          BootstrapSelect.Items
+          BootstrapSelect.DataProvider
+          BootstrapSelect.SelectedItem / SelectedItems
+          BootstrapSelect.SelectedValue / SelectedValues
+          BootstrapSelect.ValueComparer
+          BootstrapSelect.Placeholder
+          BootstrapSelect.AllowClear
+          BootstrapSelect.AllowCustomValues
+          BootstrapSelect.CustomValueFactory
+          BootstrapSelect.CloseOnSelect
+          BootstrapSelect.SearchEnabled
+          BootstrapSelect.MinimumSearchLength
+          BootstrapSelect.SearchDebounce
+          BootstrapSelect.PageSize
+          BootstrapSelect.DropDownWidth
+          BootstrapSelect.MaxDropDownHeight
+          BootstrapSelect.MaximumSelectionRows
+          BootstrapSelect.Matcher
+          BootstrapSelect.Renderer
+          BootstrapSelect.ValidationState
+          BootstrapSelect.BorderRadius
+          BootstrapSelect.Select(...) / SelectValue(...)
+          BootstrapSelect.Deselect(...) / DeselectValue(...)
+          BootstrapSelect.ClearSelection()
+          BootstrapSelect.Selecting / Selected
+          BootstrapSelect.Deselecting / Deselected
+          BootstrapSelect.SelectionChanged
+          BootstrapSelect.DropDownOpened / DropDownClosed
+          BootstrapSelect.SearchStarted / SearchCompleted / SearchFailed
+          ```
+
+          Behavior:
+
+          - `BootstrapSelect` is a separate `UserControl`; it does not subclass, wrap, or replace `BootstrapComboBox`. Use ComboBox when native WinForms binding/editing/autocomplete/popup semantics are required; use Select when the application needs managed search, multiple chips, groups, custom values, or remote paging.
+          - `BootstrapSelectItem.Value` is non-null immutable logical identity. `Text` is presentation and may change; `Disabled`, `Group`, `Icon`, and `Tag` are optional metadata. Selection reconciliation uses `ValueComparer`, never object-reference identity.
+          - Local and asynchronous result modes are mutually exclusive. With `DataProvider = null`, `Items` plus `Matcher` drive results. While `DataProvider` is set, local items are retained but ignored and are never merged into provider pages.
+          - The built-in matcher performs case-insensitive text matching. A caller-owned `IBootstrapSelectMatcher` may replace local matching/ranking; remote matching/ranking belongs entirely to the provider.
+          - Single mode exposes one selected snapshot; Multiple mode exposes unique selected snapshots as chips and supports multi-row wrapping bounded by `MaximumSelectionRows`. Selected state is independent of the currently loaded/filter-visible result page.
+          - `AllowCustomValues` is opt-in. When non-empty search text has no exact text match, a Create row may invoke the synchronous caller-owned `CustomValueFactory`; returning `null` rejects creation and a returned item follows the normal cancellable selection pipeline.
+          - `IBootstrapSelectDataProvider` is transport-agnostic. The core library owns no `HttpClient`, URL, headers, database, cache, retry library, or service client. Providers receive one-based `BootstrapSelectQuery` page requests and return `BootstrapSelectPage` with `Items` and `HasMore`.
+          - Async query mechanics are control-owned: debounce, cancellation, monotonically increasing generation/race protection, initial loading, serialized load-more, result deduplication, loading/error rows, first-page retry, later-page retry, and stale-response rejection. Provider cancellation is cooperative; correctness does not rely on the provider honoring it.
+          - A first-page failure replaces the result body with an actionable error/retry row. A later-page failure retains already loaded rows and appends an actionable retry row for the same failed page. `OperationCanceledException` is normal control flow and does not raise `SearchFailed`.
+          - Newly loaded items with an already-selected logical value may refresh the selected snapshot metadata without raising a false selection change. A provider changing an item's disabled state does not silently remove an existing selection.
+          - Group headers are non-selectable and preserve provider/local encounter order. Filtering removes empty local groups; page append logic avoids duplicate adjacent group headers across page boundaries.
+          - `IBootstrapSelectRenderer` is presentation-only. It receives item/state/theme/DPI/bounds contexts for result rows, group headers, single selection, and chips. Layout, hit testing, scrolling, selection, keyboard behavior, provider calls, and popup lifetime remain control-owned.
+          - The popup reuses the existing internal overlay host/surface/anchor tracking and `BootstrapOverlayPlacementEngine`. Bottom-start is preferred; flip/shift keeps the popup inside the current monitor working area. No second Popper-like engine, custom top-level `Form`, or global mouse/keyboard hook is introduced.
+          - Closed keyboard paths include Alt+Down/F4/Enter/Space open and printable-input search. Open popup uses Up/Down, Home/End, PageUp/PageDown, Enter, Escape, and normal Tab traversal. Search editing remains a real WinForms text editor so caret, clipboard, selection, IME, and Vietnamese input remain native responsibilities.
+          - The outer control exposes ComboBox-style accessibility semantics, focusability, expanded/collapsed state, selected text in Single mode, and a stable selected-count summary in Multiple mode. Retry, custom-value creation, clear, and chip removal have keyboard equivalents.
+          - Validation/focus/theme rendering reuses existing theme and rendering tokens. `BorderRadius = -1` uses the theme radius; logical dimensions scale through `DpiScaler`. Major horizontal affordances mirror for `RightToLeft.Yes`.
+          - `DataProvider`, custom matcher/renderer, items, item `Tag` values, and caller-assigned resources remain caller-owned. The control disposes only its debounce/cancellation/search state, popup/overlay content, owned subscriptions, and framework-created rendering resources.
+          - Hiding, disabling, disposal, or handle recreation closes an active popup and cancels obsolete query work without clearing logical selection. Reopen recreates current result/search state from the retained control configuration.
+          - Designer construction is parameterless and requires no application bootstrap. Async work and popup hosting begin only through runtime interaction.
+
+          Automated validation covers both `net48` and `net8.0-windows`, local matching/grouping/custom values, value identity and snapshot refresh, async cancellation/races/paging/retry, keyboard/focus/accessibility, popup lifecycle/placement, theme, DPI geometry/rendering, RTL, disposal, and integrated-demo contracts.
+
+          Manual verification: choose **Select** in the integrated demo. Exercise local single selection, multiple chips and wrapping, groups, custom values, disabled rows, async paging over the 300+ row deterministic provider, `fail-first` page-1 retry, `retry` later-page retry, and rapid `race` typing. Verify mouse plus keyboard-only operation, Vietnamese IME composition, Light/Dark switching, monitor-edge and cross-monitor popup placement, repeated open/close/handle recreation, and real Windows 100/125/150/175/200% scaling. These environment-dependent checks remain manual release evidence and are not implied by automated CI.
+
+          See `docs/BOOTSTRAP_SELECT.md` for complete usage examples and extension guidance.
+
+          '@
+
+          $section = $section -replace '(?m)^          ', ''
+          $content = $content.Replace($marker, $section + "`n" + $marker)
+          [System.IO.File]::WriteAllText((Resolve-Path $path), $content, [System.Text.UTF8Encoding]::new($false))
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- $path
+          git diff --cached --check
+          git commit -m 'docs: add BootstrapSelect component contract'
+          git push origin HEAD:feature/bootstrap-select
