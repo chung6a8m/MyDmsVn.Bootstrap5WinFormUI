@@ -66,7 +66,7 @@ internal sealed class BootstrapSelectSearchController : IDisposable
         var query = new BootstrapSelectQuery(_state.SearchText, 1, _state.PageSize);
         try
         {
-            var page = await provider.SearchAsync(query, cancellation.Token).ConfigureAwait(false);
+            var page = await provider.SearchAsync(query, cancellation.Token);
             if (page is null) throw new InvalidOperationException("BootstrapSelect data providers must return a non-null page.");
             if (!IsCurrentGeneration(generation)) return;
             _state.LoadedItems.Clear();
@@ -132,7 +132,7 @@ internal sealed class BootstrapSelectSearchController : IDisposable
         _isLoadingMore = true;
         try
         {
-            var page = await provider.SearchAsync(query, cancellation.Token).ConfigureAwait(false);
+            var page = await provider.SearchAsync(query, cancellation.Token);
             if (page is null) throw new InvalidOperationException("BootstrapSelect data providers must return a non-null page.");
             if (!IsCurrentGeneration(generation)) return false;
             if (pageNumber == 1) _state.LoadedItems.Clear();
