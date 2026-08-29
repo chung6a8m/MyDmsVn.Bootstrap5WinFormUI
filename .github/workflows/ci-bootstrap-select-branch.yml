@@ -1,0 +1,31 @@
+name: BootstrapSelect Branch CI
+
+on:
+  push:
+    branches:
+      - feature/bootstrap-select
+
+jobs:
+  build-test-pack:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build both target frameworks
+        shell: pwsh
+        run: ./build.ps1 -Configuration Release
+
+      - name: Run tests on both target frameworks
+        shell: pwsh
+        run: ./test.ps1 -Configuration Release -SkipBuild
+
+      - name: Verify release candidate package
+        shell: pwsh
+        run: ./release.ps1 -Configuration Release -Version 1.0.0-rc.1 -SkipBuild -SkipTests
