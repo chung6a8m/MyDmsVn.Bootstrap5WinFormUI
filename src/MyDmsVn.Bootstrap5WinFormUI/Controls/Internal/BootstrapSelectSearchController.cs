@@ -14,6 +14,8 @@ internal sealed class BootstrapSelectSearchController : IDisposable
     private readonly BootstrapSelectSearchState _state = new BootstrapSelectSearchState();
     private CancellationTokenSource? _requestCancellation;
     private int _generation;
+    private int _failedPage;
+    private bool _isLoadingMore;
     private bool _disposed;
 
     internal BootstrapSelectSearchController(
@@ -33,6 +35,8 @@ internal sealed class BootstrapSelectSearchController : IDisposable
     internal BootstrapSelectResultSet Results => _state.Results;
     internal Exception? LastError => _state.LastError;
     internal int Generation => _generation;
+    internal int FailedPage => _failedPage;
+    internal bool IsLoadingMore => _isLoadingMore;
 
     internal int BeginQuery(string searchText, int pageSize)
     {
@@ -42,6 +46,8 @@ internal sealed class BootstrapSelectSearchController : IDisposable
         CancelRequest();
         _generation++;
         _requestCancellation = new CancellationTokenSource();
+        _failedPage = 0;
+        _isLoadingMore = false;
         _state.Reset(searchText, pageSize);
         return _generation;
     }
@@ -56,14 +62,16 @@ internal sealed class BootstrapSelectSearchController : IDisposable
         ThrowIfDisposed();
         if (provider is null) throw new ArgumentNullException(nameof(provider));
         if (!IsCurrentGeneration(generation)) return;
-        var cancellation = _requestCancellation ?? throw new InvalidOperationException("BeginQuery must be called before loading results.");
+        var cancellation = GetCurrentCancellation();
         var query = new BootstrapSelectQuery(_state.SearchText, 1, _state.PageSize);
         try
         {
             var page = await provider.SearchAsync(query, cancellation.Token).ConfigureAwait(false);
             if (page is null) throw new InvalidOperationException("BootstrapSelect data providers must return a non-null page.");
             if (!IsCurrentGeneration(generation)) return;
-            PublishFirstPage(page);
+            _state.LoadedItems.Clear();
+            MergeItems(page.Items);
+            PublishSuccess(1, page.HasMore);
         }
         catch (OperationCanceledException)
         {
@@ -76,8 +84,33 @@ internal sealed class BootstrapSelectSearchController : IDisposable
             _state.HasMore = false;
             _state.LoadedItems.Clear();
             _state.LastError = error;
+            _failedPage = 1;
             _state.Results = BootstrapSelectResultSet.SingleMessage(BootstrapSelectResultRowKind.Error, error.Message);
         }
+    }
+
+    internal Task<bool> LoadNextPageAsync(IBootstrapSelectDataProvider provider, int generation)
+    {
+        ThrowIfDisposed();
+        if (provider is null) throw new ArgumentNullException(nameof(provider));
+        if (!IsCurrentGeneration(generation) || _state.CurrentPage < 1 || !_state.HasMore || _isLoadingMore || _failedPage > 0)
+        {
+            return Task.FromResult(false);
+        }
+
+        return LoadAdditionalPageAsync(provider, generation, _state.CurrentPage + 1);
+    }
+
+    internal Task<bool> RetryLastFailureAsync(IBootstrapSelectDataProvider provider, int generation)
+    {
+        ThrowIfDisposed();
+        if (provider is null) throw new ArgumentNullException(nameof(provider));
+        if (!IsCurrentGeneration(generation) || _failedPage <= 1 || _isLoadingMore)
+        {
+            return Task.FromResult(false);
+        }
+
+        return LoadAdditionalPageAsync(provider, generation, _failedPage);
     }
 
     internal void Invalidate()
@@ -85,6 +118,7 @@ internal sealed class BootstrapSelectSearchController : IDisposable
         if (_disposed) return;
         CancelRequest();
         _generation++;
+        _isLoadingMore = false;
     }
 
     public void Dispose()
@@ -93,33 +127,90 @@ internal sealed class BootstrapSelectSearchController : IDisposable
         _disposed = true;
         CancelRequest();
         _generation++;
+        _isLoadingMore = false;
     }
 
-    private void PublishFirstPage(BootstrapSelectPage page)
+    private async Task<bool> LoadAdditionalPageAsync(IBootstrapSelectDataProvider provider, int generation, int pageNumber)
     {
-        _state.LoadedItems.Clear();
-        for (var i = 0; i < page.Items.Count; i++)
+        var cancellation = GetCurrentCancellation();
+        var query = new BootstrapSelectQuery(_state.SearchText, pageNumber, _state.PageSize);
+        _isLoadingMore = true;
+        try
         {
-            var item = page.Items[i];
-            var duplicate = false;
-            for (var existingIndex = 0; existingIndex < _state.LoadedItems.Count; existingIndex++)
-            {
-                if (_valueComparer.Equals(_state.LoadedItems[existingIndex].Value, item.Value))
-                {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if (duplicate) continue;
-            _state.LoadedItems.Add(item);
+            var page = await provider.SearchAsync(query, cancellation.Token).ConfigureAwait(false);
+            if (page is null) throw new InvalidOperationException("BootstrapSelect data providers must return a non-null page.");
+            if (!IsCurrentGeneration(generation)) return false;
+            MergeItems(page.Items);
+            PublishSuccess(pageNumber, page.HasMore);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception error)
+        {
+            if (!IsCurrentGeneration(generation)) return false;
+            _state.LastError = error;
+            _failedPage = pageNumber;
+            _state.Results = BuildLoadMoreErrorResults(error);
+            return false;
+        }
+        finally
+        {
+            if (IsCurrentGeneration(generation)) _isLoadingMore = false;
+        }
+    }
+
+    private void MergeItems(IReadOnlyList<BootstrapSelectItem> items)
+    {
+        for (var itemIndex = 0; itemIndex < items.Count; itemIndex++)
+        {
+            var item = items[itemIndex];
+            var existingIndex = FindLoadedIndex(item.Value);
+            if (existingIndex >= 0) _state.LoadedItems[existingIndex] = item;
+            else _state.LoadedItems.Add(item);
             _refreshSelectedItem(item);
         }
-        _state.CurrentPage = 1;
-        _state.HasMore = page.HasMore;
+    }
+
+    private int FindLoadedIndex(object value)
+    {
+        for (var i = 0; i < _state.LoadedItems.Count; i++)
+        {
+            if (_valueComparer.Equals(_state.LoadedItems[i].Value, value)) return i;
+        }
+        return -1;
+    }
+
+    private void PublishSuccess(int pageNumber, bool hasMore)
+    {
+        _state.CurrentPage = pageNumber;
+        _state.HasMore = hasMore;
         _state.LastError = null;
-        _state.Results = _state.LoadedItems.Count == 0
+        _failedPage = 0;
+        _state.Results = BuildLoadedResults();
+    }
+
+    private BootstrapSelectResultSet BuildLoadedResults()
+    {
+        return _state.LoadedItems.Count == 0
             ? BootstrapSelectResultSet.SingleMessage(BootstrapSelectResultRowKind.Empty, "No results found.")
             : BootstrapSelectResultBuilder.BuildLoaded(_state.LoadedItems, _isSelected);
+    }
+
+    private BootstrapSelectResultSet BuildLoadMoreErrorResults(Exception error)
+    {
+        var normal = BuildLoadedResults();
+        var rows = new List<BootstrapSelectResultRow>(normal.Rows.Count + 1);
+        for (var i = 0; i < normal.Rows.Count; i++) rows.Add(normal.Rows[i]);
+        rows.Add(BootstrapSelectResultRow.Message(BootstrapSelectResultRowKind.LoadMoreError, "Retry loading more: " + error.Message));
+        return new BootstrapSelectResultSet(rows);
+    }
+
+    private CancellationTokenSource GetCurrentCancellation()
+    {
+        return _requestCancellation ?? throw new InvalidOperationException("BeginQuery must be called before loading results.");
     }
 
     private void CancelRequest()
