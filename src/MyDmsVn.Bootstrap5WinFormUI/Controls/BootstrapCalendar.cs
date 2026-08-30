@@ -220,7 +220,7 @@ public class BootstrapCalendar : Control
     /// <inheritdoc />
     public override Size GetPreferredSize(Size proposedSize)
     {
-        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var dpi = GetCurrentDpi();
         return BootstrapCalendarRenderLogic.CalculatePreferredSize(
             BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeManager.CurrentTheme.Metrics, dpi, _borderRadius));
     }
@@ -234,6 +234,11 @@ public class BootstrapCalendar : Control
     internal DateTime FocusedDate => _focusedDate;
 
     internal int LayoutBuildCount { get; private set; }
+
+    internal virtual int GetCurrentDpi()
+    {
+        return DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+    }
 
     internal static BootstrapCalendarDayOutlineMetrics ResolveDayOutlineMetrics(BootstrapThemeMetrics themeMetrics, int dpi)
     {
@@ -517,7 +522,7 @@ public class BootstrapCalendar : Control
 
     private BootstrapCalendarLayout GetLayout()
     {
-        return ResolveLayout(DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi);
+        return ResolveLayout(GetCurrentDpi());
     }
 
     internal BootstrapCalendarLayout ResolveLayout(int dpi)
@@ -542,7 +547,7 @@ public class BootstrapCalendar : Control
 
     private void PaintOuter(Graphics graphics, BootstrapTheme theme)
     {
-        var metrics = BootstrapCalendarRenderLogic.ResolveMetrics(theme.Metrics, DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi, _borderRadius);
+        var metrics = BootstrapCalendarRenderLogic.ResolveMetrics(theme.Metrics, GetCurrentDpi(), _borderRadius);
         var width = Math.Max(1, metrics.BorderWidth);
         var bounds = new RectangleF(width / 2f, width / 2f, Math.Max(0, ClientSize.Width - width), Math.Max(0, ClientSize.Height - width));
         if (bounds.Width <= 0 || bounds.Height <= 0) return;
@@ -571,7 +576,7 @@ public class BootstrapCalendar : Control
 
     private void PaintDays(Graphics graphics, BootstrapTheme theme, BootstrapCalendarLayout layout)
     {
-        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var dpi = GetCurrentDpi();
         var outlines = ResolveDayOutlineMetrics(theme.Metrics, dpi);
         foreach (var cell in layout.DayCells)
         {
@@ -739,15 +744,12 @@ public class BootstrapCalendar : Control
             {
                 if (!_isNavigation) return DayCell.Date.ToString("D", CultureInfo.CurrentCulture);
                 var target = BootstrapCalendarRenderLogic.MoveByMonth(Owner.DisplayMonth, IsPreviousNavigation ? -1 : 1);
-                var action = IsPreviousNavigation ? "Previous month" : "Next month";
-                return action + ", " + target.ToString("Y", CultureInfo.CurrentCulture);
+                return (IsPreviousNavigation ? "‹ " : "› ") + target.ToString("Y", CultureInfo.CurrentCulture);
             }
             set { }
         }
 
-        public override string? DefaultAction => _isNavigation
-            ? (IsPreviousNavigation ? "Show previous month" : "Show next month")
-            : "Select";
+        public override string? DefaultAction => _isNavigation ? (IsPreviousNavigation ? "‹" : "›") : "Select";
 
         public override Rectangle Bounds
         {

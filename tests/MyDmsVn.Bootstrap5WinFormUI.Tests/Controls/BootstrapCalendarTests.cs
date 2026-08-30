@@ -650,63 +650,81 @@ public sealed class BootstrapCalendarTests
     [Test]
     public void ThemeChangesPreserveLogicalStateAndReplaceOnlyTheThemeOwnedFont()
     {
-        using var calendar = new BootstrapCalendar
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
         {
-            MinDate = new DateTime(2026, 1, 1),
-            MaxDate = new DateTime(2026, 12, 31),
-            DisplayMonth = new DateTime(2026, 8, 1)
-        };
-        calendar.SelectedDate = new DateTime(2026, 8, 12);
-        var ownedFont = calendar.Font;
-        var initialFocusedDate = calendar.FocusedDate;
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+            using var calendar = new BootstrapCalendar
+            {
+                MinDate = new DateTime(2026, 1, 1),
+                MaxDate = new DateTime(2026, 12, 31),
+                DisplayMonth = new DateTime(2026, 8, 1)
+            };
+            calendar.SelectedDate = new DateTime(2026, 8, 12);
+            var ownedFont = calendar.Font;
+            var initialFocusedDate = calendar.FocusedDate;
 
-        var darkBase = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
-        var dark = new BootstrapTheme(
-            BootstrapThemeMode.Dark,
-            darkBase.Colors,
-            darkBase.Metrics,
-            new BootstrapThemeTypography(
-                new BootstrapFontToken("Segoe UI", 11f, FontStyle.Bold),
-                darkBase.Typography.BodySmall,
-                darkBase.Typography.Label,
-                darkBase.Typography.HeadingSmall,
-                darkBase.Typography.HeadingMedium));
-        BootstrapThemeManager.CurrentTheme = dark;
-        var darkFont = calendar.Font;
-        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+            var darkBase = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+            var dark = new BootstrapTheme(
+                BootstrapThemeMode.Dark,
+                darkBase.Colors,
+                darkBase.Metrics,
+                new BootstrapThemeTypography(
+                    new BootstrapFontToken("Segoe UI", 11f, FontStyle.Bold),
+                    darkBase.Typography.BodySmall,
+                    darkBase.Typography.Label,
+                    darkBase.Typography.HeadingSmall,
+                    darkBase.Typography.HeadingMedium));
+            BootstrapThemeManager.CurrentTheme = dark;
+            var darkFont = calendar.Font;
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
 
-        Assert.Multiple((Action)(() =>
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 8, 12)));
+                Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 8, 1)));
+                Assert.That(calendar.FocusedDate, Is.EqualTo(initialFocusedDate));
+                Assert.That(darkFont, Is.Not.SameAs(ownedFont));
+                Assert.That(calendar.Font, Is.Not.SameAs(darkFont));
+            }));
+
+            using var bitmap = new Bitmap(24, 24);
+            using var graphics = Graphics.FromImage(bitmap);
+            Assert.Catch((Action)(() => graphics.MeasureString("x", ownedFont)));
+            Assert.Catch((Action)(() => graphics.MeasureString("x", darkFont)));
+        }
+        finally
         {
-            Assert.That(calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 8, 12)));
-            Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 8, 1)));
-            Assert.That(calendar.FocusedDate, Is.EqualTo(initialFocusedDate));
-            Assert.That(darkFont, Is.Not.SameAs(ownedFont));
-            Assert.That(calendar.Font, Is.Not.SameAs(darkFont));
-        }));
-
-        using var bitmap = new Bitmap(24, 24);
-        using var graphics = Graphics.FromImage(bitmap);
-        Assert.Catch((Action)(() => graphics.MeasureString("x", ownedFont)));
-        Assert.Catch((Action)(() => graphics.MeasureString("x", darkFont)));
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
     }
 
     [Test]
     public void CallerFontAndThemeSubscriptionHaveDeterministicOwnershipAcrossDisposal()
     {
-        var baselineSubscriptions = GetThemeSubscriptionCount();
-        using var callerFont = new Font("Segoe UI", 10f, FontStyle.Italic);
-        var calendar = new BootstrapCalendar { Font = callerFont };
-        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions + 1));
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+            var baselineSubscriptions = GetThemeSubscriptionCount();
+            using var callerFont = new Font("Segoe UI", 10f, FontStyle.Italic);
+            var calendar = new BootstrapCalendar { Font = callerFont };
+            Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions + 1));
 
-        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
-        Assert.That(calendar.Font, Is.SameAs(callerFont));
-        calendar.Dispose();
-        calendar.Dispose();
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+            Assert.That(calendar.Font, Is.SameAs(callerFont));
+            calendar.Dispose();
+            calendar.Dispose();
 
-        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions));
-        using var bitmap = new Bitmap(24, 24);
-        using var graphics = Graphics.FromImage(bitmap);
-        Assert.DoesNotThrow((Action)(() => graphics.MeasureString("x", callerFont)));
+            Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions));
+            using var bitmap = new Bitmap(24, 24);
+            using var graphics = Graphics.FromImage(bitmap);
+            Assert.DoesNotThrow((Action)(() => graphics.MeasureString("x", callerFont)));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
     }
 
     [Test]
@@ -721,25 +739,81 @@ public sealed class BootstrapCalendarTests
         };
         calendar.SelectedDate = new DateTime(2026, 8, 12);
         var focusedDate = calendar.FocusedDate;
-        var preferredSize = calendar.GetPreferredSize(Size.Empty);
-        calendar.ResolveLayout(DpiScaler.DefaultDpi);
+        calendar.SetEffectiveDpi(96);
+        var preferredSize96 = calendar.GetPreferredSize(Size.Empty);
+        var layout96 = calendar.CurrentLayout;
         var builds = calendar.LayoutBuildCount;
 
         calendar.Size = new Size(320, 300);
-        calendar.ResolveLayout(DpiScaler.DefaultDpi);
+        _ = calendar.CurrentLayout;
         using var callerFont = new Font(calendar.Font, FontStyle.Bold);
         calendar.Font = callerFont;
-        calendar.ResolveLayout(DpiScaler.DefaultDpi);
+        _ = calendar.CurrentLayout;
+        calendar.SetEffectiveDpi(144);
         calendar.RaiseDpiChangedAfterParent();
-        calendar.ResolveLayout(DpiScaler.DefaultDpi);
+        var preferredSize144 = calendar.GetPreferredSize(Size.Empty);
+        var layout144 = calendar.CurrentLayout;
+        var buildsAt144 = calendar.LayoutBuildCount;
+        calendar.RaiseDpiChangedAfterParent();
+        var layout144AfterRepeat = calendar.CurrentLayout;
+        var expected144 = BootstrapCalendarRenderLogic.CalculatePreferredSize(
+            BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeManager.CurrentTheme.Metrics, 144, calendar.BorderRadius));
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(calendar.LayoutBuildCount, Is.GreaterThan(builds));
-            Assert.That(calendar.GetPreferredSize(Size.Empty), Is.EqualTo(preferredSize));
+            Assert.That(calendar.LayoutBuildCount, Is.EqualTo(buildsAt144 + 1));
+            Assert.That(preferredSize144, Is.EqualTo(expected144));
+            Assert.That(preferredSize144.Width, Is.GreaterThan(preferredSize96.Width));
+            Assert.That(preferredSize144.Height, Is.GreaterThan(preferredSize96.Height));
+            Assert.That(layout144.HeaderBounds.Top, Is.GreaterThan(layout96.HeaderBounds.Top));
+            Assert.That(layout144AfterRepeat.HeaderBounds, Is.EqualTo(layout144.HeaderBounds), "DPI must not be scaled twice on repeated lifecycle events.");
             Assert.That(calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 8, 12)));
             Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 8, 1)));
             Assert.That(calendar.FocusedDate, Is.EqualTo(focusedDate));
+        }));
+    }
+
+    [Test]
+    public void AccessibleHitTestingUsesCurrentLayoutAfterResizeMonthAndEffectiveDpiTransitions()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 8, 1),
+            MaxDate = new DateTime(2026, 9, 30),
+            DisplayMonth = new DateTime(2026, 8, 1),
+            Size = new Size(340, 310)
+        };
+        var accessible = calendar.Accessible;
+        var augustLayout = calendar.ResolveLayout(calendar.GetCurrentDpi());
+        var augustDayIndex = augustLayout.DayCells.ToList().FindIndex(cell => cell.Date == new DateTime(2026, 8, 12));
+        var augustChild = accessible.GetChild(augustDayIndex + 2)!;
+
+        calendar.Size = new Size(200, 220);
+        var resizedLayout = calendar.ResolveLayout(calendar.GetCurrentDpi());
+        var resizedPoint = calendar.PointToScreen(Center(resizedLayout.DayCells[augustDayIndex].Bounds));
+        var resizeStalePoint = calendar.PointToScreen(PointInsideNotContainedBy(augustLayout.DayCells[augustDayIndex].Bounds, resizedLayout.DayCells[augustDayIndex].Bounds));
+        Assert.That(accessible.HitTest(resizedPoint.X, resizedPoint.Y), Is.SameAs(augustChild));
+        Assert.That(accessible.HitTest(resizeStalePoint.X, resizeStalePoint.Y), Is.Not.SameAs(augustChild));
+
+        calendar.ShowNextMonth();
+        var septemberLayout = calendar.ResolveLayout(calendar.GetCurrentDpi());
+        var septemberDayIndex = septemberLayout.DayCells.ToList().FindIndex(cell => cell.Date == new DateTime(2026, 9, 12));
+        var septemberPoint = calendar.PointToScreen(Center(septemberLayout.DayCells[septemberDayIndex].Bounds));
+        var septemberChild = accessible.GetChild(septemberDayIndex + 2)!;
+        Assert.That(accessible.HitTest(septemberPoint.X, septemberPoint.Y), Is.SameAs(septemberChild));
+        Assert.That(accessible.HitTest(resizedPoint.X, resizedPoint.Y), Is.Not.SameAs(septemberChild));
+
+        calendar.SetEffectiveDpi(144);
+        calendar.RaiseDpiChangedAfterParent();
+        var dpiLayout = calendar.ResolveLayout(calendar.GetCurrentDpi());
+        var dpiPoint = calendar.PointToScreen(Center(dpiLayout.DayCells[septemberDayIndex].Bounds));
+        var dpiStalePoint = calendar.PointToScreen(PointInsideNotContainedBy(septemberLayout.DayCells[septemberDayIndex].Bounds, dpiLayout.DayCells[septemberDayIndex].Bounds));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(accessible.HitTest(dpiPoint.X, dpiPoint.Y), Is.SameAs(septemberChild));
+            Assert.That(accessible.HitTest(dpiStalePoint.X, dpiStalePoint.Y), Is.Not.SameAs(septemberChild));
+            Assert.That(calendar.Controls, Is.Empty);
         }));
     }
 
@@ -833,6 +907,36 @@ public sealed class BootstrapCalendarTests
     }
 
     [Test]
+    public void AccessibilityNavigationMetadataUsesCurrentCultureWithoutEmbeddedEnglish()
+    {
+        var originalCulture = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            var culture = System.Globalization.CultureInfo.GetCultureInfo("ja-JP");
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+            using var calendar = new CalendarInteractionProbe
+            {
+                MinDate = new DateTime(2026, 7, 1),
+                MaxDate = new DateTime(2026, 9, 30),
+                DisplayMonth = new DateTime(2026, 8, 1)
+            };
+            var accessible = calendar.Accessible;
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(accessible.GetChild(0)!.Name, Is.EqualTo("‹ " + new DateTime(2026, 7, 1).ToString("Y", culture)));
+                Assert.That(accessible.GetChild(1)!.Name, Is.EqualTo("› " + new DateTime(2026, 9, 1).ToString("Y", culture)));
+                Assert.That(accessible.GetChild(0)!.DefaultAction, Is.EqualTo("‹"));
+                Assert.That(accessible.GetChild(1)!.DefaultAction, Is.EqualTo("›"));
+            }));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = originalCulture;
+        }
+    }
+
+    [Test]
     public void AccessibilitySelectedStateRepresentsRangeEndpointsInteriorAndMultipleDates()
     {
         using var calendar = new CalendarInteractionProbe
@@ -906,7 +1010,15 @@ public sealed class BootstrapCalendarTests
 
     private sealed class CalendarInteractionProbe : BootstrapCalendar
     {
+        private int? _effectiveDpi;
+
         public AccessibleObject Accessible => AccessibilityObject;
+
+        public void SetEffectiveDpi(int dpi) => _effectiveDpi = dpi;
+
+        public void RaiseDpiChangedAfterParent() => OnDpiChangedAfterParent(EventArgs.Empty);
+
+        internal override int GetCurrentDpi() => _effectiveDpi ?? base.GetCurrentDpi();
 
         public void MouseDownDate(DateTime date, MouseButtons button = MouseButtons.Left)
         {
@@ -946,7 +1058,32 @@ public sealed class BootstrapCalendarTests
 
     private sealed class CalendarLifecycleProbe : BootstrapCalendar
     {
+        private int _effectiveDpi = DpiScaler.DefaultDpi;
+
+        public void SetEffectiveDpi(int dpi) => _effectiveDpi = dpi;
+
+        public BootstrapCalendarLayout CurrentLayout => ResolveLayout(GetCurrentDpi());
+
+        internal override int GetCurrentDpi() => _effectiveDpi;
+
         public void RaiseDpiChangedAfterParent() => OnDpiChangedAfterParent(EventArgs.Empty);
+    }
+
+    private static Point Center(Rectangle bounds) => new Point(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2);
+
+    private static Point PointInsideNotContainedBy(Rectangle oldBounds, Rectangle currentBounds)
+    {
+        for (var y = oldBounds.Top; y < oldBounds.Bottom; y++)
+        {
+            for (var x = oldBounds.Left; x < oldBounds.Right; x++)
+            {
+                var point = new Point(x, y);
+                if (!currentBounds.Contains(point)) return point;
+            }
+        }
+
+        Assert.Fail("The old logical-cell bounds unexpectedly remain contained by the current bounds.");
+        return Point.Empty;
     }
 
     private static int GetThemeSubscriptionCount()
