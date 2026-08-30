@@ -89,7 +89,19 @@ public sealed class BootstrapCalendarRenderLogicTests
             Assert.That(l.DayCells.All(c => c.Bounds.Width >= 0 && c.Bounds.Height >= 0), Is.True);
             Assert.That(BootstrapCalendarRenderLogic.HitTestDay(new Point(1, 1), l), Is.EqualTo(-1));
             Assert.That(l.DayCells.All(c => c.Bounds.Left >= 0 && c.Bounds.Top >= 0 && c.Bounds.Right <= size.Width && c.Bounds.Bottom <= size.Height), Is.True);
+            AssertContained(size, l.HeaderBounds); AssertContained(size, l.PreviousButtonBounds); AssertContained(size, l.MonthTitleBounds); AssertContained(size, l.NextButtonBounds);
+            foreach (var bounds in l.WeekdayBounds) AssertContained(size, bounds);
+            foreach (var cell in l.DayCells) AssertContained(size, cell.Bounds);
         }
+    }
+
+    [Test] public void LayoutDistributesColumnAndRowRemaindersDeterministically()
+    {
+        var l = BootstrapCalendarRenderLogic.CalculateLayout(new Size(291, 301), BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeMetrics.Default, 96, -1), new DateTime(2026, 9, 1), DayOfWeek.Sunday, DateTimePicker.MinimumDateTime.Date, DateTimePicker.MaximumDateTime.Date, DateTime.Today);
+        Assert.That(l.WeekdayBounds.Select(r => r.Width).ToArray(), Is.EqualTo(new[] { 35, 36, 36, 36, 36, 36, 36 }));
+        Assert.That(l.DayCells.Take(7).Select(c => c.Bounds.Width).ToArray(), Is.EqualTo(new[] { 35, 36, 36, 36, 36, 36, 36 }));
+        Assert.That(Enumerable.Range(0, 6).Select(row => l.DayCells[row * 7].Bounds.Height).ToArray(), Is.EqualTo(new[] { 32, 33, 33, 33, 33, 33 }));
+        Assert.That(l.DayCells[6].Bounds.Right, Is.EqualTo(283)); Assert.That(l.DayCells[41].Bounds.Bottom, Is.EqualTo(293));
     }
 
     [Test] public void HitTestFindsRepresentativeCellAndRejectsGap()
@@ -111,4 +123,5 @@ public sealed class BootstrapCalendarRenderLogicTests
 
     private static BootstrapCalendarLayout Layout(DateTime month, DayOfWeek first) => BootstrapCalendarRenderLogic.CalculateLayout(new Size(300, 296), BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeMetrics.Default, 96, -1), month, first, DateTimePicker.MinimumDateTime.Date, DateTimePicker.MaximumDateTime.Date, DateTime.Today);
     private static void AssertProjection(DateTime month, DayOfWeek first) { var l = Layout(month, first); Assert.That(l.DayCells, Has.Length.EqualTo(42)); for (var i = 1; i < 42; i++) Assert.That(l.DayCells[i].Date, Is.EqualTo(l.DayCells[i - 1].Date.AddDays(1))); }
+    private static void AssertContained(Size client, Rectangle rectangle) { Assert.That(rectangle.Width, Is.GreaterThanOrEqualTo(0)); Assert.That(rectangle.Height, Is.GreaterThanOrEqualTo(0)); Assert.That(rectangle.Left, Is.GreaterThanOrEqualTo(0)); Assert.That(rectangle.Top, Is.GreaterThanOrEqualTo(0)); Assert.That(rectangle.Right, Is.LessThanOrEqualTo(client.Width)); Assert.That(rectangle.Bottom, Is.LessThanOrEqualTo(client.Height)); }
 }

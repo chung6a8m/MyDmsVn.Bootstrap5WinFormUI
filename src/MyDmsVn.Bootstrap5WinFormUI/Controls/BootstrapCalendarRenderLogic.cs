@@ -55,13 +55,13 @@ internal static class BootstrapCalendarRenderLogic
 
     private static Rectangle[] MakeColumns(int left, int top, int width, int height, int gap, int count)
     {
-        var result = new Rectangle[count]; var effectiveGap = width >= gap * (count - 1) ? gap : 0; var usable = Math.Max(0, width - effectiveGap * (count - 1)); for (var i = 0; i < count; i++) { var x1 = left + (int)Math.Floor((double)(usable + effectiveGap * (count - 1)) * i / count); var x2 = left + (int)Math.Floor((double)(usable + effectiveGap * (count - 1)) * (i + 1) / count); result[i] = new Rectangle(x1, top, Math.Max(0, x2 - x1 - (i == count - 1 ? 0 : effectiveGap)), Math.Max(0, height)); } return result;
+        var result = new Rectangle[count]; var effectiveGap = width >= gap * (count - 1) ? gap : 0; var usable = Math.Max(0, width - effectiveGap * (count - 1)); for (var i = 0; i < count; i++) { var x1 = left + (int)Math.Floor((double)usable * i / count) + effectiveGap * i; var x2 = left + (int)Math.Floor((double)usable * (i + 1) / count) + effectiveGap * i; result[i] = new Rectangle(x1, top, Math.Max(0, x2 - x1), Math.Max(0, height)); } return result;
     }
 
     private static Rectangle[][] MakeGrid(int left, int top, int width, int height, int gap)
     {
         var rows = new Rectangle[6][]; var effectiveGap = height >= gap * 5 ? gap : 0; var usable = Math.Max(0, height - effectiveGap * 5); var total = usable + effectiveGap * 5;
-        for (var row = 0; row < 6; row++) { var y1 = top + (int)Math.Floor((double)total * row / 6); var y2 = top + (int)Math.Floor((double)total * (row + 1) / 6); rows[row] = MakeColumns(left, y1, width, Math.Max(0, y2 - y1 - (row == 5 ? 0 : effectiveGap)), gap, 7); }
+        for (var row = 0; row < 6; row++) { var y1 = top + (int)Math.Floor((double)usable * row / 6) + effectiveGap * row; var y2 = top + (int)Math.Floor((double)usable * (row + 1) / 6) + effectiveGap * row; rows[row] = MakeColumns(left, y1, width, Math.Max(0, y2 - y1), gap, 7); }
         return rows;
     }
 }
