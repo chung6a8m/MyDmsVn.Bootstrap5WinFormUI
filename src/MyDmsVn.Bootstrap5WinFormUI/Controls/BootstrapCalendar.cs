@@ -73,6 +73,7 @@ public class BootstrapCalendar : Control
     private DayOfWeek _layoutFirstDay;
     private DateTime _layoutMinDate;
     private DateTime _layoutMaxDate;
+    private DateTime _layoutToday;
     private int _layoutRadius;
     private Font? _layoutFont;
     private BootstrapThemeMetrics? _layoutThemeMetrics;
@@ -147,8 +148,10 @@ public class BootstrapCalendar : Control
         set
         {
             var changed = _selectionModel.SetSelectedDate(value);
+            var oldFocusedDate = _focusedDate;
             if (_selectionModel.SelectedDate.HasValue) _focusedDate = _selectionModel.SelectedDate.Value;
             if (changed) OnSelectionChanged(EventArgs.Empty);
+            else if (_focusedDate != oldFocusedDate) Invalidate();
         }
     }
 
@@ -189,18 +192,22 @@ public class BootstrapCalendar : Control
     public void SetRange(DateTime? start, DateTime? end)
     {
         var changed = _selectionModel.SetRange(start, end);
+        var oldFocusedDate = _focusedDate;
         SetHoverState(-1, null);
         var anchor = _selectionModel.RangeEnd ?? _selectionModel.RangeStart;
         if (anchor.HasValue) _focusedDate = anchor.Value;
         if (changed) OnSelectionChanged(EventArgs.Empty);
+        else if (_focusedDate != oldFocusedDate) Invalidate();
     }
 
     /// <summary>Replaces the selected dates in multiple-selection mode.</summary>
     public void SetSelectedDates(IEnumerable<DateTime> dates)
     {
         var changed = _selectionModel.SetSelectedDates(dates);
+        var oldFocusedDate = _focusedDate;
         if (_selectionModel.SelectedDates.Count != 0) _focusedDate = _selectionModel.SelectedDates[0];
         if (changed) OnSelectionChanged(EventArgs.Empty);
+        else if (_focusedDate != oldFocusedDate) Invalidate();
     }
 
     /// <summary>Clears the effective selection while preserving the private focus anchor.</summary>
@@ -238,6 +245,11 @@ public class BootstrapCalendar : Control
     internal virtual int GetCurrentDpi()
     {
         return DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+    }
+
+    internal virtual DateTime GetToday()
+    {
+        return DateTime.Today;
     }
 
     internal static BootstrapCalendarDayOutlineMetrics ResolveDayOutlineMetrics(BootstrapThemeMetrics themeMetrics, int dpi)
@@ -529,16 +541,19 @@ public class BootstrapCalendar : Control
     {
         if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
         var firstDay = CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek;
+        var today = GetToday().Date;
         var themeMetrics = BootstrapThemeManager.CurrentTheme.Metrics;
         if (!_layoutValid || _layoutSize != ClientSize || _layoutDpi != dpi || _layoutMonth != _displayMonth ||
             _layoutFirstDay != firstDay || _layoutMinDate != MinDate || _layoutMaxDate != MaxDate ||
+            _layoutToday != today ||
             _layoutRadius != _borderRadius || !ReferenceEquals(_layoutFont, Font) ||
             !ReferenceEquals(_layoutThemeMetrics, themeMetrics))
         {
             var metrics = BootstrapCalendarRenderLogic.ResolveMetrics(themeMetrics, dpi, _borderRadius);
-            _layout = BootstrapCalendarRenderLogic.CalculateLayout(ClientSize, metrics, _displayMonth, firstDay, MinDate, MaxDate, DateTime.Today);
+            _layout = BootstrapCalendarRenderLogic.CalculateLayout(ClientSize, metrics, _displayMonth, firstDay, MinDate, MaxDate, today);
             _layoutSize = ClientSize; _layoutDpi = dpi; _layoutMonth = _displayMonth; _layoutFirstDay = firstDay;
             _layoutMinDate = MinDate; _layoutMaxDate = MaxDate; _layoutRadius = _borderRadius; _layoutFont = Font;
+            _layoutToday = today;
             _layoutThemeMetrics = themeMetrics;
             _layoutValid = true; LayoutBuildCount++;
         }
@@ -749,7 +764,7 @@ public class BootstrapCalendar : Control
             set { }
         }
 
-        public override string? DefaultAction => _isNavigation ? (IsPreviousNavigation ? "‹" : "›") : "Select";
+        public override string? DefaultAction => _isNavigation ? Name : "Select";
 
         public override Rectangle Bounds
         {

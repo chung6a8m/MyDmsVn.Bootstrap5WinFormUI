@@ -122,6 +122,7 @@ public sealed class AdvancedInputsDemoFormTests
             Assert.That(captions.Contains("Calendar Picker — Single"), Is.True);
             Assert.That(captions.Contains("Calendar Picker — Range"), Is.True);
             Assert.That(captions.Contains("Calendar Picker — Multiple"), Is.True);
+            Assert.That(captions.Contains("Calendar Picker — Disabled"), Is.True);
             Assert.That(calendars.Any(calendar =>
                 calendar.SelectionMode == BootstrapCalendarSelectionMode.Range &&
                 calendar.DisplayMonth == new DateTime(2026, 8, 1) &&
@@ -146,13 +147,16 @@ public sealed class AdvancedInputsDemoFormTests
                 picker.MinDate == new DateTime(2025, 1, 1) &&
                 picker.MaxDate == new DateTime(2030, 12, 31) &&
                 picker.DateFormat == "yyyy-MM-dd" &&
-                !picker.Enabled &&
+                picker.Enabled &&
                 picker.SelectedDates.SequenceEqual(new[]
                 {
                     new DateTime(2026, 8, 8),
                     new DateTime(2026, 8, 12),
                     new DateTime(2026, 8, 18)
                 })), Is.True);
+            Assert.That(pickers.Any(picker =>
+                picker.SelectionMode == BootstrapCalendarSelectionMode.Single &&
+                !picker.Enabled), Is.True);
             Assert.That(labels.Any(label => label.Text.StartsWith("SelectionChanged:", StringComparison.Ordinal)), Is.True);
         }));
     }
@@ -167,7 +171,7 @@ public sealed class AdvancedInputsDemoFormTests
         var calendar = FindControls<BootstrapCalendar>(form)
             .Single(control => control.SelectionMode == BootstrapCalendarSelectionMode.Range);
         var singlePicker = FindControls<BootstrapCalendarPicker>(form)
-            .Single(control => control.SelectionMode == BootstrapCalendarSelectionMode.Single);
+            .Single(control => control.SelectionMode == BootstrapCalendarSelectionMode.Single && control.Enabled);
         var rangePicker = FindControls<BootstrapCalendarPicker>(form)
             .Single(control => control.SelectionMode == BootstrapCalendarSelectionMode.Range);
 

@@ -399,14 +399,18 @@ public sealed class AdvancedInputsDemoForm : Form
             new DateTime(2026, 8, 12),
             new DateTime(2026, 8, 18)
         });
-        multiplePicker.Enabled = false;
         AddCalendarCell(grid, "Calendar Picker — Multiple", multiplePicker);
+
+        var disabledPicker = CreateCalendarPicker(BootstrapCalendarSelectionMode.Single, minDate, maxDate);
+        disabledPicker.SelectedDate = new DateTime(2026, 8, 20);
+        disabledPicker.Enabled = false;
+        AddCalendarCell(grid, "Calendar Picker — Disabled", disabledPicker);
 
         _calendarNote.AutoSize = true;
         _calendarNote.MaximumSize = new Size(860, 0);
         _calendarNote.Margin = new Padding(6, 0, 6, 8);
         _calendarNote.Dock = DockStyle.Top;
-        _calendarNote.Text = "Calendar note: Range is shown directly; picker popups use the native dropdown host. The Range picker is invalid and the Multiple picker is disabled for visual-state comparison.";
+        _calendarNote.Text = "Calendar note: Range is shown directly; picker popups use the native dropdown host. The Range picker is invalid, Multiple remains enabled for stay-open toggling, and a separate Single picker shows the disabled state.";
 
         _calendarSection.Controls.Add(CreateSectionStack(grid, _calendarNote));
     }

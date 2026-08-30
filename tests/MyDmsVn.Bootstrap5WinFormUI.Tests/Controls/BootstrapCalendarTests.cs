@@ -165,6 +165,37 @@ public sealed class BootstrapCalendarTests
     }
 
     [Test]
+    public void UnchangedNonEmptyProgrammaticSelectionsInvalidateWhenTheyReanchorFocus()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31)
+        };
+        calendar.CreateControl();
+
+        calendar.SelectedDate = new DateTime(2026, 1, 10);
+        calendar.DisplayMonth = new DateTime(2026, 5, 1);
+        var invalidations = calendar.InvalidationCount;
+        calendar.SelectedDate = new DateTime(2026, 1, 10);
+        Assert.That(calendar.InvalidationCount, Is.GreaterThan(invalidations), "Single focus reanchor must repaint focus state.");
+
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Range;
+        calendar.SetRange(new DateTime(2026, 2, 2), new DateTime(2026, 2, 8));
+        calendar.DisplayMonth = new DateTime(2026, 6, 1);
+        invalidations = calendar.InvalidationCount;
+        calendar.SetRange(new DateTime(2026, 2, 2), new DateTime(2026, 2, 8));
+        Assert.That(calendar.InvalidationCount, Is.GreaterThan(invalidations), "Range focus reanchor must repaint focus state.");
+
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+        calendar.SetSelectedDates(new[] { new DateTime(2026, 3, 4), new DateTime(2026, 3, 7) });
+        calendar.DisplayMonth = new DateTime(2026, 7, 1);
+        invalidations = calendar.InvalidationCount;
+        calendar.SetSelectedDates(new[] { new DateTime(2026, 3, 4), new DateTime(2026, 3, 7) });
+        Assert.That(calendar.InvalidationCount, Is.GreaterThan(invalidations), "Multiple focus reanchor must repaint focus state.");
+    }
+
+    [Test]
     public void LayoutCacheReusesGeometryUntilAKeyChanges()
     {
         using var calendar = new BootstrapCalendar { DisplayMonth = new DateTime(2026, 8, 1) };
@@ -219,6 +250,30 @@ public sealed class BootstrapCalendarTests
             System.Globalization.CultureInfo.CurrentCulture = originalCulture;
             BootstrapThemeManager.CurrentTheme = originalTheme;
         }
+    }
+
+    [Test]
+    public void LayoutCacheRebuildsWhenEffectiveTodayRollsOverWithinDisplayedMonth()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            DisplayMonth = new DateTime(2026, 8, 1),
+            EffectiveToday = new DateTime(2026, 8, 15)
+        };
+
+        var first = calendar.ResolveLayout(96);
+        var builds = calendar.LayoutBuildCount;
+        Assert.That(first.DayCells.Single(cell => cell.Date == new DateTime(2026, 8, 15)).IsToday, Is.True);
+
+        calendar.EffectiveToday = new DateTime(2026, 8, 16);
+        var second = calendar.ResolveLayout(96);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(calendar.LayoutBuildCount, Is.EqualTo(builds + 1));
+            Assert.That(second.DayCells.Single(cell => cell.Date == new DateTime(2026, 8, 15)).IsToday, Is.False);
+            Assert.That(second.DayCells.Single(cell => cell.Date == new DateTime(2026, 8, 16)).IsToday, Is.True);
+        }));
     }
 
     [Test]
@@ -926,8 +981,8 @@ public sealed class BootstrapCalendarTests
             {
                 Assert.That(accessible.GetChild(0)!.Name, Is.EqualTo("‹ " + new DateTime(2026, 7, 1).ToString("Y", culture)));
                 Assert.That(accessible.GetChild(1)!.Name, Is.EqualTo("› " + new DateTime(2026, 9, 1).ToString("Y", culture)));
-                Assert.That(accessible.GetChild(0)!.DefaultAction, Is.EqualTo("‹"));
-                Assert.That(accessible.GetChild(1)!.DefaultAction, Is.EqualTo("›"));
+                Assert.That(accessible.GetChild(0)!.DefaultAction, Is.EqualTo("‹ " + new DateTime(2026, 7, 1).ToString("Y", culture)));
+                Assert.That(accessible.GetChild(1)!.DefaultAction, Is.EqualTo("› " + new DateTime(2026, 9, 1).ToString("Y", culture)));
             }));
         }
         finally
@@ -1012,6 +1067,10 @@ public sealed class BootstrapCalendarTests
     {
         private int? _effectiveDpi;
 
+        public DateTime? EffectiveToday { get; set; }
+
+        public int InvalidationCount { get; private set; }
+
         public AccessibleObject Accessible => AccessibilityObject;
 
         public void SetEffectiveDpi(int dpi) => _effectiveDpi = dpi;
@@ -1019,6 +1078,14 @@ public sealed class BootstrapCalendarTests
         public void RaiseDpiChangedAfterParent() => OnDpiChangedAfterParent(EventArgs.Empty);
 
         internal override int GetCurrentDpi() => _effectiveDpi ?? base.GetCurrentDpi();
+
+        internal override DateTime GetToday() => EffectiveToday ?? base.GetToday();
+
+        protected override void OnInvalidated(InvalidateEventArgs e)
+        {
+            InvalidationCount++;
+            base.OnInvalidated(e);
+        }
 
         public void MouseDownDate(DateTime date, MouseButtons button = MouseButtons.Left)
         {

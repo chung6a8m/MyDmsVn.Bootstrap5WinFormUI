@@ -252,6 +252,7 @@ public sealed class BootstrapCalendarPicker : Control
     protected override void OnMouseClick(MouseEventArgs e)
     {
         base.OnMouseClick(e);
+        if (e.Button != MouseButtons.Left) return;
         ToggleDropDown();
     }
 
@@ -386,10 +387,14 @@ public sealed class BootstrapCalendarPicker : Control
     private void OnCalendarSelectionActivated(object? sender, BootstrapCalendarSelectionActivatedEventArgs e)
     {
         if (_synchronizingCalendar || !ReferenceEquals(sender, _activeCalendar)) return;
-        CopySelectionFromCalendar(_activeCalendar!);
+        var calendar = _activeCalendar!;
+        var originatingMode = calendar.SelectionMode;
+        var shouldClose = e.Completed && originatingMode != BootstrapCalendarSelectionMode.Multiple;
+        _lastDisplayMonth = ClampMonth(e.Date);
+        CopySelectionFromCalendar(calendar, originatingMode);
         if (e.Changed) OnSelectionChanged(EventArgs.Empty);
         Invalidate();
-        if (e.Completed && SelectionMode != BootstrapCalendarSelectionMode.Multiple) CloseDropDown();
+        if (shouldClose) CloseDropDown();
     }
 
     private void OnCalendarDisplayMonthChanged(object? sender, EventArgs e)
@@ -422,10 +427,10 @@ public sealed class BootstrapCalendarPicker : Control
         else calendar.SetSelectedDates(SelectedDates);
     }
 
-    private void CopySelectionFromCalendar(BootstrapCalendar calendar)
+    private void CopySelectionFromCalendar(BootstrapCalendar calendar, BootstrapCalendarSelectionMode originatingMode)
     {
-        if (SelectionMode == BootstrapCalendarSelectionMode.Single) _selectionModel.SetSelectedDate(calendar.SelectedDate);
-        else if (SelectionMode == BootstrapCalendarSelectionMode.Range) _selectionModel.SetRange(calendar.RangeStart, calendar.RangeEnd);
+        if (originatingMode == BootstrapCalendarSelectionMode.Single) _selectionModel.SetSelectedDate(calendar.SelectedDate);
+        else if (originatingMode == BootstrapCalendarSelectionMode.Range) _selectionModel.SetRange(calendar.RangeStart, calendar.RangeEnd);
         else _selectionModel.SetSelectedDates(calendar.SelectedDates);
     }
 

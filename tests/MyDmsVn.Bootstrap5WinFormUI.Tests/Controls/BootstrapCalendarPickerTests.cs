@@ -844,6 +844,27 @@ public sealed class BootstrapCalendarPickerTests
     }
 
     [Test]
+    public void PickerSingleCompletionClosesUsingOriginatingModeWhenSelectionHandlerChangesMode()
+    {
+        using var form = CreatePickerHost(out var picker);
+        var closed = 0;
+        picker.SelectionChanged += (_, _) => picker.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+        picker.Closed += (_, _) => closed++;
+
+        picker.ShowDropDown();
+        Application.DoEvents();
+        ActivateDate(GetActiveCalendar(picker)!, new DateTime(2026, 8, 30));
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(picker.SelectionMode, Is.EqualTo(BootstrapCalendarSelectionMode.Multiple));
+            Assert.That(closed, Is.EqualTo(1));
+            Assert.That(GetActiveCalendar(picker), Is.Null);
+        }));
+    }
+
+    [Test]
     public void PickerRangeActivationRaisesTwoChangesOneOpenOneCompletionClose()
     {
         using var form = CreatePickerHost(out var picker);
@@ -876,6 +897,48 @@ public sealed class BootstrapCalendarPickerTests
             Assert.That(closed, Is.EqualTo(1));
             Assert.That(GetActiveCalendar(picker), Is.Null);
         }));
+    }
+
+    [Test]
+    public void PickerCompletedRangeClosesUsingOriginatingModeWhenSelectionHandlerChangesMode()
+    {
+        using var form = CreatePickerHost(out var picker);
+        picker.SelectionMode = BootstrapCalendarSelectionMode.Range;
+        picker.SetRange(new DateTime(2026, 8, 30), null);
+        var closed = 0;
+        picker.SelectionChanged += (_, _) => picker.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+        picker.Closed += (_, _) => closed++;
+
+        picker.ShowDropDown();
+        Application.DoEvents();
+        ActivateDate(GetActiveCalendar(picker)!, new DateTime(2026, 8, 31));
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(picker.SelectionMode, Is.EqualTo(BootstrapCalendarSelectionMode.Multiple));
+            Assert.That(closed, Is.EqualTo(1));
+            Assert.That(GetActiveCalendar(picker), Is.Null);
+        }));
+    }
+
+    [Test]
+    public void PickerCompletedAdjacentMonthRangeRetainsActivatedMonthForNextOpen()
+    {
+        using var form = CreatePickerHost(out var picker);
+        picker.SelectionMode = BootstrapCalendarSelectionMode.Range;
+        picker.SetRange(new DateTime(2026, 8, 30), null);
+
+        picker.ShowDropDown();
+        Application.DoEvents();
+        MouseDownDate(GetActiveCalendar(picker)!, new DateTime(2026, 9, 1));
+        Application.DoEvents();
+        Assert.That(GetActiveCalendar(picker), Is.Null);
+
+        picker.ShowDropDown();
+        Application.DoEvents();
+
+        Assert.That(GetActiveCalendar(picker)!.DisplayMonth, Is.EqualTo(new DateTime(2026, 9, 1)));
     }
 
     [Test]
@@ -934,6 +997,18 @@ public sealed class BootstrapCalendarPickerTests
         SendHostedClick(picker); Assert.That(GetActiveCalendar(picker), Is.Not.Null);
         SendHostedClick(picker); Assert.That(GetActiveCalendar(picker), Is.Null);
         picker.Enabled = false; SendHostedClick(picker); Assert.That(GetActiveCalendar(picker), Is.Null);
+    }
+
+    [TestCase(MouseButtons.Right)]
+    [TestCase(MouseButtons.Middle)]
+    public void PickerNonLeftMouseClickDoesNotToggle(MouseButtons button)
+    {
+        using var form = CreatePickerHost(out var picker);
+
+        RaiseMouseClick(picker, button);
+        Application.DoEvents();
+
+        Assert.That(GetActiveCalendar(picker), Is.Null);
     }
 
     [Test]
@@ -1134,6 +1209,24 @@ public sealed class BootstrapCalendarPickerTests
     {
         var method = typeof(BootstrapCalendar).GetMethod("ActivateDate", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.That(method, Is.Not.Null); method!.Invoke(calendar, new object[] { date });
+    }
+
+    private static void MouseDownDate(BootstrapCalendar calendar, DateTime date)
+    {
+        var cell = calendar.ResolveLayout(calendar.DeviceDpi).DayCells.Single(day => day.Date == date.Date);
+        var method = typeof(BootstrapCalendar).GetMethod("OnMouseDown", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null);
+        method!.Invoke(calendar, new object[]
+        {
+            new MouseEventArgs(MouseButtons.Left, 1, cell.Bounds.Left + cell.Bounds.Width / 2, cell.Bounds.Top + cell.Bounds.Height / 2, 0)
+        });
+    }
+
+    private static void RaiseMouseClick(BootstrapCalendarPicker picker, MouseButtons button)
+    {
+        var method = typeof(BootstrapCalendarPicker).GetMethod("OnMouseClick", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null);
+        method!.Invoke(picker, new object[] { new MouseEventArgs(button, 1, picker.Width / 2, picker.Height / 2, 0) });
     }
 
     private static BootstrapCalendar? GetActiveCalendar(BootstrapCalendarPicker picker)
