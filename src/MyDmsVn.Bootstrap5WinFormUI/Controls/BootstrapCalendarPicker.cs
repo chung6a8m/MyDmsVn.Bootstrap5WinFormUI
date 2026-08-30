@@ -36,13 +36,14 @@ public sealed class BootstrapCalendarPicker : Control
 
     /// <summary>Initializes a designer-safe picker with an empty single-date selection.</summary>
     public BootstrapCalendarPicker()
-        : this(effectiveDpiProvider: null, hostedCalendarSetupCompleted: null)
+        : this(effectiveDpiProvider: null, hostedCalendarSetupCompleted: null, showNativeDropDown: null)
     {
     }
 
     internal BootstrapCalendarPicker(
         Func<int>? effectiveDpiProvider,
-        Action<BootstrapCalendar>? hostedCalendarSetupCompleted)
+        Action<BootstrapCalendar>? hostedCalendarSetupCompleted,
+        Action<ToolStripDropDownMenu, Control, Point>? showNativeDropDown = null)
     {
         _effectiveDpiProvider = effectiveDpiProvider;
         _hostedCalendarSetupCompleted = hostedCalendarSetupCompleted;
@@ -54,7 +55,9 @@ public sealed class BootstrapCalendarPicker : Control
             BootstrapCalendarSelectionModel.MinimumSupportedDate,
             BootstrapCalendarSelectionModel.MaximumSupportedDate);
         _iconRenderer = BootstrapIconRenderer.CreateDefault();
-        _dropdown = new BootstrapDropdown();
+        _dropdown = showNativeDropDown is null
+            ? new BootstrapDropdown()
+            : new BootstrapDropdown(showNativeDropDown);
         _dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
         {
             HostedControlFactory = CreateHostedCalendar

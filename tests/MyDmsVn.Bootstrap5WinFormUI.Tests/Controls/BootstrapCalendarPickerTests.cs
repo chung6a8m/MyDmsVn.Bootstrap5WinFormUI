@@ -670,6 +670,71 @@ public sealed class BootstrapCalendarPickerTests
     }
 
     [Test]
+    public void PickerNativeShowFailureAfterCalendarPublicationRollsBackPickerAndDropdownOwnership()
+    {
+        BootstrapCalendar? publishedCalendar = null;
+        ToolStripControlHost? publishedNativeHost = null;
+        BootstrapCalendarPicker? picker = null;
+        BootstrapDropdown? dropdown = null;
+        var nativeShowCalls = 0;
+        var nativeHostDisposed = 0;
+        picker = new BootstrapCalendarPicker(
+            effectiveDpiProvider: null,
+            hostedCalendarSetupCompleted: null,
+            showNativeDropDown: (native, _, _) =>
+            {
+                nativeShowCalls++;
+                publishedCalendar = GetActiveCalendar(picker!);
+                Assert.That(publishedCalendar, Is.Not.Null);
+                Assert.That(HasHandlerTarget(publishedCalendar!, "SelectionActivated", picker), Is.True);
+                Assert.That(HasHandlerTarget(publishedCalendar!, "DisplayMonthChanged", picker), Is.True);
+                Assert.That(native.Items, Has.Count.EqualTo(1));
+                publishedNativeHost = native.Items[0] as ToolStripControlHost;
+                Assert.That(publishedNativeHost, Is.Not.Null);
+                Assert.That(publishedNativeHost!.Control, Is.SameAs(publishedCalendar));
+                publishedNativeHost.Disposed += (_, _) => nativeHostDisposed++;
+                Assert.That(GetPrivateField(dropdown!, "_activePresentationSource"), Is.SameAs(picker));
+                Assert.That(GetPrivateField(dropdown!, "_activeIconRenderer"), Is.Not.Null);
+                throw new InvalidOperationException("native-show");
+            });
+        using (picker)
+        using (var target = new BootstrapButton())
+        {
+            dropdown = GetPickerDropDown(picker);
+            dropdown.Target = target;
+            var opened = 0;
+            var closed = 0;
+            picker.Opened += (_, _) => opened++;
+            picker.Closed += (_, _) => closed++;
+
+            var exception = Assert.Throws<InvalidOperationException>((Action)(() => picker.ShowDropDown()));
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(exception!.Message, Is.EqualTo("native-show"));
+                Assert.That(nativeShowCalls, Is.EqualTo(1));
+                Assert.That(publishedCalendar, Is.Not.Null);
+                Assert.That(publishedCalendar!.IsDisposed, Is.True);
+                Assert.That(HasHandlerTarget(publishedCalendar, "SelectionActivated", picker), Is.False);
+                Assert.That(HasHandlerTarget(publishedCalendar, "DisplayMonthChanged", picker), Is.False);
+                Assert.That(GetActiveCalendar(picker), Is.Null);
+                Assert.That(publishedNativeHost, Is.Not.Null);
+                Assert.That(nativeHostDisposed, Is.EqualTo(1));
+                Assert.That(GetNativeDropDown(dropdown).Items, Is.Empty);
+                Assert.That(GetNativeDropDown(dropdown).Visible, Is.False);
+                Assert.That(GetPrivateField(dropdown, "_activePresentationSource"), Is.Null);
+                Assert.That(GetPrivateField(dropdown, "_activeIconRenderer"), Is.Null);
+                Assert.That(dropdown.Target, Is.SameAs(target));
+                Assert.That(target.IsDisposed, Is.False);
+                Assert.That(picker.AccessibilityObject.State & AccessibleStates.Collapsed, Is.Not.Zero);
+                Assert.That(picker.AccessibilityObject.State & AccessibleStates.Expanded, Is.EqualTo(AccessibleStates.None));
+                Assert.That(opened, Is.Zero);
+                Assert.That(closed, Is.Zero);
+            }));
+        }
+    }
+
+    [Test]
     public void PickerChangedSingleActivationRaisesExactSelectionOpenCloseCounts()
     {
         using var form = CreatePickerHost(out var picker);
