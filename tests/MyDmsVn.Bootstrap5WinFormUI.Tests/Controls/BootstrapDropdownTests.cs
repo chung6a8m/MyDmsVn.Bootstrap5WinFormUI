@@ -979,6 +979,23 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void DropdownGenericPresentationPropagatesSourceFontAndMinimumWidth()
+    {
+        using var source = new TextBox { Size = new Size(180, 28), Font = new Font("Arial", 14f) };
+        using var form = CreateHost(source);
+        using var dropdown = new BootstrapDropdown { MinimumWidth = 180 };
+        dropdown.Items.Add(new BootstrapDropdownItem { Text = "Action" });
+        InvokeShowFrom(dropdown, source, BootstrapIconRenderer.CreateDefault(), source, new Point(0, source.Height)); Application.DoEvents();
+        var native = GetNativeDropDown(dropdown);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.Font.FontFamily.Name, Is.EqualTo(source.Font.FontFamily.Name));
+            Assert.That(native.Font.SizeInPoints, Is.EqualTo(source.Font.SizeInPoints));
+            Assert.That(native.MinimumSize.Width, Is.EqualTo(BootstrapDropdown.ResolveMinimumWidth(180, source.DeviceDpi)));
+        }));
+    }
+
+    [Test]
     public void DropdownActivePresentationSourceDrivesLiveMinimumWidthAndThemeRefresh()
     {
         var presentationSource = new BootstrapButton { Text = "Presentation" };

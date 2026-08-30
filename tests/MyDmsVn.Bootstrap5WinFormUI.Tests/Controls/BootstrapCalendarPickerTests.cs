@@ -246,6 +246,35 @@ public sealed class BootstrapCalendarPickerTests
         Assert.That(GetActiveCalendar(picker), Is.Null);
     }
 
+    [TestCase(Keys.Enter)]
+    [TestCase(Keys.Space)]
+    [TestCase(Keys.F4)]
+    [TestCase(Keys.Down | Keys.Alt)]
+    public void PickerKeyboardTriggerTogglesOpenThenClosed(Keys key)
+    {
+        using var form = CreatePickerHost(out var picker);
+        SendHostedKey(picker, key); Application.DoEvents(); Assert.That(GetActiveCalendar(picker), Is.Not.Null);
+        SendHostedKey(picker, key); Application.DoEvents(); Assert.That(GetActiveCalendar(picker), Is.Null);
+    }
+
+    [Test]
+    public void PickerMouseTriggerTogglesAndDisabledMouseIsNoOp()
+    {
+        using var form = CreatePickerHost(out var picker);
+        SendHostedClick(picker); Assert.That(GetActiveCalendar(picker), Is.Not.Null);
+        SendHostedClick(picker); Assert.That(GetActiveCalendar(picker), Is.Null);
+        picker.Enabled = false; SendHostedClick(picker); Assert.That(GetActiveCalendar(picker), Is.Null);
+    }
+
+    [Test]
+    public void PickerOpenedFocusesHostedCalendarAndClosedDetachesHandlers()
+    {
+        using var form = CreatePickerHost(out var picker);
+        picker.ShowDropDown(); Application.DoEvents(); var active = GetActiveCalendar(picker)!;
+        Assert.That(active.Focused, Is.True);
+        picker.CloseDropDown(); Application.DoEvents(); Assert.That(GetActiveCalendar(picker), Is.Null);
+    }
+
     [Test]
     public void HostedControlClickKeepsPopupOpenAndCanFocusImmediatelyAfterOpened()
     {
