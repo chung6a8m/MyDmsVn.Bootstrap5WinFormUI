@@ -124,6 +124,8 @@ public partial class BootstrapSelect
         MouseDown += OnPopupSurfaceMouseDown;
         KeyDown += OnPopupSurfaceKeyDown;
         KeyPress += OnPopupSurfaceKeyPress;
+        GotFocus += OnFocusStateChanged;
+        LostFocus += OnFocusStateChanged;
         Disposed += OnPopupOwnerDisposed;
     }
 
