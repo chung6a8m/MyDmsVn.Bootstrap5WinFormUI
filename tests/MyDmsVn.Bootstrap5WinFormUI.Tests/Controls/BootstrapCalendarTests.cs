@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
@@ -242,6 +243,8 @@ public sealed class BootstrapCalendarTests
         Assert.That((selected & BootstrapCalendarDayRenderState.Selected) != 0, Is.True);
         Assert.That((middle & BootstrapCalendarDayRenderState.RangeInterior) != 0, Is.True);
         Assert.That((preview & BootstrapCalendarDayRenderState.Preview) != 0, Is.True);
+        var hot = BootstrapCalendar.ClassifyDay(new DateTime(2026, 8, 15), true, true, false, BootstrapCalendarSelectionMode.Single, null, null, null, Array.Empty<DateTime>(), null, true);
+        Assert.That((hot & BootstrapCalendarDayRenderState.Hot) != 0, Is.True);
         Assert.That(BootstrapCalendar.ClassifyDay(DateTime.Today, false, false, true, BootstrapCalendarSelectionMode.Single, null, null, null, Array.Empty<DateTime>(), null), Is.EqualTo(BootstrapCalendarDayRenderState.AdjacentMonth | BootstrapCalendarDayRenderState.Disabled | BootstrapCalendarDayRenderState.Today));
     }
 
@@ -270,6 +273,380 @@ public sealed class BootstrapCalendarTests
         finally { BootstrapThemeManager.CurrentTheme = original; }
     }
 
+    [Test]
+    public void MouseSingleActivationFocusesSelectsOnceAndSignalsEveryValidActivation()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31),
+            DisplayMonth = new DateTime(2026, 8, 1)
+        };
+        form.Controls.Add(calendar);
+        form.Show();
+        Application.DoEvents();
+        var changes = 0;
+        var activations = new List<BootstrapCalendarSelectionActivatedEventArgs>();
+        calendar.SelectionChanged += (_, _) => changes++;
+        calendar.SelectionActivated += (_, e) => activations.Add(e);
+        var date = new DateTime(2026, 8, 17);
+
+        calendar.MouseDownDate(date);
+        calendar.MouseDownDate(date);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(calendar.Focused, Is.True);
+            Assert.That(calendar.FocusedDate, Is.EqualTo(date));
+            Assert.That(calendar.SelectedDate, Is.EqualTo(date));
+            Assert.That(changes, Is.EqualTo(1));
+            Assert.That(activations.Select(a => (a.Date, a.Changed, a.Completed)).ToArray(), Is.EqualTo(new[]
+            {
+                (date, true, true),
+                (date, false, true)
+            }));
+        }));
+    }
+
+    [Test]
+    public void MouseRangeAndMultipleActivationUseModelCompletionAndToggleSemantics()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31),
+            DisplayMonth = new DateTime(2026, 8, 1),
+            SelectionMode = BootstrapCalendarSelectionMode.Range
+        };
+        var publicChanges = 0;
+        var activations = new List<BootstrapCalendarSelectionActivatedEventArgs>();
+        calendar.SelectionChanged += (_, _) => publicChanges++;
+        calendar.SelectionActivated += (_, e) => activations.Add(e);
+
+        calendar.MouseDownDate(new DateTime(2026, 8, 20));
+        calendar.MouseDownDate(new DateTime(2026, 8, 12));
+        calendar.MouseDownDate(new DateTime(2026, 8, 25));
+
+        Assert.That(calendar.RangeStart, Is.EqualTo(new DateTime(2026, 8, 25)));
+        Assert.That(calendar.RangeEnd, Is.Null);
+        Assert.That(activations.Select(a => a.Completed).ToArray(), Is.EqualTo(new[] { false, true, false }));
+        Assert.That(publicChanges, Is.EqualTo(3));
+
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+        publicChanges = 0;
+        activations.Clear();
+        var multipleDate = new DateTime(2026, 8, 9);
+        calendar.MouseDownDate(multipleDate);
+        calendar.MouseDownDate(multipleDate);
+
+        Assert.That(calendar.SelectedDates, Is.Empty);
+        Assert.That(publicChanges, Is.EqualTo(2));
+        Assert.That(activations.Select(a => (a.Changed, a.Completed)).ToArray(), Is.EqualTo(new[] { (true, false), (true, false) }));
+    }
+
+    [Test]
+    public void MouseRejectsInvalidActivationAndAdjacentMonthActivatesBeforeOneMonthChange()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 8, 31),
+            MaxDate = new DateTime(2026, 10, 31),
+            DisplayMonth = new DateTime(2026, 9, 1)
+        };
+        var selectionChanges = 0;
+        var activations = 0;
+        calendar.SelectionChanged += (_, _) => selectionChanges++;
+        calendar.SelectionActivated += (_, _) => activations++;
+        var enabledDate = new DateTime(2026, 9, 10);
+
+        calendar.MouseDownDate(enabledDate, MouseButtons.Right);
+        calendar.MouseDownOutside();
+        calendar.MouseDownDate(new DateTime(2026, 8, 30));
+        calendar.Enabled = false;
+        calendar.MouseDownDate(enabledDate);
+        calendar.Enabled = true;
+
+        Assert.That(selectionChanges, Is.Zero);
+        Assert.That(activations, Is.Zero);
+
+        var adjacentDate = new DateTime(2026, 8, 31);
+        var displayChanges = 0;
+        var selectionWasAppliedBeforeDisplayChange = false;
+        calendar.DisplayMonthChanged += (_, _) =>
+        {
+            displayChanges++;
+            selectionWasAppliedBeforeDisplayChange = calendar.SelectedDate == adjacentDate && calendar.FocusedDate == adjacentDate;
+        };
+
+        calendar.MouseDownDate(adjacentDate);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(calendar.SelectedDate, Is.EqualTo(adjacentDate));
+            Assert.That(calendar.FocusedDate, Is.EqualTo(adjacentDate));
+            Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 8, 1)));
+            Assert.That(selectionChanges, Is.EqualTo(1));
+            Assert.That(activations, Is.EqualTo(1));
+            Assert.That(displayChanges, Is.EqualTo(1));
+            Assert.That(selectionWasAppliedBeforeDisplayChange, Is.True);
+        }));
+    }
+
+    [Test]
+    public void ProgrammaticSelectionNeverRaisesInternalActivationSignal()
+    {
+        using var calendar = new BootstrapCalendar
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31)
+        };
+        var activations = 0;
+        calendar.SelectionActivated += (_, _) => activations++;
+
+        calendar.SelectedDate = new DateTime(2026, 2, 3);
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Range;
+        calendar.SetRange(new DateTime(2026, 3, 4), new DateTime(2026, 3, 5));
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+        calendar.SetSelectedDates(new[] { new DateTime(2026, 4, 6) });
+        calendar.ClearSelection();
+
+        Assert.That(activations, Is.Zero);
+    }
+
+    [Test]
+    public void RangeHoverPreviewIsPresentationOnlyAndClearsWhenPointerLeaves()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31),
+            DisplayMonth = new DateTime(2026, 8, 1),
+            SelectionMode = BootstrapCalendarSelectionMode.Range
+        };
+        var selectionChanges = 0;
+        var displayChanges = 0;
+        calendar.SelectionChanged += (_, _) => selectionChanges++;
+        calendar.DisplayMonthChanged += (_, _) => displayChanges++;
+        calendar.MouseDownDate(new DateTime(2026, 8, 10));
+        selectionChanges = 0;
+
+        calendar.MouseMoveDate(new DateTime(2026, 8, 14));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(GetPrivateField(calendar, "_rangePreviewDate"), Is.EqualTo(new DateTime(2026, 8, 14)));
+            Assert.That(GetPrivateField(calendar, "_hotDayIndex"), Is.Not.EqualTo(-1));
+            Assert.That(calendar.RangeStart, Is.EqualTo(new DateTime(2026, 8, 10)));
+            Assert.That(calendar.RangeEnd, Is.Null);
+            Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 8, 10)));
+            Assert.That(selectionChanges, Is.Zero);
+            Assert.That(displayChanges, Is.Zero);
+        }));
+
+        calendar.MouseLeaveSurface();
+
+        Assert.That(GetPrivateField(calendar, "_rangePreviewDate"), Is.Null);
+        Assert.That(GetPrivateField(calendar, "_hotDayIndex"), Is.EqualTo(-1));
+
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Single;
+        calendar.MouseMoveDate(new DateTime(2026, 8, 15));
+        Assert.That(GetPrivateField(calendar, "_rangePreviewDate"), Is.Null);
+
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Range;
+        calendar.SetRange(new DateTime(2026, 8, 10), new DateTime(2026, 8, 16));
+        calendar.MouseMoveDate(new DateTime(2026, 8, 17));
+        Assert.That(calendar.RangeEnd, Is.EqualTo(new DateTime(2026, 8, 16)));
+        Assert.That(GetPrivateField(calendar, "_rangePreviewDate"), Is.Null);
+    }
+
+    [Test]
+    public void HeaderNavigationUsesBoundsAndPreservesFocusedDayInTargetMonth()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 2, 3),
+            MaxDate = new DateTime(2026, 4, 20),
+            DisplayMonth = new DateTime(2026, 3, 1)
+        };
+        calendar.SelectedDate = new DateTime(2026, 3, 31);
+        calendar.ClearSelection();
+        calendar.MouseMoveDate(new DateTime(2026, 3, 5));
+        Assert.That(GetPrivateField(calendar, "_hotDayIndex"), Is.Not.EqualTo(-1));
+        var changes = 0;
+        calendar.DisplayMonthChanged += (_, _) => changes++;
+
+        calendar.MouseDownPreviousHeader();
+        Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 2, 1)));
+        Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 2, 28)));
+        Assert.That(GetPrivateField(calendar, "_hotDayIndex"), Is.EqualTo(-1));
+        calendar.MouseDownPreviousHeader();
+        Assert.That(changes, Is.EqualTo(1));
+
+        calendar.MouseDownNextHeader();
+        calendar.MouseDownNextHeader();
+        Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 4, 1)));
+        Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 4, 20)));
+        calendar.MouseDownNextHeader();
+        Assert.That(changes, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void KeyboardNavigationMovesFocusAndDisplayWithoutChangingSelection()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 8, 25),
+            MaxDate = new DateTime(2026, 10, 10),
+            DisplayMonth = new DateTime(2026, 9, 1)
+        };
+        calendar.SelectedDate = new DateTime(2026, 9, 1);
+        calendar.ClearSelection();
+        var selectionChanges = 0;
+        var activations = 0;
+        calendar.SelectionChanged += (_, _) => selectionChanges++;
+        calendar.SelectionActivated += (_, _) => activations++;
+
+        calendar.SendKey(Keys.Left);
+        Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 8, 31)));
+        Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 8, 1)));
+        calendar.SendKey(Keys.Right);
+        Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 9, 1)));
+        Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 9, 1)));
+
+        calendar.SendKey(Keys.PageDown);
+        Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 10, 1)));
+        calendar.SendKey(Keys.PageDown);
+        Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 10, 10)));
+        calendar.SendKey(Keys.Down);
+        Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 10, 10)));
+
+        Assert.That(calendar.SelectedDate, Is.Null);
+        Assert.That(selectionChanges, Is.Zero);
+        Assert.That(activations, Is.Zero);
+    }
+
+    [Test]
+    public void KeyboardWeekBoundariesRespectCultureAndBounds()
+    {
+        var originalCulture = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            var culture = (System.Globalization.CultureInfo)originalCulture.Clone();
+            culture.DateTimeFormat.FirstDayOfWeek = DayOfWeek.Monday;
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+            using var calendar = new CalendarInteractionProbe
+            {
+                MinDate = new DateTime(2026, 9, 15),
+                MaxDate = new DateTime(2026, 9, 18),
+                DisplayMonth = new DateTime(2026, 9, 1)
+            };
+            calendar.SelectedDate = new DateTime(2026, 9, 16);
+            calendar.ClearSelection();
+
+            calendar.SendKey(Keys.Home);
+            Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 9, 15)));
+            calendar.SendKey(Keys.End);
+            Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 9, 18)));
+
+            culture.DateTimeFormat.FirstDayOfWeek = DayOfWeek.Sunday;
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+            using var sundayCalendar = new CalendarInteractionProbe
+            {
+                MinDate = new DateTime(2026, 9, 1),
+                MaxDate = new DateTime(2026, 9, 30),
+                DisplayMonth = new DateTime(2026, 9, 1)
+            };
+            sundayCalendar.SelectedDate = new DateTime(2026, 9, 16);
+            sundayCalendar.ClearSelection();
+            sundayCalendar.SendKey(Keys.Home);
+            Assert.That(sundayCalendar.FocusedDate, Is.EqualTo(new DateTime(2026, 9, 13)));
+            sundayCalendar.SendKey(Keys.End);
+            Assert.That(sundayCalendar.FocusedDate, Is.EqualTo(new DateTime(2026, 9, 19)));
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = originalCulture; }
+    }
+
+    [Test]
+    public void KeyboardActivationAndInputClassificationUseTheMouseActivationContract()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31),
+            DisplayMonth = new DateTime(2026, 8, 1)
+        };
+        calendar.SelectedDate = new DateTime(2026, 8, 12);
+        calendar.ClearSelection();
+        var changes = 0;
+        var activations = new List<BootstrapCalendarSelectionActivatedEventArgs>();
+        calendar.SelectionChanged += (_, _) => changes++;
+        calendar.SelectionActivated += (_, e) => activations.Add(e);
+
+        foreach (var key in new[] { Keys.Left, Keys.Right, Keys.Up, Keys.Down, Keys.PageUp, Keys.PageDown, Keys.Home, Keys.End, Keys.Enter, Keys.Space })
+            Assert.That(calendar.IsInput(key), Is.True, key.ToString());
+
+        calendar.SendKey(Keys.Enter);
+        calendar.SendKey(Keys.Space);
+
+        Assert.That(changes, Is.EqualTo(1));
+        Assert.That(activations.Select(a => (a.Date, a.Changed, a.Completed)).ToArray(), Is.EqualTo(new[]
+        {
+            (new DateTime(2026, 8, 12), true, true),
+            (new DateTime(2026, 8, 12), false, true)
+        }));
+    }
+
+    [Test]
+    public void KeyboardActivationPreservesRangeAndMultipleCompletionSemantics()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31),
+            DisplayMonth = new DateTime(2026, 8, 1),
+            SelectionMode = BootstrapCalendarSelectionMode.Range
+        };
+        calendar.SetRange(new DateTime(2026, 8, 14), null);
+        var activations = new List<BootstrapCalendarSelectionActivatedEventArgs>();
+        calendar.SelectionActivated += (_, e) => activations.Add(e);
+
+        calendar.SendKey(Keys.Enter);
+        calendar.SendKey(Keys.Space);
+
+        Assert.That(activations.Select(a => a.Completed).ToArray(), Is.EqualTo(new[] { true, false }));
+        Assert.That(calendar.RangeStart, Is.EqualTo(new DateTime(2026, 8, 14)));
+        Assert.That(calendar.RangeEnd, Is.Null);
+
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+        activations.Clear();
+        calendar.SendKey(Keys.Enter);
+        Assert.That(activations.Select(a => (a.Changed, a.Completed)).ToArray(), Is.EqualTo(new[] { (true, false) }));
+    }
+
+    [Test]
+    public void FocusHoverAndMonthNavigationDoNotDuplicateSelectionEvents()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31),
+            DisplayMonth = new DateTime(2026, 8, 1),
+            SelectionMode = BootstrapCalendarSelectionMode.Range
+        };
+        var changes = 0;
+        calendar.SelectionChanged += (_, _) => changes++;
+        calendar.MouseDownDate(new DateTime(2026, 8, 10));
+        changes = 0;
+
+        calendar.MouseMoveDate(new DateTime(2026, 8, 11));
+        calendar.MouseLeaveSurface();
+        calendar.SendKey(Keys.Right);
+        calendar.MouseDownNextHeader();
+
+        Assert.That(changes, Is.Zero);
+    }
+
     private static DateTime ClampMonth(DateTime date, DateTime minDate, DateTime maxDate)
     {
         var month = new DateTime(date.Year, date.Month, 1);
@@ -277,6 +654,47 @@ public sealed class BootstrapCalendarTests
         var maxMonth = new DateTime(maxDate.Year, maxDate.Month, 1);
         return month < minMonth ? minMonth : month > maxMonth ? maxMonth : month;
     }
+
+    private sealed class CalendarInteractionProbe : BootstrapCalendar
+    {
+        public void MouseDownDate(DateTime date, MouseButtons button = MouseButtons.Left)
+        {
+            var cell = ResolveLayout(DeviceDpi).DayCells.Single(day => day.Date == date.Date);
+            OnMouseDown(new MouseEventArgs(button, 1, cell.Bounds.Left + cell.Bounds.Width / 2, cell.Bounds.Top + cell.Bounds.Height / 2, 0));
+        }
+
+        public void MouseDownOutside()
+        {
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, -1, -1, 0));
+        }
+
+        public void MouseMoveDate(DateTime date)
+        {
+            var cell = ResolveLayout(DeviceDpi).DayCells.Single(day => day.Date == date.Date);
+            OnMouseMove(new MouseEventArgs(MouseButtons.None, 0, cell.Bounds.Left + cell.Bounds.Width / 2, cell.Bounds.Top + cell.Bounds.Height / 2, 0));
+        }
+
+        public void MouseLeaveSurface() => OnMouseLeave(EventArgs.Empty);
+
+        public void MouseDownPreviousHeader()
+        {
+            var bounds = ResolveLayout(DeviceDpi).PreviousButtonBounds;
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2, 0));
+        }
+
+        public void MouseDownNextHeader()
+        {
+            var bounds = ResolveLayout(DeviceDpi).NextButtonBounds;
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2, 0));
+        }
+
+        public void SendKey(Keys key) => OnKeyDown(new KeyEventArgs(key));
+
+        public bool IsInput(Keys key) => IsInputKey(key);
+    }
+
+    private static object? GetPrivateField(object instance, string name) => instance.GetType().BaseType!
+        .GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(instance);
 
     private static object? GetDefaultValue(string propertyName)
     {

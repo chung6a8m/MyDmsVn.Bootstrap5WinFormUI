@@ -20,7 +20,8 @@ internal enum BootstrapCalendarDayRenderState
     Today = 4,
     Selected = 8,
     RangeInterior = 16,
-    Preview = 32
+    Preview = 32,
+    Hot = 64
 }
 
 internal readonly struct BootstrapCalendarDayOutlineMetrics
@@ -36,6 +37,22 @@ internal readonly struct BootstrapCalendarDayOutlineMetrics
     public float FocusWidth { get; }
 }
 
+internal sealed class BootstrapCalendarSelectionActivatedEventArgs : EventArgs
+{
+    public BootstrapCalendarSelectionActivatedEventArgs(DateTime date, bool changed, bool completed)
+    {
+        Date = date;
+        Changed = changed;
+        Completed = completed;
+    }
+
+    public DateTime Date { get; }
+
+    public bool Changed { get; }
+
+    public bool Completed { get; }
+}
+
 /// <summary>
 /// Provides a fully owner-drawn Bootstrap-inspired month calendar with single, range, and multiple-date state.
 /// </summary>
@@ -45,6 +62,8 @@ public class BootstrapCalendar : Control
     private readonly BootstrapCalendarSelectionModel _selectionModel;
     private DateTime _displayMonth;
     private DateTime _focusedDate;
+    private int _hotDayIndex = -1;
+    private DateTime? _rangePreviewDate;
     private int _borderRadius = -1;
     private BootstrapCalendarLayout _layout;
     private bool _layoutValid;
@@ -89,6 +108,7 @@ public class BootstrapCalendar : Control
         set
         {
             var selectionChanged = _selectionModel.SetMode(value);
+            SetHoverState(_hotDayIndex, null);
             if (selectionChanged) OnSelectionChanged(EventArgs.Empty);
             Invalidate();
         }
@@ -99,19 +119,7 @@ public class BootstrapCalendar : Control
     public DateTime DisplayMonth
     {
         get => _displayMonth;
-        set
-        {
-            var target = ClampMonth(value.Date, MinDate, MaxDate);
-            if (target == _displayMonth) return;
-            var oldFocus = _focusedDate;
-            _displayMonth = target;
-            if (oldFocus.Year != target.Year || oldFocus.Month != target.Month)
-            {
-                _focusedDate = Clamp(new DateTime(target.Year, target.Month, Math.Min(oldFocus.Day, DateTime.DaysInMonth(target.Year, target.Month))), MinDate, MaxDate);
-            }
-            InvalidateLayout();
-            OnDisplayMonthChanged(EventArgs.Empty);
-        }
+        set => TrySetDisplayMonth(value);
     }
 
     /// <summary>Gets or sets the inclusive minimum selectable date.</summary>
@@ -175,10 +183,13 @@ public class BootstrapCalendar : Control
     /// <summary>Occurs after the effective displayed month changes.</summary>
     public event EventHandler? DisplayMonthChanged;
 
+    internal event EventHandler<BootstrapCalendarSelectionActivatedEventArgs>? SelectionActivated;
+
     /// <summary>Sets an incomplete or complete selection in range-selection mode.</summary>
     public void SetRange(DateTime? start, DateTime? end)
     {
         var changed = _selectionModel.SetRange(start, end);
+        SetHoverState(-1, null);
         var anchor = _selectionModel.RangeEnd ?? _selectionModel.RangeStart;
         if (anchor.HasValue) _focusedDate = anchor.Value;
         if (changed) OnSelectionChanged(EventArgs.Empty);
@@ -195,14 +206,16 @@ public class BootstrapCalendar : Control
     /// <summary>Clears the effective selection while preserving the private focus anchor.</summary>
     public void ClearSelection()
     {
-        if (_selectionModel.Clear()) OnSelectionChanged(EventArgs.Empty);
+        var changed = _selectionModel.Clear();
+        SetHoverState(_hotDayIndex, null);
+        if (changed) OnSelectionChanged(EventArgs.Empty);
     }
 
     /// <summary>Shows the previous month when it intersects the configured date bounds.</summary>
-    public void ShowPreviousMonth() => DisplayMonth = BootstrapCalendarRenderLogic.MoveByMonth(_displayMonth, -1);
+    public void ShowPreviousMonth() => TrySetDisplayMonth(BootstrapCalendarRenderLogic.MoveByMonth(_displayMonth, -1));
 
     /// <summary>Shows the next month when it intersects the configured date bounds.</summary>
-    public void ShowNextMonth() => DisplayMonth = BootstrapCalendarRenderLogic.MoveByMonth(_displayMonth, 1);
+    public void ShowNextMonth() => TrySetDisplayMonth(BootstrapCalendarRenderLogic.MoveByMonth(_displayMonth, 1));
 
     /// <inheritdoc />
     public override Size GetPreferredSize(Size proposedSize)
@@ -227,7 +240,7 @@ public class BootstrapCalendar : Control
 
     internal static BootstrapCalendarDayRenderState ClassifyDay(DateTime date, bool currentMonth, bool enabled, bool today,
         BootstrapCalendarSelectionMode mode, DateTime? selectedDate, DateTime? rangeStart, DateTime? rangeEnd,
-        IReadOnlyList<DateTime> selectedDates, DateTime? previewDate)
+        IReadOnlyList<DateTime> selectedDates, DateTime? previewDate, bool isHot = false)
     {
         var state = BootstrapCalendarDayRenderState.None;
         if (!currentMonth) state |= BootstrapCalendarDayRenderState.AdjacentMonth;
@@ -243,6 +256,7 @@ public class BootstrapCalendar : Control
         if (mode == BootstrapCalendarSelectionMode.Range && rangeStart.HasValue && !rangeEnd.HasValue && previewDate.HasValue &&
             normalized >= (rangeStart < previewDate ? rangeStart.Value : previewDate.Value) && normalized <= (rangeStart > previewDate ? rangeStart.Value : previewDate.Value))
             state |= BootstrapCalendarDayRenderState.Preview;
+        if (enabled && isHot) state |= BootstrapCalendarDayRenderState.Hot;
         return state;
     }
 
@@ -263,6 +277,134 @@ public class BootstrapCalendar : Control
             PaintDays(graphics, theme, layout);
         }
         finally { graphics.SmoothingMode = previousSmoothing; }
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (!Enabled || e.Button != MouseButtons.Left) return;
+
+        Focus();
+        var layout = GetLayout();
+        if (layout.PreviousButtonBounds.Contains(e.Location))
+        {
+            ShowPreviousMonth();
+            return;
+        }
+
+        if (layout.NextButtonBounds.Contains(e.Location))
+        {
+            ShowNextMonth();
+            return;
+        }
+
+        var dayIndex = BootstrapCalendarRenderLogic.HitTestDay(e.Location, layout);
+        if (dayIndex < 0) return;
+        var day = layout.DayCells[dayIndex];
+        if (!day.IsEnabled) return;
+
+        ActivateDate(day.Date);
+        if (!day.IsCurrentMonth) DisplayMonth = day.Date;
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        var nextHotIndex = -1;
+        DateTime? nextPreviewDate = null;
+        if (Enabled)
+        {
+            var layout = GetLayout();
+            var dayIndex = BootstrapCalendarRenderLogic.HitTestDay(e.Location, layout);
+            if (dayIndex >= 0)
+            {
+                nextHotIndex = dayIndex;
+                var day = layout.DayCells[dayIndex];
+                if (SelectionMode == BootstrapCalendarSelectionMode.Range && RangeStart.HasValue && !RangeEnd.HasValue && day.IsEnabled)
+                    nextPreviewDate = day.Date;
+            }
+        }
+
+        SetHoverState(nextHotIndex, nextPreviewDate);
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        SetHoverState(-1, null);
+    }
+
+    /// <inheritdoc />
+    protected override bool IsInputKey(Keys keyData)
+    {
+        switch (keyData & Keys.KeyCode)
+        {
+            case Keys.Left:
+            case Keys.Right:
+            case Keys.Up:
+            case Keys.Down:
+            case Keys.PageUp:
+            case Keys.PageDown:
+            case Keys.Home:
+            case Keys.End:
+            case Keys.Enter:
+            case Keys.Space:
+                return true;
+            default:
+                return base.IsInputKey(keyData);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (!Enabled) return;
+
+        var handled = true;
+        switch (e.KeyCode)
+        {
+            case Keys.Left:
+                MoveFocusedDateByDays(-1);
+                break;
+            case Keys.Right:
+                MoveFocusedDateByDays(1);
+                break;
+            case Keys.Up:
+                MoveFocusedDateByDays(-7);
+                break;
+            case Keys.Down:
+                MoveFocusedDateByDays(7);
+                break;
+            case Keys.PageUp:
+                MoveFocusedDateTo(BootstrapCalendarRenderLogic.MoveByMonth(_focusedDate, -1));
+                break;
+            case Keys.PageDown:
+                MoveFocusedDateTo(BootstrapCalendarRenderLogic.MoveByMonth(_focusedDate, 1));
+                break;
+            case Keys.Home:
+                MoveFocusedDateTo(BootstrapCalendarRenderLogic.MoveToWeekBoundary(_focusedDate, CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek, false));
+                break;
+            case Keys.End:
+                MoveFocusedDateTo(BootstrapCalendarRenderLogic.MoveToWeekBoundary(_focusedDate, CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek, true));
+                break;
+            case Keys.Enter:
+            case Keys.Space:
+                ActivateDate(_focusedDate);
+                break;
+            default:
+                handled = false;
+                break;
+        }
+
+        if (handled)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        }
     }
 
     /// <inheritdoc />
@@ -307,10 +449,64 @@ public class BootstrapCalendar : Control
         var selectionChanged = _selectionModel.SetBounds(minDate, maxDate);
         if (MinDate == oldMinDate && MaxDate == oldMaxDate) return;
         _focusedDate = Clamp(_focusedDate, MinDate, MaxDate);
+        SetHoverState(-1, null);
         _displayMonth = ClampMonth(_displayMonth, MinDate, MaxDate);
         InvalidateLayout();
         if (selectionChanged) OnSelectionChanged(EventArgs.Empty);
         if (_displayMonth != oldMonth) OnDisplayMonthChanged(EventArgs.Empty);
+    }
+
+    private void ActivateDate(DateTime date)
+    {
+        var normalizedDate = date.Date;
+        var change = _selectionModel.Activate(normalizedDate);
+        _focusedDate = normalizedDate;
+        SetHoverState(_hotDayIndex, null);
+        if (change.Changed) OnSelectionChanged(EventArgs.Empty);
+        else Invalidate();
+        SelectionActivated?.Invoke(this, new BootstrapCalendarSelectionActivatedEventArgs(normalizedDate, change.Changed, change.Completed));
+    }
+
+    private bool TrySetDisplayMonth(DateTime value)
+    {
+        var target = ClampMonth(value.Date, MinDate, MaxDate);
+        if (target == _displayMonth) return false;
+        var oldFocus = _focusedDate;
+        _displayMonth = target;
+        if (oldFocus.Year != target.Year || oldFocus.Month != target.Month)
+            _focusedDate = Clamp(new DateTime(target.Year, target.Month, Math.Min(oldFocus.Day, DateTime.DaysInMonth(target.Year, target.Month))), MinDate, MaxDate);
+        SetHoverState(-1, null);
+        InvalidateLayout();
+        OnDisplayMonthChanged(EventArgs.Empty);
+        return true;
+    }
+
+    private void MoveFocusedDateByDays(int days)
+    {
+        DateTime target;
+        if (days > 0 && _focusedDate > MaxDate.AddDays(-days)) target = MaxDate;
+        else if (days < 0 && _focusedDate < MinDate.AddDays(-days)) target = MinDate;
+        else target = _focusedDate.AddDays(days);
+        MoveFocusedDateTo(target);
+    }
+
+    private void MoveFocusedDateTo(DateTime date)
+    {
+        var target = Clamp(date.Date, MinDate, MaxDate);
+        if (_focusedDate == target) return;
+        _focusedDate = target;
+        if (_displayMonth.Year != target.Year || _displayMonth.Month != target.Month)
+            TrySetDisplayMonth(target);
+        else
+            Invalidate();
+    }
+
+    private void SetHoverState(int hotDayIndex, DateTime? rangePreviewDate)
+    {
+        if (_hotDayIndex == hotDayIndex && _rangePreviewDate == rangePreviewDate) return;
+        _hotDayIndex = hotDayIndex;
+        _rangePreviewDate = rangePreviewDate;
+        Invalidate();
     }
 
     private BootstrapCalendarLayout GetLayout()
@@ -374,9 +570,11 @@ public class BootstrapCalendar : Control
         foreach (var cell in layout.DayCells)
         {
             var state = ClassifyDay(cell.Date, cell.IsCurrentMonth, cell.IsEnabled && Enabled, cell.IsToday,
-                SelectionMode, SelectedDate, RangeStart, RangeEnd, SelectedDates, null);
+                SelectionMode, SelectedDate, RangeStart, RangeEnd, SelectedDates, _rangePreviewDate, cell.Index == _hotDayIndex);
             if ((state & BootstrapCalendarDayRenderState.RangeInterior) != 0) FillCell(graphics, cell.Bounds, theme.Colors.SurfaceSecondary);
             if ((state & BootstrapCalendarDayRenderState.Preview) != 0) FillCell(graphics, cell.Bounds, theme.Colors.Hover);
+            if ((state & (BootstrapCalendarDayRenderState.Hot | BootstrapCalendarDayRenderState.Preview | BootstrapCalendarDayRenderState.RangeInterior | BootstrapCalendarDayRenderState.Selected)) == BootstrapCalendarDayRenderState.Hot)
+                FillCell(graphics, cell.Bounds, theme.Colors.Hover);
             if ((state & BootstrapCalendarDayRenderState.Selected) != 0)
             {
                 FillCell(graphics, cell.Bounds, theme.Colors.Active);
