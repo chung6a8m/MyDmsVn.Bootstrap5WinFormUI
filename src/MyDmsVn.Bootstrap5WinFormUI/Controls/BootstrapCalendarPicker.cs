@@ -19,6 +19,8 @@ public sealed class BootstrapCalendarPicker : Control
     private readonly BootstrapCalendarSelectionModel _selectionModel;
     private readonly BootstrapDropdown _dropdown;
     private readonly IIconRenderer _iconRenderer;
+    private readonly Func<int>? _effectiveDpiProvider;
+    private readonly Action<BootstrapCalendar>? _hostedCalendarSetupCompleted;
     private BootstrapCalendar? _activeCalendar;
     private DateTime? _lastDisplayMonth;
     private string _dateFormat = "d";
@@ -34,7 +36,16 @@ public sealed class BootstrapCalendarPicker : Control
 
     /// <summary>Initializes a designer-safe picker with an empty single-date selection.</summary>
     public BootstrapCalendarPicker()
+        : this(effectiveDpiProvider: null, hostedCalendarSetupCompleted: null)
     {
+    }
+
+    internal BootstrapCalendarPicker(
+        Func<int>? effectiveDpiProvider,
+        Action<BootstrapCalendar>? hostedCalendarSetupCompleted)
+    {
+        _effectiveDpiProvider = effectiveDpiProvider;
+        _hostedCalendarSetupCompleted = hostedCalendarSetupCompleted;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
             ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         TabStop = true;
@@ -274,6 +285,7 @@ public sealed class BootstrapCalendarPicker : Control
     protected override void OnDpiChangedAfterParent(EventArgs e)
     {
         base.OnDpiChangedAfterParent(e);
+        SynchronizeActiveCalendar();
         Invalidate();
     }
 
@@ -331,12 +343,12 @@ public sealed class BootstrapCalendarPicker : Control
             calendar.MaxDate = MaxDate;
             ApplySelectionToCalendar(calendar);
             calendar.DisplayMonth = ResolveDisplayMonth();
-            var metrics = BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeManager.CurrentTheme.Metrics, GetCurrentDpi(), calendar.BorderRadius);
-            calendar.Size = BootstrapCalendarRenderLogic.CalculatePreferredSize(metrics);
+            ApplyHostedCalendarSize(calendar);
             calendar.SelectionActivated += OnCalendarSelectionActivated;
             selectionAttached = true;
             calendar.DisplayMonthChanged += OnCalendarDisplayMonthChanged;
             displayAttached = true;
+            _hostedCalendarSetupCompleted?.Invoke(calendar);
             _activeCalendar = calendar;
             return calendar;
         }
@@ -395,6 +407,7 @@ public sealed class BootstrapCalendarPicker : Control
             calendar.MaxDate = MaxDate;
             ApplySelectionToCalendar(calendar);
             calendar.DisplayMonth = ClampMonth(calendar.DisplayMonth);
+            ApplyHostedCalendarSize(calendar);
         }
         finally { _synchronizingCalendar = false; }
     }
@@ -461,7 +474,22 @@ public sealed class BootstrapCalendarPicker : Control
     }
 
     private string Format(DateTime value) => value.ToString(DateFormat, CultureInfo.CurrentCulture);
-    private int GetCurrentDpi() => DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+    private void ApplyHostedCalendarSize(BootstrapCalendar calendar)
+    {
+        var metrics = BootstrapCalendarRenderLogic.ResolveMetrics(
+            BootstrapThemeManager.CurrentTheme.Metrics,
+            GetCurrentDpi(),
+            calendar.BorderRadius);
+        var preferredSize = BootstrapCalendarRenderLogic.CalculatePreferredSize(metrics);
+        calendar.MinimumSize = preferredSize;
+        calendar.Size = preferredSize;
+    }
+
+    private int GetCurrentDpi()
+    {
+        var effectiveDpi = _effectiveDpiProvider?.Invoke() ?? DeviceDpi;
+        return effectiveDpi > 0 ? effectiveDpi : DpiScaler.DefaultDpi;
+    }
     private DateTime ClampMonth(DateTime value)
     {
         var month = new DateTime(value.Year, value.Month, 1);
@@ -471,7 +499,22 @@ public sealed class BootstrapCalendarPicker : Control
     }
     private void OnSelectionChanged(EventArgs e) => SelectionChanged?.Invoke(this, e);
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e) { if (IsDisposed) return; if (_useThemeFont) ApplyThemeFont(); Invalidate(); }
-    private void ApplyThemeFont() { var t = BootstrapThemeManager.CurrentTheme.Typography.Body; var next = new Font(t.FontFamilyName, t.SizeInPoints, t.Style); var previous = _themeFont; _settingThemeFont = true; try { Font = next; } finally { _settingThemeFont = false; } _themeFont = next; previous?.Dispose(); }
+    private void ApplyThemeFont()
+    {
+        var token = BootstrapThemeManager.CurrentTheme.Typography.Body;
+        var next = new Font(token.FontFamilyName, token.SizeInPoints, token.Style);
+        var previous = _themeFont;
+        _settingThemeFont = true;
+        try { Font = next; } finally { _settingThemeFont = false; }
+        if (previous is not null && ReferenceEquals(Font, previous))
+        {
+            next.Dispose();
+            return;
+        }
+
+        _themeFont = next;
+        previous?.Dispose();
+    }
     private void DisposeThemeFont() { var font = _themeFont; _themeFont = null; font?.Dispose(); }
     private void ThrowIfDisposed() { if (IsDisposed) throw new ObjectDisposedException(nameof(BootstrapCalendarPicker)); }
 

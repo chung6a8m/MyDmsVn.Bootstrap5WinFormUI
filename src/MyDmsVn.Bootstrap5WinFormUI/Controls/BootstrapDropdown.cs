@@ -21,6 +21,7 @@ public class BootstrapDropdown : Component
     private readonly BootstrapDropdownRenderer _renderer;
     private readonly BootstrapDropdownItemCollection _items;
     private readonly List<Image> _ownedImages = new List<Image>();
+    private readonly Action<ToolStripDropDownMenu, Control, Point> _showNative;
     private BootstrapButton? _target;
     private Control? _activePresentationSource;
     private IIconRenderer? _activeIconRenderer;
@@ -35,7 +36,13 @@ public class BootstrapDropdown : Component
     /// Initializes a designer-safe dropdown with an empty item collection and no target.
     /// </summary>
     public BootstrapDropdown()
+        : this(ShowNativeDropDown)
     {
+    }
+
+    internal BootstrapDropdown(Action<ToolStripDropDownMenu, Control, Point> showNative)
+    {
+        _showNative = showNative ?? throw new ArgumentNullException(nameof(showNative));
         _items = new BootstrapDropdownItemCollection();
         _renderer = new BootstrapDropdownRenderer();
         _dropDown = new ToolStripDropDownMenu
@@ -236,19 +243,22 @@ public class BootstrapDropdown : Component
 
         ValidateItemTree(_items);
         RebuildNativeItems(presentationSource, iconRenderer);
-        _activePresentationSource = presentationSource;
-        _activeIconRenderer = iconRenderer;
+        SetActivePresentation(presentationSource, iconRenderer);
         try
         {
-            _dropDown.Show(anchor, location);
+            _showNative(_dropDown, anchor, location);
         }
         catch
         {
-            _activePresentationSource = null;
-            _activeIconRenderer = null;
+            ClearActivePresentation();
             ClearNativeItems();
             throw;
         }
+    }
+
+    private static void ShowNativeDropDown(ToolStripDropDownMenu dropDown, Control anchor, Point location)
+    {
+        dropDown.Show(anchor, location);
     }
 
     /// <summary>
@@ -340,8 +350,7 @@ public class BootstrapDropdown : Component
             _dropDown.Closed -= OnNativeClosed;
             ClearNativeItems();
             _dropDown.Dispose();
-            _activePresentationSource = null;
-            _activeIconRenderer = null;
+            ClearActivePresentation();
             _disposed = true;
         }
 
@@ -461,8 +470,7 @@ public class BootstrapDropdown : Component
     private void OnNativeClosed(object? sender, ToolStripDropDownClosedEventArgs e)
     {
         var presentationSource = _activePresentationSource ?? _target;
-        _activePresentationSource = null;
-        _activeIconRenderer = null;
+        ClearActivePresentation();
 
         if (e.CloseReason == ToolStripDropDownCloseReason.AppClicked &&
             presentationSource is not null &&
@@ -476,6 +484,37 @@ public class BootstrapDropdown : Component
         }
 
         Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SetActivePresentation(Control presentationSource, IIconRenderer iconRenderer)
+    {
+        ClearActivePresentation();
+        _activePresentationSource = presentationSource;
+        _activeIconRenderer = iconRenderer;
+        presentationSource.FontChanged += OnActivePresentationFontChanged;
+    }
+
+    private void ClearActivePresentation()
+    {
+        var presentationSource = _activePresentationSource;
+        _activePresentationSource = null;
+        _activeIconRenderer = null;
+        if (presentationSource is not null)
+        {
+            presentationSource.FontChanged -= OnActivePresentationFontChanged;
+        }
+    }
+
+    private void OnActivePresentationFontChanged(object? sender, EventArgs e)
+    {
+        var presentationSource = _activePresentationSource;
+        var iconRenderer = _activeIconRenderer;
+        if (!_dropDown.Visible || presentationSource is null || presentationSource.IsDisposed || iconRenderer is null)
+        {
+            return;
+        }
+
+        ApplyPresentation(presentationSource, iconRenderer, refreshImages: false);
     }
 
     internal bool ConsumePendingAppClickedDismissal()
