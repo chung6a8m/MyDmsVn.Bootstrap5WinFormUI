@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -80,6 +82,106 @@ public sealed class BootstrapCalendarPickerTests
             Assert.That(opened, Is.EqualTo(1));
             Assert.That(closed, Is.EqualTo(1));
             Assert.That(picker.AccessibilityObject.State & AccessibleStates.Collapsed, Is.Not.EqualTo(0));
+        }));
+    }
+
+    [Test]
+    public void PickerOwnerClickFollowingNativeAppClickedDismissalDoesNotImmediatelyReopen()
+    {
+        using var form = new Form { ShowInTaskbar = false, StartPosition = FormStartPosition.Manual, Location = new Point(-10000, -10000), Size = new Size(400, 200) };
+        using var picker = new BootstrapCalendarPicker { Location = new Point(20, 20), Size = new Size(240, 36) };
+        form.Controls.Add(picker);
+        form.Show();
+        Application.DoEvents();
+
+        picker.ShowDropDown();
+        Application.DoEvents();
+        GetNativeDropDown(GetPickerDropDown(picker)).Close(ToolStripDropDownCloseReason.AppClicked);
+        SendHostedClick(picker);
+
+        Assert.That(GetActiveCalendar(picker), Is.Null);
+    }
+
+    [Test]
+    public void PickerDeclaredSurfaceStateAndBoundsFollowCalendarModelAtomically()
+    {
+        using var picker = new BootstrapCalendarPicker();
+        var properties = typeof(BootstrapCalendarPicker).GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Select(property => property.Name);
+        Assert.That(properties, Is.EquivalentTo(new[] { "SelectionMode", "MinDate", "MaxDate", "SelectedDate", "RangeStart", "RangeEnd", "SelectedDates", "DateFormat", "PlaceholderText", "ValidationState", "BorderRadius" }));
+        Assert.That(picker.Controls.Count, Is.Zero);
+        Assert.Throws<InvalidOperationException>((Action)(() => picker.SetRange(DateTime.Today, DateTime.Today)));
+        var previousMin = picker.MinDate;
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => picker.MinDate = BootstrapCalendarSelectionModel.MaximumSupportedDate.AddDays(1)));
+        Assert.That(picker.MinDate, Is.EqualTo(previousMin));
+        picker.SelectionMode = BootstrapCalendarSelectionMode.Range;
+        picker.SetRange(new DateTime(2026, 8, 31), new DateTime(2026, 8, 29));
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(picker.RangeStart, Is.EqualTo(new DateTime(2026, 8, 29)));
+            Assert.That(picker.RangeEnd, Is.EqualTo(new DateTime(2026, 8, 31)));
+        }));
+    }
+
+    [Test]
+    public void PickerSynchronizesProgrammaticSelectionAndBoundsWhileOpenWithoutClosing()
+    {
+        using var form = CreatePickerHost(out var picker);
+        picker.ShowDropDown(); Application.DoEvents();
+        picker.SelectionMode = BootstrapCalendarSelectionMode.Range;
+        picker.SetRange(new DateTime(2026, 8, 29), new DateTime(2026, 8, 31));
+        picker.MinDate = new DateTime(2026, 8, 1);
+        picker.MaxDate = new DateTime(2026, 9, 30);
+        var active = GetActiveCalendar(picker)!;
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(active.SelectionMode, Is.EqualTo(BootstrapCalendarSelectionMode.Range));
+            Assert.That(active.RangeStart, Is.EqualTo(picker.RangeStart));
+            Assert.That(active.RangeEnd, Is.EqualTo(picker.RangeEnd));
+            Assert.That(active.MinDate, Is.EqualTo(picker.MinDate));
+            Assert.That(active.MaxDate, Is.EqualTo(picker.MaxDate));
+            Assert.That(picker.AccessibilityObject.State & AccessibleStates.Expanded, Is.Not.EqualTo(0));
+        }));
+    }
+
+    [Test]
+    public void PickerCompletionPolicyUsesCalendarActivationNotSelectionChanged()
+    {
+        using var form = CreatePickerHost(out var picker);
+        var changes = 0; picker.SelectionChanged += (_, _) => changes++;
+        picker.SelectedDate = new DateTime(2026, 8, 30); changes = 0;
+        picker.ShowDropDown(); Application.DoEvents();
+        ActivateDate(GetActiveCalendar(picker)!, new DateTime(2026, 8, 30)); Application.DoEvents();
+        Assert.That(changes, Is.Zero); Assert.That(GetActiveCalendar(picker), Is.Null);
+        picker.SelectionMode = BootstrapCalendarSelectionMode.Range;
+        picker.ShowDropDown(); Application.DoEvents();
+        ActivateDate(GetActiveCalendar(picker)!, new DateTime(2026, 8, 29)); Application.DoEvents();
+        Assert.That(GetActiveCalendar(picker), Is.Not.Null);
+        ActivateDate(GetActiveCalendar(picker)!, new DateTime(2026, 8, 31)); Application.DoEvents();
+        Assert.That(GetActiveCalendar(picker), Is.Null);
+        picker.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+        picker.ShowDropDown(); Application.DoEvents();
+        ActivateDate(GetActiveCalendar(picker)!, new DateTime(2026, 8, 30)); Application.DoEvents();
+        Assert.That(GetActiveCalendar(picker), Is.Not.Null);
+    }
+
+    [Test]
+    public void PickerDateFormatAndAccessibilityDefaultActionPreserveStateAndRespectDisabled()
+    {
+        using var form = CreatePickerHost(out var picker);
+        picker.DateFormat = "yyyy-MM-dd";
+        Assert.Throws<FormatException>((Action)(() => picker.DateFormat = "Q"));
+        Assert.That(picker.DateFormat, Is.EqualTo("yyyy-MM-dd"));
+        picker.AccessibleName = "Due date";
+        Assert.That(picker.AccessibilityObject.Name, Is.EqualTo("Due date"));
+        picker.AccessibilityObject.DoDefaultAction(); Application.DoEvents();
+        Assert.That(GetActiveCalendar(picker), Is.Not.Null);
+        picker.CloseDropDown(); Application.DoEvents();
+        picker.Enabled = false;
+        picker.AccessibilityObject.DoDefaultAction(); Application.DoEvents();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(GetActiveCalendar(picker), Is.Null);
+            Assert.That(picker.AccessibilityObject.State & AccessibleStates.Unavailable, Is.Not.EqualTo(0));
         }));
     }
 
@@ -218,11 +320,38 @@ public sealed class BootstrapCalendarPickerTests
         return form;
     }
 
+    private static Form CreatePickerHost(out BootstrapCalendarPicker picker)
+    {
+        var form = new Form { ShowInTaskbar = false, StartPosition = FormStartPosition.Manual, Location = new Point(-10000, -10000), Size = new Size(480, 300) };
+        picker = new BootstrapCalendarPicker { Location = new Point(24, 24), Size = new Size(240, 36) };
+        form.Controls.Add(picker); form.Show(); Application.DoEvents(); return form;
+    }
+
+    private static void ActivateDate(BootstrapCalendar calendar, DateTime date)
+    {
+        var method = typeof(BootstrapCalendar).GetMethod("ActivateDate", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null); method!.Invoke(calendar, new object[] { date });
+    }
+
     private static BootstrapCalendar? GetActiveCalendar(BootstrapCalendarPicker picker)
     {
         var field = typeof(BootstrapCalendarPicker).GetField("_activeCalendar", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         Assert.That(field, Is.Not.Null);
         return (BootstrapCalendar?)field!.GetValue(picker);
+    }
+
+    private static BootstrapDropdown GetPickerDropDown(BootstrapCalendarPicker picker)
+    {
+        var field = typeof(BootstrapCalendarPicker).GetField("_dropdown", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null);
+        return (BootstrapDropdown)field!.GetValue(picker)!;
+    }
+
+    private static ToolStripDropDownMenu GetNativeDropDown(BootstrapDropdown dropdown)
+    {
+        var field = typeof(BootstrapDropdown).GetField("_dropDown", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null);
+        return (ToolStripDropDownMenu)field!.GetValue(dropdown)!;
     }
 
     private static void SendHostedClick(Control control)

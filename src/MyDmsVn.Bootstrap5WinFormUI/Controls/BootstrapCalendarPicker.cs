@@ -434,6 +434,7 @@ public sealed class BootstrapCalendarPicker : Control
     private void ToggleDropDown()
     {
         if (!Enabled) return;
+        if (_dropdown.ConsumePendingAppClickedDismissal()) return;
         if (_isDropDownOpen) CloseDropDown(); else ShowDropDown();
     }
 

@@ -940,6 +940,33 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void DropdownGenericSourceValidatesArgumentsAndClearsActivePresentationAfterClose()
+    {
+        using var source = new TextBox();
+        using var anchor = new Panel();
+        using var dropdown = new BootstrapDropdown();
+        var renderer = new RecordingIconRenderer();
+        dropdown.Items.Add(new BootstrapDropdownItem { Text = "Action", Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus) });
+        Assert.Throws<ArgumentNullException>((Action)(() => InvokeShowFrom(dropdown, source, null!, anchor, Point.Empty)));
+        Assert.Throws<ObjectDisposedException>((Action)(() => { source.Dispose(); InvokeShowFrom(dropdown, source, renderer, anchor, Point.Empty); }));
+
+        using var liveSource = new TextBox { Size = new Size(120, 24) };
+        using var form = CreateHost(liveSource);
+        InvokeShowFrom(dropdown, liveSource, renderer, liveSource, new Point(0, liveSource.Height));
+        Application.DoEvents();
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        Application.DoEvents();
+        dropdown.Close(); Application.DoEvents();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(renderer.RenderCount, Is.GreaterThan(1));
+            Assert.That(GetPrivateField(dropdown, "_activePresentationSource"), Is.Null);
+            Assert.That(GetPrivateField(dropdown, "_activeIconRenderer"), Is.Null);
+            Assert.That(dropdown.Target, Is.Null);
+        }));
+    }
+
+    [Test]
     public void DropdownActivePresentationSourceDrivesLiveMinimumWidthAndThemeRefresh()
     {
         var presentationSource = new BootstrapButton { Text = "Presentation" };
@@ -1252,6 +1279,13 @@ public sealed class BootstrapDropdownTests
         {
             ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
         }
+    }
+
+    private static object? GetPrivateField(BootstrapDropdown dropdown, string name)
+    {
+        var field = typeof(BootstrapDropdown).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null);
+        return field!.GetValue(dropdown);
     }
 
     private static void InvokeShowFrom(

@@ -465,10 +465,10 @@ public class BootstrapDropdown : Component
         _activeIconRenderer = null;
 
         if (e.CloseReason == ToolStripDropDownCloseReason.AppClicked &&
-            presentationSource is BootstrapButton button &&
-            !button.IsDisposed)
+            presentationSource is not null &&
+            !presentationSource.IsDisposed)
         {
-            ArmPendingAppClickedDismissal(button);
+            ArmPendingAppClickedDismissal(presentationSource);
         }
         else
         {
@@ -489,7 +489,7 @@ public class BootstrapDropdown : Component
         return true;
     }
 
-    private void ArmPendingAppClickedDismissal(BootstrapButton presentationSource)
+    private void ArmPendingAppClickedDismissal(Control presentationSource)
     {
         var generation = ++_appClickedDismissalGeneration;
         _pendingAppClickedDismissal = true;
