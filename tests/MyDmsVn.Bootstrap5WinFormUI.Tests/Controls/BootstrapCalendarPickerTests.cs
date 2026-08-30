@@ -650,6 +650,61 @@ public sealed class BootstrapCalendarPickerTests
     }
 
     [Test]
+    public void PickerFormatsAllSelectionModesAtDateTimePickerDomainBoundariesWithoutChangingArSaCalendar()
+    {
+        var original = CultureInfo.CurrentCulture;
+        var arSa = CultureInfo.GetCultureInfo("ar-SA");
+        var minimum = BootstrapCalendarSelectionModel.MinimumSupportedDate;
+        var maximum = BootstrapCalendarSelectionModel.MaximumSupportedDate;
+        try
+        {
+            CultureInfo.CurrentCulture = arSa;
+            using var picker = new BootstrapCalendarPicker { DateFormat = "yyyy-MM-dd" };
+            var expectedMinimum = FormatWithRepresentableGregorianCalendar(minimum, "yyyy-MM-dd", arSa);
+            var expectedMaximum = FormatWithRepresentableGregorianCalendar(maximum, "yyyy-MM-dd", arSa);
+
+            picker.SelectedDate = minimum;
+            Assert.That(picker.AccessibilityObject.Value, Is.EqualTo(expectedMinimum));
+
+            picker.SelectionMode = BootstrapCalendarSelectionMode.Range;
+            picker.SetRange(minimum, maximum);
+            Assert.That(picker.AccessibilityObject.Value, Is.EqualTo(expectedMinimum + " – " + expectedMaximum));
+
+            picker.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+            picker.SetSelectedDates(new[] { minimum, maximum });
+            Assert.That(picker.AccessibilityObject.Value,
+                Is.EqualTo(expectedMinimum + " (+" + 1.ToString(arSa) + ")"));
+
+            Assert.That(arSa.DateTimeFormat.Calendar, Is.TypeOf<UmAlQuraCalendar>());
+        }
+        finally { CultureInfo.CurrentCulture = original; }
+    }
+
+    [Test]
+    public void PickerRetainsDefaultUmAlQuraFormattingForRepresentableDatesAndKeepsInvalidDateFormatAtomic()
+    {
+        var original = CultureInfo.CurrentCulture;
+        var arSa = CultureInfo.GetCultureInfo("ar-SA");
+        var date = new DateTime(2026, 8, 30);
+        try
+        {
+            CultureInfo.CurrentCulture = arSa;
+            using var picker = new BootstrapCalendarPicker { DateFormat = "yyyy-MM-dd", SelectedDate = date };
+            var expected = date.ToString("yyyy-MM-dd", arSa);
+
+            Assert.That(picker.AccessibilityObject.Value, Is.EqualTo(expected));
+            Assert.Throws<FormatException>((Action)(() => picker.DateFormat = "Q"));
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(picker.DateFormat, Is.EqualTo("yyyy-MM-dd"));
+                Assert.That(picker.AccessibilityObject.Value, Is.EqualTo(expected));
+                Assert.That(arSa.DateTimeFormat.Calendar, Is.TypeOf<UmAlQuraCalendar>());
+            }));
+        }
+        finally { CultureInfo.CurrentCulture = original; }
+    }
+
+    [Test]
     public void PickerHostedCalendarIsFreshAndUsesSelectedSeedThenRetainedMonth()
     {
         using var form = CreatePickerHost(out var picker);
@@ -1283,6 +1338,16 @@ public sealed class BootstrapCalendarPickerTests
     private static IntPtr CreateMouseLParam(int x, int y)
     {
         return (IntPtr)((y << 16) | (x & 0xffff));
+    }
+
+    private static string FormatWithRepresentableGregorianCalendar(DateTime value, string format, CultureInfo culture)
+    {
+        var calendar = culture.OptionalCalendars
+            .OfType<GregorianCalendar>()
+            .First(candidate => candidate.MinSupportedDateTime <= value && value <= candidate.MaxSupportedDateTime);
+        var clone = (CultureInfo)culture.Clone();
+        clone.DateTimeFormat.Calendar = calendar;
+        return value.ToString(format, clone);
     }
 
     private sealed class FocusableHostedProbe : Control

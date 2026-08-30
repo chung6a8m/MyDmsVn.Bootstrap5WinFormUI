@@ -135,7 +135,7 @@ public sealed class BootstrapCalendarPicker : Control
         set
         {
             var candidate = value ?? throw new ArgumentNullException(nameof(value));
-            _ = BootstrapCalendarSelectionModel.MinimumSupportedDate.ToString(candidate, CultureInfo.CurrentCulture);
+            BootstrapCalendarDateFormatter.ValidateFormat(candidate, CultureInfo.CurrentCulture);
             if (string.Equals(_dateFormat, candidate, StringComparison.Ordinal)) return;
             _dateFormat = candidate;
             Invalidate();
@@ -481,7 +481,7 @@ public sealed class BootstrapCalendarPicker : Control
         return SelectedDates.Count == 1 ? Format(SelectedDates[0]) : Format(SelectedDates[0]) + " (+" + (SelectedDates.Count - 1).ToString(CultureInfo.CurrentCulture) + ")";
     }
 
-    private string Format(DateTime value) => value.ToString(DateFormat, CultureInfo.CurrentCulture);
+    private string Format(DateTime value) => BootstrapCalendarDateFormatter.Format(value, DateFormat, CultureInfo.CurrentCulture);
     private void ApplyHostedCalendarSize(BootstrapCalendar calendar)
     {
         var metrics = BootstrapCalendarRenderLogic.ResolveMetrics(

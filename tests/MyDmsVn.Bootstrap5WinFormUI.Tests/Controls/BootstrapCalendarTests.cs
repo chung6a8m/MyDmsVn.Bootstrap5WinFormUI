@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
@@ -991,6 +992,48 @@ public sealed class BootstrapCalendarTests
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void CalendarDrawAndAccessibilityUseRepresentableFormattingAtDateTimePickerDomainBoundaries(bool minimumBoundary)
+    {
+        var original = CultureInfo.CurrentCulture;
+        var arSa = CultureInfo.GetCultureInfo("ar-SA");
+        var minimum = BootstrapCalendarSelectionModel.MinimumSupportedDate;
+        var maximum = BootstrapCalendarSelectionModel.MaximumSupportedDate;
+        var date = minimumBoundary ? minimum : maximum;
+        try
+        {
+            CultureInfo.CurrentCulture = arSa;
+            using var calendar = new CalendarInteractionProbe
+            {
+                MinDate = minimum,
+                MaxDate = maximum,
+                DisplayMonth = date,
+                SelectedDate = date,
+                Size = new Size(300, 280)
+            };
+            using var bitmap = new Bitmap(calendar.Width, calendar.Height);
+            Assert.DoesNotThrow((Action)(() => calendar.DrawToBitmap(bitmap, calendar.ClientRectangle)));
+
+            var layout = calendar.ResolveLayout(calendar.DeviceDpi);
+            var dayIndex = layout.DayCells.ToList().FindIndex(cell => cell.Date == date);
+            var accessible = calendar.Accessible;
+            var expectedDay = FormatWithRepresentableGregorianCalendar(date, "D", arSa);
+            var navigationDate = BootstrapCalendarRenderLogic.MoveByMonth(calendar.DisplayMonth, minimumBoundary ? -1 : 1);
+            var expectedNavigation = (minimumBoundary ? "‹ " : "› ") +
+                FormatWithRepresentableGregorianCalendar(navigationDate, "Y", arSa);
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(dayIndex, Is.GreaterThanOrEqualTo(0));
+                Assert.That(accessible.GetChild(dayIndex + 2)!.Name, Is.EqualTo(expectedDay));
+                Assert.That(accessible.GetChild(minimumBoundary ? 0 : 1)!.Name, Is.EqualTo(expectedNavigation));
+                Assert.That(arSa.DateTimeFormat.Calendar, Is.TypeOf<UmAlQuraCalendar>());
+            }));
+        }
+        finally { CultureInfo.CurrentCulture = original; }
+    }
+
     [Test]
     public void AccessibilitySelectedStateRepresentsRangeEndpointsInteriorAndMultipleDates()
     {
@@ -1168,6 +1211,16 @@ public sealed class BootstrapCalendarTests
     {
         return ((DefaultValueAttribute)typeof(BootstrapCalendar).GetProperty(propertyName)!
             .GetCustomAttributes(typeof(DefaultValueAttribute), false).Single()).Value;
+    }
+
+    private static string FormatWithRepresentableGregorianCalendar(DateTime value, string format, CultureInfo culture)
+    {
+        var calendar = culture.OptionalCalendars
+            .OfType<GregorianCalendar>()
+            .First(candidate => candidate.MinSupportedDateTime <= value && value <= candidate.MaxSupportedDateTime);
+        var clone = (CultureInfo)culture.Clone();
+        clone.DateTimeFormat.Calendar = calendar;
+        return value.ToString(format, clone);
     }
 
     private static void AssertExactPublicContract()

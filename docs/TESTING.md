@@ -366,6 +366,7 @@ BootstrapCalendar and BootstrapCalendarPicker tests verify:
 - Single replacement and same-date completion signaling, incomplete/completed/reversed range semantics, multiple selection toggles/sorted snapshots, and mode/setter validation without a public selection-model seam.
 - Private keyboard-focus lifecycle: initial clamping, mouse focus, Arrow/Week/Page/Home/End movement, Enter/Space activation, display-month synchronization, rapid navigation, hide/dispose, and inaccessible out-of-range cells.
 - Picker accessibility and interaction: collapsed keyboard opening (Enter/Space/F4/Alt+Down), hosted-calendar focus before calendar key handling, native ToolStrip Escape/outside-click dismissal and screen-edge placement, single/range close behavior, multiple stay-open toggling, opened/closed ordering, and active hosted-control synchronization after mode/bounds/selection/DPI changes.
+- Culture-safe formatting at the exact safe-domain minimum and maximum under `ar-SA`/`UmAlQuraCalendar`: picker DateFormat validation remains atomic, Single/Range/Multiple summaries and accessibility values remain available, Calendar DrawToBitmap plus day/navigation accessibility names remain available, and in-range dates retain the original UmAlQura presentation without changing `CurrentCulture`.
 - Parameterless Designer construction, Light/Dark font/resource cleanup, validation/disabled presentation, and real-Windows 100/125/150/175/200% DPI manual checks. Native `BootstrapDatePicker` tests remain separate because its calendar is WinForms/OS-owned.
 
 ## 3. DPI matrix

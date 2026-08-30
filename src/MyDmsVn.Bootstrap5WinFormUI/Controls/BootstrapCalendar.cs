@@ -578,7 +578,7 @@ public class BootstrapCalendar : Control
         var minimumMonth = new DateTime(MinDate.Year, MinDate.Month, 1);
         var maximumMonth = new DateTime(MaxDate.Year, MaxDate.Month, 1);
         DrawCentered(graphics, "‹", layout.PreviousButtonBounds, Enabled && _displayMonth > minimumMonth ? muted : theme.Colors.Disabled);
-        DrawCentered(graphics, _displayMonth.ToString("Y", CultureInfo.CurrentCulture), layout.MonthTitleBounds, Enabled ? theme.Colors.Text : theme.Colors.Disabled);
+        DrawCentered(graphics, BootstrapCalendarDateFormatter.Format(_displayMonth, "Y", CultureInfo.CurrentCulture), layout.MonthTitleBounds, Enabled ? theme.Colors.Text : theme.Colors.Disabled);
         DrawCentered(graphics, "›", layout.NextButtonBounds, Enabled && _displayMonth < maximumMonth ? muted : theme.Colors.Disabled);
     }
 
@@ -757,9 +757,9 @@ public class BootstrapCalendar : Control
         {
             get
             {
-                if (!_isNavigation) return DayCell.Date.ToString("D", CultureInfo.CurrentCulture);
+                if (!_isNavigation) return BootstrapCalendarDateFormatter.Format(DayCell.Date, "D", CultureInfo.CurrentCulture);
                 var target = BootstrapCalendarRenderLogic.MoveByMonth(Owner.DisplayMonth, IsPreviousNavigation ? -1 : 1);
-                return (IsPreviousNavigation ? "‹ " : "› ") + target.ToString("Y", CultureInfo.CurrentCulture);
+                return (IsPreviousNavigation ? "‹ " : "› ") + BootstrapCalendarDateFormatter.Format(target, "Y", CultureInfo.CurrentCulture);
             }
             set { }
         }

@@ -68,6 +68,8 @@ Stage 9 therefore introduces no target-specific `MonthCalendar`, popup `Form`, P
 
 `BootstrapCalendarPicker` presents a fresh custom calendar through the existing native `ToolStripDropDownMenu` infrastructure. Native ToolStrip remains responsible for screen working-area placement, focus transfer, Escape/outside-click dismissal, and disposal of the hosted snapshot. When the popup opens, the hosted calendar must receive focus before its arrow, PageUp/PageDown, Home/End, Enter, and Space keys can participate in the normal WinForms key route; the picker restores its collapsed keyboard entry points without exposing the hosted control or ToolStrip types. Both behaviors are verified on `net48` and `net8.0-windows`; Windows/culture-specific text measurement and ToolStrip placement may still differ naturally between runtimes and OS versions.
 
+The custom calendar family reads `CurrentCulture` at formatting and layout time without caching or mutating it. If the culture's active calendar cannot represent a safe-domain date, summaries, month titles, and calendar accessibility names use a cloned culture with a representable optional Gregorian calendar where available, then another representable optional calendar, with `InvariantCulture` as the last fallback. This preserves an active calendar such as `UmAlQuraCalendar` for dates it supports while keeping the exact WinForms `DateTimePicker` domain usable. First-day-of-week, weekday labels, and integer day labels deliberately remain direct `CurrentCulture` behavior.
+
 ## 7. System.Drawing
 
 This is a Windows-only WinForms framework, so `System.Drawing` is an appropriate rendering foundation. All drawing code still needs deterministic GDI resource disposal.
