@@ -530,7 +530,21 @@ public sealed class BootstrapCalendarPickerTests
 
             picker.ShowDropDown();
             Application.DoEvents();
-            var active = GetActiveCalendar(picker)!;
+            var active = GetActiveCalendar(picker);
+            var dropdown = GetPickerDropDown(picker);
+            var nativeDropDown = GetNativeDropDown(dropdown);
+            Assert.That(active, Is.Not.Null, "An effective open must create the picker-owned active calendar.");
+            if (active is null) throw new AssertionException("An effective open did not create the picker-owned active calendar.");
+
+            Assert.That(nativeDropDown.Visible, Is.True, "An effective open must make the native dropdown visible.");
+            var host = GetHostedCalendarHost(nativeDropDown);
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(active.IsDisposed, Is.False);
+                Assert.That(host.IsDisposed, Is.False);
+                Assert.That(host.Control, Is.SameAs(active));
+            }));
+
             var programmaticDate = new DateTime(2026, 8, 1).AddDays(index);
             picker.SetSelectedDates(new[] { programmaticDate });
             Application.DoEvents();
@@ -545,19 +559,34 @@ public sealed class BootstrapCalendarPickerTests
                 Assert.That(GetActiveCalendar(picker), Is.SameAs(active));
             }));
 
-            var dropdown = GetPickerDropDown(picker);
             picker.CloseDropDown();
             Application.DoEvents();
             Assert.Multiple((Action)(() =>
             {
                 Assert.That(closed, Is.EqualTo(1));
                 Assert.That(GetActiveCalendar(picker), Is.Null, "Closed must clear the active calendar reference.");
+                Assert.That(nativeDropDown.Visible, Is.False);
+                Assert.That(nativeDropDown.Items.Count, Is.EqualTo(1), "Closing retains the dropdown-owned snapshot until rebuild or disposal.");
+                Assert.That(host.IsDisposed, Is.False, "Closing alone must not dispose the dropdown-owned host.");
+                Assert.That(active.IsDisposed, Is.False, "Closing alone must not dispose the dropdown-owned hosted calendar.");
+                Assert.That(host.Control, Is.SameAs(active));
                 Assert.That(GetPrivateField(dropdown, "_activePresentationSource"), Is.Null);
                 Assert.That(GetPrivateField(dropdown, "_activeIconRenderer"), Is.Null);
             }));
 
             Assert.DoesNotThrow((Action)(() => picker.Dispose()), "Closing a hosted calendar must not leave disposal callbacks that throw.");
-            Assert.That(GetActiveCalendar(picker), Is.Null);
+            Assert.DoesNotThrow((Action)Application.DoEvents, "Disposal must leave no delayed hosted-calendar callbacks that throw.");
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(GetActiveCalendar(picker), Is.Null);
+                Assert.That(nativeDropDown.IsDisposed, Is.True);
+                Assert.That(nativeDropDown.Items, Is.Empty);
+                Assert.That(host.Owner, Is.Null, "Disposal must detach the native host from the disposed dropdown.");
+                Assert.That(active.IsDisposed, Is.True);
+                Assert.That(selection, Is.EqualTo(2), "Disposal must not deliver delayed selection callbacks.");
+                Assert.That(opened, Is.EqualTo(1), "Disposal must not deliver delayed opening callbacks.");
+                Assert.That(closed, Is.EqualTo(1), "Disposal after an explicit close must not deliver a duplicate close callback.");
+            }));
         }
 
         Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions));
@@ -1126,6 +1155,15 @@ public sealed class BootstrapCalendarPickerTests
         var field = typeof(BootstrapDropdown).GetField("_dropDown", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         Assert.That(field, Is.Not.Null);
         return (ToolStripDropDownMenu)field!.GetValue(dropdown)!;
+    }
+
+    private static ToolStripControlHost GetHostedCalendarHost(ToolStripDropDownMenu nativeDropDown)
+    {
+        Assert.That(nativeDropDown.Items.Count, Is.EqualTo(1), "The picker popup must contain exactly one hosted calendar row.");
+        var host = nativeDropDown.Items[0] as ToolStripControlHost;
+        Assert.That(host, Is.Not.Null, "The picker popup must use a native ToolStripControlHost.");
+        if (host is null) throw new AssertionException("The picker popup did not create a ToolStripControlHost.");
+        return host;
     }
 
     private static void SendHostedClick(Control control)
