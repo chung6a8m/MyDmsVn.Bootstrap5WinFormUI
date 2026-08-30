@@ -33,6 +33,18 @@ public sealed class BootstrapCalendarRenderLogicTests
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeMetrics.Default, 96, -2)));
     }
 
+    [Test] public void ExplicitRadiusIsScaledIndependentlyOfThemeRadius()
+    {
+        var metrics = BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeMetrics.Default, 144, 10);
+        Assert.That(metrics.Radius, Is.EqualTo(15));
+    }
+
+    [Test] public void PreferredSizeGrowsMonotonicallyWithDpi()
+    {
+        var sizes = new[] { 96, 120, 144, 168, 192 }.Select(dpi => BootstrapCalendarRenderLogic.CalculatePreferredSize(BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeMetrics.Default, dpi, -1))).ToArray();
+        for (var i = 1; i < sizes.Length; i++) { Assert.That(sizes[i].Width, Is.GreaterThan(sizes[i - 1].Width)); Assert.That(sizes[i].Height, Is.GreaterThan(sizes[i - 1].Height)); }
+    }
+
     [Test] public void PreferredSizeUsesCalendarFormula()
     {
         var m = BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeMetrics.Default, 96, -1);
@@ -52,6 +64,14 @@ public sealed class BootstrapCalendarRenderLogicTests
 
     [Test] public void LeapMonthAndYearBoundaryRemainConsecutive() { AssertProjection(new DateTime(2028, 2, 1), DayOfWeek.Monday); AssertProjection(new DateTime(2026, 12, 1), DayOfWeek.Sunday); }
 
+    [Test] public void LiteralLeapAndYearBoundaryProjectionDatesAreCorrect()
+    {
+        var leap = Layout(new DateTime(2028, 2, 1), DayOfWeek.Sunday);
+        Assert.That(leap.DayCells[0].Date, Is.EqualTo(new DateTime(2028, 1, 30))); Assert.That(leap.DayCells[30].Date, Is.EqualTo(new DateTime(2028, 2, 29)));
+        var year = Layout(new DateTime(2026, 1, 1), DayOfWeek.Sunday);
+        Assert.That(year.DayCells[0].Date, Is.EqualTo(new DateTime(2025, 12, 28))); Assert.That(year.DayCells[41].Date, Is.EqualTo(new DateTime(2026, 2, 7)));
+    }
+
     [Test] public void SafeDomainBoundariesDoNotOverflow()
     {
         AssertProjection(DateTimePicker.MinimumDateTime.Date, DayOfWeek.Sunday);
@@ -68,6 +88,7 @@ public sealed class BootstrapCalendarRenderLogicTests
             Assert.That(l.WeekdayBounds.All(r => r.Width >= 0 && r.Height >= 0), Is.True);
             Assert.That(l.DayCells.All(c => c.Bounds.Width >= 0 && c.Bounds.Height >= 0), Is.True);
             Assert.That(BootstrapCalendarRenderLogic.HitTestDay(new Point(1, 1), l), Is.EqualTo(-1));
+            Assert.That(l.DayCells.All(c => c.Bounds.Left >= 0 && c.Bounds.Top >= 0 && c.Bounds.Right <= size.Width && c.Bounds.Bottom <= size.Height), Is.True);
         }
     }
 
@@ -76,6 +97,9 @@ public sealed class BootstrapCalendarRenderLogicTests
         var l = Layout(new DateTime(2026, 9, 1), DayOfWeek.Sunday);
         Assert.That(BootstrapCalendarRenderLogic.HitTestDay(new Point(l.DayCells[0].Bounds.Left + 1, l.DayCells[0].Bounds.Top + 1), l), Is.EqualTo(0));
         Assert.That(BootstrapCalendarRenderLogic.HitTestDay(new Point(0, 0), l), Is.EqualTo(-1));
+        Assert.That(BootstrapCalendarRenderLogic.HitTestDay(new Point(l.HeaderBounds.Left + 1, l.HeaderBounds.Top + 1), l), Is.EqualTo(-1));
+        Assert.That(BootstrapCalendarRenderLogic.HitTestDay(new Point(l.DayCells[0].Bounds.Right, l.DayCells[0].Bounds.Top + 1), l), Is.EqualTo(-1));
+        Assert.That(BootstrapCalendarRenderLogic.HitTestDay(new Point(10000, 10000), l), Is.EqualTo(-1));
     }
 
     [TestCase(2025, 1, 31, 1, 2025, 2, 28)]
