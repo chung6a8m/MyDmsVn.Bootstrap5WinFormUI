@@ -510,6 +510,60 @@ public sealed class BootstrapCalendarPickerTests
     }
 
     [Test]
+    public void PickerRepeatedCreateOpenProgrammaticSyncSelectCloseAndDisposeReleasesEveryHostedReference()
+    {
+        var baselineSubscriptions = GetThemeSubscriptionCount();
+
+        for (var index = 0; index < 12; index++)
+        {
+            using var picker = new BootstrapCalendarPicker
+            {
+                SelectionMode = BootstrapCalendarSelectionMode.Multiple
+            };
+            using var form = CreatePickerHost(picker);
+            var selection = 0;
+            var opened = 0;
+            var closed = 0;
+            picker.SelectionChanged += (_, _) => selection++;
+            picker.Opened += (_, _) => opened++;
+            picker.Closed += (_, _) => closed++;
+
+            picker.ShowDropDown();
+            Application.DoEvents();
+            var active = GetActiveCalendar(picker)!;
+            var programmaticDate = new DateTime(2026, 8, 1).AddDays(index);
+            picker.SetSelectedDates(new[] { programmaticDate });
+            Application.DoEvents();
+            ActivateDate(active, programmaticDate.AddDays(12));
+            Application.DoEvents();
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(selection, Is.EqualTo(2), "Each programmatic and user selection must raise exactly one event.");
+                Assert.That(opened, Is.EqualTo(1));
+                Assert.That(closed, Is.Zero, "Multiple selection must remain open until explicitly closed.");
+                Assert.That(GetActiveCalendar(picker), Is.SameAs(active));
+            }));
+
+            var dropdown = GetPickerDropDown(picker);
+            picker.CloseDropDown();
+            Application.DoEvents();
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(closed, Is.EqualTo(1));
+                Assert.That(GetActiveCalendar(picker), Is.Null, "Closed must clear the active calendar reference.");
+                Assert.That(GetPrivateField(dropdown, "_activePresentationSource"), Is.Null);
+                Assert.That(GetPrivateField(dropdown, "_activeIconRenderer"), Is.Null);
+            }));
+
+            Assert.DoesNotThrow((Action)(() => picker.Dispose()), "Closing a hosted calendar must not leave disposal callbacks that throw.");
+            Assert.That(GetActiveCalendar(picker), Is.Null);
+        }
+
+        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions));
+    }
+
+    [Test]
     public void PickerCompletionPolicyUsesCalendarActivationNotSelectionChanged()
     {
         using var form = CreatePickerHost(out var picker);
