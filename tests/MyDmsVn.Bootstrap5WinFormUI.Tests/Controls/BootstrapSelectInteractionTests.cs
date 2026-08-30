@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using NUnit.Framework;
 
@@ -121,5 +122,79 @@ public sealed class BootstrapSelectInteractionTests
             Assert.That(select.SelectedItems, Is.Empty);
             Assert.That(selecting, Is.EqualTo(1));
         }));
+    }
+
+    [Test]
+    public void TabAfterPopupSelectionMovesFocusAndInvalidatesBothSelects()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var first = new TestBootstrapSelect { TabIndex = 0 };
+        using var second = new TestBootstrapSelect { TabIndex = 1 };
+        first.Items.Add(new BootstrapSelectItem(1, "Northwind"));
+        form.Controls.Add(first);
+        form.Controls.Add(second);
+        form.Show();
+        Application.DoEvents();
+
+        first.Focus();
+        first.OpenDropDownInternal();
+        Application.DoEvents();
+        Assert.That(first.ActivateHighlightedResultForTest(), Is.True);
+        Application.DoEvents();
+        Assert.That(first.Focused, Is.True, "Single selection should restore focus to the Select before Tab traversal.");
+
+        var firstInvalidated = 0;
+        var secondInvalidated = 0;
+        first.Invalidated += (_, _) => firstInvalidated++;
+        second.Invalidated += (_, _) => secondInvalidated++;
+
+        var handled = first.ProcessDialogKeyForTest(Keys.Tab);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(handled, Is.True);
+            Assert.That(second.Focused, Is.True, "Tab should move actual focus to the next Select.");
+            Assert.That(firstInvalidated, Is.GreaterThan(0), "The Select losing focus must repaint its active border.");
+            Assert.That(secondInvalidated, Is.GreaterThan(0), "The Select receiving focus must repaint its active border.");
+        }));
+    }
+
+    [Test]
+    public void MovingFocusBetweenSelectsInvalidatesBothFocusVisuals()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var first = new BootstrapSelect { TabIndex = 0 };
+        using var second = new BootstrapSelect { TabIndex = 1 };
+        form.Controls.Add(first);
+        form.Controls.Add(second);
+        form.Show();
+        Application.DoEvents();
+
+        first.Focus();
+        Application.DoEvents();
+
+        var firstInvalidated = 0;
+        var secondInvalidated = 0;
+        first.Invalidated += (_, _) => firstInvalidated++;
+        second.Invalidated += (_, _) => secondInvalidated++;
+
+        second.Focus();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(second.Focused, Is.True);
+            Assert.That(firstInvalidated, Is.GreaterThan(0), "The previously active Select must repaint when focus leaves it.");
+            Assert.That(secondInvalidated, Is.GreaterThan(0), "The newly active Select must repaint when focus enters it.");
+        }));
+    }
+
+    private sealed class TestBootstrapSelect : BootstrapSelect
+    {
+        internal bool ProcessDialogKeyForTest(Keys keyData)
+        {
+            return ProcessDialogKey(keyData);
+        }
     }
 }
