@@ -58,6 +58,8 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapComboBox`
 - `BootstrapSelect`
 - `BootstrapDatePicker`
+- `BootstrapCalendar`
+- `BootstrapCalendarPicker`
 - `BootstrapDropdown`
 - `BootstrapSplitButton`
 - `BootstrapCard`
@@ -160,6 +162,24 @@ dueDate.ValueChanged += (_, _) =>
 ```
 
 `Value`, `MinDate`, `MaxDate`, `Format`, `CustomFormat`, `ShowCheckBox`, and `Checked` forward directly to the owned native picker. The framework adds only the themed shell, validation/focus border, theme-owned font lifecycle, and DPI-aware layout. The native localized text, calendar popup, keyboard navigation, range normalization, and exception behavior are intentionally preserved. Stage 9 does not expose `ShowUpDown`, a nullable-value abstraction, a replacement calendar, or a custom parser/culture model.
+
+## Custom Calendar usage
+
+`BootstrapCalendar` and `BootstrapCalendarPicker` are the separate, owner-drawn date-only calendar surface. They support single, inclusive-range, and multiple-date selection in the safe WinForms `DateTimePicker` date domain; they do not change `BootstrapDatePicker` or its native popup behavior.
+
+```csharp
+var availability = new BootstrapCalendarPicker
+{
+    SelectionMode = BootstrapCalendarSelectionMode.Range,
+    MinDate = new DateTime(2026, 1, 1),
+    MaxDate = new DateTime(2026, 12, 31),
+    PlaceholderText = "Choose a date range"
+};
+
+availability.SetRange(new DateTime(2026, 8, 10), new DateTime(2026, 8, 14));
+```
+
+The custom calendar uses the current culture’s first day of week and its own owner-drawn theme/DPI presentation. The picker uses a native ToolStrip host for placement and dismissal, while the hosted calendar receives normal calendar keyboard focus.
 
 ## Native command Dropdown usage
 
@@ -309,7 +329,7 @@ ComboBox stays even closer to native WinForms: `BootstrapComboBox` derives direc
 
 BootstrapSelect is the separate managed selector for richer selection workflows. It reuses the shared overlay placement/collision engine, theme/DPI/rendering infrastructure, and source-neutral renderer contract while keeping provider transport outside the UI library. Local and provider result modes do not merge; selection identity is value-based; async requests are debounced/cancellable/generation-safe; paging and retry stay internal control state; selected snapshots survive page/query replacement; and custom values are opt-in. Caller-supplied providers, matchers, renderers, items, and tags remain caller-owned.
 
-DatePicker follows the NumericBox wrapper pattern around exactly one native `DateTimePicker`. Native date state, range rules, localized display, checkbox semantics, keyboard navigation, and calendar popup remain authoritative; the wrapper owns one tab stop, shared validation/focus shell rendering, theme-created font lifecycle, and DPI-scaled layout. It introduces no `MonthCalendar`, custom popup `Form`, nullable-date model, `ShowUpDown` proxy, parsing engine, culture property, timer, animation scheduler, Win32 hook, or external dependency.
+DatePicker follows the NumericBox wrapper pattern around exactly one native `DateTimePicker`. Native date state, range rules, localized display, checkbox semantics, keyboard navigation, and calendar popup remain authoritative; the wrapper owns one tab stop, shared validation/focus shell rendering, theme-created font lifecycle, and DPI-scaled layout. It introduces no `MonthCalendar`, custom popup `Form`, nullable-date model, `ShowUpDown` proxy, parsing engine, culture property, timer, animation scheduler, Win32 hook, or external dependency. `BootstrapCalendar` and `BootstrapCalendarPicker` are a distinct custom, owner-drawn date-only family with its own selection modes; they do not alter native DatePicker behavior.
 
 Dropdown uses a native-first command-menu pattern: each opening validates and recursively snapshots caller-owned item models into native menu/submenu rows and optional `ToolStripControlHost` content. Native ToolStrip owns focus, keyboard, dismissal, and screen placement; the framework owns rendering, generated images, hosted snapshot controls, theme refresh, and cleanup. `BootstrapSplitButton` composes that infrastructure with two connected `BootstrapButton` regions and adds no custom popup form, global hook, timer, animation scheduler, live collection synchronization, or external dependency.
 
@@ -338,7 +358,7 @@ The primary sources of truth are:
 
 ## Status
 
-Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, Stage 6 `BootstrapComboBox`, Stage 7 `BootstrapDropdown`, Stage 8 `BootstrapToast` / `BootstrapToastContainer`, Stage 9 `BootstrapDatePicker`, and the dedicated Select2-style `BootstrapSelect` are documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
+Phases 0–16 of the foundation development plan are implemented through release preparation. `BootstrapPagination`, Stage 1 `BootstrapBadge`, Stage 2 `BootstrapAlert`, Stage 3 `BootstrapTooltip`, Stage 4 `BootstrapTabControl`, Stage 5 `BootstrapNumericBox`, Stage 6 `BootstrapComboBox`, Stage 7 `BootstrapDropdown`, Stage 8 `BootstrapToast` / `BootstrapToastContainer`, Stage 9 `BootstrapDatePicker`, the dedicated Select2-style `BootstrapSelect`, and the separate `BootstrapCalendar` / `BootstrapCalendarPicker` family are documented compatible control additions on top of that foundation. The current package line remains `1.0.0-rc.1`; promotion to stable `1.0.0` remains gated by the manual release matrix recorded in `docs/RELEASING.md`.
 
 The files under `idea-drafs/` remain historical design conversations and implementation sketches. They are useful context, but they are **not authoritative specifications** and code from those files must not be copied blindly.
 

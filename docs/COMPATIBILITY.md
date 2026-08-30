@@ -64,6 +64,10 @@ Areas to verify on both targets include:
 
 Stage 9 therefore introduces no target-specific `MonthCalendar`, popup `Form`, P/Invoke hook, private WinForms reflection, parsing engine, or culture abstraction to force visual/behavioral parity. Differences that are genuinely native remain native unless a later explicit compatibility contract says otherwise.
 
+`BootstrapCalendar` and `BootstrapCalendarPicker` are separate, framework-owned custom-calendar controls; they do not alter the native `BootstrapDatePicker` distinction above. Both target frameworks use the safe inclusive date domain supported by WinForms `DateTimePicker` (`DateTimePicker.MinimumDateTime.Date` through `DateTimePicker.MaximumDateTime.Date`), normalize public selection and bounds inputs to date-only values, and use `CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek` for the 42-cell month projection. The calendar paints its own shell, header, weekday names, and day states from framework theme/DPI tokens, so its visuals are framework-owned rather than OS calendar chrome.
+
+`BootstrapCalendarPicker` presents a fresh custom calendar through the existing native `ToolStripDropDownMenu` infrastructure. Native ToolStrip remains responsible for screen working-area placement, focus transfer, Escape/outside-click dismissal, and disposal of the hosted snapshot. When the popup opens, the hosted calendar must receive focus before its arrow, PageUp/PageDown, Home/End, Enter, and Space keys can participate in the normal WinForms key route; the picker restores its collapsed keyboard entry points without exposing the hosted control or ToolStrip types. Both behaviors are verified on `net48` and `net8.0-windows`; Windows/culture-specific text measurement and ToolStrip placement may still differ naturally between runtimes and OS versions.
+
 ## 7. System.Drawing
 
 This is a Windows-only WinForms framework, so `System.Drawing` is an appropriate rendering foundation. All drawing code still needs deterministic GDI resource disposal.

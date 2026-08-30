@@ -13,7 +13,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "f586623a5061308a6f09e179bfb65a74ad82f68d5fd5e94fe16e84d2a8a48faa";
+    private const string ApprovedV1Fingerprint = "d11d17eabf24643ec2e25bbc50b04cac693be7206ea303905991c533130040ee";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -95,6 +95,84 @@ public sealed class Phase16PublicApiBaselineTests
             Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapConnectedButtonLayoutLogic"));
             Assert.That(exportedNames, Does.Not.Contain("MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapDropdownRenderer"));
         }));
+    }
+
+    [Test]
+    public void CalendarApiExportsOnlyTheReviewedPublicContract()
+    {
+        var assembly = typeof(BootstrapCalendar).Assembly;
+        var calendarProperties = GetDeclaredPublicPropertyNames(typeof(BootstrapCalendar));
+        var pickerProperties = GetDeclaredPublicPropertyNames(typeof(BootstrapCalendarPicker));
+        var calendarMethods = GetDeclaredPublicMethodNames(typeof(BootstrapCalendar));
+        var pickerMethods = GetDeclaredPublicMethodNames(typeof(BootstrapCalendarPicker));
+
+        var calendarExports = assembly.GetExportedTypes()
+            .Select(type => type.FullName)
+            .Where(name => name is not null && name.IndexOf("BootstrapCalendar", StringComparison.Ordinal) >= 0)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(Enum.GetValues(typeof(BootstrapCalendarSelectionMode)), Is.EqualTo(new[]
+            {
+                BootstrapCalendarSelectionMode.Single,
+                BootstrapCalendarSelectionMode.Range,
+                BootstrapCalendarSelectionMode.Multiple
+            }));
+            Assert.That(calendarExports, Is.EqualTo(new[]
+            {
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapCalendar",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapCalendarPicker",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapCalendarSelectionMode"
+            }));
+            Assert.That(calendarProperties, Is.EqualTo(new[]
+            {
+                "BorderRadius", "DisplayMonth", "MaxDate", "MinDate", "RangeEnd", "RangeStart", "SelectedDate", "SelectedDates", "SelectionMode"
+            }));
+            Assert.That(pickerProperties, Is.EqualTo(new[]
+            {
+                "BorderRadius", "DateFormat", "MaxDate", "MinDate", "PlaceholderText", "RangeEnd", "RangeStart", "SelectedDate", "SelectedDates", "SelectionMode", "ValidationState"
+            }));
+            Assert.That(calendarMethods, Is.EqualTo(new[]
+            {
+                "ClearSelection", "GetPreferredSize", "SetRange", "SetSelectedDates", "ShowNextMonth", "ShowPreviousMonth"
+            }));
+            Assert.That(pickerMethods, Is.EqualTo(new[]
+            {
+                "ClearSelection", "CloseDropDown", "SetRange", "SetSelectedDates", "ShowDropDown"
+            }));
+            Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapCalendar)), Is.EqualTo(new[] { "DisplayMonthChanged", "SelectionChanged" }));
+            Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapCalendarPicker)), Is.EqualTo(new[] { "Closed", "Opened", "SelectionChanged" }));
+            Assert.That(typeof(BootstrapCalendar).GetEvent("SelectionActivated", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(BootstrapCalendar).GetProperty("FocusedDate", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(BootstrapCalendarPicker).GetProperty("ActiveCalendar", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+        }));
+    }
+
+    private static string[] GetDeclaredPublicPropertyNames(Type type)
+    {
+        return type.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Select(property => property.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string[] GetDeclaredPublicMethodNames(Type type)
+    {
+        return type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Where(method => !method.IsSpecialName)
+            .Select(method => method.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string[] GetDeclaredPublicEventNames(Type type)
+    {
+        return type.GetEvents(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Select(eventInfo => eventInfo.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static string BuildApiSurface(Assembly assembly)
