@@ -16,6 +16,74 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 public sealed class BootstrapCalendarPickerTests
 {
     [Test]
+    public void PickerDefaultsExposeThePlannedShellContract()
+    {
+        using var picker = new BootstrapCalendarPicker();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(picker.SelectionMode, Is.EqualTo(BootstrapCalendarSelectionMode.Single));
+            Assert.That(picker.SelectedDate, Is.Null);
+            Assert.That(picker.DateFormat, Is.EqualTo("d"));
+            Assert.That(picker.PlaceholderText, Is.Empty);
+            Assert.That(picker.ValidationState, Is.EqualTo(BootstrapValidationState.None));
+            Assert.That(picker.BorderRadius, Is.EqualTo(-1));
+            Assert.That(picker.TabStop, Is.True);
+            Assert.That(picker.AccessibleRole, Is.EqualTo(AccessibleRole.DropList));
+        }));
+    }
+
+    [Test]
+    public void PickerFormatsSingleRangeAndMultipleSummaries()
+    {
+        using var picker = new BootstrapCalendarPicker { DateFormat = "yyyy-MM-dd", PlaceholderText = "Choose" };
+        var accessible = picker.AccessibilityObject;
+        Assert.That(accessible.Value, Is.EqualTo("Choose"));
+
+        picker.SelectedDate = new DateTime(2026, 8, 30);
+        Assert.That(accessible.Value, Is.EqualTo("2026-08-30"));
+
+        picker.SelectionMode = BootstrapCalendarSelectionMode.Range;
+        picker.SetRange(new DateTime(2026, 8, 29), null);
+        Assert.That(accessible.Value, Is.EqualTo("2026-08-29 – …"));
+        picker.SetRange(new DateTime(2026, 8, 29), new DateTime(2026, 8, 31));
+        Assert.That(accessible.Value, Is.EqualTo("2026-08-29 – 2026-08-31"));
+
+        picker.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+        picker.SetSelectedDates(new[] { new DateTime(2026, 8, 31), new DateTime(2026, 8, 29), new DateTime(2026, 8, 30) });
+        Assert.That(accessible.Value, Is.EqualTo("2026-08-29 (+2)"));
+    }
+
+    [Test]
+    public void PickerOpenCloseOwnsOnlyActiveReferenceAndForwardsLifecycle()
+    {
+        using var form = new Form { ShowInTaskbar = false, StartPosition = FormStartPosition.Manual, Location = new Point(-10000, -10000), Size = new Size(400, 200) };
+        using var picker = new BootstrapCalendarPicker { Location = new Point(20, 20) };
+        form.Controls.Add(picker);
+        form.Show();
+        Application.DoEvents();
+        var opened = 0;
+        var closed = 0;
+        picker.Opened += (_, _) => opened++;
+        picker.Closed += (_, _) => closed++;
+
+        picker.ShowDropDown();
+        Application.DoEvents();
+        Assert.That(GetActiveCalendar(picker), Is.Not.Null);
+        Assert.That(picker.AccessibilityObject.State & AccessibleStates.Expanded, Is.Not.EqualTo(0));
+
+        picker.CloseDropDown();
+        Application.DoEvents();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(GetActiveCalendar(picker), Is.Null);
+            Assert.That(opened, Is.EqualTo(1));
+            Assert.That(closed, Is.EqualTo(1));
+            Assert.That(picker.AccessibilityObject.State & AccessibleStates.Collapsed, Is.Not.EqualTo(0));
+        }));
+    }
+
+    [Test]
     public void HostedControlClickKeepsPopupOpenAndCanFocusImmediatelyAfterOpened()
     {
         using var form = CreateHost(out var presentationSource);
@@ -148,6 +216,13 @@ public sealed class BootstrapCalendarPickerTests
         form.Activate();
         Application.DoEvents();
         return form;
+    }
+
+    private static BootstrapCalendar? GetActiveCalendar(BootstrapCalendarPicker picker)
+    {
+        var field = typeof(BootstrapCalendarPicker).GetField("_activeCalendar", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null);
+        return (BootstrapCalendar?)field!.GetValue(picker);
     }
 
     private static void SendHostedClick(Control control)

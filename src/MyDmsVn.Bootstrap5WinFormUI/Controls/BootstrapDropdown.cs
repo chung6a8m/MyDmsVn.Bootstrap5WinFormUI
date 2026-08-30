@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Icons;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -21,7 +22,8 @@ public class BootstrapDropdown : Component
     private readonly BootstrapDropdownItemCollection _items;
     private readonly List<Image> _ownedImages = new List<Image>();
     private BootstrapButton? _target;
-    private BootstrapButton? _activePresentationSource;
+    private Control? _activePresentationSource;
+    private IIconRenderer? _activeIconRenderer;
     private bool _pendingAppClickedDismissal;
     private int _appClickedDismissalGeneration;
     private BootstrapVariant _variant = BootstrapVariant.Primary;
@@ -151,7 +153,7 @@ public class BootstrapDropdown : Component
                 if (presentationSource is not null && !presentationSource.IsDisposed)
                 {
                     _dropDown.MinimumSize = new Size(
-                        ResolveMinimumWidth(value, GetTargetDpi(presentationSource)),
+                        ResolveMinimumWidth(value, GetPresentationDpi(presentationSource)),
                         0);
                 }
             }
@@ -187,29 +189,63 @@ public class BootstrapDropdown : Component
             throw new ArgumentNullException(nameof(presentationSource));
         }
 
+        if (!CanOpen(presentationSource))
+        {
+            return;
+        }
+
+        ShowFrom(presentationSource, presentationSource.IconRenderer, anchor, location);
+    }
+
+    internal void ShowFrom(
+        Control presentationSource,
+        IIconRenderer iconRenderer,
+        Control anchor,
+        Point location)
+    {
+        ThrowIfDisposed();
+        if (presentationSource is null)
+        {
+            throw new ArgumentNullException(nameof(presentationSource));
+        }
+
+        if (iconRenderer is null)
+        {
+            throw new ArgumentNullException(nameof(iconRenderer));
+        }
+
         if (anchor is null)
         {
             throw new ArgumentNullException(nameof(anchor));
         }
 
-        if (_dropDown.Visible ||
-            presentationSource.IsDisposed ||
-            anchor.IsDisposed ||
-            !CanOpen(presentationSource))
+        if (presentationSource.IsDisposed)
+        {
+            throw new ObjectDisposedException(nameof(presentationSource));
+        }
+
+        if (anchor.IsDisposed)
+        {
+            throw new ObjectDisposedException(nameof(anchor));
+        }
+
+        if (_dropDown.Visible || !presentationSource.Enabled || !anchor.Enabled || _items.Count == 0)
         {
             return;
         }
 
         ValidateItemTree(_items);
+        RebuildNativeItems(presentationSource, iconRenderer);
+        _activePresentationSource = presentationSource;
+        _activeIconRenderer = iconRenderer;
         try
         {
-            RebuildNativeItems(presentationSource);
-            _activePresentationSource = presentationSource;
             _dropDown.Show(anchor, location);
         }
         catch
         {
             _activePresentationSource = null;
+            _activeIconRenderer = null;
             ClearNativeItems();
             throw;
         }
@@ -305,6 +341,7 @@ public class BootstrapDropdown : Component
             ClearNativeItems();
             _dropDown.Dispose();
             _activePresentationSource = null;
+            _activeIconRenderer = null;
             _disposed = true;
         }
 
@@ -425,12 +462,13 @@ public class BootstrapDropdown : Component
     {
         var presentationSource = _activePresentationSource ?? _target;
         _activePresentationSource = null;
+        _activeIconRenderer = null;
 
         if (e.CloseReason == ToolStripDropDownCloseReason.AppClicked &&
-            presentationSource is not null &&
-            !presentationSource.IsDisposed)
+            presentationSource is BootstrapButton button &&
+            !button.IsDisposed)
         {
-            ArmPendingAppClickedDismissal(presentationSource);
+            ArmPendingAppClickedDismissal(button);
         }
         else
         {
@@ -495,7 +533,7 @@ public class BootstrapDropdown : Component
         }
     }
 
-    private void RebuildNativeItems(BootstrapButton target)
+    private void RebuildNativeItems(Control presentationSource, IIconRenderer iconRenderer)
     {
         ClearNativeItems();
 
@@ -507,7 +545,7 @@ public class BootstrapDropdown : Component
                 item.Kind == BootstrapDropdownItemKind.Item && item.Checked);
             ConfigureNativeLevel(_dropDown, _items);
             PopulateNativeItems(_dropDown.Items, _items);
-            ApplyPresentation(target, refreshImages: true);
+            ApplyPresentation(presentationSource, iconRenderer, refreshImages: true);
         }
         catch
         {
@@ -615,22 +653,22 @@ public class BootstrapDropdown : Component
         }
     }
 
-    private void ApplyPresentation(BootstrapButton target, bool refreshImages)
+    private void ApplyPresentation(Control presentationSource, IIconRenderer iconRenderer, bool refreshImages)
     {
-        var dpi = GetTargetDpi(target);
+        var dpi = GetPresentationDpi(presentationSource);
         var theme = BootstrapThemeManager.CurrentTheme;
         var metrics = BootstrapDropdownRenderer.ResolveMetrics(theme.Metrics, dpi);
 
         _renderer.Variant = _variant;
-        _dropDown.Font = target.Font;
+        _dropDown.Font = presentationSource.Font;
         _dropDown.BackColor = theme.Colors.Surface;
         _dropDown.ForeColor = theme.Colors.Text;
         _dropDown.MinimumSize = new Size(ResolveMinimumWidth(_minimumWidth, dpi), 0);
-        ApplyPresentationToLevel(_dropDown, target.Font, theme, metrics, applyFont: true);
+        ApplyPresentationToLevel(_dropDown, presentationSource.Font, theme, metrics, applyFont: true);
 
         if (refreshImages)
         {
-            RefreshOwnedImages(target, dpi, theme, metrics.ImageSize);
+            RefreshOwnedImages(iconRenderer, dpi, theme, metrics.ImageSize);
         }
     }
 
@@ -681,7 +719,7 @@ public class BootstrapDropdown : Component
         }
     }
 
-    private void RefreshOwnedImages(BootstrapButton target, int dpi, BootstrapTheme theme, int imageSize)
+    private void RefreshOwnedImages(IIconRenderer iconRenderer, int dpi, BootstrapTheme theme, int imageSize)
     {
         ReleaseOwnedImages();
 
@@ -693,7 +731,7 @@ public class BootstrapDropdown : Component
             }
 
             var color = model.Enabled ? theme.Colors.Text : theme.Colors.MutedText;
-            var image = CreateMenuImage(target, model, dpi, imageSize, color);
+            var image = CreateMenuImage(iconRenderer, model, dpi, imageSize, color);
             if (image is null)
             {
                 continue;
@@ -704,7 +742,7 @@ public class BootstrapDropdown : Component
         }
     }
 
-    private Image? CreateMenuImage(BootstrapButton target, BootstrapDropdownItem model, int dpi, int imageSize, Color color)
+    private Image? CreateMenuImage(IIconRenderer iconRenderer, BootstrapDropdownItem model, int dpi, int imageSize, Color color)
     {
         if (model.Icon is null || imageSize <= 0)
         {
@@ -716,7 +754,7 @@ public class BootstrapDropdown : Component
         using (var graphics = Graphics.FromImage(bitmap))
         {
             graphics.Clear(Color.Transparent);
-            if (!target.IconRenderer.TryRender(
+            if (!iconRenderer.TryRender(
                     graphics,
                     model.Icon,
                     new Rectangle(0, 0, imageSize, imageSize),
@@ -784,9 +822,10 @@ public class BootstrapDropdown : Component
         if (_dropDown.Visible)
         {
             var presentationSource = _activePresentationSource ?? _target;
-            if (presentationSource is not null && !presentationSource.IsDisposed)
+            var iconRenderer = _activeIconRenderer ?? _target?.IconRenderer;
+            if (presentationSource is not null && !presentationSource.IsDisposed && iconRenderer is not null)
             {
-                ApplyPresentation(presentationSource, refreshImages: true);
+                ApplyPresentation(presentationSource, iconRenderer, refreshImages: true);
                 InvalidateNativeLevels(_dropDown);
             }
         }
@@ -804,9 +843,9 @@ public class BootstrapDropdown : Component
         }
     }
 
-    private static int GetTargetDpi(BootstrapButton target)
+    private static int GetPresentationDpi(Control presentationSource)
     {
-        return target.DeviceDpi > 0 ? target.DeviceDpi : DpiScaler.DefaultDpi;
+        return presentationSource.DeviceDpi > 0 ? presentationSource.DeviceDpi : DpiScaler.DefaultDpi;
     }
 
     private void ThrowIfDisposed()

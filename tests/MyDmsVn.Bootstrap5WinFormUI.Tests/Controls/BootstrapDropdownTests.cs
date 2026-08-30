@@ -907,6 +907,39 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void DropdownGenericInternalAnchorUsesPlainControlPresentationAndLeavesTargetUnchanged()
+    {
+        var presentationSource = new TextBox { Text = "Presentation", Size = new Size(180, 28) };
+        var anchor = new Panel { Size = new Size(240, 48) };
+        using var form = new Form { StartPosition = FormStartPosition.Manual, Location = new Point(200, 200), Size = new Size(500, 300) };
+        form.Controls.Add(presentationSource);
+        form.Controls.Add(anchor);
+        form.Show();
+        Application.DoEvents();
+        using var dropdown = new BootstrapDropdown();
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => new TextBox { Text = "Hosted" }
+        });
+        var opened = 0;
+        var closed = 0;
+        dropdown.Opened += (_, _) => opened++;
+        dropdown.Closed += (_, _) => closed++;
+
+        InvokeShowFrom(dropdown, presentationSource, BootstrapIconRenderer.CreateDefault(), anchor, new Point(0, anchor.Height));
+        Application.DoEvents();
+        dropdown.Close();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(dropdown.Target, Is.Null);
+            Assert.That(opened, Is.EqualTo(1));
+            Assert.That(closed, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
     public void DropdownActivePresentationSourceDrivesLiveMinimumWidthAndThemeRefresh()
     {
         var presentationSource = new BootstrapButton { Text = "Presentation" };
@@ -1205,12 +1238,40 @@ public sealed class BootstrapDropdownTests
     {
         var method = typeof(BootstrapDropdown).GetMethod(
             "ShowFrom",
-            BindingFlags.Instance | BindingFlags.NonPublic);
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(BootstrapButton), typeof(Control), typeof(Point) },
+            null);
         Assert.That(method, Is.Not.Null, "BootstrapDropdown must expose the planned internal anchored-show path.");
 
         try
         {
             method!.Invoke(dropdown, new object[] { presentationSource, anchor, location });
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+        }
+    }
+
+    private static void InvokeShowFrom(
+        BootstrapDropdown dropdown,
+        Control presentationSource,
+        IIconRenderer iconRenderer,
+        Control anchor,
+        Point location)
+    {
+        var method = typeof(BootstrapDropdown).GetMethod(
+            "ShowFrom",
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(Control), typeof(IIconRenderer), typeof(Control), typeof(Point) },
+            null);
+        Assert.That(method, Is.Not.Null, "BootstrapDropdown must expose the generic internal anchored-show path.");
+
+        try
+        {
+            method!.Invoke(dropdown, new object[] { presentationSource, iconRenderer, anchor, location });
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
