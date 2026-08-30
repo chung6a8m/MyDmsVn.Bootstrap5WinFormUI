@@ -225,6 +225,12 @@ public class BootstrapCalendar : Control
             BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeManager.CurrentTheme.Metrics, dpi, _borderRadius));
     }
 
+    /// <inheritdoc />
+    protected override AccessibleObject CreateAccessibilityInstance()
+    {
+        return new BootstrapCalendarAccessibleObject(this);
+    }
+
     internal DateTime FocusedDate => _focusedDate;
 
     internal int LayoutBuildCount { get; private set; }
@@ -620,9 +626,16 @@ public class BootstrapCalendar : Control
     {
         var token = BootstrapThemeManager.CurrentTheme.Typography.Body;
         var next = new Font(token.FontFamilyName, token.SizeInPoints, token.Style);
-        var old = _themeFont; _themeFont = next; _settingThemeFont = true;
+        var previous = _themeFont;
+        _settingThemeFont = true;
         try { Font = next; } finally { _settingThemeFont = false; }
-        old?.Dispose();
+        if (previous is not null && ReferenceEquals(Font, previous))
+        {
+            next.Dispose();
+            return;
+        }
+        _themeFont = next;
+        previous?.Dispose();
     }
 
     private void DisposeThemeFont() { var font = _themeFont; _themeFont = null; font?.Dispose(); }
@@ -634,5 +647,161 @@ public class BootstrapCalendar : Control
         var minimum = new DateTime(minDate.Year, minDate.Month, 1);
         var maximum = new DateTime(maxDate.Year, maxDate.Month, 1);
         return month < minimum ? minimum : month > maximum ? maximum : month;
+    }
+
+    private bool CanShowPreviousMonth()
+    {
+        return _displayMonth > new DateTime(MinDate.Year, MinDate.Month, 1);
+    }
+
+    private bool CanShowNextMonth()
+    {
+        return _displayMonth < new DateTime(MaxDate.Year, MaxDate.Month, 1);
+    }
+
+    private sealed class BootstrapCalendarAccessibleObject : ControlAccessibleObject
+    {
+        private const int NavigationChildCount = 2;
+        private const int DayChildCount = 42;
+        private readonly BootstrapCalendar _owner;
+        private readonly BootstrapCalendarChildAccessibleObject[] _children;
+
+        internal BootstrapCalendarAccessibleObject(BootstrapCalendar owner)
+            : base(owner)
+        {
+            _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+            _children = new BootstrapCalendarChildAccessibleObject[NavigationChildCount + DayChildCount];
+            _children[0] = new BootstrapCalendarChildAccessibleObject(this, 0, true);
+            _children[1] = new BootstrapCalendarChildAccessibleObject(this, 1, true);
+            for (var index = 0; index < DayChildCount; index++)
+                _children[index + NavigationChildCount] = new BootstrapCalendarChildAccessibleObject(this, index + NavigationChildCount, false);
+        }
+
+        public override int GetChildCount() => _children.Length;
+
+        public override AccessibleObject? GetChild(int index)
+        {
+            return index >= 0 && index < _children.Length ? _children[index] : null;
+        }
+
+        public override AccessibleObject? HitTest(int x, int y)
+        {
+            var localPoint = _owner.PointToClient(new Point(x, y));
+            var layout = _owner.GetLayout();
+            if (layout.PreviousButtonBounds.Contains(localPoint)) return _children[0];
+            if (layout.NextButtonBounds.Contains(localPoint)) return _children[1];
+            var dayIndex = BootstrapCalendarRenderLogic.HitTestDay(localPoint, layout);
+            return dayIndex >= 0 ? _children[dayIndex + NavigationChildCount] : base.HitTest(x, y);
+        }
+
+        internal BootstrapCalendar Calendar => _owner;
+
+        internal AccessibleObject? GetSibling(int index, AccessibleNavigation direction)
+        {
+            switch (direction)
+            {
+                case AccessibleNavigation.Previous:
+                    return index > 0 ? _children[index - 1] : null;
+                case AccessibleNavigation.Next:
+                    return index < _children.Length - 1 ? _children[index + 1] : null;
+                default:
+                    return null;
+            }
+        }
+    }
+
+    private sealed class BootstrapCalendarChildAccessibleObject : AccessibleObject
+    {
+        private readonly BootstrapCalendarAccessibleObject _parent;
+        private readonly int _index;
+        private readonly bool _isNavigation;
+
+        internal BootstrapCalendarChildAccessibleObject(BootstrapCalendarAccessibleObject parent, int index, bool isNavigation)
+        {
+            _parent = parent ?? throw new ArgumentNullException(nameof(parent));
+            _index = index;
+            _isNavigation = isNavigation;
+        }
+
+        private BootstrapCalendar Owner => _parent.Calendar;
+
+        private bool IsPreviousNavigation => _isNavigation && _index == 0;
+
+        private BootstrapCalendarDayCell DayCell => Owner.GetLayout().DayCells[_index - 2];
+
+        public override AccessibleObject? Parent => _parent;
+
+        public override AccessibleRole Role => _isNavigation ? AccessibleRole.PushButton : AccessibleRole.Cell;
+
+        public override string? Name
+        {
+            get
+            {
+                if (!_isNavigation) return DayCell.Date.ToString("D", CultureInfo.CurrentCulture);
+                var target = BootstrapCalendarRenderLogic.MoveByMonth(Owner.DisplayMonth, IsPreviousNavigation ? -1 : 1);
+                var action = IsPreviousNavigation ? "Previous month" : "Next month";
+                return action + ", " + target.ToString("Y", CultureInfo.CurrentCulture);
+            }
+            set { }
+        }
+
+        public override string? DefaultAction => _isNavigation
+            ? (IsPreviousNavigation ? "Show previous month" : "Show next month")
+            : "Select";
+
+        public override Rectangle Bounds
+        {
+            get
+            {
+                var localBounds = _isNavigation
+                    ? (IsPreviousNavigation ? Owner.GetLayout().PreviousButtonBounds : Owner.GetLayout().NextButtonBounds)
+                    : DayCell.Bounds;
+                return Owner.RectangleToScreen(localBounds);
+            }
+        }
+
+        public override AccessibleStates State
+        {
+            get
+            {
+                var state = AccessibleStates.Focusable;
+                if (_isNavigation)
+                {
+                    if (!Owner.Enabled || (IsPreviousNavigation ? !Owner.CanShowPreviousMonth() : !Owner.CanShowNextMonth()))
+                        state |= AccessibleStates.Unavailable;
+                    return state;
+                }
+
+                var cell = DayCell;
+                if (!Owner.Enabled || !cell.IsEnabled) state |= AccessibleStates.Unavailable;
+                var renderState = ClassifyDay(cell.Date, cell.IsCurrentMonth, cell.IsEnabled && Owner.Enabled, cell.IsToday,
+                    Owner.SelectionMode, Owner.SelectedDate, Owner.RangeStart, Owner.RangeEnd, Owner.SelectedDates, null);
+                if ((renderState & (BootstrapCalendarDayRenderState.Selected | BootstrapCalendarDayRenderState.RangeInterior)) != 0)
+                    state |= AccessibleStates.Selected;
+                if (Owner.Focused && cell.Date == Owner._focusedDate) state |= AccessibleStates.Focused;
+                return state;
+            }
+        }
+
+        public override void DoDefaultAction()
+        {
+            if (!Owner.Enabled) return;
+            if (_isNavigation)
+            {
+                if (IsPreviousNavigation) Owner.ShowPreviousMonth();
+                else Owner.ShowNextMonth();
+                return;
+            }
+
+            var cell = DayCell;
+            if (!cell.IsEnabled) return;
+            Owner.ActivateDate(cell.Date);
+            if (!cell.IsCurrentMonth) Owner.DisplayMonth = cell.Date;
+        }
+
+        public override AccessibleObject? Navigate(AccessibleNavigation navdir)
+        {
+            return _parent.GetSibling(_index, navdir);
+        }
     }
 }

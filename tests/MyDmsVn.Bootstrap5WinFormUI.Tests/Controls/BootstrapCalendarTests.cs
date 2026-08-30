@@ -647,6 +647,255 @@ public sealed class BootstrapCalendarTests
         Assert.That(changes, Is.Zero);
     }
 
+    [Test]
+    public void ThemeChangesPreserveLogicalStateAndReplaceOnlyTheThemeOwnedFont()
+    {
+        using var calendar = new BootstrapCalendar
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31),
+            DisplayMonth = new DateTime(2026, 8, 1)
+        };
+        calendar.SelectedDate = new DateTime(2026, 8, 12);
+        var ownedFont = calendar.Font;
+        var initialFocusedDate = calendar.FocusedDate;
+
+        var darkBase = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        var dark = new BootstrapTheme(
+            BootstrapThemeMode.Dark,
+            darkBase.Colors,
+            darkBase.Metrics,
+            new BootstrapThemeTypography(
+                new BootstrapFontToken("Segoe UI", 11f, FontStyle.Bold),
+                darkBase.Typography.BodySmall,
+                darkBase.Typography.Label,
+                darkBase.Typography.HeadingSmall,
+                darkBase.Typography.HeadingMedium));
+        BootstrapThemeManager.CurrentTheme = dark;
+        var darkFont = calendar.Font;
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 8, 12)));
+            Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 8, 1)));
+            Assert.That(calendar.FocusedDate, Is.EqualTo(initialFocusedDate));
+            Assert.That(darkFont, Is.Not.SameAs(ownedFont));
+            Assert.That(calendar.Font, Is.Not.SameAs(darkFont));
+        }));
+
+        using var bitmap = new Bitmap(24, 24);
+        using var graphics = Graphics.FromImage(bitmap);
+        Assert.Catch((Action)(() => graphics.MeasureString("x", ownedFont)));
+        Assert.Catch((Action)(() => graphics.MeasureString("x", darkFont)));
+    }
+
+    [Test]
+    public void CallerFontAndThemeSubscriptionHaveDeterministicOwnershipAcrossDisposal()
+    {
+        var baselineSubscriptions = GetThemeSubscriptionCount();
+        using var callerFont = new Font("Segoe UI", 10f, FontStyle.Italic);
+        var calendar = new BootstrapCalendar { Font = callerFont };
+        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions + 1));
+
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        Assert.That(calendar.Font, Is.SameAs(callerFont));
+        calendar.Dispose();
+        calendar.Dispose();
+
+        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions));
+        using var bitmap = new Bitmap(24, 24);
+        using var graphics = Graphics.FromImage(bitmap);
+        Assert.DoesNotThrow((Action)(() => graphics.MeasureString("x", callerFont)));
+    }
+
+    [Test]
+    public void SizeFontAndDpiLifecycleRebuildCachesWithoutChangingLogicalState()
+    {
+        using var calendar = new CalendarLifecycleProbe
+        {
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31),
+            DisplayMonth = new DateTime(2026, 8, 1),
+            Size = new Size(300, 280)
+        };
+        calendar.SelectedDate = new DateTime(2026, 8, 12);
+        var focusedDate = calendar.FocusedDate;
+        var preferredSize = calendar.GetPreferredSize(Size.Empty);
+        calendar.ResolveLayout(DpiScaler.DefaultDpi);
+        var builds = calendar.LayoutBuildCount;
+
+        calendar.Size = new Size(320, 300);
+        calendar.ResolveLayout(DpiScaler.DefaultDpi);
+        using var callerFont = new Font(calendar.Font, FontStyle.Bold);
+        calendar.Font = callerFont;
+        calendar.ResolveLayout(DpiScaler.DefaultDpi);
+        calendar.RaiseDpiChangedAfterParent();
+        calendar.ResolveLayout(DpiScaler.DefaultDpi);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(calendar.LayoutBuildCount, Is.GreaterThan(builds));
+            Assert.That(calendar.GetPreferredSize(Size.Empty), Is.EqualTo(preferredSize));
+            Assert.That(calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 8, 12)));
+            Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 8, 1)));
+            Assert.That(calendar.FocusedDate, Is.EqualTo(focusedDate));
+        }));
+    }
+
+    [Test]
+    public void AccessibilityMetadataExposesFortyFourLogicalChildrenWithoutWinFormsChildren()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 8, 5),
+            MaxDate = new DateTime(2026, 8, 25),
+            DisplayMonth = new DateTime(2026, 8, 1),
+            Size = new Size(300, 280)
+        };
+        calendar.SelectedDate = new DateTime(2026, 8, 12);
+        calendar.ClearSelection();
+        calendar.MouseDownDate(new DateTime(2026, 8, 12));
+        var accessible = calendar.Accessible;
+        var selected = accessible.GetChild(2 + calendar.ResolveLayout(calendar.DeviceDpi).DayCells.ToList().FindIndex(cell => cell.Date == new DateTime(2026, 8, 12)));
+        var unavailable = accessible.GetChild(2);
+        var oldBounds = selected!.Bounds;
+
+        calendar.Size = new Size(340, 310);
+        var resizedBounds = selected.Bounds;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(calendar.Controls, Is.Empty);
+            Assert.That(accessible.GetChildCount(), Is.EqualTo(44));
+            Assert.That(accessible.GetChild(0)!.Role, Is.EqualTo(AccessibleRole.PushButton));
+            Assert.That(accessible.GetChild(1)!.Role, Is.EqualTo(AccessibleRole.PushButton));
+            Assert.That(selected.Role, Is.EqualTo(AccessibleRole.Cell));
+            Assert.That(selected.Name, Is.EqualTo(new DateTime(2026, 8, 12).ToString("D", System.Globalization.CultureInfo.CurrentCulture)));
+            Assert.That(selected.State & AccessibleStates.Selected, Is.EqualTo(AccessibleStates.Selected));
+            Assert.That(unavailable!.State & AccessibleStates.Unavailable, Is.EqualTo(AccessibleStates.Unavailable));
+            Assert.That(resizedBounds, Is.Not.EqualTo(oldBounds));
+        }));
+    }
+
+    [Test]
+    public void AccessibilityActionsHitTestingAndSiblingNavigationUseTheExistingInteractionPaths()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 8, 5),
+            MaxDate = new DateTime(2026, 9, 25),
+            DisplayMonth = new DateTime(2026, 8, 1),
+            Size = new Size(300, 280)
+        };
+        var accessible = calendar.Accessible;
+        var layout = calendar.ResolveLayout(calendar.DeviceDpi);
+        var enabledIndex = layout.DayCells.ToList().FindIndex(cell => cell.Date == new DateTime(2026, 8, 12));
+        var disabledIndex = layout.DayCells.ToList().FindIndex(cell => cell.Date == new DateTime(2026, 8, 1));
+        var enabledDay = accessible.GetChild(enabledIndex + 2)!;
+        var disabledDay = accessible.GetChild(disabledIndex + 2)!;
+        var activations = new List<BootstrapCalendarSelectionActivatedEventArgs>();
+        var changes = 0;
+        calendar.SelectionChanged += (_, _) => changes++;
+        calendar.SelectionActivated += (_, e) => activations.Add(e);
+
+        enabledDay.DoDefaultAction();
+        enabledDay.DoDefaultAction();
+        disabledDay.DoDefaultAction();
+        accessible.GetChild(1)!.DoDefaultAction();
+        var afterNext = calendar.DisplayMonth;
+        accessible.GetChild(0)!.DoDefaultAction();
+        var navCell = layout.DayCells[enabledIndex].Bounds;
+        var navPoint = calendar.PointToScreen(new Point(navCell.Left + navCell.Width / 2, navCell.Top + navCell.Height / 2));
+        var childPoint = calendar.PointToScreen(new Point(layout.NextButtonBounds.Left + layout.NextButtonBounds.Width / 2, layout.NextButtonBounds.Top + layout.NextButtonBounds.Height / 2));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 8, 12)));
+            Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 8, 12)));
+            Assert.That(changes, Is.EqualTo(1));
+            Assert.That(activations.Select(item => (item.Date, item.Changed, item.Completed)).ToArray(), Is.EqualTo(new[]
+            {
+                (new DateTime(2026, 8, 12), true, true),
+                (new DateTime(2026, 8, 12), false, true)
+            }));
+            Assert.That(afterNext, Is.EqualTo(new DateTime(2026, 9, 1)));
+            Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 8, 1)));
+            Assert.That(accessible.HitTest(navPoint.X, navPoint.Y), Is.SameAs(enabledDay));
+            Assert.That(accessible.HitTest(childPoint.X, childPoint.Y), Is.SameAs(accessible.GetChild(1)));
+            Assert.That(accessible.GetChild(0)!.Navigate(AccessibleNavigation.Previous), Is.Null);
+            Assert.That(accessible.GetChild(0)!.Navigate(AccessibleNavigation.Next), Is.SameAs(accessible.GetChild(1)));
+            Assert.That(enabledDay.Navigate(AccessibleNavigation.Previous), Is.SameAs(accessible.GetChild(enabledIndex + 1)));
+            Assert.That(enabledDay.Navigate(AccessibleNavigation.Next), Is.SameAs(accessible.GetChild(enabledIndex + 3)));
+            Assert.That(accessible.GetChild(43)!.Navigate(AccessibleNavigation.Next), Is.Null);
+            Assert.That(calendar.Controls, Is.Empty);
+        }));
+    }
+
+    [Test]
+    public void AccessibilitySelectedStateRepresentsRangeEndpointsInteriorAndMultipleDates()
+    {
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 8, 1),
+            MaxDate = new DateTime(2026, 8, 31),
+            DisplayMonth = new DateTime(2026, 8, 1),
+            Size = new Size(300, 280),
+            SelectionMode = BootstrapCalendarSelectionMode.Range
+        };
+        calendar.SetRange(new DateTime(2026, 8, 10), new DateTime(2026, 8, 12));
+        var accessible = calendar.Accessible;
+        var layout = calendar.ResolveLayout(calendar.DeviceDpi);
+        var rangeIndices = new[] { new DateTime(2026, 8, 10), new DateTime(2026, 8, 11), new DateTime(2026, 8, 12) }
+            .Select(date => layout.DayCells.ToList().FindIndex(cell => cell.Date == date) + 2)
+            .ToArray();
+
+        Assert.That(rangeIndices.Select(index => accessible.GetChild(index)!.State & AccessibleStates.Selected),
+            Is.EqualTo(new[] { AccessibleStates.Selected, AccessibleStates.Selected, AccessibleStates.Selected }));
+
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+        calendar.SetSelectedDates(new[] { new DateTime(2026, 8, 10), new DateTime(2026, 8, 12) });
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(accessible.GetChild(rangeIndices[0])!.State & AccessibleStates.Selected, Is.EqualTo(AccessibleStates.Selected));
+            Assert.That(accessible.GetChild(rangeIndices[1])!.State & AccessibleStates.Selected, Is.EqualTo(AccessibleStates.None));
+            Assert.That(accessible.GetChild(rangeIndices[2])!.State & AccessibleStates.Selected, Is.EqualTo(AccessibleStates.Selected));
+        }));
+    }
+
+    [Test]
+    public void AccessibilityFocusedStateTracksCalendarKeyboardFocusAndNavigationAtBoundsIsUnavailable()
+    {
+        using var form = new Form { Size = new Size(420, 360) };
+        using var calendar = new CalendarInteractionProbe
+        {
+            MinDate = new DateTime(2026, 8, 5),
+            MaxDate = new DateTime(2026, 8, 25),
+            DisplayMonth = new DateTime(2026, 8, 1),
+            Size = new Size(300, 280)
+        };
+        form.Controls.Add(calendar);
+        form.Show();
+        calendar.Focus();
+        var accessible = calendar.Accessible;
+        var focusedIndex = calendar.ResolveLayout(calendar.DeviceDpi).DayCells.ToList()
+            .FindIndex(cell => cell.Date == calendar.FocusedDate);
+
+        accessible.GetChild(0)!.DoDefaultAction();
+        accessible.GetChild(1)!.DoDefaultAction();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(calendar.Focused, Is.True);
+            Assert.That(accessible.GetChild(focusedIndex + 2)!.State & AccessibleStates.Focused, Is.EqualTo(AccessibleStates.Focused));
+            Assert.That(accessible.GetChild(0)!.State & AccessibleStates.Unavailable, Is.EqualTo(AccessibleStates.Unavailable));
+            Assert.That(accessible.GetChild(1)!.State & AccessibleStates.Unavailable, Is.EqualTo(AccessibleStates.Unavailable));
+            Assert.That(calendar.DisplayMonth, Is.EqualTo(new DateTime(2026, 8, 1)));
+            Assert.That(calendar.Controls, Is.Empty);
+        }));
+    }
+
     private static DateTime ClampMonth(DateTime date, DateTime minDate, DateTime maxDate)
     {
         var month = new DateTime(date.Year, date.Month, 1);
@@ -657,6 +906,8 @@ public sealed class BootstrapCalendarTests
 
     private sealed class CalendarInteractionProbe : BootstrapCalendar
     {
+        public AccessibleObject Accessible => AccessibilityObject;
+
         public void MouseDownDate(DateTime date, MouseButtons button = MouseButtons.Left)
         {
             var cell = ResolveLayout(DeviceDpi).DayCells.Single(day => day.Date == date.Date);
@@ -691,6 +942,19 @@ public sealed class BootstrapCalendarTests
         public void SendKey(Keys key) => OnKeyDown(new KeyEventArgs(key));
 
         public bool IsInput(Keys key) => IsInputKey(key);
+    }
+
+    private sealed class CalendarLifecycleProbe : BootstrapCalendar
+    {
+        public void RaiseDpiChangedAfterParent() => OnDpiChangedAfterParent(EventArgs.Empty);
+    }
+
+    private static int GetThemeSubscriptionCount()
+    {
+        var eventField = typeof(BootstrapThemeManager).GetField("ThemeChanged", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(eventField, Is.Not.Null);
+        var handler = eventField!.GetValue(null) as Delegate;
+        return handler?.GetInvocationList().Length ?? 0;
     }
 
     private static object? GetPrivateField(object instance, string name) => instance.GetType().BaseType!
