@@ -967,6 +967,18 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void DropdownGenericSourceRejectsNullAndDisposedAnchorsAndNoOpsWhenDisabledOrEmpty()
+    {
+        using var source = new TextBox(); using var anchor = new Panel(); using var dropdown = new BootstrapDropdown();
+        var renderer = BootstrapIconRenderer.CreateDefault();
+        Assert.Throws<ArgumentNullException>((Action)(() => InvokeShowFrom(dropdown, null!, renderer, anchor, Point.Empty)));
+        Assert.Throws<ArgumentNullException>((Action)(() => InvokeShowFrom(dropdown, source, renderer, null!, Point.Empty)));
+        anchor.Dispose(); Assert.Throws<ObjectDisposedException>((Action)(() => InvokeShowFrom(dropdown, source, renderer, anchor, Point.Empty)));
+        using var usableAnchor = new Panel(); source.Enabled = false; InvokeShowFrom(dropdown, source, renderer, usableAnchor, Point.Empty);
+        Assert.Multiple((Action)(() => { Assert.That(GetNativeDropDown(dropdown).Visible, Is.False); Assert.That(dropdown.Target, Is.Null); }));
+    }
+
+    [Test]
     public void DropdownActivePresentationSourceDrivesLiveMinimumWidthAndThemeRefresh()
     {
         var presentationSource = new BootstrapButton { Text = "Presentation" };

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
@@ -123,6 +124,31 @@ public sealed class BootstrapCalendarPickerTests
     }
 
     [Test]
+    public void PickerDeclaredEventsMethodsMetadataAndEmptyDefaultsAreExact()
+    {
+        using var picker = new BootstrapCalendarPicker();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(typeof(BootstrapCalendarPicker).GetCustomAttribute<DefaultEventAttribute>()!.Name, Is.EqualTo("SelectionChanged"));
+            Assert.That(typeof(BootstrapCalendarPicker).GetEvents(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Select(e => e.Name), Is.EquivalentTo(new[] { "SelectionChanged", "Opened", "Closed" }));
+            Assert.That(typeof(BootstrapCalendarPicker).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Where(m => !m.IsSpecialName).Select(m => m.Name), Is.EquivalentTo(new[] { "SetRange", "SetSelectedDates", "ClearSelection", "ShowDropDown", "CloseDropDown" }));
+            Assert.That(picker.MinDate, Is.EqualTo(BootstrapCalendarSelectionModel.MinimumSupportedDate));
+            Assert.That(picker.MaxDate, Is.EqualTo(BootstrapCalendarSelectionModel.MaximumSupportedDate));
+            Assert.That(picker.RangeStart, Is.Null); Assert.That(picker.RangeEnd, Is.Null); Assert.That(picker.SelectedDates, Is.Empty); Assert.That(picker.Controls, Is.Empty);
+        }));
+    }
+
+    [Test]
+    public void PickerWrongModeAndInvalidDomainLeaveModelAndEventsUnchanged()
+    {
+        using var picker = new BootstrapCalendarPicker();
+        picker.SelectedDate = new DateTime(2026, 8, 30); var events = 0; picker.SelectionChanged += (_, _) => events++;
+        Assert.Throws<InvalidOperationException>((Action)(() => picker.SetSelectedDates(new[] { DateTime.Today })));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => picker.SelectedDate = picker.MaxDate.AddDays(1)));
+        Assert.Multiple((Action)(() => { Assert.That(picker.SelectedDate, Is.EqualTo(new DateTime(2026, 8, 30))); Assert.That(events, Is.Zero); }));
+    }
+
+    [Test]
     public void PickerSynchronizesProgrammaticSelectionAndBoundsWhileOpenWithoutClosing()
     {
         using var form = CreatePickerHost(out var picker);
@@ -183,6 +209,41 @@ public sealed class BootstrapCalendarPickerTests
             Assert.That(GetActiveCalendar(picker), Is.Null);
             Assert.That(picker.AccessibilityObject.State & AccessibleStates.Unavailable, Is.Not.EqualTo(0));
         }));
+    }
+
+    [Test]
+    public void PickerNullPlaceholderAndFixedCultureSummariesRemainDeterministic()
+    {
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+            using var picker = new BootstrapCalendarPicker { DateFormat = "yyyy-MM-dd", PlaceholderText = null! };
+            Assert.That(picker.AccessibilityObject.Value, Is.Empty);
+            picker.SelectedDate = new DateTime(2026, 8, 30); Assert.That(picker.AccessibilityObject.Value, Is.EqualTo("2026-08-30"));
+            picker.SelectionMode = BootstrapCalendarSelectionMode.Multiple; picker.SetSelectedDates(new[] { new DateTime(2026, 8, 30) }); Assert.That(picker.AccessibilityObject.Value, Is.EqualTo("2026-08-30"));
+        }
+        finally { CultureInfo.CurrentCulture = original; }
+    }
+
+    [Test]
+    public void PickerHostedCalendarIsFreshAndUsesSelectedSeedThenRetainedMonth()
+    {
+        using var form = CreatePickerHost(out var picker);
+        picker.SelectedDate = new DateTime(2026, 8, 30); picker.ShowDropDown(); Application.DoEvents(); var first = GetActiveCalendar(picker)!;
+        Assert.That(first.DisplayMonth, Is.EqualTo(new DateTime(2026, 8, 1)));
+        first.DisplayMonth = new DateTime(2026, 9, 1); picker.CloseDropDown(); Application.DoEvents(); picker.ShowDropDown(); Application.DoEvents();
+        Assert.Multiple((Action)(() => { Assert.That(GetActiveCalendar(picker), Is.Not.SameAs(first)); Assert.That(GetActiveCalendar(picker)!.DisplayMonth, Is.EqualTo(new DateTime(2026, 9, 1))); }));
+    }
+
+    [Test]
+    public void PickerFactoryFailureClearsActiveReferenceAndLeavesPopupClosed()
+    {
+        using var form = CreatePickerHost(out var picker);
+        var dropdown = GetPickerDropDown(picker);
+        dropdown.Items[0].HostedControlFactory = () => throw new InvalidOperationException("factory");
+        Assert.Throws<InvalidOperationException>((Action)(() => picker.ShowDropDown()));
+        Assert.That(GetActiveCalendar(picker), Is.Null);
     }
 
     [Test]
