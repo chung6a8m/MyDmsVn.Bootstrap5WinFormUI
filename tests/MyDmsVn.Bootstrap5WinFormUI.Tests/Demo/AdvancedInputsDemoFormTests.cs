@@ -157,6 +157,41 @@ public sealed class AdvancedInputsDemoFormTests
         }));
     }
 
+    [Test]
+    public void AdvancedInputsDemoUpdatesCalendarSelectionFeedbackForPublicSelectionChanges()
+    {
+        using var form = new AdvancedInputsDemoForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var calendar = FindControls<BootstrapCalendar>(form)
+            .Single(control => control.SelectionMode == BootstrapCalendarSelectionMode.Range);
+        var singlePicker = FindControls<BootstrapCalendarPicker>(form)
+            .Single(control => control.SelectionMode == BootstrapCalendarSelectionMode.Single);
+        var rangePicker = FindControls<BootstrapCalendarPicker>(form)
+            .Single(control => control.SelectionMode == BootstrapCalendarSelectionMode.Range);
+
+        calendar.SetRange(new DateTime(2026, 9, 2), new DateTime(2026, 9, 6));
+        singlePicker.SelectedDate = new DateTime(2026, 9, 12);
+        rangePicker.SetRange(new DateTime(2026, 9, 10), new DateTime(2026, 9, 18));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(GetScenarioStatus(form, "Custom Calendar — Range").Text,
+                Is.EqualTo("SelectionChanged: 2026-09-02 — 2026-09-06"));
+            Assert.That(GetScenarioStatus(form, "Calendar Picker — Single").Text,
+                Is.EqualTo("SelectionChanged: 2026-09-12"));
+            Assert.That(GetScenarioStatus(form, "Calendar Picker — Range").Text,
+                Is.EqualTo("SelectionChanged: 2026-09-10 — 2026-09-18"));
+        }));
+    }
+
+    private static Label GetScenarioStatus(Control root, string caption)
+    {
+        var captionLabel = FindControls<Label>(root).Single(label => label.Text == caption);
+        return captionLabel.Parent!.Controls.OfType<Label>().Single(label => !ReferenceEquals(label, captionLabel));
+    }
+
     private static IEnumerable<T> FindControls<T>(Control root)
         where T : Control
     {
