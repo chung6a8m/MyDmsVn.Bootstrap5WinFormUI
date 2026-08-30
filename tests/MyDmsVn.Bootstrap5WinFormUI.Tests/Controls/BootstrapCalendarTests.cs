@@ -47,6 +47,14 @@ public sealed class BootstrapCalendarTests
             Assert.That(declared, Is.EqualTo(new[] { "BorderRadius", "ClearSelection", "DisplayMonth", "DisplayMonthChanged", "GetPreferredSize", "MaxDate", "MinDate", "RangeEnd", "RangeStart", "SelectedDate", "SelectedDates", "SelectionChanged", "SelectionMode", "SetRange", "SetSelectedDates", "ShowNextMonth", "ShowPreviousMonth" }));
         }));
         Assert.That(TypeDescriptor.GetProperties(calendar)[nameof(BootstrapCalendar.SelectedDates)]!.IsBrowsable, Is.False);
+        Assert.That(TypeDescriptor.GetProperties(calendar)[nameof(BootstrapCalendar.RangeStart)]!.IsBrowsable, Is.True);
+        Assert.That(TypeDescriptor.GetProperties(calendar)[nameof(BootstrapCalendar.RangeEnd)]!.IsBrowsable, Is.True);
+        Assert.That(GetDefaultValue(nameof(BootstrapCalendar.SelectionMode)), Is.EqualTo(BootstrapCalendarSelectionMode.Single));
+        Assert.That(GetDefaultValue(nameof(BootstrapCalendar.SelectedDate)), Is.Null);
+        Assert.That(GetDefaultValue(nameof(BootstrapCalendar.BorderRadius)), Is.EqualTo(-1));
+        Assert.That(typeof(BootstrapCalendar).GetProperty(nameof(BootstrapCalendar.RangeStart))!.GetCustomAttributes(typeof(BrowsableAttribute), false), Is.Empty);
+        Assert.That(typeof(BootstrapCalendar).GetProperty(nameof(BootstrapCalendar.RangeEnd))!.GetCustomAttributes(typeof(BrowsableAttribute), false), Is.Empty);
+        AssertExactPublicContract();
     }
 
     [Test]
@@ -130,6 +138,32 @@ public sealed class BootstrapCalendarTests
     }
 
     [Test]
+    public void UnchangedNonEmptyProgrammaticSelectionsReanchorFocusWithoutRaisingSelectionChanged()
+    {
+        using var calendar = new BootstrapCalendar { MinDate = new DateTime(2026, 1, 1), MaxDate = new DateTime(2026, 12, 31) };
+        var changes = 0;
+        calendar.SelectionChanged += (_, _) => changes++;
+
+        calendar.SelectedDate = new DateTime(2026, 1, 10);
+        calendar.DisplayMonth = new DateTime(2026, 5, 1);
+        calendar.SelectedDate = new DateTime(2026, 1, 10, 18, 0, 0);
+        Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 1, 10)));
+
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Range;
+        calendar.SetRange(new DateTime(2026, 2, 2), new DateTime(2026, 2, 8));
+        calendar.DisplayMonth = new DateTime(2026, 6, 1);
+        calendar.SetRange(new DateTime(2026, 2, 2), new DateTime(2026, 2, 8));
+        Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 2, 8)));
+
+        calendar.SelectionMode = BootstrapCalendarSelectionMode.Multiple;
+        calendar.SetSelectedDates(new[] { new DateTime(2026, 3, 7), new DateTime(2026, 3, 4) });
+        calendar.DisplayMonth = new DateTime(2026, 7, 1);
+        calendar.SetSelectedDates(new[] { new DateTime(2026, 3, 4), new DateTime(2026, 3, 7) });
+        Assert.That(calendar.FocusedDate, Is.EqualTo(new DateTime(2026, 3, 4)));
+        Assert.That(changes, Is.EqualTo(5));
+    }
+
+    [Test]
     public void LayoutCacheReusesGeometryUntilAKeyChanges()
     {
         using var calendar = new BootstrapCalendar { DisplayMonth = new DateTime(2026, 8, 1) };
@@ -138,9 +172,65 @@ public sealed class BootstrapCalendarTests
         var first = calendar.LayoutBuildCount;
         calendar.DrawToBitmap(bitmap, calendar.ClientRectangle);
         Assert.That(calendar.LayoutBuildCount, Is.EqualTo(first));
+        calendar.MinDate = calendar.MinDate.AddHours(12);
+        calendar.MaxDate = calendar.MaxDate.AddHours(12);
+        calendar.DrawToBitmap(bitmap, calendar.ClientRectangle);
+        Assert.That(calendar.LayoutBuildCount, Is.EqualTo(first));
         calendar.BorderRadius = 12;
         calendar.DrawToBitmap(bitmap, calendar.ClientRectangle);
         Assert.That(calendar.LayoutBuildCount, Is.EqualTo(first + 1));
+    }
+
+    [Test]
+    public void LayoutCacheCoversEveryRequiredGeometryKeyIncludingDpiAndThemeMetrics()
+    {
+        var originalCulture = System.Globalization.CultureInfo.CurrentCulture;
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            using var calendar = new BootstrapCalendar { DisplayMonth = new DateTime(2026, 8, 1) };
+            calendar.ResolveLayout(96);
+            var builds = calendar.LayoutBuildCount;
+            calendar.ResolveLayout(96);
+            Assert.That(calendar.LayoutBuildCount, Is.EqualTo(builds));
+
+            calendar.ResolveLayout(192); Assert.That(calendar.LayoutBuildCount, Is.EqualTo(++builds), "DPI");
+            calendar.Size = new Size(calendar.Width + 1, calendar.Height); calendar.ResolveLayout(192); Assert.That(calendar.LayoutBuildCount, Is.EqualTo(++builds), "size");
+            calendar.DisplayMonth = new DateTime(2026, 9, 1); calendar.ResolveLayout(192); Assert.That(calendar.LayoutBuildCount, Is.EqualTo(++builds), "month");
+
+            var culture = (System.Globalization.CultureInfo)originalCulture.Clone();
+            culture.DateTimeFormat.FirstDayOfWeek = originalCulture.DateTimeFormat.FirstDayOfWeek == DayOfWeek.Sunday ? DayOfWeek.Monday : DayOfWeek.Sunday;
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+            calendar.ResolveLayout(192); Assert.That(calendar.LayoutBuildCount, Is.EqualTo(++builds), "culture first day");
+
+            calendar.MinDate = new DateTime(2026, 1, 2); calendar.ResolveLayout(192); Assert.That(calendar.LayoutBuildCount, Is.EqualTo(++builds), "bounds");
+            calendar.BorderRadius = 10; calendar.ResolveLayout(192); Assert.That(calendar.LayoutBuildCount, Is.EqualTo(++builds), "radius");
+            using var callerFont = new Font(calendar.Font.FontFamily, calendar.Font.Size + 1f);
+            calendar.Font = callerFont; calendar.ResolveLayout(192); Assert.That(calendar.LayoutBuildCount, Is.EqualTo(++builds), "font metrics");
+
+            var metrics = new BootstrapThemeMetrics(28, 34, 38, 4, 6, 8, 2, 3, 4, 8, 12, 16, 24);
+            BootstrapThemeManager.CurrentTheme = new BootstrapTheme(originalTheme.Mode, originalTheme.Colors, metrics, originalTheme.Typography);
+            calendar.ResolveLayout(192); Assert.That(calendar.LayoutBuildCount, Is.EqualTo(++builds), "theme metrics");
+            calendar.ResolveLayout(192); Assert.That(calendar.LayoutBuildCount, Is.EqualTo(builds), "unchanged key");
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = originalCulture;
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
+    }
+
+    [Test]
+    public void DayOutlinesUseDpiScaledTaskThreeBorderMetrics()
+    {
+        var outlines = BootstrapCalendar.ResolveDayOutlineMetrics(BootstrapThemeMetrics.Default, 192);
+        Assert.That(outlines.SelectionWidth, Is.EqualTo(2f));
+        Assert.That(outlines.FocusWidth, Is.EqualTo(4f));
+
+        var custom = new BootstrapThemeMetrics(28, 32, 38, 4, 6, 8, 3, 5, 4, 8, 12, 16, 24);
+        outlines = BootstrapCalendar.ResolveDayOutlineMetrics(custom, 144);
+        Assert.That(outlines.SelectionWidth, Is.EqualTo(4.5f));
+        Assert.That(outlines.FocusWidth, Is.EqualTo(7.5f));
     }
 
     [Test]
@@ -186,5 +276,66 @@ public sealed class BootstrapCalendarTests
         var minMonth = new DateTime(minDate.Year, minDate.Month, 1);
         var maxMonth = new DateTime(maxDate.Year, maxDate.Month, 1);
         return month < minMonth ? minMonth : month > maxMonth ? maxMonth : month;
+    }
+
+    private static object? GetDefaultValue(string propertyName)
+    {
+        return ((DefaultValueAttribute)typeof(BootstrapCalendar).GetProperty(propertyName)!
+            .GetCustomAttributes(typeof(DefaultValueAttribute), false).Single()).Value;
+    }
+
+    private static void AssertExactPublicContract()
+    {
+        var type = typeof(BootstrapCalendar);
+        var constructor = type.GetConstructor(Type.EmptyTypes);
+        Assert.That(constructor, Is.Not.Null);
+        Assert.That(type.GetConstructors(BindingFlags.Instance | BindingFlags.Public), Has.Length.EqualTo(1));
+
+        AssertProperty(type, nameof(BootstrapCalendar.SelectionMode), typeof(BootstrapCalendarSelectionMode), canWrite: true, typeof(DefaultValueAttribute));
+        AssertProperty(type, nameof(BootstrapCalendar.DisplayMonth), typeof(DateTime), canWrite: true);
+        AssertProperty(type, nameof(BootstrapCalendar.MinDate), typeof(DateTime), canWrite: true);
+        AssertProperty(type, nameof(BootstrapCalendar.MaxDate), typeof(DateTime), canWrite: true);
+        AssertProperty(type, nameof(BootstrapCalendar.SelectedDate), typeof(DateTime?), canWrite: true, typeof(DefaultValueAttribute));
+        AssertProperty(type, nameof(BootstrapCalendar.RangeStart), typeof(DateTime?), canWrite: false);
+        AssertProperty(type, nameof(BootstrapCalendar.RangeEnd), typeof(DateTime?), canWrite: false);
+        AssertProperty(type, nameof(BootstrapCalendar.SelectedDates), typeof(System.Collections.Generic.IReadOnlyList<DateTime>), canWrite: false, typeof(BrowsableAttribute));
+        AssertProperty(type, nameof(BootstrapCalendar.BorderRadius), typeof(int), canWrite: true, typeof(DefaultValueAttribute));
+
+        AssertEvent(type, nameof(BootstrapCalendar.SelectionChanged));
+        AssertEvent(type, nameof(BootstrapCalendar.DisplayMonthChanged));
+        AssertMethod(type, nameof(BootstrapCalendar.SetRange), typeof(void), typeof(DateTime?), typeof(DateTime?));
+        AssertMethod(type, nameof(BootstrapCalendar.SetSelectedDates), typeof(void), typeof(System.Collections.Generic.IEnumerable<DateTime>));
+        AssertMethod(type, nameof(BootstrapCalendar.ClearSelection), typeof(void));
+        AssertMethod(type, nameof(BootstrapCalendar.ShowPreviousMonth), typeof(void));
+        AssertMethod(type, nameof(BootstrapCalendar.ShowNextMonth), typeof(void));
+        AssertMethod(type, nameof(BootstrapCalendar.GetPreferredSize), typeof(Size), typeof(Size));
+    }
+
+    private static void AssertProperty(Type type, string name, Type propertyType, bool canWrite, params Type[] attributeTypes)
+    {
+        var property = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+        Assert.That(property, Is.Not.Null, name);
+        Assert.That(property!.PropertyType, Is.EqualTo(propertyType), name);
+        Assert.That(property.CanRead, Is.True, name);
+        Assert.That(property.CanWrite, Is.EqualTo(canWrite), name);
+        Assert.That(property.GetMethod!.IsPublic, Is.True, name);
+        if (canWrite) Assert.That(property.SetMethod!.IsPublic, Is.True, name);
+        foreach (var attributeType in attributeTypes) Assert.That(property.GetCustomAttributes(attributeType, false), Has.Length.EqualTo(1), name);
+    }
+
+    private static void AssertEvent(Type type, string name)
+    {
+        var eventInfo = type.GetEvent(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+        Assert.That(eventInfo, Is.Not.Null, name);
+        Assert.That(eventInfo!.EventHandlerType, Is.EqualTo(typeof(EventHandler)), name);
+        Assert.That(eventInfo.AddMethod!.IsPublic, Is.True, name);
+        Assert.That(eventInfo.RemoveMethod!.IsPublic, Is.True, name);
+    }
+
+    private static void AssertMethod(Type type, string name, Type returnType, params Type[] parameterTypes)
+    {
+        var method = type.GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly, null, parameterTypes, null);
+        Assert.That(method, Is.Not.Null, name);
+        Assert.That(method!.ReturnType, Is.EqualTo(returnType), name);
     }
 }

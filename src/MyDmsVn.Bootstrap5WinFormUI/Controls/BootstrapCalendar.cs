@@ -23,6 +23,19 @@ internal enum BootstrapCalendarDayRenderState
     Preview = 32
 }
 
+internal readonly struct BootstrapCalendarDayOutlineMetrics
+{
+    public BootstrapCalendarDayOutlineMetrics(float selectionWidth, float focusWidth)
+    {
+        SelectionWidth = selectionWidth;
+        FocusWidth = focusWidth;
+    }
+
+    public float SelectionWidth { get; }
+
+    public float FocusWidth { get; }
+}
+
 /// <summary>
 /// Provides a fully owner-drawn Bootstrap-inspired month calendar with single, range, and multiple-date state.
 /// </summary>
@@ -43,6 +56,7 @@ public class BootstrapCalendar : Control
     private DateTime _layoutMaxDate;
     private int _layoutRadius;
     private Font? _layoutFont;
+    private BootstrapThemeMetrics? _layoutThemeMetrics;
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
     private Font? _themeFont;
@@ -124,18 +138,16 @@ public class BootstrapCalendar : Control
         get => _selectionModel.SelectedDate;
         set
         {
-            if (!_selectionModel.SetSelectedDate(value)) return;
-            if (value.HasValue) _focusedDate = value.Value.Date;
-            OnSelectionChanged(EventArgs.Empty);
+            var changed = _selectionModel.SetSelectedDate(value);
+            if (_selectionModel.SelectedDate.HasValue) _focusedDate = _selectionModel.SelectedDate.Value;
+            if (changed) OnSelectionChanged(EventArgs.Empty);
         }
     }
 
     /// <summary>Gets the inclusive range start in range-selection mode.</summary>
-    [Browsable(false)]
     public DateTime? RangeStart => _selectionModel.RangeStart;
 
     /// <summary>Gets the inclusive range end in range-selection mode.</summary>
-    [Browsable(false)]
     public DateTime? RangeEnd => _selectionModel.RangeEnd;
 
     /// <summary>Gets the sorted immutable selected-date snapshot in multiple-selection mode.</summary>
@@ -166,18 +178,18 @@ public class BootstrapCalendar : Control
     /// <summary>Sets an incomplete or complete selection in range-selection mode.</summary>
     public void SetRange(DateTime? start, DateTime? end)
     {
-        if (!_selectionModel.SetRange(start, end)) return;
+        var changed = _selectionModel.SetRange(start, end);
         var anchor = _selectionModel.RangeEnd ?? _selectionModel.RangeStart;
         if (anchor.HasValue) _focusedDate = anchor.Value;
-        OnSelectionChanged(EventArgs.Empty);
+        if (changed) OnSelectionChanged(EventArgs.Empty);
     }
 
     /// <summary>Replaces the selected dates in multiple-selection mode.</summary>
     public void SetSelectedDates(IEnumerable<DateTime> dates)
     {
-        if (!_selectionModel.SetSelectedDates(dates)) return;
+        var changed = _selectionModel.SetSelectedDates(dates);
         if (_selectionModel.SelectedDates.Count != 0) _focusedDate = _selectionModel.SelectedDates[0];
-        OnSelectionChanged(EventArgs.Empty);
+        if (changed) OnSelectionChanged(EventArgs.Empty);
     }
 
     /// <summary>Clears the effective selection while preserving the private focus anchor.</summary>
@@ -203,6 +215,15 @@ public class BootstrapCalendar : Control
     internal DateTime FocusedDate => _focusedDate;
 
     internal int LayoutBuildCount { get; private set; }
+
+    internal static BootstrapCalendarDayOutlineMetrics ResolveDayOutlineMetrics(BootstrapThemeMetrics themeMetrics, int dpi)
+    {
+        if (themeMetrics is null) throw new ArgumentNullException(nameof(themeMetrics));
+        if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
+        return new BootstrapCalendarDayOutlineMetrics(
+            DpiScaler.Scale((float)themeMetrics.BorderWidth, dpi),
+            DpiScaler.Scale((float)themeMetrics.FocusBorderWidth, dpi));
+    }
 
     internal static BootstrapCalendarDayRenderState ClassifyDay(DateTime date, bool currentMonth, bool enabled, bool today,
         BootstrapCalendarSelectionMode mode, DateTime? selectedDate, DateTime? rangeStart, DateTime? rangeEnd,
@@ -280,8 +301,11 @@ public class BootstrapCalendar : Control
 
     private void SetBounds(DateTime minDate, DateTime maxDate)
     {
+        var oldMinDate = MinDate;
+        var oldMaxDate = MaxDate;
         var oldMonth = _displayMonth;
         var selectionChanged = _selectionModel.SetBounds(minDate, maxDate);
+        if (MinDate == oldMinDate && MaxDate == oldMaxDate) return;
         _focusedDate = Clamp(_focusedDate, MinDate, MaxDate);
         _displayMonth = ClampMonth(_displayMonth, MinDate, MaxDate);
         InvalidateLayout();
@@ -291,16 +315,24 @@ public class BootstrapCalendar : Control
 
     private BootstrapCalendarLayout GetLayout()
     {
-        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        return ResolveLayout(DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi);
+    }
+
+    internal BootstrapCalendarLayout ResolveLayout(int dpi)
+    {
+        if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
         var firstDay = CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek;
+        var themeMetrics = BootstrapThemeManager.CurrentTheme.Metrics;
         if (!_layoutValid || _layoutSize != ClientSize || _layoutDpi != dpi || _layoutMonth != _displayMonth ||
             _layoutFirstDay != firstDay || _layoutMinDate != MinDate || _layoutMaxDate != MaxDate ||
-            _layoutRadius != _borderRadius || !ReferenceEquals(_layoutFont, Font))
+            _layoutRadius != _borderRadius || !ReferenceEquals(_layoutFont, Font) ||
+            !ReferenceEquals(_layoutThemeMetrics, themeMetrics))
         {
-            var metrics = BootstrapCalendarRenderLogic.ResolveMetrics(BootstrapThemeManager.CurrentTheme.Metrics, dpi, _borderRadius);
+            var metrics = BootstrapCalendarRenderLogic.ResolveMetrics(themeMetrics, dpi, _borderRadius);
             _layout = BootstrapCalendarRenderLogic.CalculateLayout(ClientSize, metrics, _displayMonth, firstDay, MinDate, MaxDate, DateTime.Today);
             _layoutSize = ClientSize; _layoutDpi = dpi; _layoutMonth = _displayMonth; _layoutFirstDay = firstDay;
             _layoutMinDate = MinDate; _layoutMaxDate = MaxDate; _layoutRadius = _borderRadius; _layoutFont = Font;
+            _layoutThemeMetrics = themeMetrics;
             _layoutValid = true; LayoutBuildCount++;
         }
         return _layout;
@@ -337,6 +369,8 @@ public class BootstrapCalendar : Control
 
     private void PaintDays(Graphics graphics, BootstrapTheme theme, BootstrapCalendarLayout layout)
     {
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var outlines = ResolveDayOutlineMetrics(theme.Metrics, dpi);
         foreach (var cell in layout.DayCells)
         {
             var state = ClassifyDay(cell.Date, cell.IsCurrentMonth, cell.IsEnabled && Enabled, cell.IsToday,
@@ -346,12 +380,12 @@ public class BootstrapCalendar : Control
             if ((state & BootstrapCalendarDayRenderState.Selected) != 0)
             {
                 FillCell(graphics, cell.Bounds, theme.Colors.Active);
-                DrawCellOutline(graphics, cell.Bounds, theme.Colors.Primary, 1f);
+                DrawCellOutline(graphics, cell.Bounds, theme.Colors.Primary, outlines.SelectionWidth);
             }
-            if ((state & BootstrapCalendarDayRenderState.Today) != 0) DrawCellOutline(graphics, cell.Bounds, theme.Colors.Primary, 1f);
+            if ((state & BootstrapCalendarDayRenderState.Today) != 0) DrawCellOutline(graphics, cell.Bounds, theme.Colors.Primary, outlines.SelectionWidth);
             var color = (state & BootstrapCalendarDayRenderState.Disabled) != 0 || (state & BootstrapCalendarDayRenderState.AdjacentMonth) != 0 ? theme.Colors.MutedText : theme.Colors.Text;
             DrawCentered(graphics, cell.Date.Day.ToString(CultureInfo.CurrentCulture), cell.Bounds, color);
-            if (Focused && ShowFocusCues && cell.Date == _focusedDate) DrawCellOutline(graphics, cell.Bounds, theme.Colors.Focus, 2f);
+            if (Focused && ShowFocusCues && cell.Date == _focusedDate) DrawCellOutline(graphics, cell.Bounds, theme.Colors.Focus, outlines.FocusWidth);
         }
     }
 
@@ -363,7 +397,7 @@ public class BootstrapCalendar : Control
 
     private static void DrawCellOutline(Graphics graphics, Rectangle bounds, Color color, float width)
     {
-        if (bounds.Width <= 1 || bounds.Height <= 1) return;
+        if (bounds.Width <= 1 || bounds.Height <= 1 || width <= 0f) return;
         using var pen = new Pen(color, width); graphics.DrawRectangle(pen, bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1);
     }
 
