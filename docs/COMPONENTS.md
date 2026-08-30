@@ -878,6 +878,44 @@ Behavior:
 
 Manual verification: choose **Advanced Inputs**. Compare Long/Short/Time, custom `yyyy-MM-dd`, custom `yyyy-MM-dd HH:mm`, optional unchecked checkbox, constrained range, Valid/Invalid, disabled, explicit radius, and live `ValueChanged`. Exercise Tab/Shift+Tab, native calendar open/close and arrow/navigation keys, locale-sensitive display, Light/Dark switching, repeated resize, and 100/125/150/175/200% real Windows scaling. The calendar popup and localized native rendering remain WinForms/OS-owned and may differ by Windows/runtime/culture.
 
+## BootstrapCalendar and BootstrapCalendarPicker
+
+Responsibility: provide the separate framework-owned calendar surface for date-only single, inclusive-range, and multiple-date workflows. These controls do not replace or change the native `BootstrapDatePicker` contract.
+
+The approved public concepts are:
+
+```text
+BootstrapCalendarSelectionMode: Single | Range | Multiple
+
+BootstrapCalendar : Control
+  SelectionMode, DisplayMonth, MinDate, MaxDate, SelectedDate,
+  RangeStart, RangeEnd, SelectedDates, BorderRadius,
+  SelectionChanged, DisplayMonthChanged,
+  SetRange(...), SetSelectedDates(...), ClearSelection(),
+  ShowPreviousMonth(), ShowNextMonth(), GetPreferredSize(...)
+
+BootstrapCalendarPicker : Control
+  SelectionMode, MinDate, MaxDate, SelectedDate, RangeStart, RangeEnd,
+  SelectedDates, DateFormat, PlaceholderText, ValidationState, BorderRadius,
+  SelectionChanged, Opened, Closed,
+  SetRange(...), SetSelectedDates(...), ClearSelection(),
+  ShowDropDown(), CloseDropDown()
+```
+
+Behavior:
+
+- `Single` accepts zero or one date, `Range` accepts an incomplete start or a complete inclusive start/end pair, and `Multiple` keeps a sorted immutable date snapshot. Changing modes clears the prior logical selection. Mode-specific setters reject calls in another mode; `SetRange` also rejects an end without a start and orders a supplied reversed pair.
+- `MinDate`, `MaxDate`, and every selected value are normalized to `.Date` and use the safe inclusive WinForms `DateTimePicker` domain (`DateTimePicker.MinimumDateTime.Date` through `DateTimePicker.MaximumDateTime.Date`). Invalid bounds and out-of-domain/out-of-bounds selections are rejected. Tightening bounds removes invalid logical selection without inventing a replacement date.
+- `BootstrapCalendar` starts with the clamped `DateTime.Today` month and private focus date. `DisplayMonth` is always the first day of an in-bounds month; it changes deterministically through assignment, header navigation, or keyboard movement. `BootstrapCalendarPicker` remembers the last displayed month while open; otherwise it opens on the first available selected date (single, range start, or first multiple value), then on the clamped current month.
+- The calendar projects exactly six weeks by seven days (42 cells), beginning according to `CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek`. It owner-draws the shell, month header, weekday labels, adjacent-month cells, disabled/today/hot/focus/selection/range-preview states, and uses shared theme, rendering, and DPI metrics. Its preferred size is the metric formula `2 * outer padding + 7 * preferred cell width + 6 * cell gap` by `2 * outer padding + header + weekday row + 6 * day-row height + 7 * cell gap`.
+- Keyboard focus is private calendar state, not public selection state. Arrow keys move it by day or week; PageUp/PageDown move it by month; Home/End move to the culture-defined week boundary; Enter/Space activate it. Movement clamps to bounds and moves the displayed month when necessary. Mouse activation follows the same mode rules; range hover supplies preview only while a start is awaiting completion.
+- `SelectionChanged` fires only for an effective logical-selection change. A same-date single activation can still complete picker selection but does not manufacture a selection change. `DisplayMonthChanged` fires only for an effective month change.
+- `BootstrapCalendarPicker` paints a themed collapsed summary and opens a fresh `BootstrapCalendar` in the existing native ToolStrip dropdown. It formats summaries through `DateFormat` and the current culture when that culture's active calendar represents the date. For a safe-domain boundary outside that calendar's range, it formats with a non-mutating clone using a representable optional Gregorian calendar when possible, then another representable optional calendar, and invariant formatting only as a final fallback. `DateFormat` validation uses the same rule. It uses `PlaceholderText` with no selection and the established validation/focus/radius input shell. It transfers mode, bounds, selection, remembered month, DPI, and focus to the hosted calendar; `Opened` and `Closed` reflect the native dropdown lifecycle. Single selection and completed ranges close the picker; multiple selection remains open for toggling.
+- Calendar month titles and day/navigation accessibility names use that same representable-date formatter. Week order, weekday names, and integer day labels remain sourced directly from `CurrentCulture`, preserving its regional layout behavior.
+- The hosted calendar, ToolStrip menu, selection model, activation/completion signal, focus state, layout types, and synchronization wiring are implementation details. There is no public popup overload, native host accessor, active-calendar reference, timer, parser, culture override, or second native DatePicker surface.
+
+Manual verification: use the calendar demo scenarios for empty/default, single, range preview/completion, multiple toggle, constrained safe-domain boundaries, leap February, Monday/Sunday culture week starts, keyboard-only navigation, repeated open/close, Light/Dark, disabled/validation states, and 100/125/150/175/200% real Windows scaling. Confirm that `BootstrapDatePicker` remains the separate native `DateTimePicker` wrapper with OS-owned calendar behavior.
+
 ## Deferred components
 
 Dialog/Modal, Skeleton, and others are not part of the initial foundation contract.

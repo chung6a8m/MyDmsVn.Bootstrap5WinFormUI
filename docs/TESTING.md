@@ -359,6 +359,16 @@ BootstrapDatePicker Stage 9 STA tests verify:
 
 Manual BootstrapDatePicker verification remains required on real Windows for calendar popup behavior, locale-sensitive text/formatting, keyboard/focus traversal, and physical DPI rendering because those surfaces are owned by WinForms/Windows rather than the framework shell.
 
+BootstrapCalendar and BootstrapCalendarPicker tests verify:
+
+- The fixed 42-cell projection across normal months, leap February, culture-specific Sunday/Monday week starts, and safe `DateTimePicker` domain boundaries; date-only normalization, bound validation/reconciliation, and deterministic default/display-month rules.
+- Preferred-size metric formula and 96/120/144/168/192 DPI scaling; owner-drawn Light/Dark geometry for normal, disabled, focused, selected, range-interior, range-preview, and adjacent-month cells.
+- Single replacement and same-date completion signaling, incomplete/completed/reversed range semantics, multiple selection toggles/sorted snapshots, and mode/setter validation without a public selection-model seam.
+- Private keyboard-focus lifecycle: initial clamping, mouse focus, Arrow/Week/Page/Home/End movement, Enter/Space activation, display-month synchronization, rapid navigation, hide/dispose, and inaccessible out-of-range cells.
+- Picker accessibility and interaction: collapsed keyboard opening (Enter/Space/F4/Alt+Down), hosted-calendar focus before calendar key handling, native ToolStrip Escape/outside-click dismissal and screen-edge placement, single/range close behavior, multiple stay-open toggling, opened/closed ordering, and active hosted-control synchronization after mode/bounds/selection/DPI changes.
+- Culture-safe formatting at the exact safe-domain minimum and maximum under `ar-SA`/`UmAlQuraCalendar`: picker DateFormat validation remains atomic, Single/Range/Multiple summaries and accessibility values remain available, Calendar DrawToBitmap plus day/navigation accessibility names remain available, and in-range dates retain the original UmAlQura presentation without changing `CurrentCulture`.
+- Parameterless Designer construction, Light/Dark font/resource cleanup, validation/disabled presentation, and real-Windows 100/125/150/175/200% DPI manual checks. Native `BootstrapDatePicker` tests remain separate because its calendar is WinForms/OS-owned.
+
 ## 3. DPI matrix
 
 Release/manual checks must cover:
@@ -612,7 +622,7 @@ Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`
 
 The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by implemented phases.
 
-Pagination, Badge, Alert, Tooltip, TabControl, NumericBox, ComboBox, and Dropdown participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
+Pagination, Badge, Alert, Tooltip, TabControl, NumericBox, ComboBox, Dropdown, DatePicker, Select, Calendar, and CalendarPicker participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
 
 ## 11. Definition of done for a component
 

@@ -907,6 +907,233 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void DropdownGenericInternalAnchorUsesPlainControlPresentationAndLeavesTargetUnchanged()
+    {
+        var presentationSource = new TextBox { Text = "Presentation", Size = new Size(180, 28) };
+        var anchor = new Panel { Size = new Size(240, 48) };
+        using var form = new Form { StartPosition = FormStartPosition.Manual, Location = new Point(200, 200), Size = new Size(500, 300) };
+        form.Controls.Add(presentationSource);
+        form.Controls.Add(anchor);
+        form.Show();
+        Application.DoEvents();
+        using var dropdown = new BootstrapDropdown();
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => new TextBox { Text = "Hosted" }
+        });
+        var opened = 0;
+        var closed = 0;
+        dropdown.Opened += (_, _) => opened++;
+        dropdown.Closed += (_, _) => closed++;
+
+        InvokeShowFrom(dropdown, presentationSource, BootstrapIconRenderer.CreateDefault(), anchor, new Point(0, anchor.Height));
+        Application.DoEvents();
+        dropdown.Close();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(dropdown.Target, Is.Null);
+            Assert.That(opened, Is.EqualTo(1));
+            Assert.That(closed, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void DropdownGenericSourceValidatesArgumentsAndClearsActivePresentationAfterClose()
+    {
+        using var source = new TextBox();
+        using var anchor = new Panel();
+        using var dropdown = new BootstrapDropdown();
+        var renderer = new RecordingIconRenderer();
+        dropdown.Items.Add(new BootstrapDropdownItem { Text = "Action", Icon = IconDescriptor.Framework(FrameworkIconGlyph.Plus) });
+        Assert.Throws<ArgumentNullException>((Action)(() => InvokeShowFrom(dropdown, source, null!, anchor, Point.Empty)));
+        Assert.Throws<ObjectDisposedException>((Action)(() => { source.Dispose(); InvokeShowFrom(dropdown, source, renderer, anchor, Point.Empty); }));
+
+        using var liveSource = new TextBox { Size = new Size(120, 24) };
+        using var form = CreateHost(liveSource);
+        InvokeShowFrom(dropdown, liveSource, renderer, liveSource, new Point(0, liveSource.Height));
+        Application.DoEvents();
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        Application.DoEvents();
+        dropdown.Close(); Application.DoEvents();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(renderer.RenderCount, Is.GreaterThan(1));
+            Assert.That(GetPrivateField(dropdown, "_activePresentationSource"), Is.Null);
+            Assert.That(GetPrivateField(dropdown, "_activeIconRenderer"), Is.Null);
+            Assert.That(dropdown.Target, Is.Null);
+        }));
+    }
+
+    [Test]
+    public void DropdownGenericSourceRejectsNullAndDisposedAnchorsAndNoOpsWhenDisabledOrEmpty()
+    {
+        using var source = new TextBox(); using var anchor = new Panel(); using var dropdown = new BootstrapDropdown();
+        var renderer = BootstrapIconRenderer.CreateDefault();
+        Assert.Throws<ArgumentNullException>((Action)(() => InvokeShowFrom(dropdown, null!, renderer, anchor, Point.Empty)));
+        Assert.Throws<ArgumentNullException>((Action)(() => InvokeShowFrom(dropdown, source, renderer, null!, Point.Empty)));
+        anchor.Dispose(); Assert.Throws<ObjectDisposedException>((Action)(() => InvokeShowFrom(dropdown, source, renderer, anchor, Point.Empty)));
+        using var usableAnchor = new Panel(); source.Enabled = false; InvokeShowFrom(dropdown, source, renderer, usableAnchor, Point.Empty);
+        Assert.Multiple((Action)(() => { Assert.That(GetNativeDropDown(dropdown).Visible, Is.False); Assert.That(dropdown.Target, Is.Null); }));
+    }
+
+    [Test]
+    public void DropdownGenericVisibleNoOpDoesNotRebuildOrDuplicateLifecycle()
+    {
+        using var source = new TextBox { Size = new Size(160, 28) };
+        using var form = CreateHost(source);
+        using var dropdown = new BootstrapDropdown();
+        var factoryCalls = 0;
+        var opened = 0;
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => { factoryCalls++; return new TextBox(); }
+        });
+        dropdown.Opened += (_, _) => opened++;
+
+        InvokeShowFrom(dropdown, source, BootstrapIconRenderer.CreateDefault(), source, new Point(0, source.Height));
+        Application.DoEvents();
+        var activeSource = GetPrivateField(dropdown, "_activePresentationSource");
+        InvokeShowFrom(dropdown, source, BootstrapIconRenderer.CreateDefault(), source, new Point(0, source.Height));
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(GetNativeDropDown(dropdown).Visible, Is.True);
+            Assert.That(factoryCalls, Is.EqualTo(1));
+            Assert.That(opened, Is.EqualTo(1));
+            Assert.That(GetPrivateField(dropdown, "_activePresentationSource"), Is.SameAs(activeSource));
+            Assert.That(dropdown.Target, Is.Null);
+        }));
+    }
+
+    [Test]
+    public void DropdownGenericDisabledSourceNoOpLeavesSnapshotAndActivePresentationEmpty()
+    {
+        using var source = new TextBox { Enabled = false };
+        using var anchor = new Panel();
+        using var target = new BootstrapButton();
+        using var dropdown = new BootstrapDropdown { Target = target };
+        var factoryCalls = 0;
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => { factoryCalls++; return new TextBox(); }
+        });
+
+        InvokeShowFrom(dropdown, source, BootstrapIconRenderer.CreateDefault(), anchor, Point.Empty);
+
+        AssertGenericNoOpState(dropdown, target, factoryCalls);
+    }
+
+    [Test]
+    public void DropdownGenericDisabledAnchorNoOpLeavesSnapshotAndActivePresentationEmpty()
+    {
+        using var source = new TextBox();
+        using var anchor = new Panel { Enabled = false };
+        using var target = new BootstrapButton();
+        using var dropdown = new BootstrapDropdown { Target = target };
+        var factoryCalls = 0;
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => { factoryCalls++; return new TextBox(); }
+        });
+
+        InvokeShowFrom(dropdown, source, BootstrapIconRenderer.CreateDefault(), anchor, Point.Empty);
+
+        AssertGenericNoOpState(dropdown, target, factoryCalls);
+    }
+
+    [Test]
+    public void DropdownGenericEmptyItemsNoOpLeavesSnapshotAndActivePresentationEmpty()
+    {
+        using var source = new TextBox();
+        using var anchor = new Panel();
+        using var target = new BootstrapButton();
+        using var dropdown = new BootstrapDropdown { Target = target };
+
+        InvokeShowFrom(dropdown, source, BootstrapIconRenderer.CreateDefault(), anchor, Point.Empty);
+
+        AssertGenericNoOpState(dropdown, target, factoryCalls: 0);
+    }
+
+    [Test]
+    public void DropdownGenericSnapshotFailureDisposesPartialRowsAndClearsNativeAndActiveState()
+    {
+        using var source = new TextBox();
+        using var anchor = new Panel();
+        using var target = new BootstrapButton();
+        using var dropdown = new BootstrapDropdown { Target = target };
+        TextBox? partial = null;
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => partial = new TextBox()
+        });
+        dropdown.Items.Add(new BootstrapDropdownItem(BootstrapDropdownItemKind.HostedControl)
+        {
+            HostedControlFactory = () => throw new InvalidOperationException("snapshot")
+        });
+
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            InvokeShowFrom(dropdown, source, BootstrapIconRenderer.CreateDefault(), anchor, Point.Empty)));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(partial, Is.Not.Null);
+            Assert.That(partial!.IsDisposed, Is.True);
+            Assert.That(GetNativeDropDown(dropdown).Items, Is.Empty);
+            Assert.That(GetPrivateField(dropdown, "_activePresentationSource"), Is.Null);
+            Assert.That(GetPrivateField(dropdown, "_activeIconRenderer"), Is.Null);
+            Assert.That(dropdown.Target, Is.SameAs(target));
+        }));
+    }
+
+    [Test]
+    public void DropdownGenericNativeShowFailureClearsBuiltSnapshotAndActiveState()
+    {
+        using var source = new TextBox();
+        using var anchor = new Panel();
+        using var target = new BootstrapButton();
+        var nativeShowCalls = 0;
+        using var dropdown = new BootstrapDropdown((native, _, _) =>
+        {
+            nativeShowCalls++;
+            Assert.That(native.Items.Count, Is.EqualTo(1));
+            throw new InvalidOperationException("show");
+        }) { Target = target };
+        dropdown.Items.Add(new BootstrapDropdownItem { Text = "Action" });
+
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            InvokeShowFrom(dropdown, source, BootstrapIconRenderer.CreateDefault(), anchor, Point.Empty)));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(nativeShowCalls, Is.EqualTo(1));
+            Assert.That(GetNativeDropDown(dropdown).Items, Is.Empty);
+            Assert.That(GetPrivateField(dropdown, "_activePresentationSource"), Is.Null);
+            Assert.That(GetPrivateField(dropdown, "_activeIconRenderer"), Is.Null);
+            Assert.That(dropdown.Target, Is.SameAs(target));
+        }));
+    }
+
+    [Test]
+    public void DropdownGenericPresentationPropagatesSourceFontAndMinimumWidth()
+    {
+        using var source = new TextBox { Size = new Size(180, 28), Font = new Font("Arial", 14f) };
+        using var form = CreateHost(source);
+        using var dropdown = new BootstrapDropdown { MinimumWidth = 180 };
+        dropdown.Items.Add(new BootstrapDropdownItem { Text = "Action" });
+        InvokeShowFrom(dropdown, source, BootstrapIconRenderer.CreateDefault(), source, new Point(0, source.Height)); Application.DoEvents();
+        var native = GetNativeDropDown(dropdown);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(native.Font.FontFamily.Name, Is.EqualTo(source.Font.FontFamily.Name));
+            Assert.That(native.Font.SizeInPoints, Is.EqualTo(source.Font.SizeInPoints));
+            Assert.That(native.MinimumSize.Width, Is.EqualTo(BootstrapDropdown.ResolveMinimumWidth(180, source.DeviceDpi)));
+        }));
+    }
+
+    [Test]
     public void DropdownActivePresentationSourceDrivesLiveMinimumWidthAndThemeRefresh()
     {
         var presentationSource = new BootstrapButton { Text = "Presentation" };
@@ -1168,6 +1395,19 @@ public sealed class BootstrapDropdownTests
         return form;
     }
 
+    private static void AssertGenericNoOpState(BootstrapDropdown dropdown, BootstrapButton expectedTarget, int factoryCalls)
+    {
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(factoryCalls, Is.Zero);
+            Assert.That(GetNativeDropDown(dropdown).Visible, Is.False);
+            Assert.That(GetNativeDropDown(dropdown).Items, Is.Empty);
+            Assert.That(GetPrivateField(dropdown, "_activePresentationSource"), Is.Null);
+            Assert.That(GetPrivateField(dropdown, "_activeIconRenderer"), Is.Null);
+            Assert.That(dropdown.Target, Is.SameAs(expectedTarget));
+        }));
+    }
+
     private static BootstrapDropdownItemCollection CollectionOf(BootstrapDropdownItem item)
     {
         return new BootstrapDropdownItemCollection { item };
@@ -1205,12 +1445,47 @@ public sealed class BootstrapDropdownTests
     {
         var method = typeof(BootstrapDropdown).GetMethod(
             "ShowFrom",
-            BindingFlags.Instance | BindingFlags.NonPublic);
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(BootstrapButton), typeof(Control), typeof(Point) },
+            null);
         Assert.That(method, Is.Not.Null, "BootstrapDropdown must expose the planned internal anchored-show path.");
 
         try
         {
             method!.Invoke(dropdown, new object[] { presentationSource, anchor, location });
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+        }
+    }
+
+    private static object? GetPrivateField(BootstrapDropdown dropdown, string name)
+    {
+        var field = typeof(BootstrapDropdown).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null);
+        return field!.GetValue(dropdown);
+    }
+
+    private static void InvokeShowFrom(
+        BootstrapDropdown dropdown,
+        Control presentationSource,
+        IIconRenderer iconRenderer,
+        Control anchor,
+        Point location)
+    {
+        var method = typeof(BootstrapDropdown).GetMethod(
+            "ShowFrom",
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(Control), typeof(IIconRenderer), typeof(Control), typeof(Point) },
+            null);
+        Assert.That(method, Is.Not.Null, "BootstrapDropdown must expose the generic internal anchored-show path.");
+
+        try
+        {
+            method!.Invoke(dropdown, new object[] { presentationSource, iconRenderer, anchor, location });
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {

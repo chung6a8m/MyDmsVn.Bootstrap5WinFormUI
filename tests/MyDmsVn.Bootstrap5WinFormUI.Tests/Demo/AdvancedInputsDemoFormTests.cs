@@ -104,6 +104,98 @@ public sealed class AdvancedInputsDemoFormTests
         }));
     }
 
+    [Test]
+    public void AdvancedInputsDemoContainsCustomCalendarAndPickerSelectionScenarios()
+    {
+        using var form = new AdvancedInputsDemoForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var calendars = FindControls<BootstrapCalendar>(form).ToArray();
+        var pickers = FindControls<BootstrapCalendarPicker>(form).ToArray();
+        var labels = FindControls<Label>(form).ToArray();
+        var captions = labels.Select(label => label.Text).ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(captions.Contains("Custom Calendar — Range"), Is.True);
+            Assert.That(captions.Contains("Calendar Picker — Single"), Is.True);
+            Assert.That(captions.Contains("Calendar Picker — Range"), Is.True);
+            Assert.That(captions.Contains("Calendar Picker — Multiple"), Is.True);
+            Assert.That(captions.Contains("Calendar Picker — Disabled"), Is.True);
+            Assert.That(calendars.Any(calendar =>
+                calendar.SelectionMode == BootstrapCalendarSelectionMode.Range &&
+                calendar.DisplayMonth == new DateTime(2026, 8, 1) &&
+                calendar.RangeStart == new DateTime(2026, 8, 10) &&
+                calendar.RangeEnd == new DateTime(2026, 8, 15)), Is.True);
+            Assert.That(pickers.Any(picker =>
+                picker.SelectionMode == BootstrapCalendarSelectionMode.Single &&
+                picker.MinDate == new DateTime(2025, 1, 1) &&
+                picker.MaxDate == new DateTime(2030, 12, 31) &&
+                picker.DateFormat == "yyyy-MM-dd" &&
+                picker.SelectedDate == new DateTime(2026, 8, 12)), Is.True);
+            Assert.That(pickers.Any(picker =>
+                picker.SelectionMode == BootstrapCalendarSelectionMode.Range &&
+                picker.MinDate == new DateTime(2025, 1, 1) &&
+                picker.MaxDate == new DateTime(2030, 12, 31) &&
+                picker.DateFormat == "yyyy-MM-dd" &&
+                picker.RangeStart == new DateTime(2026, 8, 10) &&
+                picker.RangeEnd == new DateTime(2026, 8, 15) &&
+                picker.ValidationState == BootstrapValidationState.Invalid), Is.True);
+            Assert.That(pickers.Any(picker =>
+                picker.SelectionMode == BootstrapCalendarSelectionMode.Multiple &&
+                picker.MinDate == new DateTime(2025, 1, 1) &&
+                picker.MaxDate == new DateTime(2030, 12, 31) &&
+                picker.DateFormat == "yyyy-MM-dd" &&
+                picker.Enabled &&
+                picker.SelectedDates.SequenceEqual(new[]
+                {
+                    new DateTime(2026, 8, 8),
+                    new DateTime(2026, 8, 12),
+                    new DateTime(2026, 8, 18)
+                })), Is.True);
+            Assert.That(pickers.Any(picker =>
+                picker.SelectionMode == BootstrapCalendarSelectionMode.Single &&
+                !picker.Enabled), Is.True);
+            Assert.That(labels.Any(label => label.Text.StartsWith("SelectionChanged:", StringComparison.Ordinal)), Is.True);
+        }));
+    }
+
+    [Test]
+    public void AdvancedInputsDemoUpdatesCalendarSelectionFeedbackForPublicSelectionChanges()
+    {
+        using var form = new AdvancedInputsDemoForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var calendar = FindControls<BootstrapCalendar>(form)
+            .Single(control => control.SelectionMode == BootstrapCalendarSelectionMode.Range);
+        var singlePicker = FindControls<BootstrapCalendarPicker>(form)
+            .Single(control => control.SelectionMode == BootstrapCalendarSelectionMode.Single && control.Enabled);
+        var rangePicker = FindControls<BootstrapCalendarPicker>(form)
+            .Single(control => control.SelectionMode == BootstrapCalendarSelectionMode.Range);
+
+        calendar.SetRange(new DateTime(2026, 9, 2), new DateTime(2026, 9, 6));
+        singlePicker.SelectedDate = new DateTime(2026, 9, 12);
+        rangePicker.SetRange(new DateTime(2026, 9, 10), new DateTime(2026, 9, 18));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(GetScenarioStatus(form, "Custom Calendar — Range").Text,
+                Is.EqualTo("SelectionChanged: 2026-09-02 — 2026-09-06"));
+            Assert.That(GetScenarioStatus(form, "Calendar Picker — Single").Text,
+                Is.EqualTo("SelectionChanged: 2026-09-12"));
+            Assert.That(GetScenarioStatus(form, "Calendar Picker — Range").Text,
+                Is.EqualTo("SelectionChanged: 2026-09-10 — 2026-09-18"));
+        }));
+    }
+
+    private static Label GetScenarioStatus(Control root, string caption)
+    {
+        var captionLabel = FindControls<Label>(root).Single(label => label.Text == caption);
+        return captionLabel.Parent!.Controls.OfType<Label>().Single(label => !ReferenceEquals(label, captionLabel));
+    }
+
     private static IEnumerable<T> FindControls<T>(Control root)
         where T : Control
     {

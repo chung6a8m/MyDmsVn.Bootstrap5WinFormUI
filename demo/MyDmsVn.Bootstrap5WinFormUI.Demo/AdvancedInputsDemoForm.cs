@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Icons;
@@ -13,11 +14,14 @@ public sealed class AdvancedInputsDemoForm : Form
     private readonly GroupBox _numericSection = new GroupBox();
     private readonly GroupBox _comboSection = new GroupBox();
     private readonly GroupBox _dateSection = new GroupBox();
+    private readonly GroupBox _calendarSection = new GroupBox();
     private readonly Label _integerStatus = new Label();
     private readonly Label _comboStatus = new Label();
     private readonly Label _comboNote = new Label();
     private readonly Label _dateStatus = new Label();
     private readonly Label _dateNote = new Label();
+    private readonly Label _calendarStatus = new Label();
+    private readonly Label _calendarNote = new Label();
 
     public AdvancedInputsDemoForm()
     {
@@ -31,6 +35,7 @@ public sealed class AdvancedInputsDemoForm : Form
         BuildNumericSection();
         BuildComboSection();
         BuildDateSection();
+        BuildCalendarSection();
         Controls.Add(_content);
 
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
@@ -76,9 +81,17 @@ public sealed class AdvancedInputsDemoForm : Form
         _dateSection.Margin = new Padding(0, 0, 0, 12);
         _dateSection.Padding = new Padding(12);
 
+        _calendarSection.Text = "Custom Calendar scenarios";
+        _calendarSection.AutoSize = true;
+        _calendarSection.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _calendarSection.MinimumSize = new Size(920, 0);
+        _calendarSection.Margin = new Padding(0, 0, 0, 12);
+        _calendarSection.Padding = new Padding(12);
+
         _content.Controls.Add(_numericSection);
         _content.Controls.Add(_comboSection);
         _content.Controls.Add(_dateSection);
+        _content.Controls.Add(_calendarSection);
     }
 
     private void BuildNumericSection()
@@ -343,6 +356,128 @@ public sealed class AdvancedInputsDemoForm : Form
         _dateSection.Controls.Add(CreateSectionStack(grid, _dateNote));
     }
 
+    private void BuildCalendarSection()
+    {
+        var grid = CreateScenarioGrid();
+        var minDate = new DateTime(2025, 1, 1);
+        var maxDate = new DateTime(2030, 12, 31);
+        var rangeStart = new DateTime(2026, 8, 10);
+        var rangeEnd = new DateTime(2026, 8, 15);
+
+        var rangeCalendar = new BootstrapCalendar
+        {
+            SelectionMode = BootstrapCalendarSelectionMode.Range,
+            MinDate = minDate,
+            MaxDate = maxDate,
+            DisplayMonth = new DateTime(2026, 8, 1)
+        };
+        rangeCalendar.SetRange(rangeStart, rangeEnd);
+        _calendarStatus.AutoSize = true;
+        _calendarStatus.Margin = new Padding(0, 5, 0, 0);
+        UpdateRangeStatus(rangeCalendar);
+        rangeCalendar.SelectionChanged += (_, _) => UpdateRangeStatus(rangeCalendar);
+        AddCalendarCell(grid, "Custom Calendar — Range", rangeCalendar, _calendarStatus);
+
+        var singlePicker = CreateCalendarPicker(BootstrapCalendarSelectionMode.Single, minDate, maxDate);
+        singlePicker.PlaceholderText = "Choose one date";
+        singlePicker.SelectedDate = new DateTime(2026, 8, 12);
+        var singleStatus = CreatePickerStatus(singlePicker);
+        AddCalendarCell(grid, "Calendar Picker — Single", singlePicker, singleStatus);
+
+        var rangePicker = CreateCalendarPicker(BootstrapCalendarSelectionMode.Range, minDate, maxDate);
+        rangePicker.PlaceholderText = "Choose a date range";
+        rangePicker.ValidationState = BootstrapValidationState.Invalid;
+        rangePicker.SetRange(rangeStart, rangeEnd);
+        var rangeStatus = CreatePickerStatus(rangePicker);
+        AddCalendarCell(grid, "Calendar Picker — Range", rangePicker, rangeStatus);
+
+        var multiplePicker = CreateCalendarPicker(BootstrapCalendarSelectionMode.Multiple, minDate, maxDate);
+        multiplePicker.PlaceholderText = "Choose one or more dates";
+        multiplePicker.SetSelectedDates(new[]
+        {
+            new DateTime(2026, 8, 8),
+            new DateTime(2026, 8, 12),
+            new DateTime(2026, 8, 18)
+        });
+        AddCalendarCell(grid, "Calendar Picker — Multiple", multiplePicker);
+
+        var disabledPicker = CreateCalendarPicker(BootstrapCalendarSelectionMode.Single, minDate, maxDate);
+        disabledPicker.SelectedDate = new DateTime(2026, 8, 20);
+        disabledPicker.Enabled = false;
+        AddCalendarCell(grid, "Calendar Picker — Disabled", disabledPicker);
+
+        _calendarNote.AutoSize = true;
+        _calendarNote.MaximumSize = new Size(860, 0);
+        _calendarNote.Margin = new Padding(6, 0, 6, 8);
+        _calendarNote.Dock = DockStyle.Top;
+        _calendarNote.Text = "Calendar note: Range is shown directly; picker popups use the native dropdown host. The Range picker is invalid, Multiple remains enabled for stay-open toggling, and a separate Single picker shows the disabled state.";
+
+        _calendarSection.Controls.Add(CreateSectionStack(grid, _calendarNote));
+    }
+
+    private static BootstrapCalendarPicker CreateCalendarPicker(
+        BootstrapCalendarSelectionMode selectionMode,
+        DateTime minDate,
+        DateTime maxDate)
+    {
+        return new BootstrapCalendarPicker
+        {
+            SelectionMode = selectionMode,
+            MinDate = minDate,
+            MaxDate = maxDate,
+            DateFormat = "yyyy-MM-dd"
+        };
+    }
+
+    private static Label CreatePickerStatus(BootstrapCalendarPicker picker)
+    {
+        var status = new Label
+        {
+            AutoSize = true,
+            Margin = new Padding(0, 5, 0, 0)
+        };
+        UpdatePickerStatus(picker, status);
+        picker.SelectionChanged += (_, _) => UpdatePickerStatus(picker, status);
+        return status;
+    }
+
+    private void UpdateRangeStatus(BootstrapCalendar calendar)
+    {
+        _calendarStatus.Text = $"SelectionChanged: {FormatRange(calendar.RangeStart, calendar.RangeEnd)}";
+    }
+
+    private static void UpdatePickerStatus(BootstrapCalendarPicker picker, Label status)
+    {
+        status.Text = $"SelectionChanged: {FormatPickerSelection(picker)}";
+    }
+
+    private static string FormatPickerSelection(BootstrapCalendarPicker picker)
+    {
+        if (picker.SelectionMode == BootstrapCalendarSelectionMode.Range)
+        {
+            return FormatRange(picker.RangeStart, picker.RangeEnd);
+        }
+
+        if (picker.SelectionMode == BootstrapCalendarSelectionMode.Multiple)
+        {
+            return string.Join(", ", picker.SelectedDates.Select(date => date.ToString(picker.DateFormat)));
+        }
+
+        return picker.SelectedDate.HasValue ? picker.SelectedDate.Value.ToString(picker.DateFormat) : "No date selected";
+    }
+
+    private static string FormatRange(DateTime? start, DateTime? end)
+    {
+        if (!start.HasValue)
+        {
+            return "No date selected";
+        }
+
+        return end.HasValue
+            ? $"{start.Value:yyyy-MM-dd} — {end.Value:yyyy-MM-dd}"
+            : $"{start.Value:yyyy-MM-dd} — choose an end date";
+    }
+
     private static TableLayoutPanel CreateScenarioGrid()
     {
         var grid = new TableLayoutPanel
@@ -405,6 +540,15 @@ public sealed class AdvancedInputsDemoForm : Form
         AddScenarioCell(grid, caption, input, "date picker", status);
     }
 
+    private static void AddCalendarCell(
+        TableLayoutPanel grid,
+        string caption,
+        Control input,
+        Control? status = null)
+    {
+        AddScenarioCell(grid, caption, input, "calendar", status);
+    }
+
     private static void AddScenarioCell(
         TableLayoutPanel grid,
         string caption,
@@ -459,14 +603,19 @@ public sealed class AdvancedInputsDemoForm : Form
         _comboSection.ForeColor = theme.Colors.Text;
         _dateSection.BackColor = theme.Colors.Body;
         _dateSection.ForeColor = theme.Colors.Text;
+        _calendarSection.BackColor = theme.Colors.Body;
+        _calendarSection.ForeColor = theme.Colors.Text;
         ApplyStandardTextColor(_numericSection, theme.Colors.Text);
         ApplyStandardTextColor(_comboSection, theme.Colors.Text);
         ApplyStandardTextColor(_dateSection, theme.Colors.Text);
+        ApplyStandardTextColor(_calendarSection, theme.Colors.Text);
         _integerStatus.ForeColor = theme.Colors.MutedText;
         _comboStatus.ForeColor = theme.Colors.MutedText;
         _comboNote.ForeColor = theme.Colors.MutedText;
         _dateStatus.ForeColor = theme.Colors.MutedText;
         _dateNote.ForeColor = theme.Colors.MutedText;
+        _calendarStatus.ForeColor = theme.Colors.MutedText;
+        _calendarNote.ForeColor = theme.Colors.MutedText;
     }
 
     private static void ApplyStandardTextColor(Control root, Color color)
