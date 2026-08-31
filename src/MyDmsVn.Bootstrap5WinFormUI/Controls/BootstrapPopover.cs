@@ -449,19 +449,9 @@ public class BootstrapPopover : Component
             return null;
         }
 
-        if (IsFocusable(parent))
+        foreach (var control in EnumerateFocusableForward(parent))
         {
-            return parent;
-        }
-
-        Control? child = null;
-        while ((child = parent.GetNextControl(child, true)) is not null)
-        {
-            var descendant = FindFirstFocusable(child);
-            if (descendant is not null)
-            {
-                return descendant;
-            }
+            return control;
         }
 
         return null;
@@ -474,17 +464,13 @@ public class BootstrapPopover : Component
             return null;
         }
 
-        Control? child = null;
-        while ((child = parent.GetNextControl(child, false)) is not null)
+        Control? last = null;
+        foreach (var control in EnumerateFocusableForward(parent))
         {
-            var descendant = FindLastFocusable(child);
-            if (descendant is not null)
-            {
-                return descendant;
-            }
+            last = control;
         }
 
-        return IsFocusable(parent) ? parent : null;
+        return last;
     }
 
     private static Control? FindAdjacentFocusable(Control root, Control current, bool forward)
