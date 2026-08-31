@@ -192,6 +192,22 @@ Behavior:
 
 Manual verification: launch the demo and choose **TextBox / Card**. Exercise placeholder, leading/trailing icons, clear, valid/invalid, read-only, password, and disabled examples. Tab into inputs, type/select/copy text, verify focus/validation border priority, switch Light/Dark, and repeat at each supported Windows DPI setting.
 
+## BootstrapFormattedTextBox
+
+Responsibility: format native text input as it is edited while exposing a stable canonical string separately from its presentation.
+
+`BootstrapFormattedTextBox` derives from `BootstrapTextBox`. `Text` is always the final formatted display value; `RawValue` is the canonical unformatted value. `RawValueChanged` follows `TextChanged` when one edit changes both values, and `CreditCardTypeChanged` reports effective card-family changes without implying Luhn or business validation.
+
+The formatting engine is pure C# and independent of WinForms. `FormatMode` selects identity, General, Numeral, Date, Time, CreditCard, or Custom behavior. General supports blocks, delimiters, prefixes, character casing, and numeric-only filtering. Numeral keeps invariant `.` in `RawValue` while allowing configurable display grouping, decimal mark, scale, sign, and prefix rules. Date and Time perform structural partial-input formatting; CreditCard performs digit grouping and IIN-based type detection. Mutable mode options reformat the current value immediately. Applications can implement `IInputFormatter` and assign `Formatter` in Custom mode.
+
+Edits are normalized as one stable raw/display pair. Middle insertion, selection replacement, raw or already-formatted paste, and cut restore selection through raw-position mapping. Backspace/Delete beside a formatting separator removes the adjacent raw character and recomputes presentation. Ctrl+Z/Ctrl+Y use bounded formatted-input history; Ctrl+A/C/X/V, Tab/Shift+Tab, Alt keys, focus, clipboard, and IME remain on the native editor path. Programmatic `Text`/`RawValue` assignment and `Reformat()` clear that edit history.
+
+The inherited TextBox shell remains authoritative for placeholder, icons, clear button, read-only/password state, validation border, theme, DPI, focus, and disposal. Formatting only canonicalizes text; `ValidationState` is still caller-owned and does not assert semantic validity. Use `BootstrapNumericBox` when the application needs a typed `decimal`, range, increment, spin buttons, or mouse-wheel behavior. Formatted Numeral mode is string-based and preserves partial input.
+
+The v1 contract deliberately excludes Phone mode, typed `DecimalValue`/`DateTime` properties, a regex-mask DSL, business validation, and a second native editor abstraction.
+
+Manual verification: choose **Advanced Inputs** and exercise every formatted mode, live RawValue/card-type feedback, middle edits, formatted/raw paste, separator deletion, undo/redo, clear, Tab/Shift+Tab, Alt shortcuts, Vietnamese IME composition, Light/Dark switching, and real Windows 100/125/150/175/200% scaling.
+
 ## BootstrapNumericBox
 
 Responsibility: provide Bootstrap-themed numeric input while preserving native WinForms numeric editing, formatting, range, spin, keyboard, and wheel semantics.
