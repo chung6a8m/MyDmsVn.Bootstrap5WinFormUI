@@ -54,13 +54,29 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
 
     protected override bool ProcessCmdKey(ref Message m, Keys keyData)
     {
-        if (CloseOnEscape && keyData == Keys.Escape && EscapeRequested is not null)
+        if (keyData == Keys.Escape)
         {
-            EscapeRequested();
+            if (CloseOnEscape && EscapeRequested is not null)
+            {
+                EscapeRequested();
+            }
+
             return true;
         }
 
         return base.ProcessCmdKey(ref m, keyData);
+    }
+
+    protected override void OnClosing(ToolStripDropDownClosingEventArgs e)
+    {
+        if (e.CloseReason == ToolStripDropDownCloseReason.Keyboard
+            && (ModifierKeys & Keys.Alt) == Keys.Alt)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        base.OnClosing(e);
     }
 
     protected override void Dispose(bool disposing)
