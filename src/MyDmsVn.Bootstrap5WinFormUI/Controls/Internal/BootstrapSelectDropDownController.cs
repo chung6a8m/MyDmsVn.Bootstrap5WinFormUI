@@ -133,7 +133,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         _content.SearchTextChanged += OnSearchTextChanged;
         _content.RowActivated += OnRowActivated;
         _content.EscapeRequested += () => Close(true);
-        _content.TabRequested += () => Close(false);
+        _content.TabRequested += OnTabRequested;
         _content.NearEndRequested += () => _owner.NotifyNearEndRequested();
         _surface = new BootstrapOverlaySurface { LogicalContentPadding = Padding.Empty, LogicalBorderRadius = _owner.BorderRadius };
         _surface.AttachContent(_content);
@@ -185,6 +185,32 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
             if (_owner.CloseOnSelect) Close(true);
             else RefreshResults();
         }
+    }
+
+    private void OnTabRequested(bool reverse)
+    {
+        Close(false);
+
+        if (_owner.IsDisposed || !_owner.IsHandleCreated)
+        {
+            return;
+        }
+
+        _owner.BeginInvoke(new Action(() =>
+        {
+            if (_owner.IsDisposed || !_owner.Enabled)
+            {
+                return;
+            }
+
+            var container = (Control?)_owner.FindForm() ?? _owner.Parent;
+            container?.SelectNextControl(
+                _owner,
+                forward: !reverse,
+                tabStopOnly: true,
+                nested: true,
+                wrap: true);
+        }));
     }
 
     private void OnItemsChanged()

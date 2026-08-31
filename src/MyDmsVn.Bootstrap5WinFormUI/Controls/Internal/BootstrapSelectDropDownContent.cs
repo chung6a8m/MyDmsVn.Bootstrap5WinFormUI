@@ -9,26 +9,36 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 
 internal sealed class BootstrapSelectDropDownContent : UserControl
 {
-    private readonly TextBox _searchEditor;
+    private readonly Panel _searchHost;
+    private readonly BootstrapSelectSearchTextBox _searchEditor;
     private readonly BootstrapSelectResultsView _resultsView;
     private bool _suppressSearchChanged;
-    private int _dpi = DpiScaler.DefaultDpi;
 
     internal BootstrapSelectDropDownContent()
     {
         Margin = Padding.Empty;
         Padding = Padding.Empty;
-        _searchEditor = new TextBox
+        _searchHost = new Panel
         {
             Dock = DockStyle.Top,
-            BorderStyle = BorderStyle.FixedSingle,
-            Margin = Padding.Empty
+            Height = 0,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        _searchEditor = new BootstrapSelectSearchTextBox
+        {
+            Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
+            ShowClearButton = false,
+            BorderRadius = -1
         };
         _resultsView = new BootstrapSelectResultsView { Dock = DockStyle.Fill, Margin = Padding.Empty };
+        _searchHost.Controls.Add(_searchEditor);
         Controls.Add(_resultsView);
-        Controls.Add(_searchEditor);
+        Controls.Add(_searchHost);
         _searchEditor.TextChanged += OnSearchTextChanged;
         _searchEditor.KeyDown += OnSearchKeyDown;
+        _searchEditor.TabNavigationRequested += reverse => TabRequested?.Invoke(reverse);
         _resultsView.RowActivated += (row, reason) => RowActivated?.Invoke(row, reason);
         _resultsView.NearEndReached += () => NearEndRequested?.Invoke();
     }
@@ -36,15 +46,15 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
     internal event Action<string>? SearchTextChanged;
     internal event Action<BootstrapSelectResultRow, BootstrapSelectChangeReason>? RowActivated;
     internal event Action? EscapeRequested;
-    internal event Action? TabRequested;
+    internal event Action<bool>? TabRequested;
     internal event Action? NearEndRequested;
 
     internal bool SearchEnabled
     {
-        get => _searchEditor.Visible;
+        get => _searchHost.Visible;
         set
         {
-            _searchEditor.Visible = value;
+            _searchHost.Visible = value;
             PerformLayout();
         }
     }
@@ -62,17 +72,17 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
     {
         if (theme is null) throw new ArgumentNullException(nameof(theme));
         if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
-        _dpi = dpi;
         BackColor = theme.Colors.Surface;
         ForeColor = theme.Colors.Text;
-        _searchEditor.BackColor = theme.Colors.Surface;
-        _searchEditor.ForeColor = theme.Colors.Text;
+        var inset = DpiScaler.Scale(theme.Metrics.SpacingXS, dpi);
+        var fieldHeight = DpiScaler.Scale(theme.Metrics.ControlHeightSmall, dpi);
+        _searchHost.Padding = new Padding(inset);
+        _searchHost.Height = fieldHeight + (inset * 2);
+        _searchHost.BackColor = theme.Colors.Surface;
         _searchEditor.Font = Font;
+        _searchEditor.Height = fieldHeight;
         _resultsView.Font = Font;
         _resultsView.ApplyPresentation(renderer, theme, dpi);
-        var height = DpiScaler.Scale(30, dpi);
-        _searchEditor.MinimumSize = new Size(0, height);
-        _searchEditor.Height = height;
     }
 
     internal void SetResults(BootstrapSelectResultSet results)
@@ -87,10 +97,9 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
 
     internal void FocusSearch()
     {
-        if (_searchEditor.Visible)
+        if (_searchHost.Visible)
         {
-            _searchEditor.Focus();
-            _searchEditor.SelectionStart = _searchEditor.TextLength;
+            _searchEditor.FocusEditorAtEnd();
         }
         else
         {
@@ -100,9 +109,8 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
 
     internal void ForwardCharacter(char character)
     {
-        if (!_searchEditor.Visible || char.IsControl(character)) return;
-        _searchEditor.AppendText(character.ToString());
-        _searchEditor.Focus();
+        if (!_searchHost.Visible || char.IsControl(character)) return;
+        _searchEditor.AppendCharacter(character);
     }
 
     internal void ClearSearchSilently()
@@ -121,7 +129,7 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
     public override Size GetPreferredSize(Size proposedSize)
     {
         var results = _resultsView.GetPreferredSize(proposedSize);
-        var searchHeight = _searchEditor.Visible ? Math.Max(_searchEditor.Height, DpiScaler.Scale(30, _dpi)) : 0;
+        var searchHeight = _searchHost.Visible ? _searchHost.Height : 0;
         return new Size(Math.Max(160, proposedSize.Width), searchHeight + results.Height);
     }
 
@@ -161,9 +169,6 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
             case Keys.Escape:
                 EscapeRequested?.Invoke();
                 break;
-            case Keys.Tab:
-                TabRequested?.Invoke();
-                break;
             default:
                 handled = false;
                 break;
@@ -172,7 +177,7 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
         if (handled)
         {
             e.Handled = true;
-            if (e.KeyCode != Keys.Tab) e.SuppressKeyPress = true;
+            e.SuppressKeyPress = true;
         }
     }
 }
