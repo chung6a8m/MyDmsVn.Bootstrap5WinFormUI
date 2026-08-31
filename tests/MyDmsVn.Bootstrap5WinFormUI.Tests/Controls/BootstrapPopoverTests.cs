@@ -16,6 +16,104 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapPopoverTests
 {
+    private sealed class InteractivePopoverFixture : IDisposable
+    {
+        public InteractivePopoverFixture()
+        {
+            Form = new Form
+            {
+                ShowInTaskbar = false,
+                StartPosition = FormStartPosition.Manual,
+                Bounds = new Rectangle(200, 200, 700, 500)
+            };
+            Target = new Button
+            {
+                Text = "Open",
+                Location = new Point(30, 30),
+                Size = new Size(120, 30),
+                TabIndex = 0
+            };
+            Outside = new Button
+            {
+                Text = "Outside",
+                Location = new Point(180, 30),
+                Size = new Size(120, 30),
+                TabIndex = 1
+            };
+            Content = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                MinimumSize = new Size(280, 0)
+            };
+            Editor = new TextBox { Width = 220, TabIndex = 0 };
+            Option = new CheckBox { AutoSize = true, Text = "Enable", TabIndex = 1 };
+            Commands = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                TabIndex = 2,
+                TabStop = false
+            };
+            Apply = new Button { Text = "Apply", TabIndex = 0 };
+            Close = new Button { Text = "Close", TabIndex = 1 };
+            Commands.Controls.Add(Apply);
+            Commands.Controls.Add(Close);
+            Content.Controls.Add(Editor);
+            Content.Controls.Add(Option);
+            Content.Controls.Add(Commands);
+            Form.Controls.Add(Target);
+            Form.Controls.Add(Outside);
+            Popover = new BootstrapPopover
+            {
+                Target = Target,
+                Content = Content,
+                CloseOnEscape = true,
+                CloseOnClickOutside = true
+            };
+        }
+
+        public Form Form { get; }
+
+        public Button Target { get; }
+
+        public Button Outside { get; }
+
+        public FlowLayoutPanel Content { get; }
+
+        public TextBox Editor { get; }
+
+        public CheckBox Option { get; }
+
+        public FlowLayoutPanel Commands { get; }
+
+        public Button Apply { get; }
+
+        public Button Close { get; }
+
+        public BootstrapPopover Popover { get; }
+
+        public void Show()
+        {
+            Form.Show();
+            Form.Activate();
+            Target.Focus();
+            Popover.Show();
+            Application.DoEvents();
+        }
+
+        public void Dispose()
+        {
+            Popover.Dispose();
+            Content.Dispose();
+            Form.Dispose();
+        }
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRectangle
     {
@@ -210,6 +308,64 @@ public sealed class BootstrapPopoverTests
         {
             popover.Hide();
         }
+    }
+
+    [Test]
+    public void AltDoesNotDismissOpenPopover()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Show();
+
+        SendKeys.SendWait("%");
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(fixture.Popover.IsOpen, Is.True);
+            Assert.That(fixture.Editor.Focused, Is.True);
+        }));
+    }
+
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public void EscapeHonorsClosePolicyAndRestoresTargetFocus(bool closeOnEscape, bool remainsOpen)
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnEscape = closeOnEscape;
+        fixture.Show();
+
+        SendKeys.SendWait("{ESC}");
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.EqualTo(remainsOpen));
+        if (closeOnEscape)
+        {
+            Assert.That(fixture.Target.Focused, Is.True);
+        }
+        else
+        {
+            Assert.That(fixture.Editor.Focused, Is.True);
+        }
+    }
+
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public void OutsideActivationHonorsClosePolicyAndPreservesOutsideFocus(bool closeOnClickOutside, bool remainsOpen)
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = closeOnClickOutside;
+        fixture.Show();
+
+        fixture.Outside.Select();
+        fixture.Outside.Focus();
+        fixture.Outside.PerformClick();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(fixture.Popover.IsOpen, Is.EqualTo(remainsOpen));
+            Assert.That(fixture.Outside.Focused, Is.True);
+        }));
     }
 
     [Test]
