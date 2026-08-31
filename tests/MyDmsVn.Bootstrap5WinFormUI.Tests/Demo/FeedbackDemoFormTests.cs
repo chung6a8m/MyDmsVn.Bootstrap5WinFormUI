@@ -240,6 +240,33 @@ public sealed class FeedbackDemoFormTests
     }
 
     [Test]
+    public void FeedbackDemoInteractivePopoverHasDeterministicNestedTabOrder()
+    {
+        using var form = new FeedbackDemoForm();
+        var popover = typeof(FeedbackDemoForm)
+            .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Where(field => field.FieldType == typeof(BootstrapPopover))
+            .Select(field => (BootstrapPopover?)field.GetValue(form))
+            .Single(value => value is not null)!;
+        var content = popover.Content!;
+        var editor = FindControls<TextBox>(content).Single(control => control.AccessibleName == "Popover text editor");
+        var option = FindControls<CheckBox>(content).Single(control => control.AccessibleName == "Popover option");
+        var apply = FindControls<Button>(content).Single(control => control.AccessibleName == "Popover apply action");
+        var close = FindControls<Button>(content).Single(control => control.AccessibleName == "Popover close action");
+        var commands = apply.Parent!;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(editor.TabIndex, Is.EqualTo(0));
+            Assert.That(option.TabIndex, Is.EqualTo(1));
+            Assert.That(commands.TabIndex, Is.EqualTo(2));
+            Assert.That(commands.TabStop, Is.False);
+            Assert.That(apply.TabIndex, Is.EqualTo(0));
+            Assert.That(close.TabIndex, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
     public void FeedbackDemoDisposesPopoverBeforeItsCallerOwnedContentExactlyOnce()
     {
         var form = new FeedbackDemoForm();
