@@ -295,6 +295,97 @@ public sealed class BootstrapToastContainerTests
         }));
     }
 
+    [Test]
+    public void FiniteHeightClampsOversizedToastAndRejectsInvalidLimitWithoutMutation()
+    {
+        using var container = new BootstrapToastContainer { Size = new Size(320, 140) };
+        container.MaximumStackHeightPixels = 140;
+        var toast = CreateManualToast(string.Join(" ", Enumerable.Repeat("long notification body", 80)));
+        toast.Width = 260;
+
+        container.ShowToast(toast);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(toast.Visible, Is.True);
+            Assert.That(toast.Height, Is.EqualTo(140));
+            Assert.Throws<ArgumentOutOfRangeException>((Action)(() => container.MaximumStackHeightPixels = 0));
+            Assert.That(container.MaximumStackHeightPixels, Is.EqualTo(140));
+        }));
+    }
+
+    [Test]
+    public void HeightQueuePreservesStrictFifoWhenLaterSmallerToastWouldFit()
+    {
+        using var container = new BootstrapToastContainer
+        {
+            Size = new Size(360, 600),
+            MaximumVisibleToasts = 5,
+            ToastSpacing = 8
+        };
+        var first = CreateManualToast("first");
+        var largeHead = CreateManualToast(string.Join(" ", Enumerable.Repeat("large head", 16)));
+        var smallLater = CreateManualToast("small later");
+        first.Width = largeHead.Width = smallLater.Width = 240;
+        var firstHeight = first.CalculatePreferredHeightForCurrentWidth();
+        var largeHeight = largeHead.CalculatePreferredHeightForCurrentWidth();
+        var smallHeight = smallLater.CalculatePreferredHeightForCurrentWidth();
+        Assert.That(largeHeight, Is.GreaterThan(smallHeight));
+        container.MaximumStackHeightPixels = firstHeight + container.ToastSpacing + smallHeight;
+
+        container.ShowToast(first);
+        container.ShowToast(largeHead);
+        container.ShowToast(smallLater);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(first.Visible, Is.True);
+            Assert.That(largeHead.Visible, Is.False);
+            Assert.That(smallLater.Visible, Is.False);
+        }));
+
+        first.Dismiss();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(largeHead.Visible, Is.True);
+            Assert.That(smallLater.Visible, Is.False);
+        }));
+    }
+
+    [Test]
+    public void ShrinkingHeightReturnsNewestExcessToQueueWithoutDismissal()
+    {
+        using var container = new BootstrapToastContainer
+        {
+            Size = new Size(360, 600),
+            MaximumVisibleToasts = 5,
+            ToastSpacing = 8
+        };
+        var first = CreateManualToast("first");
+        var second = CreateManualToast("second");
+        var third = CreateManualToast("third");
+        first.Width = second.Width = third.Width = 240;
+        container.ShowToast(first);
+        container.ShowToast(second);
+        container.ShowToast(third);
+        var dismissed = 0;
+        third.Dismissed += (_, _) => dismissed++;
+
+        container.MaximumStackHeightPixels = first.Height + container.ToastSpacing + second.Height;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(first.Visible, Is.True);
+            Assert.That(second.Visible, Is.True);
+            Assert.That(third.Visible, Is.False);
+            Assert.That(dismissed, Is.Zero);
+        }));
+
+        first.Dismiss();
+        Assert.That(third.Visible, Is.True);
+    }
+
     private static BootstrapToast CreateManualToast(string text)
     {
         return new BootstrapToast

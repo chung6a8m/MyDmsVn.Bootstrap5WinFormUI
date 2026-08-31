@@ -58,6 +58,7 @@ public class BootstrapToastContainer : Panel
     private BootstrapToastPlacement _placement = BootstrapToastPlacement.TopRight;
     private int _toastSpacing = 8;
     private int _maximumVisibleToasts = 5;
+    private int? _maximumStackHeightPixels;
     private BootstrapAnimation? _reflowAnimation;
     private bool _suppressPromotion;
     private bool _disposing;
@@ -126,6 +127,8 @@ public class BootstrapToastContainer : Panel
             }
 
             _toastSpacing = value;
+            ReconcileVisibleConstraints();
+            PromoteQueuedToasts();
             StartReflow();
         }
     }
@@ -150,7 +153,30 @@ public class BootstrapToastContainer : Panel
             }
 
             _maximumVisibleToasts = value;
-            ReconcileMaximumVisible();
+            ReconcileVisibleConstraints();
+            PromoteQueuedToasts();
+            StartReflow();
+        }
+    }
+
+    internal int? MaximumStackHeightPixels
+    {
+        get => _maximumStackHeightPixels;
+        set
+        {
+            if (value.HasValue && value.Value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Maximum stack height must be greater than zero.");
+            }
+
+            if (_maximumStackHeightPixels == value)
+            {
+                return;
+            }
+
+            _maximumStackHeightPixels = value;
+            RecomputeOwnedHeights();
+            ReconcileVisibleConstraints();
             PromoteQueuedToasts();
             StartReflow();
         }
@@ -198,14 +224,8 @@ public class BootstrapToastContainer : Panel
             toast.NotifyHostVisibilityChanged(Visible);
             _entries.Add(entry);
 
-            if (CountOccupiedSlots() < _maximumVisibleToasts)
-            {
-                BeginEnter(entry);
-            }
-            else
-            {
-                toast.NotifyEnterStarted();
-            }
+            toast.NotifyEnterStarted();
+            PromoteQueuedToasts();
         }
         catch
         {
@@ -272,6 +292,8 @@ public class BootstrapToastContainer : Panel
     {
         base.OnDpiChangedAfterParent(e);
         RecomputeOwnedHeights();
+        ReconcileVisibleConstraints();
+        PromoteQueuedToasts();
         CancelReflow();
         SnapForHostGeometryChange();
     }
@@ -487,7 +509,7 @@ public class BootstrapToastContainer : Panel
         while (CountOccupiedSlots() < _maximumVisibleToasts)
         {
             var next = _entries.FirstOrDefault(entry => entry.State == BootstrapToastHostState.Queued);
-            if (next is null)
+            if (next is null || !CanOccupyNextVisibleSlot(next))
             {
                 break;
             }
@@ -496,10 +518,10 @@ public class BootstrapToastContainer : Panel
         }
     }
 
-    private void ReconcileMaximumVisible()
+    private void ReconcileVisibleConstraints()
     {
         CancelReflow();
-        while (CountOccupiedSlots() > _maximumVisibleToasts)
+        while (!OccupiedStackFitsConstraints())
         {
             var candidate = _entries.LastOrDefault(entry =>
                 entry.State == BootstrapToastHostState.Visible ||
@@ -514,6 +536,43 @@ public class BootstrapToastContainer : Panel
             candidate.Toast.NotifyEnterStarted();
             candidate.Toast.Visible = false;
         }
+    }
+
+    private bool OccupiedStackFitsConstraints()
+    {
+        var occupied = _entries
+            .Where(entry => entry.State != BootstrapToastHostState.Queued && !entry.Toast.IsDisposed)
+            .ToArray();
+        if (occupied.Length > _maximumVisibleToasts)
+        {
+            return false;
+        }
+
+        return !_maximumStackHeightPixels.HasValue ||
+               CalculateStackHeight(occupied) <= _maximumStackHeightPixels.Value;
+    }
+
+    private bool CanOccupyNextVisibleSlot(ToastEntry candidate)
+    {
+        if (!_maximumStackHeightPixels.HasValue)
+        {
+            return true;
+        }
+
+        RecomputeHeight(candidate.Toast);
+        var occupied = _entries
+            .Where(entry => entry.State != BootstrapToastHostState.Queued && !entry.Toast.IsDisposed)
+            .Concat(new[] { candidate })
+            .ToArray();
+        return CalculateStackHeight(occupied) <= _maximumStackHeightPixels.Value;
+    }
+
+    private int CalculateStackHeight(IReadOnlyList<ToastEntry> entries)
+    {
+        return BootstrapToastLayoutLogic.CalculateRequiredStackHeight(
+            entries.Select(entry => entry.Toast.Size).ToArray(),
+            _toastSpacing,
+            GetCurrentDpi());
     }
 
     private int CountOccupiedSlots()
@@ -532,12 +591,15 @@ public class BootstrapToastContainer : Panel
         }
     }
 
-    private static void RecomputeHeight(BootstrapToast toast)
+    private void RecomputeHeight(BootstrapToast toast)
     {
         var preferredHeight = toast.CalculatePreferredHeightForCurrentWidth();
-        if (toast.Height != preferredHeight)
+        var resolvedHeight = _maximumStackHeightPixels.HasValue
+            ? Math.Min(preferredHeight, _maximumStackHeightPixels.Value)
+            : preferredHeight;
+        if (toast.Height != resolvedHeight)
         {
-            toast.Height = preferredHeight;
+            toast.Height = resolvedHeight;
         }
     }
 
@@ -555,6 +617,8 @@ public class BootstrapToastContainer : Panel
         }
 
         RecomputeHeight(toast);
+        ReconcileVisibleConstraints();
+        PromoteQueuedToasts();
         if (entry.State == BootstrapToastHostState.Visible)
         {
             StartReflow();
@@ -562,6 +626,10 @@ public class BootstrapToastContainer : Panel
         else if (entry.State == BootstrapToastHostState.Entering)
         {
             SnapForHostGeometryChange();
+        }
+        else
+        {
+            StartReflow();
         }
     }
 
