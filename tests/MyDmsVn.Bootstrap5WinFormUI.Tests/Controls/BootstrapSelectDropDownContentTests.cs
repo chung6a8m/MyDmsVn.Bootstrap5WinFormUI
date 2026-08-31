@@ -121,6 +121,47 @@ public sealed class BootstrapSelectDropDownContentTests
         }));
     }
 
+    [Test]
+    public void RealThemeManagerSwitchRethemesSameSearchCompositionWithoutLosingState()
+    {
+        using var content = new BootstrapSelectDropDownContent
+        {
+            Size = new Size(340, 180)
+        };
+
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+        content.ApplyPresentation(
+            new BootstrapSelectRenderer(),
+            BootstrapThemeManager.CurrentTheme,
+            96);
+        content.SearchText = "Northwind";
+        content.PerformLayout();
+
+        var search = Descendants(content).OfType<BootstrapTextBox>().Single();
+        var native = Descendants(search).OfType<TextBox>().Single();
+        var results = Descendants(content).OfType<BootstrapSelectResultsView>().Single();
+        var lightHostColor = search.Parent!.BackColor;
+
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        content.ApplyPresentation(
+            new BootstrapSelectRenderer(),
+            BootstrapThemeManager.CurrentTheme,
+            96);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(Descendants(content).OfType<BootstrapTextBox>().Single(), Is.SameAs(search));
+            Assert.That(Descendants(content).OfType<BootstrapSelectResultsView>().Single(), Is.SameAs(results));
+            Assert.That(content.SearchText, Is.EqualTo("Northwind"));
+            Assert.That(native.BorderStyle, Is.EqualTo(BorderStyle.None));
+            Assert.That(search.Parent!.BackColor, Is.EqualTo(BootstrapThemeManager.CurrentTheme.Colors.Surface));
+            Assert.That(search.Parent!.BackColor, Is.Not.EqualTo(lightHostColor));
+            Assert.That(results.Left, Is.EqualTo(0));
+            Assert.That(results.Width, Is.EqualTo(content.ClientSize.Width));
+        }));
+    }
+
     private static BootstrapSelectDropDownContent CreatePresentedContent(int dpi)
     {
         var content = new BootstrapSelectDropDownContent
