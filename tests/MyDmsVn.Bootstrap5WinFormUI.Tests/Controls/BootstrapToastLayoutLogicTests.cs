@@ -96,6 +96,38 @@ public sealed class BootstrapToastLayoutLogicTests
     }
 
     [Test]
+    public void CalculateRequiredStackHeight_AddsHeightsAndScaledGaps()
+    {
+        var sizes = new[] { new Size(320, 80), new Size(320, 100), new Size(320, 120) };
+
+        var height = BootstrapToastLayoutLogic.CalculateRequiredStackHeight(
+            sizes,
+            logicalSpacing: 8,
+            dpi: 96);
+
+        Assert.That(height, Is.EqualTo(80 + 8 + 100 + 8 + 120));
+    }
+
+    [Test]
+    public void CalculateRequiredStackHeight_ValidatesInputsAndSaturatesOverflow()
+    {
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(BootstrapToastLayoutLogic.CalculateRequiredStackHeight(Array.Empty<Size>(), 8, 96), Is.Zero);
+            Assert.That(
+                BootstrapToastLayoutLogic.CalculateRequiredStackHeight(
+                    new[] { new Size(1, int.MaxValue), new Size(1, int.MaxValue) },
+                    8,
+                    96),
+                Is.EqualTo(int.MaxValue));
+            Assert.Throws<ArgumentNullException>((Action)(() => BootstrapToastLayoutLogic.CalculateRequiredStackHeight(null!, 8, 96)));
+            Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapToastLayoutLogic.CalculateRequiredStackHeight(ToastSizes, -1, 96)));
+            Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapToastLayoutLogic.CalculateRequiredStackHeight(ToastSizes, 8, 0)));
+            Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapToastLayoutLogic.CalculateRequiredStackHeight(new[] { new Size(1, -1) }, 8, 96)));
+        }));
+    }
+
+    [Test]
     public void DefaultMetricsMatchStage8LogicalContract()
     {
         var actual = BootstrapToastLayoutLogic.ResolveMetrics(BootstrapThemeMetrics.Default, 96);

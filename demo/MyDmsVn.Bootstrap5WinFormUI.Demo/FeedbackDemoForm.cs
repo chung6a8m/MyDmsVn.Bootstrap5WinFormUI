@@ -28,6 +28,8 @@ public sealed class FeedbackDemoForm : Form
     private readonly Label _dismissStatus = new Label();
     private readonly Button _restoreAlertsButton = new Button();
     private readonly BootstrapToastContainer _toastContainer = new BootstrapToastContainer();
+    private readonly BootstrapToastService _toastService = new BootstrapToastService();
+    private readonly Label _globalToastUnreadStatus = new Label();
     private readonly IContainer _components;
     private readonly BootstrapTooltip _defaultTooltip;
     private readonly BootstrapTooltip _semanticTooltip;
@@ -38,6 +40,7 @@ public sealed class FeedbackDemoForm : Form
     private readonly BootstrapPopover _interactivePopover;
     private readonly FlowLayoutPanel _interactivePopoverContent;
     private readonly Label _popoverStatus = new Label();
+    private bool _ownedResourcesDisposed;
     private int _toastSequence;
 
     public FeedbackDemoForm()
@@ -88,17 +91,23 @@ public sealed class FeedbackDemoForm : Form
         AddAlertsSection();
         AddTooltipsSection();
         AddToastsSection();
+        AddGlobalToastServiceSection();
         AddDpiGuidanceSection();
 
+        _toastService.HistoryChanged += OnGlobalToastHistoryChanged;
+        UpdateGlobalToastUnreadStatus();
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         ApplyTheme(BootstrapThemeManager.CurrentTheme);
     }
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing)
+        if (disposing && !_ownedResourcesDisposed)
         {
+            _ownedResourcesDisposed = true;
             BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+            _toastService.HistoryChanged -= OnGlobalToastHistoryChanged;
+            _toastService.Dispose();
             _components.Dispose();
             if (!_interactivePopoverContent.IsDisposed)
             {
@@ -410,6 +419,88 @@ public sealed class FeedbackDemoForm : Form
         _content.Controls.Add(group);
     }
 
+    private void AddGlobalToastServiceSection()
+    {
+        var group = CreateGroup("Global Toast service and notification center");
+        var stack = CreateVerticalStack();
+        var notificationCommands = CreateBadgeRow();
+        notificationCommands.Controls.Add(CreateActionButton("Show global Toast", "Show global Toast", (_, _) =>
+            ShowGlobalToast("Global notification", "This auto-hide Toast is routed to the monitor containing this Feedback page.", autoHide: true)));
+        notificationCommands.Controls.Add(CreateActionButton("Show non-auto-hide", "Show non-auto-hide Toast", (_, _) =>
+            ShowGlobalToast("Persistent notification", "Dismiss this Toast explicitly; its history remains available in the center.", autoHide: false)));
+        notificationCommands.Controls.Add(CreateActionButton("Burst 7", "Burst 7 notifications", (_, _) => ShowGlobalToastBurst(7)));
+        notificationCommands.Controls.Add(CreateActionButton("History disabled", "Show history-disabled Toast", (_, _) =>
+            _toastService.Show(new BootstrapToastOptions
+            {
+                Title = "Transient only",
+                Text = "IncludeInHistory=false leaves the unread count unchanged.",
+                Variant = BootstrapVariant.Secondary,
+                AutoHide = false,
+                IncludeInHistory = false
+            }, this)));
+        notificationCommands.Controls.Add(CreateActionButton("Long content", "Show long global Toast", (_, _) =>
+            ShowGlobalToast(
+                "Oversized notification",
+                "This deliberately long notification exercises screen-height constraints while preserving the full text in notification history.\r\n" +
+                "Move the demo between monitors and repeat at each supported DPI scale. The transient host remains bounded to the working area, while the notification center retains all content for later reading.",
+                autoHide: false)));
+
+        var centerCommands = CreateBadgeRow();
+        centerCommands.Controls.Add(CreateActionButton("Open center", "Open notification center", (_, _) => _toastService.ShowNotificationCenter(this)));
+        centerCommands.Controls.Add(CreateActionButton("Hide center", "Hide notification center", (_, _) => _toastService.HideNotificationCenter()));
+        centerCommands.Controls.Add(CreateActionButton("Mark all read", "Mark all global notifications read", (_, _) => _toastService.MarkAllAsRead()));
+        centerCommands.Controls.Add(CreateActionButton("Clear history", "Clear global notification history", (_, _) => _toastService.ClearHistory()));
+        centerCommands.Controls.Add(CreateActionButton("Dismiss live Toasts", "Dismiss all global Toasts", (_, _) => _toastService.DismissAll()));
+
+        var placementCommands = CreateBadgeRow();
+        placementCommands.Controls.Add(CreatePlacementButton("Top left", "Set global Toast TopLeft", BootstrapToastPlacement.TopLeft));
+        placementCommands.Controls.Add(CreatePlacementButton("Top right", "Set global Toast TopRight", BootstrapToastPlacement.TopRight));
+        placementCommands.Controls.Add(CreatePlacementButton("Bottom left", "Set global Toast BottomLeft", BootstrapToastPlacement.BottomLeft));
+        placementCommands.Controls.Add(CreatePlacementButton("Bottom right", "Set global Toast BottomRight", BootstrapToastPlacement.BottomRight));
+        var topMost = new CheckBox
+        {
+            AutoSize = true,
+            Text = "TopMost",
+            Checked = _toastService.TopMost,
+            AccessibleName = "Global Toast TopMost",
+            Margin = new Padding(12, 7, 3, 3)
+        };
+        topMost.CheckedChanged += (_, _) => _toastService.TopMost = topMost.Checked;
+        placementCommands.Controls.Add(topMost);
+
+        var capacity = new NumericUpDown
+        {
+            Minimum = 0,
+            Maximum = 500,
+            Value = _toastService.HistoryCapacity,
+            Width = 72,
+            AccessibleName = "Global Toast history capacity",
+            Margin = new Padding(12, 4, 3, 3)
+        };
+        capacity.ValueChanged += (_, _) => _toastService.HistoryCapacity = (int)capacity.Value;
+        placementCommands.Controls.Add(new Label { AutoSize = true, Text = "History capacity", Margin = new Padding(8, 8, 0, 0) });
+        placementCommands.Controls.Add(capacity);
+
+        _globalToastUnreadStatus.AutoSize = true;
+        _globalToastUnreadStatus.AccessibleName = "Global Toast unread count";
+        _globalToastUnreadStatus.Margin = new Padding(3, 6, 3, 4);
+
+        stack.Controls.Add(notificationCommands);
+        stack.Controls.Add(centerCommands);
+        stack.Controls.Add(placementCommands);
+        stack.Controls.Add(_globalToastUnreadStatus);
+        stack.Controls.Add(new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(780, 0),
+            AccessibleName = "Global Toast service guidance",
+            Text = "All Show/Open actions pass this page as relativeTo, so routing follows the monitor containing the demo. Unread updates come from HistoryChanged without polling. Verify all placements, TopMost off/on, Light/Dark, reduced motion, Alt+F4 hide/reopen, monitor reconfiguration, keyboard focus, and rapid open/hide/show/dismiss cycles.",
+            Margin = new Padding(3, 4, 3, 8)
+        });
+        group.Controls.Add(stack);
+        _content.Controls.Add(group);
+    }
+
     private FlowLayoutPanel CreateTooltipTimingRow()
     {
         var row = CreateBadgeRow();
@@ -536,6 +627,54 @@ public sealed class FeedbackDemoForm : Form
         {
             ShowToast(variants[index % variants.Length], $"Burst {index + 1}", $"FIFO queue demonstration item {index + 1} of {count}.", autoHide: false);
         }
+    }
+
+    private void ShowGlobalToast(string title, string text, bool autoHide)
+    {
+        _toastService.Show(new BootstrapToastOptions
+        {
+            Title = title,
+            Text = text,
+            Variant = BootstrapVariant.Info,
+            AutoHide = autoHide,
+            AutoHideDelay = 3000
+        }, this);
+    }
+
+    private void ShowGlobalToastBurst(int count)
+    {
+        var variants = new[]
+        {
+            BootstrapVariant.Success,
+            BootstrapVariant.Warning,
+            BootstrapVariant.Danger,
+            BootstrapVariant.Info
+        };
+        for (var index = 0; index < count; index++)
+        {
+            _toastService.Show(new BootstrapToastOptions
+            {
+                Title = $"Global burst {index + 1}",
+                Text = $"Per-screen FIFO notification {index + 1} of {count}.",
+                Variant = variants[index % variants.Length],
+                AutoHide = false
+            }, this);
+        }
+    }
+
+    private Button CreatePlacementButton(string text, string accessibleName, BootstrapToastPlacement placement)
+    {
+        return CreateActionButton(text, accessibleName, (_, _) => _toastService.Placement = placement);
+    }
+
+    private void OnGlobalToastHistoryChanged(object? sender, EventArgs e)
+    {
+        UpdateGlobalToastUnreadStatus();
+    }
+
+    private void UpdateGlobalToastUnreadStatus()
+    {
+        _globalToastUnreadStatus.Text = $"Unread: {_toastService.UnreadCount}";
     }
 
     private void CycleToastPlacement()

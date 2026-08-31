@@ -13,7 +13,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "d11d17eabf24643ec2e25bbc50b04cac693be7206ea303905991c533130040ee";
+    private const string ApprovedV1Fingerprint = "4e9893379e322029068a2c32e195679311ed5a844549c5d0e22685cb6e60da32";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -147,6 +147,48 @@ public sealed class Phase16PublicApiBaselineTests
             Assert.That(typeof(BootstrapCalendar).GetEvent("SelectionActivated", BindingFlags.Instance | BindingFlags.Public), Is.Null);
             Assert.That(typeof(BootstrapCalendar).GetProperty("FocusedDate", BindingFlags.Instance | BindingFlags.Public), Is.Null);
             Assert.That(typeof(BootstrapCalendarPicker).GetProperty("ActiveCalendar", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+        }));
+    }
+
+    [Test]
+    public void GlobalToastApiExportsOnlyTheReviewedPublicContract()
+    {
+        var assembly = typeof(BootstrapToastService).Assembly;
+        var toastExports = assembly.GetExportedTypes()
+            .Select(type => type.FullName)
+            .Where(name => name is not null &&
+                           (name.IndexOf("Toast", StringComparison.Ordinal) >= 0 ||
+                            name.IndexOf("Notification", StringComparison.Ordinal) >= 0))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(toastExports, Is.EqualTo(new[]
+            {
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapToast",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapToastContainer",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapToastHistoryItem",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapToastOptions",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapToastPlacement",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapToastService"
+            }));
+            Assert.That(GetDeclaredPublicPropertyNames(typeof(BootstrapToastOptions)), Is.EqualTo(new[]
+            {
+                "AnimationDuration", "AutoHide", "AutoHideDelay", "Dismissible", "Icon",
+                "IncludeInHistory", "Text", "Title", "Variant"
+            }));
+            Assert.That(GetDeclaredPublicPropertyNames(typeof(BootstrapToastHistoryItem)), Is.EqualTo(new[]
+            {
+                "CreatedAtUtc", "Id", "IsRead", "Text", "Title", "Variant"
+            }));
+            Assert.That(GetDeclaredPublicMethodNames(typeof(BootstrapToastService)), Is.EqualTo(new[]
+            {
+                "ClearHistory", "DismissAll", "Dispose", "GetHistory", "HideNotificationCenter",
+                "MarkAllAsRead", "MarkAsRead", "Show", "Show", "ShowNotificationCenter", "ToggleNotificationCenter"
+            }));
+            Assert.That(toastExports.Any(name => name!.IndexOf("Host", StringComparison.Ordinal) >= 0), Is.False);
+            Assert.That(toastExports.Any(name => name!.IndexOf("Window", StringComparison.Ordinal) >= 0), Is.False);
         }));
     }
 

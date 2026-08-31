@@ -72,6 +72,51 @@ internal readonly struct BootstrapToastContentLayout
 
 internal static class BootstrapToastLayoutLogic
 {
+    public static int CalculateRequiredStackHeight(
+        IReadOnlyList<Size> toastSizes,
+        int logicalSpacing,
+        int dpi)
+    {
+        if (toastSizes is null)
+        {
+            throw new ArgumentNullException(nameof(toastSizes));
+        }
+
+        if (logicalSpacing < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(logicalSpacing), logicalSpacing, "Toast spacing cannot be negative.");
+        }
+
+        if (dpi <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dpi), dpi, "DPI must be greater than zero.");
+        }
+
+        long height = 0;
+        var spacing = DpiScaler.Scale(logicalSpacing, dpi);
+        for (var index = 0; index < toastSizes.Count; index++)
+        {
+            var size = toastSizes[index];
+            if (size.Width < 0 || size.Height < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(toastSizes), "Toast sizes cannot contain negative dimensions.");
+            }
+
+            if (index > 0)
+            {
+                height += spacing;
+            }
+
+            height += size.Height;
+            if (height >= int.MaxValue)
+            {
+                return int.MaxValue;
+            }
+        }
+
+        return (int)height;
+    }
+
     public static IReadOnlyList<Rectangle> CalculateStackBounds(
         Rectangle containerBounds,
         IReadOnlyList<Size> toastSizes,
