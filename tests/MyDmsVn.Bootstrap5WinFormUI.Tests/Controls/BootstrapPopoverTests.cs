@@ -124,6 +124,101 @@ public sealed class BootstrapPopoverTests
         }
     }
 
+    private sealed class NestedContainerPopoverFixture : IDisposable
+    {
+        public NestedContainerPopoverFixture(bool containerTabStop)
+        {
+            Form = new Form
+            {
+                ShowInTaskbar = false,
+                StartPosition = FormStartPosition.Manual,
+                Bounds = new Rectangle(200, 200, 700, 500)
+            };
+            Target = new Button
+            {
+                Text = "Open",
+                Location = new Point(30, 30),
+                Size = new Size(120, 30)
+            };
+            Content = new Panel { Size = new Size(300, 150) };
+            Before = new TextBox
+            {
+                Location = new Point(10, 10),
+                Size = new Size(220, 23),
+                TabIndex = 0
+            };
+            var container = new UserControl
+            {
+                Location = new Point(10, 40),
+                Size = new Size(260, 60),
+                TabIndex = 1,
+                TabStop = containerTabStop
+            };
+            NestedEditor = new TextBox
+            {
+                Location = new Point(0, 0),
+                Size = new Size(150, 23),
+                TabIndex = 0
+            };
+            NestedButton = new Button
+            {
+                Text = "Nested",
+                Location = new Point(160, 0),
+                Size = new Size(90, 23),
+                TabIndex = 1
+            };
+            After = new TextBox
+            {
+                Location = new Point(10, 110),
+                Size = new Size(220, 23),
+                TabIndex = 2
+            };
+            container.Controls.Add(NestedEditor);
+            container.Controls.Add(NestedButton);
+            Content.Controls.Add(Before);
+            Content.Controls.Add(container);
+            Content.Controls.Add(After);
+            Form.Controls.Add(Target);
+            Popover = new BootstrapPopover
+            {
+                Target = Target,
+                Content = Content
+            };
+        }
+
+        public Form Form { get; }
+
+        public Button Target { get; }
+
+        public Panel Content { get; }
+
+        public TextBox Before { get; }
+
+        public TextBox NestedEditor { get; }
+
+        public Button NestedButton { get; }
+
+        public TextBox After { get; }
+
+        public BootstrapPopover Popover { get; }
+
+        public void Show()
+        {
+            Form.Show();
+            Form.Activate();
+            Target.Focus();
+            Popover.Show();
+            Application.DoEvents();
+        }
+
+        public void Dispose()
+        {
+            Popover.Dispose();
+            Content.Dispose();
+            Form.Dispose();
+        }
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRectangle
     {
@@ -407,6 +502,48 @@ public sealed class BootstrapPopoverTests
         Assert.That(fixture.Option.Focused, Is.True);
         SendTab(fixture.Content, forward: false);
         Assert.That(fixture.Editor.Focused, Is.True);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TabMovesForwardThroughNestedUserControl(bool containerTabStop)
+    {
+        using var fixture = new NestedContainerPopoverFixture(containerTabStop);
+        fixture.Show();
+
+        Assert.That(fixture.Before.Focused, Is.True);
+        SendTab(fixture.Content, forward: true);
+        Assert.That(fixture.NestedEditor.Focused, Is.True);
+        SendTab(fixture.Content, forward: true);
+        Assert.That(fixture.NestedButton.Focused, Is.True);
+        SendTab(fixture.Content, forward: true);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(fixture.After.Focused, Is.True);
+            Assert.That(fixture.Popover.IsOpen, Is.True);
+        }));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ShiftTabMovesBackwardThroughNestedUserControl(bool containerTabStop)
+    {
+        using var fixture = new NestedContainerPopoverFixture(containerTabStop);
+        fixture.Show();
+        fixture.After.Focus();
+
+        SendTab(fixture.Content, forward: false);
+        Assert.That(fixture.NestedButton.Focused, Is.True);
+        SendTab(fixture.Content, forward: false);
+        Assert.That(fixture.NestedEditor.Focused, Is.True);
+        SendTab(fixture.Content, forward: false);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(fixture.Before.Focused, Is.True);
+            Assert.That(fixture.Popover.IsOpen, Is.True);
+        }));
     }
 
     [Test]

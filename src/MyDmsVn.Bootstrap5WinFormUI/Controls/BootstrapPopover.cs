@@ -510,14 +510,43 @@ public class BootstrapPopover : Component
 
     private static IEnumerable<Control> EnumerateFocusableForward(Control root)
     {
-        if (IsFocusable(root))
+        var descendantFound = false;
+        foreach (var descendant in EnumerateFocusableDescendants(root))
+        {
+            descendantFound = true;
+            yield return descendant;
+        }
+
+        if (!descendantFound && IsFocusable(root))
         {
             yield return root;
         }
+    }
 
+    private static IEnumerable<Control> EnumerateFocusableDescendants(Control root)
+    {
         Control? child = null;
         while ((child = root.GetNextControl(child, true)) is not null)
         {
+            if (child is ContainerControl container)
+            {
+                // The parent scope's GetNextControl traversal stops at focus-managing
+                // containers, so enumerate that container's native tab scope explicitly.
+                var descendantFound = false;
+                foreach (var descendant in EnumerateFocusableDescendants(container))
+                {
+                    descendantFound = true;
+                    yield return descendant;
+                }
+
+                if (!descendantFound && IsFocusable(container))
+                {
+                    yield return container;
+                }
+
+                continue;
+            }
+
             if (IsFocusable(child))
             {
                 yield return child;
