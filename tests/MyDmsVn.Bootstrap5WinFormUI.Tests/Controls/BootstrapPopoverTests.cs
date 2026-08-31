@@ -31,6 +31,13 @@ public sealed class BootstrapPopoverTests
                 Text = "Open",
                 Location = new Point(30, 30),
                 Size = new Size(120, 30),
+                TabIndex = 1
+            };
+            Before = new Button
+            {
+                Text = "Before",
+                Location = new Point(30, 80),
+                Size = new Size(120, 30),
                 TabIndex = 0
             };
             Outside = new Button
@@ -38,7 +45,7 @@ public sealed class BootstrapPopoverTests
                 Text = "Outside",
                 Location = new Point(180, 30),
                 Size = new Size(120, 30),
-                TabIndex = 1
+                TabIndex = 2
             };
             Content = new FlowLayoutPanel
             {
@@ -66,6 +73,7 @@ public sealed class BootstrapPopoverTests
             Content.Controls.Add(Editor);
             Content.Controls.Add(Option);
             Content.Controls.Add(Commands);
+            Form.Controls.Add(Before);
             Form.Controls.Add(Target);
             Form.Controls.Add(Outside);
             Popover = new BootstrapPopover
@@ -80,6 +88,8 @@ public sealed class BootstrapPopoverTests
         public Form Form { get; }
 
         public Button Target { get; }
+
+        public Button Before { get; }
 
         public Button Outside { get; }
 
@@ -420,6 +430,39 @@ public sealed class BootstrapPopoverTests
 
         SendTab(fixture, forward: false);
         Assert.That(fixture.Option.Focused, Is.True);
+    }
+
+    [Test]
+    public void ForwardTabFromLastContentControlClosesAndContinuesAfterTarget()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Show();
+        fixture.Close.Focus();
+
+        SendTab(fixture, forward: true);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(fixture.Popover.IsOpen, Is.False);
+            Assert.That(fixture.Outside.Focused, Is.True);
+            Assert.That(fixture.Target.Focused, Is.False);
+        }));
+    }
+
+    [Test]
+    public void BackwardTabFromFirstContentControlClosesAndContinuesBeforeTarget()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Show();
+
+        SendTab(fixture, forward: false);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(fixture.Popover.IsOpen, Is.False);
+            Assert.That(fixture.Before.Focused, Is.True);
+            Assert.That(fixture.Target.Focused, Is.False);
+        }));
     }
 
     [Test]

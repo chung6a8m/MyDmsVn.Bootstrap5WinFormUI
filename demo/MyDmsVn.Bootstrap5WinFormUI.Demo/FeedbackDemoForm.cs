@@ -351,13 +351,17 @@ public sealed class FeedbackDemoForm : Form
             MinimumSize = new Size(280, 0),
             AccessibleName = "Interactive Popover content"
         };
-        var heading = new Label { AutoSize = true, Text = "Interactive settings", AccessibleName = "Popover heading" };
-        var editor = new TextBox { Width = 240, Text = "Draft value", AccessibleName = "Popover text editor" };
-        var checkBox = new CheckBox { AutoSize = true, Text = "Enable option", AccessibleName = "Popover option" };
+        var heading = new Label { AutoSize = true, Text = "Interactive settings", AccessibleName = "Popover heading", TabIndex = 3 };
+        var editor = new TextBox { Width = 240, Text = "Draft value", AccessibleName = "Popover text editor", TabIndex = 0 };
+        var checkBox = new CheckBox { AutoSize = true, Text = "Enable option", AccessibleName = "Popover option", TabIndex = 1 };
         var commands = CreateBadgeRow();
+        commands.TabIndex = 2;
+        commands.TabStop = false;
         var apply = CreateActionButton("Apply", "Popover apply action", (_, _) =>
             _popoverStatus.Text = checkBox.Checked ? "Popover value applied with option." : "Popover value applied.");
         var close = CreateActionButton("Close", "Popover close action", (_, _) => _interactivePopover.Hide());
+        apply.TabIndex = 0;
+        close.TabIndex = 1;
         commands.Controls.Add(apply);
         commands.Controls.Add(close);
         content.Controls.Add(heading);
