@@ -106,6 +106,28 @@ public sealed class BootstrapTextBoxTests
     }
 
     [Test]
+    public void ProtectedEditorHooksPreserveSingleWrapperEventForwarding()
+    {
+        using var input = new BootstrapTextBoxProbe();
+        var textChangedCount = 0;
+        var keyDownCount = 0;
+        input.TextChanged += (_, _) => textChangedCount++;
+        input.KeyDown += (_, _) => keyDownCount++;
+
+        input.NativeEditor.Text = "candidate";
+        RaiseProtectedControlEvent(input.NativeEditor, "OnKeyDown", new KeyEventArgs(Keys.A));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.Text, Is.EqualTo("candidate"));
+            Assert.That(input.EditorTextChangedCount, Is.EqualTo(1));
+            Assert.That(textChangedCount, Is.EqualTo(1));
+            Assert.That(input.EditorKeyDownCount, Is.EqualTo(1));
+            Assert.That(keyDownCount, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
     public void PlaceholderIsMutedAndHidesAsSoonAsEditorReceivesFocus()
     {
         using var input = new BootstrapTextBox { PlaceholderText = "Email address" };
@@ -262,6 +284,27 @@ public sealed class BootstrapTextBoxTests
             LastDescriptor = descriptor;
             LastBounds = bounds;
             return true;
+        }
+    }
+
+    private sealed class BootstrapTextBoxProbe : BootstrapTextBox
+    {
+        public TextBox NativeEditor => Editor;
+
+        public int EditorTextChangedCount { get; private set; }
+
+        public int EditorKeyDownCount { get; private set; }
+
+        protected override void OnEditorTextChanged(EventArgs e)
+        {
+            EditorTextChangedCount++;
+            base.OnEditorTextChanged(e);
+        }
+
+        protected override void OnEditorKeyDown(KeyEventArgs e)
+        {
+            EditorKeyDownCount++;
+            base.OnEditorKeyDown(e);
         }
     }
 }
