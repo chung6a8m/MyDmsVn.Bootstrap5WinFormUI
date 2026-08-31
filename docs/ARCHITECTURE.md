@@ -106,6 +106,24 @@ BootstrapPopover only
 
 The runtime adapter preserves the engine contract exactly. `CollisionBehavior.None` may place an overlay outside the selected monitor working area, and `Flip` changes to the exact opposite side without an implicit cross-axis shift. Native window correction does not activate the overlay or change its Z-order.
 
+### Global Toast service composition
+
+The application-placed `BootstrapToast` + `BootstrapToastContainer` path remains supported and is the primitive ownership boundary. `BootstrapToastService` is a higher-level, UI-thread-affine composition over those controls; it does not move screen, history, or window concerns into the foundation layers and exposes no public host, center, resolver, dispatcher, or rendering helper.
+
+```text
+BootstrapToastService
+  +-- semantic bounded in-memory history
+  +-- one canonical transient host per screen
+  |     +-- one BootstrapToastContainer (strict FIFO, height bounded)
+  +-- one reusable notification-center window
+```
+
+The service resolves the target screen from `relativeTo` and passes explicit work-area pixels and per-monitor DPI through its internal layout boundary, including negative virtual-screen coordinates. Transient hosts are borderless, taskbar-hidden, non-activating tool windows. Their interactive/painted area is constrained with a WinForms `Region`; `TransparencyKey` is not used. When a screen disappears, its host retires and dismisses owned Toasts rather than being rebound or allowed to overlap a surviving screen. A height constraint may reduce the visible set, but never permits a newer item to bypass the FIFO head.
+
+History records semantic title/text/variant/time/read state and is independent from the lifetime of transient controls. It is process-memory-only: there is no OS notification bridge, persistence provider, or cross-process synchronization. A committed history mutation refreshes the internal notification center before the public `HistoryChanged` event is invoked. Consequently, an exception thrown by an application event handler propagates only after framework state and UI are committed.
+
+All public service operations are confined to the creating WinForms UI thread. Framework-owned display and application-exit callbacks marshal to that thread through a private dispatcher. User close and Alt+F4 hide the notification center so the same instance can reopen; service disposal takes the distinct terminal path that unsubscribes callbacks and actually disposes the center and all hosts.
+
 ## 5. Foundation responsibilities
 
 ### 5.1 Compatibility

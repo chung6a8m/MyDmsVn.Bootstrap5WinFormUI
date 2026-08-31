@@ -678,6 +678,14 @@ Stage 8 participates in the Phase 16 public/protected API fingerprint gate. The 
 
 Both `net48` and `net8.0-windows` must pass the focused Toast/Feedback/demo suite, shared Animation/Alert regressions, and the complete test suite before Stage 8 is considered complete.
 
+### Global Toast service verification
+
+Pure tests cover bounded semantic history, effective mutations, newest-first snapshots, strict FIFO under maximum-height pressure, work-area insets with negative coordinates, all four notification-center anchors, and explicit 96/120/144/168/192 per-screen DPI calculations. STA tests cover non-activating per-screen host styles, `Region`-based hit/paint bounds (never `TransparencyKey`), atomic Show rollback, option/renderer snapshots, UI-thread affinity and callback dispatch, topology retirement, reusable center close/hide behavior, row/keyboard activation, refresh-before-`HistoryChanged` ordering, and deterministic disposal/subscription cleanup on both TFMs.
+
+The Feedback demo contract verifies global auto-hide and persistent Toasts, Burst 7, `IncludeInHistory=false`, unread updates from `HistoryChanged` without polling, center open/mark-all/clear, TopMost, all placements, and `relativeTo` routing. Manual validation additionally covers real mixed-DPI monitors, monitor removal/reconfiguration, focus/non-activation, Alt+F4 hide/reopen, long/oversized content, capacity reduction, and rapid lifecycle/resource stress. No result may be interpreted as OS notification or persistence coverage; neither integration exists.
+
+The public/protected API fingerprint must fail against the prior approved hash before review. Approval is limited to `BootstrapToastOptions`, `BootstrapToastHistoryItem`, and `BootstrapToastService`; host/center forms and controls, history store, screen/DPI resolver, dispatcher, height/topology APIs, rendering helpers, and test seams must remain non-exported.
+
 ## 13. Overlay placement and Popover verification
 
 Pure tests cover all explicit placements, deterministic Auto selection, exact-opposite Flip, cross-axis Shift, FlipAndShift ordering, RTL Start/End, padded boundaries, oversized popups, negative coordinates, saturation, and invalid values on both TFMs.

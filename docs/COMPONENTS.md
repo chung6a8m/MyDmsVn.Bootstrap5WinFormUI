@@ -841,6 +841,34 @@ After the final line, use the Toast/container API to request dismissal rather th
 
 Manual verification: choose **Feedback** in the integrated demo. Exercise manual and auto-hide Toasts, title/body/icon/multiline/disabled states, Burst 8 with `MaximumVisibleToasts = 3`, `DismissAll()`, all four placements, rapid show-then-dismiss, and Stress 100. Repeat with Light/Dark and Reduced motion, resize while Toasts are active, hide/show the host, switch theme during auto-hide, and repeat at 100/125/150/175/200% real Windows scaling. For resource soak, repeat stress/dismiss cycles and inspect process USER/GDI handles for unbounded growth.
 
+### BootstrapToastService and notification history
+
+Responsibility: compose the existing Toast/container primitive into application-level, per-screen transient notifications plus bounded semantic history and a reusable notification center.
+
+The only additional public concepts are `BootstrapToastOptions`, immutable `BootstrapToastHistoryItem`, and `BootstrapToastService`. Host windows, notification-center controls, history storage, monitor/DPI resolution, layout/render logic, dispatcher behavior, topology retirement, and test seams remain internal.
+
+- The service and `Default` are UI-thread-affine. Framework display/application callbacks marshal internally to the creating UI thread; callers must not call the public API from worker threads.
+- `Show(..., relativeTo)` snapshots caller options, resolves the target monitor, applies that monitor's explicit DPI and working area, then transfers the created Toast to one canonical per-screen host. The host is non-activating and uses `Region`, not `TransparencyKey`.
+- `Placement`, `ToastSpacing`, `MaximumVisibleToasts`, `ScreenMargin`, and `TopMost` update existing and future hosts. Height constraints preserve strict FIFO; a removed-screen host retires/dismisses rather than moving over a live screen.
+- `IncludeInHistory = false` affects history only. Otherwise, history stores semantic values independently of transient controls, is newest-first when read, bounded by `HistoryCapacity`, and exists only in memory. There is no persistence or OS notification integration.
+- `Show` is atomic with respect to history: a host failure rolls back the tentative record. Successful mutations refresh the internal center before raising `HistoryChanged`; an exception from an application handler occurs after the mutation is committed.
+- Activating an unread center row marks it read. Mark-all and clear are effective-mutation operations. User close, the close button, Escape, and Alt+F4 hide the center for reuse; service disposal closes and disposes it permanently.
+
+```csharp
+BootstrapToastService.Default.Show(
+    new BootstrapToastOptions
+    {
+        Title = "Saved",
+        Text = "The order was saved successfully.",
+        Variant = BootstrapVariant.Success
+    },
+    this);
+
+BootstrapToastService.Default.ShowNotificationCenter(this);
+```
+
+Manual verification: use the **Feedback** global-service section for Light/Dark, reduced motion, all real Windows 100/125/150/175/200% scales, every placement, TopMost off/on, single/burst/long content, auto-hide on/off, close dismissal, center row/mark-all/clear, Alt+F4 hide/reopen, capacity reduction, history-disabled Toasts, focus behavior, rapid stress, moving between monitors, and secondary-monitor removal/reconfiguration. History must survive host retirement and transient Toast appearance must not steal keyboard focus.
+
 ## BootstrapDatePicker
 
 Responsibility: provide a Bootstrap-themed date/time input while preserving native WinForms date state, range, formatting, checkbox, keyboard, localized display, and calendar-popup semantics.
