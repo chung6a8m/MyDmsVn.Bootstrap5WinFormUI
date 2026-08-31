@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -9,6 +11,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 
 [TestFixture]
 [Apartment(ApartmentState.STA)]
+[NonParallelizable]
 public sealed class BootstrapSelectInteractionTests
 {
     [Test]
@@ -190,8 +193,113 @@ public sealed class BootstrapSelectInteractionTests
         }));
     }
 
+    [Test]
+    public void PrintableInputStillFiltersLocalResultsThroughPopupSearch()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var select = new TestBootstrapSelect
+        {
+            Bounds = new Rectangle(20, 20, 220, 32)
+        };
+        select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        select.Items.Add(new BootstrapSelectItem(2, "Northwind"));
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+
+        Assert.That(select.Focus(), Is.True);
+        select.RaisePrintableKeyForTest('N');
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.VisibleResultItemTextsForTest, Does.Contain("Northwind"));
+            Assert.That(select.VisibleResultItemTextsForTest, Does.Not.Contain("Alpha"));
+        }));
+    }
+
+    [Test]
+    public void TabFromFocusedNativeSearchEditorClosesPopupAndContinuesOwnerTraversal()
+    {
+        using var form = new Form
+        {
+            ShowInTaskbar = false,
+            ClientSize = new Size(420, 160)
+        };
+        using var previous = new Button
+        {
+            Bounds = new Rectangle(20, 20, 100, 30),
+            TabIndex = 0,
+            Text = "Previous"
+        };
+        using var select = new TestBootstrapSelect
+        {
+            Bounds = new Rectangle(20, 60, 220, 32),
+            TabIndex = 1
+        };
+        using var next = new Button
+        {
+            Bounds = new Rectangle(20, 105, 100, 30),
+            TabIndex = 2,
+            Text = "Next"
+        };
+        select.Items.Add(new BootstrapSelectItem(1, "Northwind"));
+        form.Controls.Add(previous);
+        form.Controls.Add(select);
+        form.Controls.Add(next);
+        form.Show();
+        Application.DoEvents();
+
+        Assert.That(select.Focus(), Is.True);
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+
+        var native = Descendants(select.DropDownContentForTest!)
+            .OfType<TextBox>()
+            .Single();
+        Assert.That(native.Focus(), Is.True);
+        Application.DoEvents();
+        Assert.That(native.Focused, Is.True);
+
+        var message = Message.Create(
+            native.Handle,
+            0x0100,
+            (IntPtr)(int)Keys.Tab,
+            IntPtr.Zero);
+
+        Assert.That(native.PreProcessMessage(ref message), Is.True);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.False);
+            Assert.That(
+                next.Focused,
+                Is.True,
+                "Tab from the popup search editor must continue owner-relative WinForms traversal.");
+        }));
+    }
+
+    private static IEnumerable<Control> Descendants(Control root)
+    {
+        foreach (Control child in root.Controls)
+        {
+            yield return child;
+            foreach (var descendant in Descendants(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
     private sealed class TestBootstrapSelect : BootstrapSelect
     {
+        internal void RaisePrintableKeyForTest(char character)
+        {
+            OnKeyPress(new KeyPressEventArgs(character));
+        }
+
         internal bool ProcessDialogKeyForTest(Keys keyData)
         {
             return ProcessDialogKey(keyData);

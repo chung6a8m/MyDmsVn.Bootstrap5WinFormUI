@@ -22,6 +22,7 @@ public partial class BootstrapSelect
     internal int DropDownCreationCountForTest => _dropDownController?.CreationCount ?? 0;
     internal Rectangle DropDownBoundsForTest => _dropDownController?.CurrentBounds ?? Rectangle.Empty;
     internal string? HighlightedResultTextForTest => _dropDownController?.Content?.HighlightedRow?.Text;
+    internal BootstrapSelectDropDownContent? DropDownContentForTest => _dropDownController?.Content;
 
     internal IReadOnlyList<string> VisibleResultItemTextsForTest
     {
