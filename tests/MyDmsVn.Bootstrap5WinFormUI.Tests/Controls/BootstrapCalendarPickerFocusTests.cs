@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 public sealed class BootstrapCalendarPickerFocusTests
 {
     [Test]
-    public void PickerLeftMouseDownClaimsFocusBeforeNativePopupOpens()
+    public void PickerLeftMouseClickClaimsFocusBeforeNativePopupOpens()
     {
         using var form = new Form
         {
@@ -28,7 +28,12 @@ public sealed class BootstrapCalendarPickerFocusTests
             Location = new Point(24, 24),
             Size = new Size(240, 36)
         };
-        using var picker = new BootstrapCalendarPicker
+
+        Control? activeControlAtShow = null;
+        using var picker = new BootstrapCalendarPicker(
+            effectiveDpiProvider: () => 96,
+            hostedCalendarSetupCompleted: null,
+            showNativeDropDown: (_, _, _) => activeControlAtShow = form.ActiveControl)
         {
             Location = new Point(24, 80),
             Size = new Size(240, 36)
@@ -41,23 +46,23 @@ public sealed class BootstrapCalendarPickerFocusTests
 
         previous.Focus();
         Application.DoEvents();
-        Assert.That(previous.Focused, Is.True, "The regression setup requires another control to own focus first.");
+        Assert.That(form.ActiveControl, Is.SameAs(previous),
+            "The regression setup requires another control to own focus first.");
 
-        RaiseMouseDown(picker, MouseButtons.Left);
-        Application.DoEvents();
+        RaiseMouseClick(picker, MouseButtons.Left);
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(picker.Focused, Is.True,
-                "Mouse interaction must make the picker the pre-popup focus owner so native ToolStrip dismissal restores focus here.");
-            Assert.That(previous.Focused, Is.False,
-                "The previously active control must release focus before the native calendar popup opens.");
+            Assert.That(activeControlAtShow, Is.SameAs(picker),
+                "The picker must own focus before ToolStripDropDown.Show so native dismissal restores focus to the picker.");
+            Assert.That(form.ActiveControl, Is.SameAs(picker),
+                "Mouse activation must not leave the previously active control as the form focus owner.");
         }));
     }
 
-    private static void RaiseMouseDown(BootstrapCalendarPicker picker, MouseButtons button)
+    private static void RaiseMouseClick(BootstrapCalendarPicker picker, MouseButtons button)
     {
-        var method = typeof(BootstrapCalendarPicker).GetMethod("OnMouseDown", BindingFlags.Instance | BindingFlags.NonPublic);
+        var method = typeof(BootstrapCalendarPicker).GetMethod("OnMouseClick", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.That(method, Is.Not.Null);
         method!.Invoke(picker, new object[]
         {
