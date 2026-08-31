@@ -696,3 +696,29 @@ Tooltip race tests invalidate a native Popup request through mouse leave/down, v
 
 Manual Feedback verification covers native-versus-managed Tooltip timing and edge placement, interactive Popover keyboard/content behavior, Escape/outside-click focus, movement without Opened/Closed churn, Light/Dark reflow, real Windows 96/120/144/168/192 DPI, mixed-DPI and negative-coordinate monitors, and at least 500 combined popup cycles while observing USER/GDI handles and event subscriptions.
 
+### Popover keyboard regression matrix
+
+Automated STA coverage on both target frameworks verifies that an interactive Popover:
+
+- keeps the current content control focused and remains open when Alt is pressed and released;
+- closes on Escape only when `CloseOnEscape` is enabled and restores focus to a live Target;
+- traverses eligible descendants forward and backward in WinForms tab order, including nested containers;
+- skips hidden, disabled, non-tab-stop, and non-selectable controls and applies eligibility changes made while open;
+- remains non-modal: Tab from the last descendant and Shift+Tab from the first descendant close the Popover and continue after or before Target in the surrounding form tab order;
+- preserves native outside-click close and clicked-control focus when `CloseOnClickOutside` is enabled, while remaining open when it is disabled;
+- delivers one Opened/Closed transition per action through repeated 100 keyboard cycles and the existing 500-cycle lifetime test; and
+- closes safely when Target is disposed while keyboard routing is active.
+
+Run this manual sequence on the integrated **Feedback** page:
+
+1. Click **Open interactive Popover** and verify the **Draft value** editor receives focus.
+2. Press Tab three times and verify focus moves through **Enable option**, **Apply**, and **Close**.
+3. Press Shift+Tab repeatedly and verify the reverse order.
+4. Reopen the Popover, press and release Alt, and verify it remains visible with content focus unchanged.
+5. Press Escape and verify the Popover closes and the target button regains focus.
+6. Reopen and click a control outside; verify the Popover closes and the clicked control receives focus.
+7. Disable **Outside close**, reopen, click outside, and verify the Popover remains open.
+8. Verify boundary Tab/Shift+Tab closes the non-modal Popover and continues through the surrounding form tab order instead of trapping focus.
+
+Repeat the sequence in Light and Dark themes and at a non-100% Windows DPI setting. Focus cues must remain visible, and theme/DPI changes must not alter keyboard behavior or overlay placement.
+
