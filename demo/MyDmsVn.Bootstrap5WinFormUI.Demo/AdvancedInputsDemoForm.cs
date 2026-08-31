@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Formatting;
 using MyDmsVn.Bootstrap5WinFormUI.Icons;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -11,6 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 public sealed class AdvancedInputsDemoForm : Form
 {
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
+    private readonly GroupBox _formattedSection = new GroupBox();
     private readonly GroupBox _numericSection = new GroupBox();
     private readonly GroupBox _comboSection = new GroupBox();
     private readonly GroupBox _dateSection = new GroupBox();
@@ -22,6 +26,7 @@ public sealed class AdvancedInputsDemoForm : Form
     private readonly Label _dateNote = new Label();
     private readonly Label _calendarStatus = new Label();
     private readonly Label _calendarNote = new Label();
+    private readonly List<Label> _formattedStatuses = new List<Label>();
 
     public AdvancedInputsDemoForm()
     {
@@ -32,6 +37,7 @@ public sealed class AdvancedInputsDemoForm : Form
         AutoScaleMode = AutoScaleMode.Dpi;
 
         ConfigureContent();
+        BuildFormattedSection();
         BuildNumericSection();
         BuildComboSection();
         BuildDateSection();
@@ -59,6 +65,13 @@ public sealed class AdvancedInputsDemoForm : Form
         _content.FlowDirection = FlowDirection.TopDown;
         _content.WrapContents = false;
         _content.Padding = new Padding(12);
+
+        _formattedSection.Text = "Formatted TextBox scenarios";
+        _formattedSection.AutoSize = true;
+        _formattedSection.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _formattedSection.MinimumSize = new Size(920, 0);
+        _formattedSection.Margin = new Padding(0, 0, 0, 12);
+        _formattedSection.Padding = new Padding(12);
 
         _numericSection.Text = "NumericBox scenarios";
         _numericSection.AutoSize = true;
@@ -88,10 +101,65 @@ public sealed class AdvancedInputsDemoForm : Form
         _calendarSection.Margin = new Padding(0, 0, 0, 12);
         _calendarSection.Padding = new Padding(12);
 
+        _content.Controls.Add(_formattedSection);
         _content.Controls.Add(_numericSection);
         _content.Controls.Add(_comboSection);
         _content.Controls.Add(_dateSection);
         _content.Controls.Add(_calendarSection);
+    }
+
+    private void BuildFormattedSection()
+    {
+        var grid = CreateScenarioGrid();
+
+        var general = new BootstrapFormattedTextBox
+        {
+            PlaceholderText = "Type an account reference",
+            ShowClearButton = true,
+            Icon = IconDescriptor.Framework(FrameworkIconGlyph.Check),
+            ValidationState = BootstrapValidationState.Valid
+        };
+        general.GeneralOptions.Blocks = new[] { 4, 3, 3, 4 };
+        general.GeneralOptions.Delimiter = "-";
+        general.FormatMode = BootstrapInputFormatMode.General;
+        general.RawValue = "12345678901234";
+        AddFormattedCell(grid, "General blocks", general, CreateRawStatus(general));
+
+        var numeral = new BootstrapFormattedTextBox { FormatMode = BootstrapInputFormatMode.Numeral };
+        numeral.RawValue = "1234567.89";
+        AddFormattedCell(grid, "Numeral — invariant raw", numeral, CreateRawStatus(numeral));
+
+        var vietnameseNumeral = new BootstrapFormattedTextBox();
+        vietnameseNumeral.NumeralOptions.Delimiter = string.Empty;
+        vietnameseNumeral.NumeralOptions.DecimalMark = ",";
+        vietnameseNumeral.NumeralOptions.Delimiter = ".";
+        vietnameseNumeral.FormatMode = BootstrapInputFormatMode.Numeral;
+        vietnameseNumeral.RawValue = "1234567.89";
+        AddFormattedCell(grid, "Numeral — Vietnamese separators", vietnameseNumeral, CreateRawStatus(vietnameseNumeral));
+
+        var date = new BootstrapFormattedTextBox { FormatMode = BootstrapInputFormatMode.Date };
+        date.RawValue = "31082026";
+        AddFormattedCell(grid, "Date — dd/MM/yyyy", date, CreateRawStatus(date));
+
+        var time = new BootstrapFormattedTextBox();
+        time.TimeOptions.Pattern = "hms";
+        time.FormatMode = BootstrapInputFormatMode.Time;
+        time.RawValue = "123045";
+        AddFormattedCell(grid, "Time — HH:mm:ss", time, CreateRawStatus(time));
+
+        var card = new BootstrapFormattedTextBox { FormatMode = BootstrapInputFormatMode.CreditCard };
+        card.RawValue = "4111111111111111";
+        AddFormattedCell(grid, "Credit card / detected type", card, CreateRawStatus(card, includeCardType: true));
+
+        var custom = new BootstrapFormattedTextBox
+        {
+            FormatMode = BootstrapInputFormatMode.Custom,
+            Formatter = new DemoUppercaseBlockFormatter()
+        };
+        custom.RawValue = "abcdef";
+        AddFormattedCell(grid, "Custom formatter — AAA-BBB", custom, CreateRawStatus(custom));
+
+        _formattedSection.Controls.Add(grid);
     }
 
     private void BuildNumericSection()
@@ -522,6 +590,41 @@ public sealed class AdvancedInputsDemoForm : Form
         AddScenarioCell(grid, caption, input, "numeric input", status);
     }
 
+    private static void AddFormattedCell(
+        TableLayoutPanel grid,
+        string caption,
+        BootstrapFormattedTextBox input,
+        Control status)
+    {
+        AddScenarioCell(grid, caption, input, "formatted input", status);
+    }
+
+    private Label CreateRawStatus(BootstrapFormattedTextBox input, bool includeCardType = false)
+    {
+        var status = new Label
+        {
+            AutoSize = true,
+            Margin = new Padding(0, 5, 0, 0)
+        };
+
+        void UpdateStatus()
+        {
+            status.Text = includeCardType
+                ? $"RawValue: {input.RawValue} / Type: {input.CreditCardType}"
+                : $"RawValue: {input.RawValue}";
+        }
+
+        input.RawValueChanged += (_, _) => UpdateStatus();
+        if (includeCardType)
+        {
+            input.CreditCardTypeChanged += (_, _) => UpdateStatus();
+        }
+
+        _formattedStatuses.Add(status);
+        UpdateStatus();
+        return status;
+    }
+
     private static void AddComboCell(
         TableLayoutPanel grid,
         string caption,
@@ -597,6 +700,8 @@ public sealed class AdvancedInputsDemoForm : Form
         ForeColor = theme.Colors.Text;
         _content.BackColor = theme.Colors.Body;
         _content.ForeColor = theme.Colors.Text;
+        _formattedSection.BackColor = theme.Colors.Body;
+        _formattedSection.ForeColor = theme.Colors.Text;
         _numericSection.BackColor = theme.Colors.Body;
         _numericSection.ForeColor = theme.Colors.Text;
         _comboSection.BackColor = theme.Colors.Body;
@@ -605,6 +710,7 @@ public sealed class AdvancedInputsDemoForm : Form
         _dateSection.ForeColor = theme.Colors.Text;
         _calendarSection.BackColor = theme.Colors.Body;
         _calendarSection.ForeColor = theme.Colors.Text;
+        ApplyStandardTextColor(_formattedSection, theme.Colors.Text);
         ApplyStandardTextColor(_numericSection, theme.Colors.Text);
         ApplyStandardTextColor(_comboSection, theme.Colors.Text);
         ApplyStandardTextColor(_dateSection, theme.Colors.Text);
@@ -616,6 +722,10 @@ public sealed class AdvancedInputsDemoForm : Form
         _dateNote.ForeColor = theme.Colors.MutedText;
         _calendarStatus.ForeColor = theme.Colors.MutedText;
         _calendarNote.ForeColor = theme.Colors.MutedText;
+        foreach (var status in _formattedStatuses)
+        {
+            status.ForeColor = theme.Colors.MutedText;
+        }
     }
 
     private static void ApplyStandardTextColor(Control root, Color color)
@@ -729,6 +839,36 @@ public sealed class AdvancedInputsDemoForm : Form
             {
                 _layingOut = false;
             }
+        }
+    }
+
+    private sealed class DemoUppercaseBlockFormatter : IInputFormatter
+    {
+        public string Format(string rawValue)
+        {
+            var canonical = Unformat(rawValue);
+            if (canonical.Length > 6)
+            {
+                canonical = canonical.Substring(0, 6);
+            }
+
+            return canonical.Length <= 3
+                ? canonical
+                : canonical.Substring(0, 3) + "-" + canonical.Substring(3);
+        }
+
+        public string Unformat(string formattedValue)
+        {
+            var builder = new StringBuilder(formattedValue?.Length ?? 0);
+            foreach (var character in formattedValue ?? string.Empty)
+            {
+                if (char.IsLetterOrDigit(character))
+                {
+                    builder.Append(char.ToUpperInvariant(character));
+                }
+            }
+
+            return builder.ToString();
         }
     }
 
