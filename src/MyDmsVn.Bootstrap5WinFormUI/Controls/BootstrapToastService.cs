@@ -75,6 +75,8 @@ public sealed class BootstrapToastService : IDisposable
     private bool _topMost;
     private IIconRenderer _iconRenderer = BootstrapIconRenderer.CreateDefault();
     private EventHandler? _historyChanged;
+    private BootstrapNotificationCenterWindow? _notificationCenter;
+    private BootstrapToastScreenInfo? _notificationCenterScreen;
     private bool _displaySubscribed;
     private bool _applicationExitSubscribed;
     private bool _disposed;
@@ -171,6 +173,7 @@ public sealed class BootstrapToastService : IDisposable
             if (_placement == value) return;
             _placement = value;
             ApplySettingsToCanonicalHosts();
+            ApplySettingsToNotificationCenter();
         }
     }
 
@@ -225,6 +228,7 @@ public sealed class BootstrapToastService : IDisposable
             if (_screenMargin == value) return;
             _screenMargin = value;
             ApplySettingsToCanonicalHosts();
+            ApplySettingsToNotificationCenter();
         }
     }
 
@@ -238,6 +242,7 @@ public sealed class BootstrapToastService : IDisposable
             if (_topMost == value) return;
             _topMost = value;
             ApplySettingsToCanonicalHosts();
+            ApplySettingsToNotificationCenter();
         }
     }
 
@@ -277,7 +282,13 @@ public sealed class BootstrapToastService : IDisposable
     /// <summary>Gets whether the service-owned notification center is currently visible.</summary>
     public bool IsNotificationCenterVisible
     {
-        get { VerifyAccess(); return false; }
+        get
+        {
+            VerifyAccess();
+            return _notificationCenter is not null &&
+                   !_notificationCenter.IsDisposed &&
+                   _notificationCenter.Visible;
+        }
     }
 
     /// <summary>Occurs after an effective history mutation and after framework-owned history UI has refreshed.</summary>
@@ -392,20 +403,34 @@ public sealed class BootstrapToastService : IDisposable
     public void ShowNotificationCenter(Control? relativeTo = null)
     {
         VerifyAccess();
-        throw new NotSupportedException("Notification-center presentation is initialized by the notification-center implementation layer.");
+        EnsureDisplaySubscription();
+        var screen = _screenResolver.Resolve(relativeTo);
+        var center = EnsureNotificationCenter();
+        _notificationCenterScreen = screen;
+        center.ApplySettings(screen, CreateNotificationCenterSettings());
+        RefreshNotificationCenterFromStore();
+        center.ShowCenter();
     }
 
     /// <summary>Hides the notification-center window if it exists.</summary>
     public void HideNotificationCenter()
     {
         VerifyAccess();
+        _notificationCenter?.HideCenter();
     }
 
     /// <summary>Toggles the reusable notification-center window.</summary>
     public void ToggleNotificationCenter(Control? relativeTo = null)
     {
         VerifyAccess();
-        ShowNotificationCenter(relativeTo);
+        if (IsNotificationCenterVisible)
+        {
+            HideNotificationCenter();
+        }
+        else
+        {
+            ShowNotificationCenter(relativeTo);
+        }
     }
 
     /// <summary>Releases hosts, callbacks, history UI, and static subscriptions owned by this service.</summary>
@@ -438,6 +463,18 @@ public sealed class BootstrapToastService : IDisposable
 
         _canonicalHosts.Clear();
         _retiringHosts.Clear();
+
+        if (_notificationCenter is not null)
+        {
+            _notificationCenter.ItemActivated -= OnNotificationCenterItemActivated;
+            _notificationCenter.MarkAllRequested -= OnNotificationCenterMarkAllRequested;
+            _notificationCenter.ClearRequested -= OnNotificationCenterClearRequested;
+            _notificationCenter.CloseForServiceDisposal();
+            _notificationCenter.Dispose();
+            _notificationCenter = null;
+            _notificationCenterScreen = null;
+        }
+
         _historyChanged = null;
         _uiDispatcher.Dispose();
 
@@ -460,6 +497,8 @@ public sealed class BootstrapToastService : IDisposable
     {
         PostFrameworkCallbackToUi(callback);
     }
+
+    internal BootstrapNotificationCenterWindow? NotificationCenterForTests => _notificationCenter;
 
     private BootstrapToast CreateToast(OptionsSnapshot options, int widthPixels)
     {
@@ -517,8 +556,49 @@ public sealed class BootstrapToastService : IDisposable
         }
     }
 
+    private BootstrapNotificationCenterSettings CreateNotificationCenterSettings()
+    {
+        return new BootstrapNotificationCenterSettings(_placement, _screenMargin, _topMost);
+    }
+
+    private void ApplySettingsToNotificationCenter()
+    {
+        if (_notificationCenter is null || _notificationCenter.IsDisposed || _notificationCenterScreen is null)
+        {
+            return;
+        }
+
+        _notificationCenter.ApplySettings(_notificationCenterScreen.Value, CreateNotificationCenterSettings());
+    }
+
+    private BootstrapNotificationCenterWindow EnsureNotificationCenter()
+    {
+        if (_notificationCenter is not null && !_notificationCenter.IsDisposed)
+        {
+            return _notificationCenter;
+        }
+
+        var center = new BootstrapNotificationCenterWindow();
+        center.ItemActivated += OnNotificationCenterItemActivated;
+        center.MarkAllRequested += OnNotificationCenterMarkAllRequested;
+        center.ClearRequested += OnNotificationCenterClearRequested;
+        _notificationCenter = center;
+        return center;
+    }
+
+    private void RefreshNotificationCenterFromStore()
+    {
+        if (_notificationCenter is null || _notificationCenter.IsDisposed)
+        {
+            return;
+        }
+
+        _notificationCenter.RefreshHistory(_historyStore.SnapshotNewestFirst(), _historyStore.UnreadCount);
+    }
+
     private void PublishCommittedHistoryMutation()
     {
+        RefreshNotificationCenterFromStore();
         _historyRefreshObserver?.Invoke();
         _historyChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -585,6 +665,40 @@ public sealed class BootstrapToastService : IDisposable
             _retiringHosts.Add(pair.Value.Host);
             pair.Value.Host.RetireForScreenRemoval();
         }
+
+        RefreshNotificationCenterTopology(live);
+    }
+
+    private void RefreshNotificationCenterTopology(IReadOnlyDictionary<string, BootstrapToastScreenInfo> liveScreens)
+    {
+        if (_notificationCenter is null || _notificationCenter.IsDisposed || _notificationCenterScreen is null)
+        {
+            return;
+        }
+
+        BootstrapToastScreenInfo screen;
+        if (!liveScreens.TryGetValue(_notificationCenterScreen.Value.DeviceName, out screen))
+        {
+            screen = _screenResolver.Resolve(null);
+        }
+
+        _notificationCenterScreen = screen;
+        _notificationCenter.ApplySettings(screen, CreateNotificationCenterSettings());
+    }
+
+    private void OnNotificationCenterItemActivated(object? sender, BootstrapNotificationHistoryItemActivatedEventArgs e)
+    {
+        MarkAsRead(e.Item.Id);
+    }
+
+    private void OnNotificationCenterMarkAllRequested(object? sender, EventArgs e)
+    {
+        MarkAllAsRead();
+    }
+
+    private void OnNotificationCenterClearRequested(object? sender, EventArgs e)
+    {
+        ClearHistory();
     }
 
     private void OnHostBecameEmpty(object? sender, EventArgs e)
