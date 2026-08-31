@@ -265,6 +265,73 @@ public sealed class FeedbackDemoFormTests
         }));
     }
 
+    [Test]
+    public void FeedbackDemoExercisesGlobalToastServiceAndNotificationCenterContract()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light, reducedMotion: true);
+            using var form = new FeedbackDemoForm();
+            form.Show();
+            Application.DoEvents();
+
+            var service = (BootstrapToastService)typeof(FeedbackDemoForm)
+                .GetField("_toastService", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(form)!;
+            var unread = FindControls<Label>(form).Single(label => label.AccessibleName == "Global Toast unread count");
+            var topMost = FindControls<CheckBox>(form).Single(checkBox => checkBox.AccessibleName == "Global Toast TopMost");
+            Button Action(string name) => FindControls<Button>(form).Single(button => button.AccessibleName == name);
+
+            Action("Show global Toast").PerformClick();
+            Action("Show non-auto-hide Toast").PerformClick();
+            Action("Burst 7 notifications").PerformClick();
+            Application.DoEvents();
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(service.UnreadCount, Is.EqualTo(9));
+                Assert.That(unread.Text, Is.EqualTo("Unread: 9"));
+            }));
+
+            Action("Show history-disabled Toast").PerformClick();
+            Assert.That(service.UnreadCount, Is.EqualTo(9));
+
+            topMost.Checked = true;
+            Assert.That(service.TopMost, Is.True);
+            topMost.Checked = false;
+            Assert.That(service.TopMost, Is.False);
+
+            var placements = new[]
+            {
+                ("Set global Toast TopLeft", BootstrapToastPlacement.TopLeft),
+                ("Set global Toast TopRight", BootstrapToastPlacement.TopRight),
+                ("Set global Toast BottomLeft", BootstrapToastPlacement.BottomLeft),
+                ("Set global Toast BottomRight", BootstrapToastPlacement.BottomRight)
+            };
+            foreach (var placement in placements)
+            {
+                Action(placement.Item1).PerformClick();
+                Assert.That(service.Placement, Is.EqualTo(placement.Item2));
+            }
+
+            Action("Open notification center").PerformClick();
+            Assert.That(service.IsNotificationCenterVisible, Is.True);
+            Action("Mark all global notifications read").PerformClick();
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(service.UnreadCount, Is.Zero);
+                Assert.That(unread.Text, Is.EqualTo("Unread: 0"));
+            }));
+
+            Action("Clear global notification history").PerformClick();
+            Assert.That(service.GetHistory(), Is.Empty);
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
+    }
+
     private static BootstrapTooltip[] GetTooltipComponents(FeedbackDemoForm form)
     {
         return typeof(FeedbackDemoForm)
