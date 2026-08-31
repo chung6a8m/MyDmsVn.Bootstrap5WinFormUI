@@ -208,6 +208,31 @@ public sealed class BootstrapToastServiceTests
     }
 
     [Test]
+    public void TransferFailureAtCapacityPreservesExistingHistoryTransaction()
+    {
+        using var service = CreateService(out _, out var factory);
+        service.HistoryCapacity = 2;
+        var firstId = service.Show("first");
+        var secondId = service.Show("second");
+        var beforeFailure = service.GetHistory();
+        var historyChangedCount = 0;
+        service.HistoryChanged += (_, _) => historyChangedCount++;
+        factory.ThrowOnShow = true;
+
+        Assert.Throws<InvalidOperationException>((Action)(() => service.Show("third")));
+
+        var afterFailure = service.GetHistory();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(afterFailure.Select(item => item.Id), Is.EqualTo(new[] { secondId, firstId }));
+            Assert.That(afterFailure.Select(item => item.Text), Is.EqualTo(beforeFailure.Select(item => item.Text)));
+            Assert.That(afterFailure.Select(item => item.IsRead), Is.EqualTo(beforeFailure.Select(item => item.IsRead)));
+            Assert.That(service.UnreadCount, Is.EqualTo(2));
+            Assert.That(historyChangedCount, Is.Zero);
+        }));
+    }
+
+    [Test]
     public void HistoryMutationsPublishOnlyEffectiveChangesAfterRefresh()
     {
         var order = new List<string>();

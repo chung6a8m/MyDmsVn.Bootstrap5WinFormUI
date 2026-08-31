@@ -320,17 +320,15 @@ public sealed class BootstrapToastService : IDisposable
         var width = BootstrapToastServiceLayoutLogic.ResolveToastWidth(_toastWidth, available.Width, screen.Dpi);
         var toast = CreateToast(snapshot, width);
         var id = Guid.NewGuid();
-        var historyAdded = false;
-        if (snapshot.IncludeInHistory)
-        {
-            historyAdded = _historyStore.Add(new BootstrapToastHistoryItem(
+        var historyItem = snapshot.IncludeInHistory
+            ? new BootstrapToastHistoryItem(
                 id,
                 DateTimeOffset.UtcNow,
                 snapshot.Title,
                 snapshot.Text,
                 snapshot.Variant,
-                isRead: false));
-        }
+                isRead: false)
+            : null;
 
         try
         {
@@ -338,11 +336,6 @@ public sealed class BootstrapToastService : IDisposable
         }
         catch
         {
-            if (historyAdded)
-            {
-                _historyStore.Remove(id);
-            }
-
             if (!toast.IsDisposed && !toast.IsOwned)
             {
                 toast.Dispose();
@@ -351,6 +344,7 @@ public sealed class BootstrapToastService : IDisposable
             throw;
         }
 
+        var historyAdded = historyItem is not null && _historyStore.Add(historyItem);
         if (historyAdded)
         {
             PublishCommittedHistoryMutation();
