@@ -140,6 +140,7 @@ BootstrapNumericBox Stage 5 pure tests cover:
 BootstrapFormattedTextBox pure formatter tests cover:
 
 - General, Numeral, Date, Time, and CreditCard format/unformat round trips, canonicalization, partial input, option validation, lazy delimiters, prefixes, scale limits, and frozen credit-card IIN boundaries
+- ASCII-only numeric raw domains for Date, Time, Numeral, and CreditCard, including mixed ASCII/Unicode digit input and atomic rejection of ASCII-digit delimiters or decimal marks
 - Invariant `.` Numeral RawValue with configurable display separators and Thousand/Lakh/Wan grouping
 - Caret/selection mapping across prefixes and delimiters, including bounded edit-history undo/redo and redo invalidation after a branch edit
 - Null/empty/pathological input without WinForms handles, timers, culture-dependent parsing, or external formatter dependencies
@@ -494,7 +495,7 @@ TabControl must retain native interaction ownership. Test normal/hover/selected/
 
 NumericBox owns one public tab stop while its private native editor has `TabStop = false`. Test wrapper Tab entry and Shift+Tab exit, shell clicks redirecting focus to the editor, wrapper KeyDown/KeyPress/KeyUp/PreviewKeyDown forwarding exactly once, and preservation of native spin buttons, Up/Down, wheel, boundaries, and read-only spin behavior.
 
-FormattedTextBox retains the one composite tab stop and native editor owned by `BootstrapTextBox`. STA tests cover partial and middle edits, selection replacement across delimiters, raw/already-formatted/invalid-character paste, native cut, clear, separator-adjacent Backspace/Delete, exact TextChanged then RawValueChanged ordering, bounded Ctrl+Z/Ctrl+Y, and branch-edit redo clearing. Ctrl+A/C/X/V remain native paths; Tab/Shift+Tab leave the composite normally; Alt input is neither consumed nor allowed to mutate the value. Theme, validation, enabled/read-only, focus, option-change reformatting, rapid state changes, and disposal must preserve one stable Text/RawValue pair.
+FormattedTextBox retains the one composite tab stop and native editor owned by `BootstrapTextBox`. STA tests cover partial and middle edits, selection replacement across delimiters, raw/already-formatted/invalid-character paste, native cut, clear, separator-adjacent Backspace/Delete, General-prefix insertion/deletion/cross-boundary replacement, exact TextChanged then RawValueChanged ordering, bounded Ctrl+Z/Ctrl+Y, and branch-edit redo clearing. Rejected separator assignments must not reformat or emit logical value events. Ctrl+A/C/X/V remain native paths; Tab/Shift+Tab leave the composite normally; Alt input is neither consumed nor allowed to mutate the value. Theme, validation, enabled/read-only, focus, option-change reformatting, rapid state changes, and disposal must preserve one stable Text/RawValue pair.
 
 ComboBox remains a native `ComboBox`, so it retains one native focus/input path rather than a wrapper redirect. Test `DropDownList` and editable `DropDown`, native arrow/popup open-close, Up/Down/Enter/Escape, free typing, autocomplete, Tab/Shift+Tab traversal, disabled/re-enabled behavior, bound/unbound selection, and native selection/dropdown events. Framework presentation changes must never synthesize those events or create a second selection state.
 
