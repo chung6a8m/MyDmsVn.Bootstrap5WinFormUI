@@ -28,7 +28,16 @@ public sealed class BootstrapDateFormatOptions
 
     /// <summary>Gets or sets the component delimiter.</summary>
     [DefaultValue("/")]
-    public string Delimiter { get => _delimiter; set => SetString(ref _delimiter, InputFormatOptionValidation.Normalize(value)); }
+    public string Delimiter
+    {
+        get => _delimiter;
+        set
+        {
+            var next = InputFormatOptionValidation.Normalize(value);
+            InputFormatOptionValidation.ValidateContainsNoAsciiDigits(next, nameof(value));
+            SetString(ref _delimiter, next);
+        }
+    }
 
     /// <summary>Gets or sets whether delimiters appear only after the next digit.</summary>
     [DefaultValue(false)]

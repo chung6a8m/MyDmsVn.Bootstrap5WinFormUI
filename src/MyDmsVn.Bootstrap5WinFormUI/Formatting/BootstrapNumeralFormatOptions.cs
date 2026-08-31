@@ -29,6 +29,7 @@ public sealed class BootstrapNumeralFormatOptions
         {
             var next = InputFormatOptionValidation.Normalize(value);
             InputFormatOptionValidation.ValidateSingleCharacter(next, nameof(value));
+            InputFormatOptionValidation.ValidateContainsNoAsciiDigits(next, nameof(value));
             if (next.Length > 0 && next == _decimalMark) throw new ArgumentException("Delimiter and decimal mark must differ.", nameof(value));
             SetString(ref _delimiter, next);
         }
@@ -65,6 +66,7 @@ public sealed class BootstrapNumeralFormatOptions
         {
             var next = InputFormatOptionValidation.Normalize(value);
             InputFormatOptionValidation.ValidateSingleCharacter(next, nameof(value), allowEmpty: _decimalScale == 0);
+            InputFormatOptionValidation.ValidateContainsNoAsciiDigits(next, nameof(value));
             if (next.Length > 0 && next == _delimiter) throw new ArgumentException("Decimal mark and delimiter must differ.", nameof(value));
             SetString(ref _decimalMark, next);
         }

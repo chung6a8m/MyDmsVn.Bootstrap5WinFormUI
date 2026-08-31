@@ -111,4 +111,33 @@ public sealed class FormattingOptionsTests
             Assert.That(changes, Is.EqualTo(2));
         }));
     }
+
+    [Test]
+    public void RawDigitSeparatorsAreRejectedAtomically()
+    {
+        var date = new BootstrapDateFormatOptions();
+        var time = new BootstrapTimeFormatOptions();
+        var card = new BootstrapCreditCardFormatOptions();
+        var numeral = new BootstrapNumeralFormatOptions();
+        var changes = 0;
+        date.Changed += (_, _) => changes++;
+        time.Changed += (_, _) => changes++;
+        card.Changed += (_, _) => changes++;
+        numeral.Changed += (_, _) => changes++;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.Throws<ArgumentException>((Action)(() => date.Delimiter = "1"));
+            Assert.Throws<ArgumentException>((Action)(() => time.Delimiter = "2"));
+            Assert.Throws<ArgumentException>((Action)(() => card.Delimiter = "3"));
+            Assert.Throws<ArgumentException>((Action)(() => numeral.Delimiter = "4"));
+            Assert.Throws<ArgumentException>((Action)(() => numeral.DecimalMark = "5"));
+            Assert.That(date.Delimiter, Is.EqualTo("/"));
+            Assert.That(time.Delimiter, Is.EqualTo(":"));
+            Assert.That(card.Delimiter, Is.EqualTo(" "));
+            Assert.That(numeral.Delimiter, Is.EqualTo(","));
+            Assert.That(numeral.DecimalMark, Is.EqualTo("."));
+            Assert.That(changes, Is.Zero);
+        }));
+    }
 }

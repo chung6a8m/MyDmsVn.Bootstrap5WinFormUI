@@ -134,6 +134,55 @@ public sealed class BootstrapFormattedTextBoxTests
         }));
     }
 
+    [Test]
+    public void RejectedRawDigitSeparatorsDoNotReformatStableValues()
+    {
+        AssertRejectedSeparatorPreservesValue(
+            BootstrapInputFormatMode.Date,
+            "31082026",
+            input => input.DateOptions.Delimiter = "1");
+        AssertRejectedSeparatorPreservesValue(
+            BootstrapInputFormatMode.Time,
+            "1230",
+            input => input.TimeOptions.Delimiter = "2");
+        AssertRejectedSeparatorPreservesValue(
+            BootstrapInputFormatMode.CreditCard,
+            "4111111111111111",
+            input => input.CreditCardOptions.Delimiter = "3");
+        AssertRejectedSeparatorPreservesValue(
+            BootstrapInputFormatMode.Numeral,
+            "1234.56",
+            input => input.NumeralOptions.Delimiter = "4");
+        AssertRejectedSeparatorPreservesValue(
+            BootstrapInputFormatMode.Numeral,
+            "1234.56",
+            input => input.NumeralOptions.DecimalMark = "5");
+    }
+
+    private static void AssertRejectedSeparatorPreservesValue(
+        BootstrapInputFormatMode mode,
+        string rawValue,
+        Action<BootstrapFormattedTextBox> assignInvalidSeparator)
+    {
+        using var input = new BootstrapFormattedTextBox { FormatMode = mode };
+        input.RawValue = rawValue;
+        var originalRaw = input.RawValue;
+        var originalText = input.Text;
+        var textChanges = 0;
+        var rawChanges = 0;
+        input.TextChanged += (_, _) => textChanges++;
+        input.RawValueChanged += (_, _) => rawChanges++;
+
+        Assert.Throws<ArgumentException>((Action)(() => assignInvalidSeparator(input)), mode.ToString());
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.RawValue, Is.EqualTo(originalRaw), mode.ToString());
+            Assert.That(input.Text, Is.EqualTo(originalText), mode.ToString());
+            Assert.That(textChanges, Is.Zero, mode.ToString());
+            Assert.That(rawChanges, Is.Zero, mode.ToString());
+        }));
+    }
+
     private sealed class UppercaseFormatter : IInputFormatter
     {
         public string Format(string rawValue) => rawValue.ToUpperInvariant();

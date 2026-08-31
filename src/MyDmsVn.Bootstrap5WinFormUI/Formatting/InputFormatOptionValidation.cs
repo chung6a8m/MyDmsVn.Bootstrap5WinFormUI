@@ -9,6 +9,17 @@ internal static class InputFormatOptionValidation
 
     internal static bool IsAsciiDigit(char value) => value >= '0' && value <= '9';
 
+    internal static void ValidateContainsNoAsciiDigits(string value, string parameterName)
+    {
+        foreach (var character in value)
+        {
+            if (IsAsciiDigit(character))
+            {
+                throw new ArgumentException("The value must not contain ASCII digits.", parameterName);
+            }
+        }
+    }
+
     internal static void ValidateSingleCharacter(string value, string parameterName, bool allowEmpty = true)
     {
         if ((!allowEmpty && value.Length == 0) || value.Length > 1)

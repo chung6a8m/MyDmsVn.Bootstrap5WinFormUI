@@ -21,6 +21,7 @@ public sealed class BootstrapCreditCardFormatOptions
         set
         {
             var next = InputFormatOptionValidation.Normalize(value);
+            InputFormatOptionValidation.ValidateContainsNoAsciiDigits(next, nameof(value));
             if (_delimiter == next) return;
             _delimiter = next;
             RaiseChanged();
