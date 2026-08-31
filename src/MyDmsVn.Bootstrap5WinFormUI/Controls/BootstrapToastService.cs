@@ -464,7 +464,6 @@ public sealed class BootstrapToastService : IDisposable
             _notificationCenter.MarkAllRequested -= OnNotificationCenterMarkAllRequested;
             _notificationCenter.ClearRequested -= OnNotificationCenterClearRequested;
             _notificationCenter.CloseForServiceDisposal();
-            _notificationCenter.Dispose();
             _notificationCenter = null;
             _notificationCenterScreen = null;
         }

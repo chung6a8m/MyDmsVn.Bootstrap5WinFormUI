@@ -219,9 +219,16 @@ internal sealed class BootstrapNotificationCenterWindow : Form
         OnKeyDown(new KeyEventArgs(Keys.Escape));
     }
 
+    internal FormClosingEventArgs ProcessFormClosingForTests(CloseReason closeReason)
+    {
+        var e = new FormClosingEventArgs(closeReason, cancel: false);
+        OnFormClosing(e);
+        return e;
+    }
+
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if (!_allowCloseForServiceDisposal)
+        if (!_allowCloseForServiceDisposal && e.CloseReason == CloseReason.UserClosing)
         {
             e.Cancel = true;
             Hide();

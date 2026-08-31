@@ -106,10 +106,11 @@ public sealed class BootstrapNotificationCenterTests
             new BootstrapToastScreenInfo("DISPLAY1", new Rectangle(0, 0, 1000, 800), 96),
             new BootstrapNotificationCenterSettings(BootstrapToastPlacement.TopRight, new Padding(16), false));
         window.ShowCenter();
-        window.Close();
+        var closing = window.ProcessFormClosingForTests(CloseReason.UserClosing);
 
         Assert.Multiple((Action)(() =>
         {
+            Assert.That(closing.Cancel, Is.True);
             Assert.That(window.Visible, Is.False);
             Assert.That(window.IsDisposed, Is.False);
         }));
@@ -125,6 +126,20 @@ public sealed class BootstrapNotificationCenterTests
             Assert.That(window.Visible, Is.False);
             Assert.That(window.IsDisposed, Is.False);
         }));
+    }
+
+    [TestCase(CloseReason.ApplicationExitCall)]
+    [TestCase(CloseReason.WindowsShutDown)]
+    [TestCase(CloseReason.TaskManagerClosing)]
+    [TestCase(CloseReason.FormOwnerClosing)]
+    [TestCase(CloseReason.MdiFormClosing)]
+    public void ApplicationAndSystemCloseReasonsAreNotCanceled(CloseReason closeReason)
+    {
+        using var window = new BootstrapNotificationCenterWindow();
+
+        var closing = window.ProcessFormClosingForTests(closeReason);
+
+        Assert.That(closing.Cancel, Is.False);
     }
 
     [Test]
@@ -161,13 +176,20 @@ public sealed class BootstrapNotificationCenterTests
         var service = new BootstrapToastService(new SingleScreenResolver(), new PassiveHostFactory(), null, false);
         service.ShowNotificationCenter();
         var center = service.NotificationCenterForTests!;
+        var disposeCount = 0;
+        center.Disposed += (_, _) => disposeCount++;
         service.HideNotificationCenter();
         service.ShowNotificationCenter();
         Assert.That(service.NotificationCenterForTests, Is.SameAs(center));
 
         service.Dispose();
+        service.Dispose();
 
-        Assert.That(center.IsDisposed, Is.True);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(center.IsDisposed, Is.True);
+            Assert.That(disposeCount, Is.EqualTo(1));
+        }));
     }
 
     private static BootstrapToastHistoryItem Item(string text, bool isRead)

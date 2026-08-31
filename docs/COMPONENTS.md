@@ -851,8 +851,8 @@ The only additional public concepts are `BootstrapToastOptions`, immutable `Boot
 - `Show(..., relativeTo)` snapshots caller options, resolves the target monitor, applies that monitor's explicit DPI and working area, then transfers the created Toast to one canonical per-screen host. The host is non-activating and uses `Region`, not `TransparencyKey`.
 - `Placement`, `ToastSpacing`, `MaximumVisibleToasts`, `ScreenMargin`, and `TopMost` update existing and future hosts. Height constraints preserve strict FIFO; a removed-screen host retires/dismisses rather than moving over a live screen.
 - `IncludeInHistory = false` affects history only. Otherwise, history stores semantic values independently of transient controls, is newest-first when read, bounded by `HistoryCapacity`, and exists only in memory. There is no persistence or OS notification integration.
-- `Show` is atomic with respect to history: a host failure rolls back the tentative record. Successful mutations refresh the internal center before raising `HistoryChanged`; an exception from an application handler occurs after the mutation is committed.
-- Activating an unread center row marks it read. Mark-all and clear are effective-mutation operations. User close, the close button, Escape, and Alt+F4 hide the center for reuse; service disposal closes and disposes it permanently.
+- `Show` is atomic with respect to history: the immutable record is committed only after the host accepts the transient Toast, so a failed transfer cannot trim or mutate existing entries. Successful mutations refresh the internal center before raising `HistoryChanged`; an exception from an application handler occurs after the mutation is committed.
+- Activating an unread center row marks it read. Mark-all and clear are effective-mutation operations. User `Close()`, the close button, Escape, and Alt+F4 hide the center for reuse. Application exit and application/system close reasons are allowed to close it normally; service disposal closes and disposes it permanently.
 
 ```csharp
 BootstrapToastService.Default.Show(
