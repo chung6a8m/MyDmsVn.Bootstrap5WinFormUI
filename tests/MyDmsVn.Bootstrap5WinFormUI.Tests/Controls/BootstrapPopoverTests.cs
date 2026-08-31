@@ -385,11 +385,11 @@ public sealed class BootstrapPopoverTests
         fixture.Show();
 
         Assert.That(fixture.Editor.Focused, Is.True);
-        SendTab(fixture, forward: true);
+        SendTab(fixture.Content, forward: true);
         Assert.That(fixture.Option.Focused, Is.True);
-        SendTab(fixture, forward: true);
+        SendTab(fixture.Content, forward: true);
         Assert.That(fixture.Apply.Focused, Is.True);
-        SendTab(fixture, forward: true);
+        SendTab(fixture.Content, forward: true);
         Assert.That(fixture.Close.Focused, Is.True);
     }
 
@@ -401,11 +401,11 @@ public sealed class BootstrapPopoverTests
         fixture.Close.Focus();
 
         Assert.That(fixture.Close.Focused, Is.True);
-        SendTab(fixture, forward: false);
+        SendTab(fixture.Content, forward: false);
         Assert.That(fixture.Apply.Focused, Is.True);
-        SendTab(fixture, forward: false);
+        SendTab(fixture.Content, forward: false);
         Assert.That(fixture.Option.Focused, Is.True);
-        SendTab(fixture, forward: false);
+        SendTab(fixture.Content, forward: false);
         Assert.That(fixture.Editor.Focused, Is.True);
     }
 
@@ -425,10 +425,10 @@ public sealed class BootstrapPopoverTests
         fixture.Show();
 
         fixture.Option.Focus();
-        SendTab(fixture, forward: true);
+        SendTab(fixture.Content, forward: true);
         Assert.That(fixture.Apply.Focused, Is.True);
 
-        SendTab(fixture, forward: false);
+        SendTab(fixture.Content, forward: false);
         Assert.That(fixture.Option.Focused, Is.True);
     }
 
@@ -439,7 +439,7 @@ public sealed class BootstrapPopoverTests
         fixture.Show();
         fixture.Close.Focus();
 
-        SendTab(fixture, forward: true);
+        SendTab(fixture.Content, forward: true);
 
         Assert.Multiple((Action)(() =>
         {
@@ -455,13 +455,89 @@ public sealed class BootstrapPopoverTests
         using var fixture = new InteractivePopoverFixture();
         fixture.Show();
 
-        SendTab(fixture, forward: false);
+        SendTab(fixture.Content, forward: false);
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(fixture.Popover.IsOpen, Is.False);
             Assert.That(fixture.Before.Focused, Is.True);
             Assert.That(fixture.Target.Focused, Is.False);
+        }));
+    }
+
+    [Test]
+    public void RuntimeEligibilityChangesAreAppliedToTheNextTabRequest()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Show();
+        fixture.Option.Enabled = false;
+
+        SendTab(fixture.Content, forward: true);
+        Assert.That(fixture.Apply.Focused, Is.True);
+
+        fixture.Option.Enabled = true;
+        fixture.Option.Visible = false;
+        SendTab(fixture.Content, forward: false);
+        Assert.That(fixture.Editor.Focused, Is.True);
+    }
+
+    [Test]
+    public void TargetDisposalWhileKeyboardCallbackIsActiveClosesSafely()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Show();
+
+        fixture.Target.Dispose();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(fixture.Popover.IsOpen, Is.False);
+            Assert.That(fixture.Popover.Target, Is.Null);
+            Assert.DoesNotThrow((Action)(() => SendTab(fixture.Content, forward: true)));
+        }));
+    }
+
+    [Test]
+    public void RepeatedKeyboardCyclesDeliverOneOpenAndClosePerCycle()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        var opened = 0;
+        var closed = 0;
+        fixture.Popover.Opened += (_, _) => opened++;
+        fixture.Popover.Closed += (_, _) => closed++;
+        fixture.Form.Show();
+        fixture.Form.Activate();
+
+        for (var cycle = 0; cycle < 100; cycle++)
+        {
+            fixture.Target.Focus();
+            fixture.Popover.Show();
+            Application.DoEvents();
+            if (cycle % 10 == 0)
+            {
+                SendKeys.SendWait("%");
+                Application.DoEvents();
+                Assert.That(fixture.Popover.IsOpen, Is.True, $"Alt cycle {cycle}");
+                SendKeys.SendWait("{ESC}");
+                Application.DoEvents();
+                Assert.That(fixture.Target.Focused, Is.True, $"Escape cycle {cycle}");
+            }
+            else
+            {
+                SendTab(fixture.Content, forward: true);
+                SendTab(fixture.Content, forward: true);
+                SendTab(fixture.Content, forward: true);
+                SendTab(fixture.Content, forward: true);
+                Assert.That(fixture.Outside.Focused, Is.True, $"Boundary cycle {cycle}");
+            }
+        }
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(opened, Is.EqualTo(100));
+            Assert.That(closed, Is.EqualTo(100));
+            Assert.That(fixture.Popover.IsOpen, Is.False);
         }));
     }
 
@@ -603,7 +679,7 @@ public sealed class BootstrapPopoverTests
             {
                 popover.Show();
                 Application.DoEvents();
-                popover.Hide();
+                SendTab(content, forward: true);
                 Application.DoEvents();
                 if (cycle % 50 == 0)
                 {
@@ -635,9 +711,9 @@ public sealed class BootstrapPopoverTests
         return Rectangle.FromLTRB(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
     }
 
-    private static void SendTab(InteractivePopoverFixture fixture, bool forward)
+    private static void SendTab(Control content, bool forward)
     {
-        var dropDown = (BootstrapOverlayDropDown)fixture.Content.TopLevelControl!;
+        var dropDown = (BootstrapOverlayDropDown)content.TopLevelControl!;
         var processDialogKey = typeof(BootstrapOverlayDropDown).GetMethod(
             "ProcessDialogKey",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
