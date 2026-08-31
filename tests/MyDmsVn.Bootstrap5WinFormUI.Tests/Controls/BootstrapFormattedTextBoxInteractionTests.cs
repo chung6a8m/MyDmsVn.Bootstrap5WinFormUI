@@ -73,6 +73,73 @@ public sealed class BootstrapFormattedTextBoxInteractionTests
     }
 
     [Test]
+    public void InsertionInsideGeneralPrefixMapsToRawStartWithoutPromotingDecoration()
+    {
+        using var input = CreatePrefixedGeneralProbe();
+        var textChanges = 0;
+        var rawChanges = 0;
+        input.TextChanged += (_, _) => textChanges++;
+        input.RawValueChanged += (_, _) => rawChanges++;
+        input.NativeEditor.Select(1, 0);
+
+        input.NativeEditor.SelectedText = "X";
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.RawValue, Is.EqualTo("X1234567"));
+            Assert.That(input.Text, Is.EqualTo("VNX123-4567"));
+            Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(3));
+            Assert.That(textChanges, Is.EqualTo(1));
+            Assert.That(rawChanges, Is.EqualTo(1));
+        }));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    public void DeletingGeneralPrefixDecorationRestoresDisplayWithoutLogicalChange(int prefixPosition)
+    {
+        using var input = CreatePrefixedGeneralProbe();
+        var textChanges = 0;
+        var rawChanges = 0;
+        input.TextChanged += (_, _) => textChanges++;
+        input.RawValueChanged += (_, _) => rawChanges++;
+        input.NativeEditor.Select(prefixPosition, 1);
+
+        input.NativeEditor.SelectedText = string.Empty;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.RawValue, Is.EqualTo("12345678"));
+            Assert.That(input.Text, Is.EqualTo("VN1234-5678"));
+            Assert.That(textChanges, Is.Zero);
+            Assert.That(rawChanges, Is.Zero);
+        }));
+    }
+
+    [Test]
+    public void ReplacementAcrossGeneralPrefixBoundaryUsesRawRangeAndRemainsUndoable()
+    {
+        using var input = CreatePrefixedGeneralProbe();
+        input.NativeEditor.Select(1, 3);
+
+        input.NativeEditor.SelectedText = "AB";
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.RawValue, Is.EqualTo("AB345678"));
+            Assert.That(input.Text, Is.EqualTo("VNAB34-5678"));
+            Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(4));
+        }));
+
+        input.RaiseEditorKeyDown(new KeyEventArgs(Keys.Control | Keys.Z));
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.RawValue, Is.EqualTo("12345678"));
+            Assert.That(input.Text, Is.EqualTo("VN1234-5678"));
+        }));
+    }
+
+    [Test]
     public void BackspaceAndDeleteAdjacentToFormattingDelimiterDeleteRawCharacters()
     {
         using var input = CreateProbe(BootstrapInputFormatMode.General);
@@ -174,6 +241,14 @@ public sealed class BootstrapFormattedTextBoxInteractionTests
         var input = new FormattedProbe { FormatMode = mode };
         input.GeneralOptions.Blocks = new[] { 4, 4 };
         input.GeneralOptions.Delimiter = "-";
+        return input;
+    }
+
+    private static FormattedProbe CreatePrefixedGeneralProbe()
+    {
+        var input = CreateProbe(BootstrapInputFormatMode.General);
+        input.GeneralOptions.Prefix = "VN";
+        input.RawValue = "12345678";
         return input;
     }
 

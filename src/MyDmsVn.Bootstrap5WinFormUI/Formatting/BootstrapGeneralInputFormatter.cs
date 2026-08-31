@@ -53,6 +53,15 @@ public sealed class BootstrapGeneralInputFormatter : IInputFormatter
     /// <inheritdoc />
     public string Unformat(string formattedValue) => Normalize(formattedValue);
 
+    internal int GetLeadingDecorationLength(string formattedValue)
+    {
+        var prefix = _options.Prefix;
+        return prefix.Length > 0 &&
+               (formattedValue ?? string.Empty).StartsWith(prefix, StringComparison.Ordinal)
+            ? prefix.Length
+            : 0;
+    }
+
     private string Normalize(string? value)
     {
         var candidate = value ?? string.Empty;

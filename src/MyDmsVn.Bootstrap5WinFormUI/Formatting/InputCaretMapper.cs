@@ -9,6 +9,12 @@ internal static class InputCaretMapper
         if (formatter is null) throw new ArgumentNullException(nameof(formatter));
         var display = formattedText ?? string.Empty;
         var position = Math.Max(0, Math.Min(display.Length, formattedPosition));
+        if (formatter is BootstrapGeneralInputFormatter generalFormatter &&
+            position <= generalFormatter.GetLeadingDecorationLength(display))
+        {
+            return 0;
+        }
+
         return formatter.Unformat(display.Substring(0, position) ?? string.Empty).Length;
     }
 

@@ -27,7 +27,13 @@ public sealed class InputCaretMapperTests
     public void PrefixAndEndPositionsMapToStableBounds()
     {
         var formatter = new BootstrapNumeralInputFormatter(new BootstrapNumeralFormatOptions { Prefix = "$" });
+        var general = new BootstrapGeneralInputFormatter(new BootstrapGeneralFormatOptions
+        {
+            Prefix = "VN",
+            Blocks = new[] { 4, 4 }
+        });
         const string display = "$1,234";
+        const string generalDisplay = "VN1234 5678";
 
         Assert.Multiple((Action)(() =>
         {
@@ -35,6 +41,9 @@ public sealed class InputCaretMapperTests
             Assert.That(InputCaretMapper.ToRawPosition(formatter, display, 1), Is.Zero);
             Assert.That(InputCaretMapper.ToRawPosition(formatter, display, display.Length), Is.EqualTo(4));
             Assert.That(InputCaretMapper.ToFormattedPosition(formatter, "1234", 4), Is.EqualTo(display.Length));
+            Assert.That(InputCaretMapper.ToRawPosition(general, generalDisplay, 0), Is.Zero);
+            Assert.That(InputCaretMapper.ToRawPosition(general, generalDisplay, 1), Is.Zero);
+            Assert.That(InputCaretMapper.ToRawPosition(general, generalDisplay, 2), Is.Zero);
         }));
     }
 

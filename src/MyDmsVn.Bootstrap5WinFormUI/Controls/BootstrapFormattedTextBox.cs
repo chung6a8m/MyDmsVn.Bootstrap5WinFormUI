@@ -187,14 +187,52 @@ public class BootstrapFormattedTextBox : BootstrapTextBox
 
     private void ApplyCandidateText(string candidateText, int selectionStart, int selectionLength, bool recordHistory, bool raiseEvents)
     {
+        var candidate = candidateText ?? string.Empty;
+        if (TryApplyGeneralPrefixEdit(candidate, recordHistory, raiseEvents)) return;
+
         var formatter = GetEffectiveFormatter();
-        var rawSelectionStart = InputCaretMapper.ToRawPosition(formatter, candidateText, selectionStart);
-        var rawSelectionEnd = InputCaretMapper.ToRawPosition(formatter, candidateText, selectionStart + selectionLength);
-        var canonicalRaw = formatter.Unformat(candidateText ?? string.Empty) ?? string.Empty;
+        var rawSelectionStart = InputCaretMapper.ToRawPosition(formatter, candidate, selectionStart);
+        var rawSelectionEnd = InputCaretMapper.ToRawPosition(formatter, candidate, selectionStart + selectionLength);
+        var canonicalRaw = formatter.Unformat(candidate) ?? string.Empty;
         var finalDisplay = formatter.Format(canonicalRaw) ?? string.Empty;
         canonicalRaw = formatter.Unformat(finalDisplay) ?? string.Empty;
         finalDisplay = formatter.Format(canonicalRaw) ?? string.Empty;
         ApplyStablePair(canonicalRaw, finalDisplay, rawSelectionStart, rawSelectionEnd - rawSelectionStart, recordHistory, raiseEvents);
+    }
+
+    private bool TryApplyGeneralPrefixEdit(string candidateText, bool recordHistory, bool raiseEvents)
+    {
+        var prefix = GeneralOptions.Prefix;
+        if (!recordHistory ||
+            _formatMode != BootstrapInputFormatMode.General ||
+            prefix.Length == 0 ||
+            !_displayValue.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var change = FindChangedRange(_displayValue, candidateText);
+        if (change.PreviousStart >= prefix.Length) return false;
+
+        var rawStart = InputCaretMapper.ToRawPosition(_generalFormatter, _displayValue, change.PreviousStart);
+        var previousEnd = change.PreviousStart + change.PreviousLength;
+        var rawEnd = InputCaretMapper.ToRawPosition(_generalFormatter, _displayValue, previousEnd);
+        var insertedCandidate = candidateText.Substring(change.CandidateStart, change.CandidateLength);
+        var insertedRaw = _generalFormatter.Unformat(prefix + insertedCandidate);
+        var candidateRaw = _rawValue
+            .Remove(rawStart, Math.Max(0, rawEnd - rawStart))
+            .Insert(rawStart, insertedRaw);
+        var finalDisplay = _generalFormatter.Format(candidateRaw) ?? string.Empty;
+        var canonicalRaw = _generalFormatter.Unformat(finalDisplay) ?? string.Empty;
+        finalDisplay = _generalFormatter.Format(canonicalRaw) ?? string.Empty;
+        ApplyStablePair(
+            canonicalRaw,
+            finalDisplay,
+            rawStart + insertedRaw.Length,
+            0,
+            recordHistory,
+            raiseEvents);
+        return true;
     }
 
     private void ApplyRawValue(string candidateRaw, int rawSelectionStart, int rawSelectionLength, bool raiseEvents)
@@ -308,6 +346,13 @@ public class BootstrapFormattedTextBox : BootstrapTextBox
     private static int InferCandidateSelectionStart(string previousDisplay, string candidateDisplay, int nativeSelectionStart)
     {
         if (previousDisplay == candidateDisplay) return nativeSelectionStart;
+        var change = FindChangedRange(previousDisplay, candidateDisplay);
+        var inferred = change.CandidateStart + change.CandidateLength;
+        return Math.Max(nativeSelectionStart, inferred);
+    }
+
+    private static TextChangeRange FindChangedRange(string previousDisplay, string candidateDisplay)
+    {
         var prefix = 0;
         var commonLength = Math.Min(previousDisplay.Length, candidateDisplay.Length);
         while (prefix < commonLength && previousDisplay[prefix] == candidateDisplay[prefix]) prefix++;
@@ -320,9 +365,9 @@ public class BootstrapFormattedTextBox : BootstrapTextBox
             candidateSuffix--;
         }
 
+        var changedPreviousLength = Math.Max(0, previousSuffix - prefix + 1);
         var changedCandidateLength = Math.Max(0, candidateSuffix - prefix + 1);
-        var inferred = prefix + changedCandidateLength;
-        return Math.Max(nativeSelectionStart, inferred);
+        return new TextChangeRange(prefix, changedPreviousLength, prefix, changedCandidateLength);
     }
 
     private IInputFormatter GetEffectiveFormatter()
@@ -351,6 +396,25 @@ public class BootstrapFormattedTextBox : BootstrapTextBox
     }
 
     private void OnOptionsChanged(object? sender, EventArgs e) => Reformat();
+
+    private readonly struct TextChangeRange
+    {
+        internal TextChangeRange(int previousStart, int previousLength, int candidateStart, int candidateLength)
+        {
+            PreviousStart = previousStart;
+            PreviousLength = previousLength;
+            CandidateStart = candidateStart;
+            CandidateLength = candidateLength;
+        }
+
+        internal int PreviousStart { get; }
+
+        internal int PreviousLength { get; }
+
+        internal int CandidateStart { get; }
+
+        internal int CandidateLength { get; }
+    }
 
     private sealed class IdentityInputFormatter : IInputFormatter
     {
