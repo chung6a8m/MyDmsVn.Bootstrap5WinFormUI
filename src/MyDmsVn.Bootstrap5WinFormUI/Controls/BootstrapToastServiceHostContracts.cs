@@ -62,3 +62,16 @@ internal interface IBootstrapToastHostWindow : IDisposable
 
     void RetireForScreenRemoval();
 }
+
+internal interface IBootstrapToastHostWindowFactory
+{
+    IBootstrapToastHostWindow Create();
+}
+
+internal sealed class BootstrapToastHostWindowFactory : IBootstrapToastHostWindowFactory
+{
+    public IBootstrapToastHostWindow Create()
+    {
+        return new BootstrapToastHostWindow();
+    }
+}
