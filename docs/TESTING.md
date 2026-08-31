@@ -137,6 +137,14 @@ BootstrapNumericBox Stage 5 pure tests cover:
 - DPI scaling of horizontal padding, border/focus widths, and theme/explicit radius at 96/120/144/168/192 logical DPI
 - Native-editor bounds containment for normal, narrow, empty, and malformed client sizes without negative rectangles
 
+BootstrapFormattedTextBox pure formatter tests cover:
+
+- General, Numeral, Date, Time, and CreditCard format/unformat round trips, canonicalization, partial input, option validation, lazy delimiters, prefixes, scale limits, and frozen credit-card IIN boundaries
+- ASCII-only numeric raw domains for Date, Time, Numeral, and CreditCard, including mixed ASCII/Unicode digit input and atomic rejection of ASCII-digit delimiters or decimal marks
+- Invariant `.` Numeral RawValue with configurable display separators and Thousand/Lakh/Wan grouping
+- Caret/selection mapping across prefixes and delimiters, including bounded edit-history undo/redo and redo invalidation after a branch edit
+- Null/empty/pathological input without WinForms handles, timers, culture-dependent parsing, or external formatter dependencies
+
 BootstrapComboBox Stage 6 pure tests cover:
 
 - Disabled/valid/invalid/focused/neutral border palette priority using the established input validation tokens
@@ -342,6 +350,8 @@ For BootstrapTabControl Stage 4, choose **Navigation / Tabs**. Compare Tabs/Pill
 
 For BootstrapNumericBox Stage 5, choose **Advanced Inputs**. Verify integer/default, decimal `0.25` increment with two decimal places, thousands formatting, signed `-100..100` range with step `10`, valid/invalid borders, read-only versus disabled behavior, and live `ValueChanged` feedback. Type culture-sensitive values, use Up/Down and native spin buttons, exercise mouse wheel, Tab/Shift+Tab, switch Light/Dark, resize repeatedly, and repeat at 100/125/150/175/200% real Windows scaling.
 
+For `BootstrapFormattedTextBox`, remain on **Advanced Inputs** and verify General, Numeral (including Vietnamese display separators), Date, Time, CreditCard, and Custom scenarios against their live RawValue feedback. Exercise partial input, middle insertion, selection replacement, raw and already-formatted paste, cut, clear, separator-adjacent Backspace/Delete, multiple undo/redo steps, Tab/Shift+Tab, and Alt shortcuts. Switch Light/Dark and repeat at 100/125/150/175/200% real Windows scaling. Perform a Vietnamese IME composition smoke test and confirm only committed text is canonicalized; automated tests do not substitute for this OS/IME check.
+
 For BootstrapComboBox Stage 6, stay on **Advanced Inputs**. Verify unbound items, a bound object list using `DisplayMember`/`ValueMember`, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` with `ListItems`, long text/ellipsis, leading-icon and no-icon comparison, Valid/Invalid, disabled, and explicit radius examples. Exercise the native arrow and popup plus Up/Down/Enter/Escape, free typing, Tab/Shift+Tab, selected-value changes, and runtime Light/Dark switching without losing binding or selection. Repeat at 100/125/150/175/200% real Windows scaling. Native editable child, arrow button, and popup chrome may remain OS-themed/square; the framework must not replace them merely for visual uniformity.
 
 For BootstrapDropdown and `BootstrapSplitButton`, use the **Navigation / Tabs** basic/icon/state/long/stress/nested/hosted/mixed/split scenarios. Verify primary versus chevron mouse routing, Tab/Shift+Tab between regions, Enter/Space on each region, native Up/Down/Home/End/Right/Left/Enter/Escape submenu navigation, and outside-click dismissal. Focus/edit/toggle hosted controls, navigate back to menu rows, dismiss, reopen, and confirm the documented fresh-snapshot policy. Cover disabled leaves/submenus/hosts, checked leaves, split loading, Light/Dark changes while root/submenus are visible, default and caller-owned fonts, and primary/menu accessibility names before/after outer `Text` and `AccessibleName` changes. Repeat at 100/125/150/175/200% real Windows scaling and at bottom/right/secondary-monitor edges. Stress repeated open/close/rebuild, hosted disposal, and form disposal while nested content is open; check focus restoration, stale windows, duplicate events, GDI growth, and disposed-object failures. Inherited split `Controls` are observable but must not be mutated or disposed by application code.
@@ -485,6 +495,8 @@ TabControl must retain native interaction ownership. Test normal/hover/selected/
 
 NumericBox owns one public tab stop while its private native editor has `TabStop = false`. Test wrapper Tab entry and Shift+Tab exit, shell clicks redirecting focus to the editor, wrapper KeyDown/KeyPress/KeyUp/PreviewKeyDown forwarding exactly once, and preservation of native spin buttons, Up/Down, wheel, boundaries, and read-only spin behavior.
 
+FormattedTextBox retains the one composite tab stop and native editor owned by `BootstrapTextBox`. STA tests cover partial and middle edits, selection replacement across delimiters, raw/already-formatted/invalid-character paste, native cut, clear, separator-adjacent Backspace/Delete, General-prefix insertion/deletion/cross-boundary replacement, exact TextChanged then RawValueChanged ordering, bounded Ctrl+Z/Ctrl+Y, and branch-edit redo clearing. Rejected separator assignments must not reformat or emit logical value events. Ctrl+A/C/X/V remain native paths; Tab/Shift+Tab leave the composite normally; Alt input is neither consumed nor allowed to mutate the value. Theme, validation, enabled/read-only, focus, option-change reformatting, rapid state changes, and disposal must preserve one stable Text/RawValue pair.
+
 ComboBox remains a native `ComboBox`, so it retains one native focus/input path rather than a wrapper redirect. Test `DropDownList` and editable `DropDown`, native arrow/popup open-close, Up/Down/Enter/Escape, free typing, autocomplete, Tab/Shift+Tab traversal, disabled/re-enabled behavior, bound/unbound selection, and native selection/dropdown events. Framework presentation changes must never synthesize those events or create a second selection state.
 
 Dropdown interaction begins on its caller-owned `BootstrapButton` target or one of the split button's two native-focusable regions and transfers to native `ToolStripDropDownMenu` behavior while open. Test primary/chevron Enter/Space routing, Tab/Shift+Tab region traversal, recursive native menu keys, hosted-control focus return, Escape/outside dismissal, disabled rows, and loading suppression. `Checked` is display state rather than a toggle policy. Advanced composition still introduces no second focus, keyboard, placement, or animation engine.
@@ -622,7 +634,7 @@ Exact solution/project paths are established in Phase 0 of `DEVELOPMENT_PLAN.md`
 
 The repository CI runs `build.ps1` followed by `test.ps1 -SkipBuild` on Windows, covering the complete `net48` and `net8.0-windows` matrix used by implemented phases.
 
-Pagination, Badge, Alert, Tooltip, TabControl, NumericBox, ComboBox, Dropdown, DatePicker, Select, Calendar, and CalendarPicker participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
+Pagination, Badge, Alert, Tooltip, TabControl, NumericBox, FormattedTextBox, ComboBox, Dropdown, DatePicker, Select, Calendar, and CalendarPicker participate in the Phase 16 public/protected API fingerprint gate. Each addition must first fail that gate, the reconstructed API must be reviewed, and only the intentionally changed fingerprint may then be approved. `AssemblyVersion` remains `1.0.0.0`.
 
 ## 11. Definition of done for a component
 

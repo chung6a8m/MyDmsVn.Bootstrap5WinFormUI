@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Formatting;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
@@ -13,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "4e9893379e322029068a2c32e195679311ed5a844549c5d0e22685cb6e60da32";
+    private const string ApprovedV1Fingerprint = "9e559718fc7c4c3f1f0df64455d09f2fc0e1b7ef98ca6f868fce0c21daaa4181";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -33,6 +34,78 @@ public sealed class Phase16PublicApiBaselineTests
     public void V1CompatibilityAssemblyVersionIsStable()
     {
         Assert.That(typeof(BootstrapButton).Assembly.GetName().Version, Is.EqualTo(new Version(1, 0, 0, 0)));
+    }
+
+    [Test]
+    public void FormattedInputApiExportsOnlyTheReviewedPublicContract()
+    {
+        var assembly = typeof(BootstrapFormattedTextBox).Assembly;
+        var formattedExports = assembly.GetExportedTypes()
+            .Select(type => type.FullName)
+            .Where(name => name is not null &&
+                           (name.IndexOf("FormattedTextBox", StringComparison.Ordinal) >= 0 ||
+                            name.IndexOf("InputFormatter", StringComparison.Ordinal) >= 0 ||
+                            name.IndexOf("FormatOptions", StringComparison.Ordinal) >= 0 ||
+                            name.IndexOf("InputFormatMode", StringComparison.Ordinal) >= 0 ||
+                            name.IndexOf("NumeralGroupStyle", StringComparison.Ordinal) >= 0 ||
+                            name.IndexOf("CreditCardType", StringComparison.Ordinal) >= 0 ||
+                            name.IndexOf("BootstrapTimeFormat", StringComparison.Ordinal) >= 0))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        var editor = typeof(BootstrapTextBox).GetProperty(
+            "Editor",
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+        var editorTextChanged = typeof(BootstrapTextBox).GetMethod(
+            "OnEditorTextChanged",
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+        var editorKeyDown = typeof(BootstrapTextBox).GetMethod(
+            "OnEditorKeyDown",
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(formattedExports, Is.EqualTo(new[]
+            {
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapFormattedTextBox",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapCreditCardFormatOptions",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapCreditCardInputFormatter",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapCreditCardType",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapDateFormatOptions",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapDateInputFormatter",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapGeneralFormatOptions",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapGeneralInputFormatter",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapInputFormatMode",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapNumeralFormatOptions",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapNumeralGroupStyle",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapNumeralInputFormatter",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapTimeFormat",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapTimeFormatOptions",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.BootstrapTimeInputFormatter",
+                "MyDmsVn.Bootstrap5WinFormUI.Formatting.IInputFormatter"
+            }));
+            Assert.That(GetDeclaredPublicPropertyNames(typeof(BootstrapFormattedTextBox)), Is.EqualTo(new[]
+            {
+                "CreditCardOptions", "CreditCardType", "DateOptions", "FormatMode", "Formatter",
+                "GeneralOptions", "NumeralOptions", "RawValue", "Text", "TimeOptions"
+            }));
+            Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapFormattedTextBox)),
+                Is.EqualTo(new[] { "CreditCardTypeChanged", "RawValueChanged" }));
+            Assert.That(GetDeclaredPublicMethodNames(typeof(BootstrapFormattedTextBox)), Is.EqualTo(new[] { "Reformat" }));
+            Assert.That(editor, Is.Not.Null);
+            Assert.That(editor!.GetMethod!.IsFamily, Is.True);
+            Assert.That(editorTextChanged, Is.Not.Null);
+            Assert.That(editorTextChanged!.IsFamily, Is.True);
+            Assert.That(editorKeyDown, Is.Not.Null);
+            Assert.That(editorKeyDown!.IsFamily, Is.True);
+            Assert.That(typeof(BootstrapTextBox).GetProperty("Editor", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(BootstrapTextBox).GetMethod("OnEditorTextChanged", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(BootstrapTextBox).GetMethod("OnEditorKeyDown", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("InputCaretMapper"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("FormattedTextSnapshot"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("FormattedTextHistory"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("InputFormatOptionValidation"));
+        }));
     }
 
     [Test]

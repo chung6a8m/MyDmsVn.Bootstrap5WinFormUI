@@ -5,6 +5,7 @@ using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Demo;
+using MyDmsVn.Bootstrap5WinFormUI.Formatting;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Demo;
@@ -13,6 +14,47 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Demo;
 [Apartment(ApartmentState.STA)]
 public sealed class AdvancedInputsDemoFormTests
 {
+    [Test]
+    public void AdvancedInputsDemoContainsFormattedInputScenariosAndLiveRawFeedback()
+    {
+        using var form = new AdvancedInputsDemoForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var inputs = FindControls<BootstrapFormattedTextBox>(form).ToArray();
+        var modes = inputs.Select(input => input.FormatMode).ToArray();
+        var captions = FindControls<Label>(form).Select(label => label.Text).ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(inputs.Length, Is.GreaterThanOrEqualTo(7));
+            Assert.That(modes, Does.Contain(BootstrapInputFormatMode.General));
+            Assert.That(modes, Does.Contain(BootstrapInputFormatMode.Numeral));
+            Assert.That(modes, Does.Contain(BootstrapInputFormatMode.Date));
+            Assert.That(modes, Does.Contain(BootstrapInputFormatMode.Time));
+            Assert.That(modes, Does.Contain(BootstrapInputFormatMode.CreditCard));
+            Assert.That(modes, Does.Contain(BootstrapInputFormatMode.Custom));
+            Assert.That(inputs.Any(input => input.NumeralOptions.DecimalMark == "," && input.NumeralOptions.Delimiter == "."), Is.True);
+            Assert.That(inputs.Any(input => input.ShowClearButton && input.Icon is not null && input.PlaceholderText.Length > 0), Is.True);
+            Assert.That(captions.Contains("General blocks"), Is.True);
+            Assert.That(captions.Contains("Numeral — Vietnamese separators"), Is.True);
+            Assert.That(captions.Contains("Credit card / detected type"), Is.True);
+            Assert.That(FindControls<BootstrapNumericBox>(form).Any(), Is.True);
+            Assert.That(FindControls<BootstrapComboBox>(form).Any(), Is.True);
+            Assert.That(FindControls<BootstrapDatePicker>(form).Any(), Is.True);
+            Assert.That(FindControls<BootstrapCalendar>(form).Any(), Is.True);
+        }));
+
+        var general = inputs.Single(input => (input.AccessibleName ?? string.Empty).StartsWith("General blocks", StringComparison.Ordinal));
+        general.RawValue = "99998888777";
+        Assert.That(GetScenarioStatus(form, "General blocks").Text, Is.EqualTo("RawValue: 99998888777"));
+
+        var card = inputs.Single(input => input.FormatMode == BootstrapInputFormatMode.CreditCard);
+        card.RawValue = "378282246310005";
+        Assert.That(GetScenarioStatus(form, "Credit card / detected type").Text,
+            Is.EqualTo("RawValue: 378282246310005 / Type: AmericanExpress"));
+    }
+
     [Test]
     public void AdvancedInputsDemoContainsStage5NumericScenarios()
     {

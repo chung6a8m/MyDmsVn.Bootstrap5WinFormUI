@@ -57,10 +57,10 @@ public class BootstrapTextBox : UserControl
         _editor.BorderStyle = BorderStyle.None;
         _editor.TabStop = false;
         _editor.Margin = Padding.Empty;
-        _editor.TextChanged += OnEditorTextChanged;
+        _editor.TextChanged += HandleEditorTextChanged;
         _editor.GotFocus += OnEditorGotFocus;
         _editor.LostFocus += OnEditorLostFocus;
-        _editor.KeyDown += OnEditorKeyDown;
+        _editor.KeyDown += HandleEditorKeyDown;
         _editor.KeyPress += OnEditorKeyPress;
         _editor.KeyUp += OnEditorKeyUp;
         _editor.PreviewKeyDown += OnEditorPreviewKeyDown;
@@ -105,6 +105,11 @@ public class BootstrapTextBox : UserControl
         UpdatePlaceholderVisibility();
         UpdateClearButtonVisibility();
     }
+
+    /// <summary>
+    /// Gets the native text editor used by this composite control.
+    /// </summary>
+    protected TextBox Editor => _editor;
 
     /// <inheritdoc />
     [Browsable(true)]
@@ -442,12 +447,30 @@ public class BootstrapTextBox : UserControl
         base.Dispose(disposing);
     }
 
-    private void OnEditorTextChanged(object? sender, EventArgs e)
+    /// <summary>
+    /// Processes a text change raised by the native editor.
+    /// </summary>
+    /// <param name="e">The event data.</param>
+    protected virtual void OnEditorTextChanged(EventArgs e)
     {
         UpdatePlaceholderVisibility();
         UpdateClearButtonVisibility();
         PerformLayout();
         OnTextChanged(e);
+    }
+
+    /// <summary>
+    /// Processes a key-down event raised by the native editor.
+    /// </summary>
+    /// <param name="e">The event data.</param>
+    protected virtual void OnEditorKeyDown(KeyEventArgs e)
+    {
+        OnKeyDown(e);
+    }
+
+    private void HandleEditorTextChanged(object? sender, EventArgs e)
+    {
+        OnEditorTextChanged(e);
     }
 
     private void OnEditorGotFocus(object? sender, EventArgs e)
@@ -464,9 +487,9 @@ public class BootstrapTextBox : UserControl
         Invalidate();
     }
 
-    private void OnEditorKeyDown(object? sender, KeyEventArgs e)
+    private void HandleEditorKeyDown(object? sender, KeyEventArgs e)
     {
-        OnKeyDown(e);
+        OnEditorKeyDown(e);
     }
 
     private void OnEditorKeyPress(object? sender, KeyPressEventArgs e)
