@@ -35,6 +35,8 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
 
     public Action? EscapeRequested { get; set; }
 
+    public Func<bool, bool>? TabNavigationRequested { get; set; }
+
     public void ShowAt(Rectangle screenBounds)
     {
         RecordRequestedBounds(screenBounds);
@@ -67,6 +69,31 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
         return base.ProcessCmdKey(ref m, keyData);
     }
 
+    protected override bool ProcessDialogKey(Keys keyData)
+    {
+        if (TryProcessTabNavigation(keyData))
+        {
+            return true;
+        }
+
+        return base.ProcessDialogKey(keyData);
+    }
+
+    private bool TryProcessTabNavigation(Keys keyData)
+    {
+        var keyCode = keyData & Keys.KeyCode;
+        var modifiers = keyData & Keys.Modifiers;
+        if (keyCode == Keys.Tab
+            && (modifiers == Keys.None || modifiers == Keys.Shift)
+            && TabNavigationRequested is not null
+            && TabNavigationRequested(modifiers != Keys.Shift))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     protected override void OnClosing(ToolStripDropDownClosingEventArgs e)
     {
         if (e.CloseReason == ToolStripDropDownCloseReason.Keyboard
@@ -86,6 +113,7 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
             _boundsGeneration++;
             _boundsCorrectionQueued = false;
             EscapeRequested = null;
+            TabNavigationRequested = null;
             Region = null;
             _ownedRegion?.Dispose();
             _ownedRegion = null;

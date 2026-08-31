@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
@@ -47,6 +48,7 @@ public class BootstrapPopover : Component
             CloseOnEscape = _closeOnEscape
         };
         _dropDown.EscapeRequested = OnEscapeRequested;
+        _dropDown.TabNavigationRequested = OnTabNavigationRequested;
         _dropDown.Opened += OnDropDownOpened;
         _dropDown.Closed += OnDropDownClosed;
     }
@@ -335,6 +337,7 @@ public class BootstrapPopover : Component
             _dropDown.Opened -= OnDropDownOpened;
             _dropDown.Closed -= OnDropDownClosed;
             _dropDown.EscapeRequested = null;
+            _dropDown.TabNavigationRequested = null;
             _dropDown.Dispose();
         }
 
@@ -415,6 +418,30 @@ public class BootstrapPopover : Component
         first?.Focus();
     }
 
+    private bool OnTabNavigationRequested(bool forward)
+    {
+        var content = _content;
+        if (content is null || content.IsDisposed)
+        {
+            return false;
+        }
+
+        var current = FindFocusedDescendant(content);
+        if (current is null)
+        {
+            var initial = forward ? FindFirstFocusable(content) : FindLastFocusable(content);
+            return initial is not null && initial.Focus();
+        }
+
+        var next = FindAdjacentFocusable(content, current, forward);
+        if (next is not null && next.Focus())
+        {
+            return true;
+        }
+
+        return MoveFocusPastPopover(forward);
+    }
+
     private static Control? FindFirstFocusable(Control? parent)
     {
         if (parent is null)
@@ -422,7 +449,7 @@ public class BootstrapPopover : Component
             return null;
         }
 
-        if (parent.Visible && parent.Enabled && parent.TabStop && parent.CanSelect)
+        if (IsFocusable(parent))
         {
             return parent;
         }
@@ -438,6 +465,128 @@ public class BootstrapPopover : Component
         }
 
         return null;
+    }
+
+    private static Control? FindLastFocusable(Control? parent)
+    {
+        if (parent is null)
+        {
+            return null;
+        }
+
+        Control? child = null;
+        while ((child = parent.GetNextControl(child, false)) is not null)
+        {
+            var descendant = FindLastFocusable(child);
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return IsFocusable(parent) ? parent : null;
+    }
+
+    private static Control? FindAdjacentFocusable(Control root, Control current, bool forward)
+    {
+        var currentFound = false;
+        foreach (var candidate in EnumerateFocusable(root, forward))
+        {
+            if (currentFound)
+            {
+                return candidate;
+            }
+
+            currentFound = ReferenceEquals(candidate, current);
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<Control> EnumerateFocusable(Control root, bool forward)
+    {
+        if (forward)
+        {
+            foreach (var control in EnumerateFocusableForward(root))
+            {
+                yield return control;
+            }
+
+            yield break;
+        }
+
+        var controls = new List<Control>(EnumerateFocusableForward(root));
+        for (var index = controls.Count - 1; index >= 0; index--)
+        {
+            yield return controls[index];
+        }
+    }
+
+    private static IEnumerable<Control> EnumerateFocusableForward(Control root)
+    {
+        if (IsFocusable(root))
+        {
+            yield return root;
+        }
+
+        Control? child = null;
+        while ((child = root.GetNextControl(child, true)) is not null)
+        {
+            if (IsFocusable(child))
+            {
+                yield return child;
+            }
+        }
+    }
+
+    private static Control? FindFocusedDescendant(Control root)
+    {
+        foreach (Control child in root.Controls)
+        {
+            var focused = FindFocusedDescendant(child);
+            if (focused is not null)
+            {
+                return focused;
+            }
+        }
+
+        return root.Focused && IsFocusable(root) ? root : null;
+    }
+
+    private static bool IsFocusable(Control control)
+    {
+        return control.Visible && control.Enabled && control.TabStop && control.CanSelect;
+    }
+
+    private bool MoveFocusPastPopover(bool forward)
+    {
+        var target = _target;
+        var parent = target?.Parent;
+        var form = target?.FindForm();
+        Hide();
+
+        if (target is null || target.IsDisposed || !target.Visible || !target.Enabled)
+        {
+            return true;
+        }
+
+        if (parent is not null
+            && !parent.IsDisposed
+            && parent.SelectNextControl(target, forward, true, true, false))
+        {
+            return true;
+        }
+
+        if (form is not null
+            && !form.IsDisposed
+            && !ReferenceEquals(form, parent)
+            && form.SelectNextControl(target, forward, true, true, false))
+        {
+            return true;
+        }
+
+        target.Focus();
+        return true;
     }
 
     private void RepositionIfOpen()

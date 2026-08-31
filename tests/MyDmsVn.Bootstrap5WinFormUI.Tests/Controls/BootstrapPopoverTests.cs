@@ -369,6 +369,60 @@ public sealed class BootstrapPopoverTests
     }
 
     [Test]
+    public void TabMovesForwardThroughNestedInteractiveContent()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Show();
+
+        Assert.That(fixture.Editor.Focused, Is.True);
+        SendTab(fixture, forward: true);
+        Assert.That(fixture.Option.Focused, Is.True);
+        SendTab(fixture, forward: true);
+        Assert.That(fixture.Apply.Focused, Is.True);
+        SendTab(fixture, forward: true);
+        Assert.That(fixture.Close.Focused, Is.True);
+    }
+
+    [Test]
+    public void ShiftTabMovesBackwardThroughNestedInteractiveContent()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Show();
+        fixture.Close.Focus();
+
+        Assert.That(fixture.Close.Focused, Is.True);
+        SendTab(fixture, forward: false);
+        Assert.That(fixture.Apply.Focused, Is.True);
+        SendTab(fixture, forward: false);
+        Assert.That(fixture.Option.Focused, Is.True);
+        SendTab(fixture, forward: false);
+        Assert.That(fixture.Editor.Focused, Is.True);
+    }
+
+    [Test]
+    public void TabTraversalSkipsIneligibleControlsInBothDirections()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Commands.TabIndex = 6;
+        using var hidden = new TextBox { TabIndex = 2, Visible = false };
+        using var disabled = new TextBox { TabIndex = 3, Enabled = false };
+        using var noTabStop = new TextBox { TabIndex = 4, TabStop = false };
+        using var label = new Label { TabIndex = 5, Text = "Information" };
+        fixture.Content.Controls.Add(hidden);
+        fixture.Content.Controls.Add(disabled);
+        fixture.Content.Controls.Add(noTabStop);
+        fixture.Content.Controls.Add(label);
+        fixture.Show();
+
+        fixture.Option.Focus();
+        SendTab(fixture, forward: true);
+        Assert.That(fixture.Apply.Focused, Is.True);
+
+        SendTab(fixture, forward: false);
+        Assert.That(fixture.Option.Focused, Is.True);
+    }
+
+    [Test]
     public void TargetReplacementAssignedFromClosedSurvivesOriginalTargetDisposal()
     {
         using var form = new Form { ShowInTaskbar = false };
@@ -536,6 +590,19 @@ public sealed class BootstrapPopoverTests
     {
         Assert.That(GetWindowRect(handle, out var bounds), Is.True);
         return Rectangle.FromLTRB(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+    }
+
+    private static void SendTab(InteractivePopoverFixture fixture, bool forward)
+    {
+        var dropDown = (BootstrapOverlayDropDown)fixture.Content.TopLevelControl!;
+        var processDialogKey = typeof(BootstrapOverlayDropDown).GetMethod(
+            "ProcessDialogKey",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var handled = (bool)processDialogKey.Invoke(
+            dropDown,
+            new object[] { forward ? Keys.Tab : Keys.Shift | Keys.Tab })!;
+        Application.DoEvents();
+        Assert.That(handled, Is.True);
     }
 
     [DllImport("user32.dll", SetLastError = true)]
