@@ -77,7 +77,7 @@ public sealed class BootstrapNumeralInputFormatter : IInputFormatter
         var hasDecimal = false;
         foreach (var character in candidate)
         {
-            if (char.IsDigit(character)) raw.Append(character);
+            if (InputFormatOptionValidation.IsAsciiDigit(character)) raw.Append(character);
             else if (character == DecimalMarker && !hasDecimal && _options.DecimalScale > 0)
             {
                 raw.Append('.');
@@ -96,7 +96,7 @@ public sealed class BootstrapNumeralInputFormatter : IInputFormatter
         var hasDecimal = false;
         foreach (var character in candidate)
         {
-            if (char.IsDigit(character)) raw.Append(character);
+            if (InputFormatOptionValidation.IsAsciiDigit(character)) raw.Append(character);
             else if (character == '.' && !hasDecimal && _options.DecimalScale > 0)
             {
                 raw.Append('.');

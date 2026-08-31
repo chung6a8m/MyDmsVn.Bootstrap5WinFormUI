@@ -39,7 +39,9 @@ public sealed class BootstrapTimeInputFormatter : IInputFormatter
     private string ShapeComponent(char component, string value)
     {
         if (value.Length != 2) return value;
-        var parsed = int.Parse(value);
+        if (!InputFormatOptionValidation.IsAsciiDigit(value[0]) ||
+            !InputFormatOptionValidation.IsAsciiDigit(value[1])) return value;
+        var parsed = ((value[0] - '0') * 10) + (value[1] - '0');
         if (component == 'h')
         {
             var minimum = _options.TimeFormat == BootstrapTimeFormat.TwelveHour ? 1 : 0;

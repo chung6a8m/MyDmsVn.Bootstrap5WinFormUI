@@ -41,4 +41,14 @@ public sealed class BootstrapTimeInputFormatterTests
             Assert.That(twentyFour.Unformat("23:59:59"), Is.EqualTo("235959"));
         }));
     }
+
+    [TestCase("３１", "")]
+    [TestCase("٣1", "1")]
+    public void UnicodeDecimalDigitsAreIgnoredWithoutThrowing(string candidate, string expected)
+    {
+        var formatter = new BootstrapTimeInputFormatter(new BootstrapTimeFormatOptions());
+
+        Assert.That(formatter.Format(candidate), Is.EqualTo(expected));
+        Assert.That(formatter.Unformat(candidate), Is.EqualTo(expected));
+    }
 }

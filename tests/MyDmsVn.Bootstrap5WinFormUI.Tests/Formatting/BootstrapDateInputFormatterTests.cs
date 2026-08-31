@@ -44,4 +44,14 @@ public sealed class BootstrapDateInputFormatterTests
             Assert.That(eager.Format("31022026"), Is.EqualTo("31/02/2026"), "Cross-component calendar validation is outside formatting.");
         }));
     }
+
+    [TestCase("３１", "")]
+    [TestCase("٣1", "1")]
+    public void UnicodeDecimalDigitsAreIgnoredWithoutThrowing(string candidate, string expected)
+    {
+        var formatter = new BootstrapDateInputFormatter(new BootstrapDateFormatOptions());
+
+        Assert.That(formatter.Format(candidate), Is.EqualTo(expected));
+        Assert.That(formatter.Unformat(candidate), Is.EqualTo(expected));
+    }
 }

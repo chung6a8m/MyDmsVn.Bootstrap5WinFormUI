@@ -81,4 +81,17 @@ public sealed class BootstrapCreditCardInputFormatterTests
             Assert.That(formatter.Unformat("4111-ab11-1111"), Is.EqualTo("4111111111"));
         }));
     }
+
+    [Test]
+    public void CanonicalRawKeepsOnlyAsciiDigits()
+    {
+        var formatter = new BootstrapCreditCardInputFormatter(new BootstrapCreditCardFormatOptions());
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(formatter.Format("４11١2"), Is.EqualTo("112"));
+            Assert.That(formatter.Unformat("４11١2"), Is.EqualTo("112"));
+            Assert.That(formatter.GetCardType("４11١2"), Is.EqualTo(BootstrapCreditCardType.Uatp));
+        }));
+    }
 }

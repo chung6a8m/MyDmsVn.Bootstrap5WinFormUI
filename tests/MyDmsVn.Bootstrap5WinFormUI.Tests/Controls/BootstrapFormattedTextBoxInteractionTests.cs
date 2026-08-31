@@ -56,6 +56,22 @@ public sealed class BootstrapFormattedTextBoxInteractionTests
         }));
     }
 
+    [TestCase(BootstrapInputFormatMode.Date)]
+    [TestCase(BootstrapInputFormatMode.Time)]
+    public void PasteLikeEditIgnoresUnicodeDecimalDigits(BootstrapInputFormatMode mode)
+    {
+        using var input = CreateProbe(mode);
+
+        input.NativeEditor.SelectedText = "３1";
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.RawValue, Is.EqualTo("1"));
+            Assert.That(input.Text, Is.EqualTo("1"));
+            Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(1));
+        }));
+    }
+
     [Test]
     public void BackspaceAndDeleteAdjacentToFormattingDelimiterDeleteRawCharacters()
     {

@@ -7,6 +7,8 @@ internal static class InputFormatOptionValidation
 {
     internal static string Normalize(string? value) => value ?? string.Empty;
 
+    internal static bool IsAsciiDigit(char value) => value >= '0' && value <= '9';
+
     internal static void ValidateSingleCharacter(string value, string parameterName, bool allowEmpty = true)
     {
         if ((!allowEmpty && value.Length == 0) || value.Length > 1)

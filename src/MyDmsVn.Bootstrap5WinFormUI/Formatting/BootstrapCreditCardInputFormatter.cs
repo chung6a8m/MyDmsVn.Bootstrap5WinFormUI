@@ -91,7 +91,7 @@ public sealed class BootstrapCreditCardInputFormatter : IInputFormatter
         var digits = new StringBuilder(candidate.Length);
         foreach (var character in candidate)
         {
-            if (char.IsDigit(character)) digits.Append(character);
+            if (InputFormatOptionValidation.IsAsciiDigit(character)) digits.Append(character);
         }
 
         return digits.ToString();

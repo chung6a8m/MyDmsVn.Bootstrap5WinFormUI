@@ -41,7 +41,9 @@ public sealed class BootstrapDateInputFormatter : IInputFormatter
     private static string ShapeComponent(char component, string value)
     {
         if (value.Length != 2 || (component != 'd' && component != 'm')) return value;
-        var parsed = int.Parse(value);
+        if (!InputFormatOptionValidation.IsAsciiDigit(value[0]) ||
+            !InputFormatOptionValidation.IsAsciiDigit(value[1])) return value;
+        var parsed = ((value[0] - '0') * 10) + (value[1] - '0');
         var maximum = component == 'd' ? 31 : 12;
         parsed = Math.Max(1, Math.Min(maximum, parsed));
         return parsed.ToString("00");
@@ -56,7 +58,7 @@ internal static class StructuredInputFormatterLogic
         var digits = new StringBuilder(candidate.Length);
         foreach (var character in candidate)
         {
-            if (char.IsDigit(character)) digits.Append(character);
+            if (InputFormatOptionValidation.IsAsciiDigit(character)) digits.Append(character);
         }
 
         var capacity = 0;

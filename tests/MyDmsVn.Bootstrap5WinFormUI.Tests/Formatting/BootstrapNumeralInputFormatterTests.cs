@@ -77,4 +77,16 @@ public sealed class BootstrapNumeralInputFormatterTests
             Assert.That(formatter.Format(candidate), Is.EqualTo("12345678901234567890.34"));
         }));
     }
+
+    [Test]
+    public void CanonicalRawKeepsOnlyAsciiDigits()
+    {
+        var formatter = new BootstrapNumeralInputFormatter(new BootstrapNumeralFormatOptions());
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(formatter.Format("１２3٤.٥6"), Is.EqualTo("3.6"));
+            Assert.That(formatter.Unformat("１２3٤.٥6"), Is.EqualTo("3.6"));
+        }));
+    }
 }
