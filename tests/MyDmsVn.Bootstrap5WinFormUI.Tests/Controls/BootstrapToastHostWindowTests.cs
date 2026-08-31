@@ -112,6 +112,32 @@ public sealed class BootstrapToastHostWindowTests
     }
 
     [Test]
+    public void FirstShowHasNonInteractiveBlankRegionBeforeHostBecomesVisible()
+    {
+        using var host = CreateConfiguredHost();
+        var toast = new BootstrapToast { Text = "First", AutoHide = false, Width = 240 };
+        bool? blankSpaceExcludedWhenShown = null;
+        host.VisibleChanged += (_, _) =>
+        {
+            if (host.Visible)
+            {
+                blankSpaceExcludedWhenShown = host.Region is not null &&
+                    !host.Region.IsVisible(host.ClientSize.Width / 2, host.ClientSize.Height / 2);
+            }
+        };
+
+        host.ShowToast(toast);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(blankSpaceExcludedWhenShown, Is.True);
+            Assert.That(host.Region, Is.Not.Null);
+            Assert.That(host.Region!.IsVisible(toast.Left, toast.Top), Is.True);
+            Assert.That(host.Region.IsVisible(host.ClientSize.Width / 2, host.ClientSize.Height / 2), Is.False);
+        }));
+    }
+
+    [Test]
     public void RetirementHidesDismissesAndRejectsNewToasts()
     {
         using var host = CreateConfiguredHost();

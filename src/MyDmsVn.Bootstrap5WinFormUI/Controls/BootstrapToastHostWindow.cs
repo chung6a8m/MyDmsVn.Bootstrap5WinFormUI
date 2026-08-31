@@ -99,9 +99,11 @@ internal sealed class BootstrapToastHostWindow : Form, IBootstrapToastHostWindow
         _hadOwnedToasts = true;
         if (!Visible)
         {
+            ReplaceOwnedRegion(new Region(Rectangle.Empty));
             Show();
         }
 
+        RefreshHostRegion();
         ScheduleRegionRefresh();
     }
 
