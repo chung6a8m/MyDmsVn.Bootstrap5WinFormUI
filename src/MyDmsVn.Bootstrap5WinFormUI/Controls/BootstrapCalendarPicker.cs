@@ -50,6 +50,8 @@ public sealed class BootstrapCalendarPicker : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
             ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         TabStop = true;
+        GotFocus += OnPickerFocusChanged;
+        LostFocus += OnPickerFocusChanged;
         AccessibleRole = AccessibleRole.DropList;
         _selectionModel = new BootstrapCalendarSelectionModel(
             BootstrapCalendarSelectionModel.MinimumSupportedDate,
@@ -325,6 +327,8 @@ public sealed class BootstrapCalendarPicker : Control
     {
         if (disposing)
         {
+            GotFocus -= OnPickerFocusChanged;
+            LostFocus -= OnPickerFocusChanged;
             DetachActiveCalendar();
             _dropdown.Opened -= OnDropDownOpened;
             _dropdown.Closed -= OnDropDownClosed;
@@ -367,6 +371,11 @@ public sealed class BootstrapCalendarPicker : Control
             }
             throw;
         }
+    }
+
+    private void OnPickerFocusChanged(object? sender, EventArgs e)
+    {
+        Invalidate();
     }
 
     private void OnDropDownOpened(object? sender, EventArgs e)
