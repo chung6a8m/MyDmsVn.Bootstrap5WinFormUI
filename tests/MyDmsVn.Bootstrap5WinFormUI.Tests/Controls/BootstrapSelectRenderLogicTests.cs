@@ -70,13 +70,13 @@ public sealed class BootstrapSelectRenderLogicTests
         Assert.Multiple((Action)(() =>
         {
             Assert.That(
-                () => BootstrapSelectRenderLogic.ResolveMetrics(new Size(10, 10), null!, 96, -1, false),
+                (Action)(() => _ = BootstrapSelectRenderLogic.ResolveMetrics(new Size(10, 10), null!, 96, -1, false)),
                 Throws.ArgumentNullException);
             Assert.That(
-                () => BootstrapSelectRenderLogic.ResolveMetrics(new Size(10, 10), BootstrapThemeMetrics.Default, 0, -1, false),
+                (Action)(() => _ = BootstrapSelectRenderLogic.ResolveMetrics(new Size(10, 10), BootstrapThemeMetrics.Default, 0, -1, false)),
                 Throws.TypeOf<ArgumentOutOfRangeException>());
             Assert.That(
-                () => BootstrapSelectRenderLogic.ResolveMetrics(new Size(10, 10), BootstrapThemeMetrics.Default, 96, -2, false),
+                (Action)(() => _ = BootstrapSelectRenderLogic.ResolveMetrics(new Size(10, 10), BootstrapThemeMetrics.Default, 96, -2, false)),
                 Throws.TypeOf<ArgumentOutOfRangeException>());
         }));
     }
