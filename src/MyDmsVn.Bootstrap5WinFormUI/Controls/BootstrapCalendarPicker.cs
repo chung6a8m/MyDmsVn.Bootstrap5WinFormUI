@@ -249,18 +249,11 @@ public sealed class BootstrapCalendarPicker : Control
     protected override AccessibleObject CreateAccessibilityInstance() => new BootstrapCalendarPickerAccessibleObject(this);
 
     /// <inheritdoc />
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        base.OnMouseDown(e);
-        if (!Enabled || e.Button != MouseButtons.Left) return;
-        Focus();
-    }
-
-    /// <inheritdoc />
     protected override void OnMouseClick(MouseEventArgs e)
     {
         base.OnMouseClick(e);
         if (e.Button != MouseButtons.Left) return;
+        Focus();
         ToggleDropDown();
     }
 
