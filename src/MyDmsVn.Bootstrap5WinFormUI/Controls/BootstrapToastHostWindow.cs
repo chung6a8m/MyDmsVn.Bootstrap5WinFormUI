@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Compatibility;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -75,7 +76,13 @@ internal sealed class BootstrapToastHostWindow : Form, IBootstrapToastHostWindow
         _toastContainer.ToastSpacing = settings.ToastSpacing;
         _toastContainer.MaximumVisibleToasts = settings.MaximumVisibleToasts;
         TopMost = settings.TopMost;
-        Bounds = BootstrapToastServiceLayoutLogic.InsetWorkingArea(screen.WorkingArea, settings.ScreenMargin, screen.Dpi);
+        var bounds = BootstrapToastServiceLayoutLogic.InsetWorkingArea(screen.WorkingArea, settings.ScreenMargin, screen.Dpi);
+        _ = Handle;
+        if (!BootstrapOverlayWindowBounds.TrySetBounds(Handle, bounds))
+        {
+            throw new InvalidOperationException("The Toast host window could not be positioned at the resolved screen bounds.");
+        }
+
         UpdateMaximumStackHeight();
         ScheduleRegionRefresh();
     }

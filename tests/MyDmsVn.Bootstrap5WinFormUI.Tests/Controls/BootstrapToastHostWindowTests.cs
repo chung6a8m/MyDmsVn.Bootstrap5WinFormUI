@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Compatibility;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
@@ -54,7 +55,10 @@ public sealed class BootstrapToastHostWindowTests
     [Test]
     public void ApplySettingsUsesWorkingAreaMarginAndTracksHeightLimit()
     {
-        using var host = new BootstrapToastHostWindow();
+        using var host = new BootstrapToastHostWindow
+        {
+            MaximumSize = new Size(300, 200)
+        };
         var screen = new BootstrapToastScreenInfo("DISPLAY2", new Rectangle(-1920, 0, 1920, 1040), 144);
         var settings = new BootstrapToastHostSettings(
             BootstrapToastPlacement.BottomLeft,
@@ -64,11 +68,14 @@ public sealed class BootstrapToastHostWindowTests
             topMost: true);
 
         host.ApplySettings(screen, settings);
+        var nativeBoundsRead = BootstrapOverlayWindowBounds.TryGetBounds(host.Handle, out var nativeBounds);
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(host.ScreenDeviceName, Is.EqualTo("DISPLAY2"));
             Assert.That(host.Bounds, Is.EqualTo(new Rectangle(-1896, 24, 1872, 992)));
+            Assert.That(nativeBoundsRead, Is.True);
+            Assert.That(nativeBounds, Is.EqualTo(new Rectangle(-1896, 24, 1872, 992)));
             Assert.That(host.TopMost, Is.True);
             Assert.That(host.ToastContainer.Placement, Is.EqualTo(BootstrapToastPlacement.BottomLeft));
             Assert.That(host.ToastContainer.ToastSpacing, Is.EqualTo(12));

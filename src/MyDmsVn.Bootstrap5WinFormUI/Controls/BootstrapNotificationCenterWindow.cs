@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Compatibility;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -145,7 +146,13 @@ internal sealed class BootstrapNotificationCenterWindow : Form
         TopMost = settings.TopMost;
         var available = BootstrapToastServiceLayoutLogic.InsetWorkingArea(screen.WorkingArea, settings.ScreenMargin, screen.Dpi);
         var desired = BootstrapToastServiceLayoutLogic.ResolveNotificationCenterSize(LogicalPreferredSize, available.Size, screen.Dpi);
-        Bounds = BootstrapToastServiceLayoutLogic.CalculateNotificationCenterBounds(available, desired, settings.Placement);
+        var bounds = BootstrapToastServiceLayoutLogic.CalculateNotificationCenterBounds(available, desired, settings.Placement);
+        _ = Handle;
+        if (!BootstrapOverlayWindowBounds.TrySetBounds(Handle, bounds))
+        {
+            throw new InvalidOperationException("The notification-center window could not be positioned at the resolved screen bounds.");
+        }
+
         PerformLayout();
     }
 

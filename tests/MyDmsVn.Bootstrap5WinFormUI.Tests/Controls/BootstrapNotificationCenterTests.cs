@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Compatibility;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
@@ -35,11 +36,15 @@ public sealed class BootstrapNotificationCenterTests
     [Test]
     public void WindowCompositionAndExplicitDpiPlacementMatchContract()
     {
-        using var window = new BootstrapNotificationCenterWindow();
+        using var window = new BootstrapNotificationCenterWindow
+        {
+            MaximumSize = new Size(300, 200)
+        };
         var screen = new BootstrapToastScreenInfo("DISPLAY2", new Rectangle(-1600, 100, 1600, 900), 144);
         window.ApplySettings(
             screen,
             new BootstrapNotificationCenterSettings(BootstrapToastPlacement.BottomRight, new Padding(16), topMost: true));
+        var nativeBoundsRead = BootstrapOverlayWindowBounds.TryGetBounds(window.Handle, out var nativeBounds);
 
         Assert.Multiple((Action)(() =>
         {
@@ -49,6 +54,8 @@ public sealed class BootstrapNotificationCenterTests
             Assert.That(window.KeyPreview, Is.True);
             Assert.That(window.TopMost, Is.True);
             Assert.That(window.Bounds, Is.EqualTo(new Rectangle(-654, 136, 630, 840)));
+            Assert.That(nativeBoundsRead, Is.True);
+            Assert.That(nativeBounds, Is.EqualTo(new Rectangle(-654, 136, 630, 840)));
             Assert.That(window.HistoryList, Is.Not.Null);
             Assert.That(window.UnreadBadge, Is.TypeOf<BootstrapBadge>());
             Assert.That(window.MarkAllButton, Is.TypeOf<BootstrapButton>());
