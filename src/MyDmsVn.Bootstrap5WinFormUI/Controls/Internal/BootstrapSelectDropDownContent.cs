@@ -75,8 +75,18 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
     internal IReadOnlyList<BootstrapSelectResultRow> Rows => _resultsView.Rows;
     internal BootstrapSelectResultRow? HighlightedRow => _resultsView.HighlightedRow;
     internal int ScrollOffset => _resultsView.ScrollOffset;
+    internal int ResultRowHeight => _resultsView.RowHeight;
 
     internal void ApplyPresentation(IBootstrapSelectRenderer renderer, BootstrapTheme theme, int dpi)
+    {
+        ApplyPresentation(renderer, theme, dpi, 32);
+    }
+
+    internal void ApplyPresentation(
+        IBootstrapSelectRenderer renderer,
+        BootstrapTheme theme,
+        int dpi,
+        int logicalResultRowHeight)
     {
         if (theme is null) throw new ArgumentNullException(nameof(theme));
         if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
@@ -90,7 +100,7 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
         _searchEditor.Font = Font;
         _searchEditor.Height = fieldHeight;
         _resultsView.Font = Font;
-        _resultsView.ApplyPresentation(renderer, theme, dpi);
+        _resultsView.ApplyPresentation(renderer, theme, dpi, logicalResultRowHeight);
     }
 
     internal void SetResults(BootstrapSelectResultSet results)

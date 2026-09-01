@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -37,6 +38,22 @@ public sealed class BootstrapSelectResultsViewTests
         Assert.That(layout.ScrollOffset, Is.EqualTo(64));
         Assert.That(layout.FirstVisibleIndex, Is.EqualTo(2));
         Assert.That(layout.LastVisibleIndex, Is.EqualTo(3));
+    }
+
+    [TestCase(96, 48)]
+    [TestCase(144, 72)]
+    [TestCase(192, 96)]
+    public void ApplyPresentationScalesConfiguredLogicalRowHeight(int dpi, int expectedHeight)
+    {
+        using var view = new BootstrapSelectResultsView();
+
+        view.ApplyPresentation(
+            new BootstrapSelectRenderer(),
+            BootstrapThemeManager.CurrentTheme,
+            dpi,
+            logicalRowHeight: 48);
+
+        Assert.That(view.RowHeight, Is.EqualTo(expectedHeight));
     }
 
     [Test]

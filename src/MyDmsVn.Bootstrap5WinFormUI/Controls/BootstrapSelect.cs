@@ -31,6 +31,7 @@ public partial class BootstrapSelect : UserControl
     private int _pageSize = 20;
     private int _dropDownWidth;
     private int _maxDropDownHeight = 320;
+    private int _resultRowHeight = 32;
     private int _maximumSelectionRows = 3;
     private BootstrapValidationState _validationState;
     private int _borderRadius = -1;
@@ -336,6 +337,29 @@ public partial class BootstrapSelect : UserControl
             }
 
             _maxDropDownHeight = value;
+        }
+    }
+
+    /// <summary>Gets or sets the uniform popup result-row height in logical 96-DPI pixels.</summary>
+    [Category("Layout")]
+    [DefaultValue(32)]
+    public int ResultRowHeight
+    {
+        get => _resultRowHeight;
+        set
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Result row height must be positive.");
+            }
+
+            if (_resultRowHeight == value)
+            {
+                return;
+            }
+
+            _resultRowHeight = value;
+            RefreshDropDownPresentationAndLayout();
         }
     }
 

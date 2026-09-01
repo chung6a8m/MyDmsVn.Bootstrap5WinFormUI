@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -227,6 +228,72 @@ public sealed class BootstrapSelectPopupTests
             Assert.That(select.IsDropDownOpenForTest, Is.True);
             Assert.That(select.HighlightedResultTextForTest, Is.EqualTo(highlighted));
             Assert.That(select.ResultScrollOffsetForTest, Is.EqualTo(scrollOffset));
+        }));
+    }
+
+    [Test]
+    public void OwnerDpiRefreshReappliesOpenPopupWithoutRecreation()
+    {
+        using var form = new Form { Size = new Size(800, 700), StartPosition = FormStartPosition.Manual, Location = new Point(100, 100) };
+        using var select = new BootstrapSelect
+        {
+            Location = new Point(40, 40),
+            Width = 320,
+            ResultRowHeight = 48,
+            MaxDropDownHeight = 320
+        };
+        for (var value = 1; value <= 12; value++)
+        {
+            select.Items.Add(new BootstrapSelectItem(value, "Item " + value));
+        }
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+        var creationCount = select.DropDownCreationCountForTest;
+
+        foreach (var dpi in new[] { 96, 144, 192 })
+        {
+            select.ApplyDropDownDpiForTest(dpi);
+            Application.DoEvents();
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(select.IsDropDownOpenForTest, Is.True);
+                Assert.That(select.DropDownCreationCountForTest, Is.EqualTo(creationCount));
+                Assert.That(select.EffectiveResultRowHeightForTest, Is.EqualTo(DpiScaler.Scale(48, dpi)));
+                Assert.That(select.DropDownBoundsForTest.Height, Is.LessThanOrEqualTo(DpiScaler.Scale(320, dpi)));
+                Assert.That(Screen.FromControl(select).WorkingArea.Contains(select.DropDownBoundsForTest), Is.True);
+            }));
+        }
+    }
+
+    [Test]
+    public void OwnerDpiRefreshUpdatesCreatedClosedPopupForNextOpen()
+    {
+        using var form = new Form { Size = new Size(700, 600), StartPosition = FormStartPosition.Manual, Location = new Point(100, 100) };
+        using var select = new BootstrapSelect { Width = 300, ResultRowHeight = 48 };
+        select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+
+        select.OpenDropDownInternal();
+        select.CloseDropDownInternal(false);
+        Application.DoEvents();
+        var creationCount = select.DropDownCreationCountForTest;
+
+        select.ApplyDropDownDpiForTest(144);
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.DropDownCreationCountForTest, Is.EqualTo(creationCount));
+            Assert.That(select.EffectiveResultRowHeightForTest, Is.EqualTo(72));
         }));
     }
 

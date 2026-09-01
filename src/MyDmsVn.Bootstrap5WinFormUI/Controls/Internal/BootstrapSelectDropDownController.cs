@@ -18,11 +18,13 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     private bool _restoreFocusOnClosed;
     private Rectangle _currentBounds;
     private int _creationCount;
+    private int _effectiveDpi = DpiScaler.DefaultDpi;
 
     internal BootstrapSelectDropDownController(BootstrapSelect owner)
     {
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
         owner.Items.Changed += OnItemsChanged;
+        owner.DpiChangedAfterParent += OnOwnerDpiChangedAfterParent;
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
     }
 
@@ -46,7 +48,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         if (_owner.IsDisposed || !_owner.Enabled || !_owner.Visible || !_owner.IsHandleCreated) return;
         EnsureCreated();
         RefreshResults();
-        ApplyPresentation();
+        ApplyPresentation(_effectiveDpi);
         _currentBounds = ComputeBounds();
         _isOpen = true;
         _restoreFocusOnClosed = false;
@@ -102,14 +104,32 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
 
     internal void ApplyPresentation()
     {
+        ApplyPresentation(ResolveOwnerDpi());
+    }
+
+    internal void ApplyPresentation(int dpi)
+    {
+        if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
         if (_surface is null || _content is null) return;
-        var dpi = _owner.DeviceDpi > 0 ? _owner.DeviceDpi : DpiScaler.DefaultDpi;
+        _effectiveDpi = dpi;
         var theme = BootstrapThemeManager.CurrentTheme;
         _surface.LogicalBorderRadius = _owner.BorderRadius;
         _surface.ApplyTheme(theme, dpi);
         _content.Font = _owner.Font;
         _content.SearchEnabled = _owner.SearchEnabled;
-        _content.ApplyPresentation(_owner.Renderer, theme, dpi);
+        _content.ApplyPresentation(_owner.Renderer, theme, dpi, _owner.ResultRowHeight);
+    }
+
+    internal void ApplyOwnerDpiChange(int dpi)
+    {
+        if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
+        if (_dropDown is null) return;
+
+        ApplyPresentation(dpi);
+        if (_isOpen)
+        {
+            Reposition();
+        }
     }
 
     public void Dispose()
@@ -117,6 +137,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         if (_disposed) return;
         _disposed = true;
         _owner.Items.Changed -= OnItemsChanged;
+        _owner.DpiChangedAfterParent -= OnOwnerDpiChangedAfterParent;
         BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
         _tracker?.Dispose();
         _tracker = null;
@@ -160,7 +181,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
 
     private Rectangle ComputeBounds()
     {
-        var dpi = _owner.DeviceDpi > 0 ? _owner.DeviceDpi : DpiScaler.DefaultDpi;
+        var dpi = _effectiveDpi;
         var requestedWidth = _owner.DropDownWidth == 0 ? _owner.Width : DpiScaler.Scale(_owner.DropDownWidth, dpi);
         var width = Math.Max(_owner.Width, requestedWidth);
         var maxHeight = DpiScaler.Scale(_owner.MaxDropDownHeight, dpi);
@@ -231,6 +252,16 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         if (_disposed || _dropDown is null) return;
         ApplyPresentation();
         if (_isOpen) Reposition();
+    }
+
+    private int ResolveOwnerDpi()
+    {
+        return _owner.DeviceDpi > 0 ? _owner.DeviceDpi : DpiScaler.DefaultDpi;
+    }
+
+    private void OnOwnerDpiChangedAfterParent(object? sender, EventArgs e)
+    {
+        ApplyOwnerDpiChange(ResolveOwnerDpi());
     }
 
     private void OnDropDownClosed(object? sender, ToolStripDropDownClosedEventArgs e)
