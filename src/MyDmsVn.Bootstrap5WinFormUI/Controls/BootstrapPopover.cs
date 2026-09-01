@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -31,6 +32,8 @@ public class BootstrapPopover : Component
     private bool _restoreFocusAfterClose;
     private BootstrapOverlayAnchorTracker? _anchorTracker;
     private bool _themeSubscribed;
+    private int _activationGeneration;
+    private int _queuedWindowDeactivationGeneration = -1;
 
     /// <summary>
     /// Initializes a designer-safe interactive popover with an owned native overlay host.
@@ -300,6 +303,7 @@ public class BootstrapPopover : Component
 
         _dropDown.AutoClose = _closeOnClickOutside;
         _dropDown.CloseOnEscape = _closeOnEscape;
+        _activationGeneration++;
         _dropDown.ShowAt(CalculatePopupBounds(target, popupSize));
     }
 
@@ -333,6 +337,8 @@ public class BootstrapPopover : Component
     {
         if (disposing && !_disposed)
         {
+            _activationGeneration++;
+            _queuedWindowDeactivationGeneration = -1;
             Hide();
             _disposed = true;
             DetachTargetHandlers(_target);
@@ -400,17 +406,31 @@ public class BootstrapPopover : Component
 
     private void OnWindowDeactivated(IntPtr activatedWindow)
     {
-        var ownerForm = _target?.FindForm();
-        if (ownerForm?.IsHandleCreated == true && ownerForm.Handle == activatedWindow)
+        if (_disposed || !IsOpen)
         {
             return;
         }
 
-        Hide();
+        var ownerForm = _target?.FindForm();
+        if (BootstrapOverlayActivationDomain.IsOwnerWindow(activatedWindow, ownerForm)
+            || BootstrapOverlayActivationDomain.IsPopupWindow(activatedWindow, _dropDown, _surface))
+        {
+            return;
+        }
+
+        if (activatedWindow != IntPtr.Zero)
+        {
+            Hide();
+            return;
+        }
+
+        QueueWindowDeactivationCheck();
     }
 
     private void OnDropDownClosed(object? sender, ToolStripDropDownClosedEventArgs e)
     {
+        _activationGeneration++;
+        _queuedWindowDeactivationGeneration = -1;
         StopOpenLifecycle();
         Closed?.Invoke(this, EventArgs.Empty);
         if (_restoreFocusAfterClose)
@@ -420,6 +440,63 @@ public class BootstrapPopover : Component
             if (target is not null && !target.IsDisposed && target.Visible && target.Enabled)
             {
                 target.Focus();
+            }
+        }
+    }
+
+    private void QueueWindowDeactivationCheck()
+    {
+        if (_dropDown.IsDisposed || !_dropDown.IsHandleCreated)
+        {
+            return;
+        }
+
+        var generation = _activationGeneration;
+        if (_queuedWindowDeactivationGeneration == generation)
+        {
+            return;
+        }
+
+        _queuedWindowDeactivationGeneration = generation;
+        try
+        {
+            _dropDown.BeginInvoke((Action)(() =>
+            {
+                if (_queuedWindowDeactivationGeneration == generation)
+                {
+                    _queuedWindowDeactivationGeneration = -1;
+                }
+
+                if (_disposed || !IsOpen || generation != _activationGeneration)
+                {
+                    return;
+                }
+
+                var popupStillOwnsFocus = _dropDown.ContainsFocus
+                    || _surface.ContainsFocus
+                    || _content?.ContainsFocus == true;
+                var ownerForm = _target?.FindForm();
+                var ownerStillActive = ownerForm?.IsHandleCreated == true
+                    && (ownerForm.ContainsFocus || Form.ActiveForm == ownerForm);
+
+                if (!popupStillOwnsFocus && !ownerStillActive)
+                {
+                    Hide();
+                }
+            }));
+        }
+        catch (ObjectDisposedException)
+        {
+            if (_queuedWindowDeactivationGeneration == generation)
+            {
+                _queuedWindowDeactivationGeneration = -1;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            if (_queuedWindowDeactivationGeneration == generation)
+            {
+                _queuedWindowDeactivationGeneration = -1;
             }
         }
     }

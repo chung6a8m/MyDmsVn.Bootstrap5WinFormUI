@@ -539,6 +539,21 @@ public sealed class BootstrapPopoverTests
     }
 
     [Test]
+    public void QueuedZeroDeactivationFromPreviousOpenDoesNotCloseReopenedPopover()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = false;
+        fixture.Show();
+
+        SendWindowDeactivate(fixture.Popover.DropDownHandleForTest, IntPtr.Zero);
+        fixture.Popover.Hide();
+        fixture.Popover.Show();
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.True);
+    }
+
+    [Test]
     public void PopupDeactivateToSecondApplicationFormClosesPopoverWhenOutsideCloseIsDisabled()
     {
         using var fixture = new InteractivePopoverFixture();
