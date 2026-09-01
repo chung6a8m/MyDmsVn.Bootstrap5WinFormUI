@@ -55,7 +55,7 @@ The following are intentionally outside the first version:
 - REST URL, headers, HTTP methods, or JSON mapping;
 - `IAsyncEnumerable` as the provider contract;
 - arbitrary hosted WinForms controls per result row;
-- variable-height result rows;
+- variable-height or per-item-measured result rows;
 - HTML-like templates;
 - hierarchical/tree selection;
 - nested groups;
@@ -161,6 +161,7 @@ public class BootstrapSelect : UserControl
 
     public int DropDownWidth { get; set; }
     public int MaxDropDownHeight { get; set; }
+    public int ResultRowHeight { get; set; }
     public int MaximumSelectionRows { get; set; }
 
     public BootstrapValidationState ValidationState { get; set; }
@@ -685,9 +686,11 @@ Error
 
 ### 18.1 Fixed row metrics
 
-V1 uses DPI-scaled fixed heights for result rows and group headers.
+V1 uses one caller-configurable, DPI-scaled uniform height for every popup result row. `ResultRowHeight` is expressed in logical pixels at 96 DPI, defaults to `32`, and must be greater than zero. Its effective device height is calculated through `DpiScaler`. Item, group, loading, empty, instruction, error/retry, and create-value rows all use the same effective height for a given control.
 
-Variable arbitrary row heights are intentionally excluded because fixed metrics keep scrolling, hit testing, virtualization, and paging thresholds deterministic.
+Changing `ResultRowHeight` after popup creation reapplies presentation. If the popup is open, it remains open and its bounds are recomputed and repositioned without recreating the popup or resetting logical navigation state.
+
+Variable-height or per-item-measured result rows remain intentionally excluded because one uniform metric keeps scrolling, hit testing, virtualization, PageUp/PageDown, and paging thresholds deterministic. The renderer contract does not include a measurement callback, hosted row controls, or an HTML-like template layer.
 
 ### 18.2 Result states
 
@@ -822,6 +825,8 @@ DPI-sensitive elements include:
 - popup spacing.
 
 Moving a form between monitors with different DPI while the popup is open must trigger remeasurement and placement recalculation.
+
+The popup controller owns one effective DPI for each refresh. An owner DPI transition reapplies search-host, result-row, renderer-context, surface, and theme metrics before computing and moving popup bounds. The implementation subscribes internally to the inherited owner `DpiChangedAfterParent` event and does not add a declared public or protected DPI member to `BootstrapSelect`.
 
 ### 23.4 RTL
 
