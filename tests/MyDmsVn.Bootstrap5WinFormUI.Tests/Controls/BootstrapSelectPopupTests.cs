@@ -51,6 +51,52 @@ public sealed class BootstrapSelectPopupTests
     }
 
     [Test]
+    public void LocalSinglePopupKeepsStableHeightAcrossRepeatedOpenCycles()
+    {
+        using var form = new Form
+        {
+            Size = new Size(600, 500),
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(100, 100)
+        };
+        using var select = new BootstrapSelect { Location = new Point(30, 30), Width = 340 };
+        select.Items.Add(new BootstrapSelectItem(1, "Contoso"));
+        select.Items.Add(new BootstrapSelectItem(2, "Fabrikam"));
+        select.Items.Add(new BootstrapSelectItem(3, "Northwind"));
+        select.Items.Add(new BootstrapSelectItem(4, "Adventure Works") { Disabled = true });
+        select.Items.Add(new BootstrapSelectItem(
+            5,
+            "Tailspin Toys — a deliberately long customer caption used to verify ellipsis and popup width behavior"));
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+
+        var heights = new int[3];
+        for (var cycle = 0; cycle < heights.Length; cycle++)
+        {
+            select.OpenDropDownInternal();
+            Application.DoEvents();
+
+            heights[cycle] = select.DropDownBoundsForTest.Height;
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(select.IsDropDownOpenForTest, Is.True);
+                Assert.That(select.DropDownCreationCountForTest, Is.EqualTo(1));
+                Assert.That(select.VisibleResultItemTextsForTest, Has.Count.EqualTo(5));
+            }));
+
+            select.CloseDropDownInternal(false);
+            Application.DoEvents();
+        }
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(heights[1], Is.EqualTo(heights[0]));
+            Assert.That(heights[2], Is.EqualTo(heights[0]));
+        }));
+    }
+
+    [Test]
     public void LocalSearchFiltersRowsAndActivatedRowUsesSelectionPipeline()
     {
         using var form = new Form();

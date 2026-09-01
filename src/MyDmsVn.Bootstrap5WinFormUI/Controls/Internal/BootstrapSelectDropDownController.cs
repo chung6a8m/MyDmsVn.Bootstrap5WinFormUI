@@ -75,6 +75,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     {
         if (_content is null) return;
         _content.SetResults(_owner.BuildCurrentPopupResultSet(_content.SearchEnabled ? _content.SearchText : string.Empty));
+        if (_isOpen) Reposition();
     }
 
     internal void SetSearchText(string text)
@@ -175,7 +176,6 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     {
         _owner.NotifyPopupSearchTextChanged(text);
         RefreshResults();
-        if (_isOpen) Reposition();
     }
 
     private void OnRowActivated(BootstrapSelectResultRow row, BootstrapSelectChangeReason reason)

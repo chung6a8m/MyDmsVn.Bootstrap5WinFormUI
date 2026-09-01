@@ -12,6 +12,7 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
     private readonly Panel _searchHost;
     private readonly BootstrapSelectSearchTextBox _searchEditor;
     private readonly BootstrapSelectResultsView _resultsView;
+    private bool _searchEnabled = true;
     private bool _suppressSearchChanged;
 
     internal BootstrapSelectDropDownContent()
@@ -51,9 +52,15 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
 
     internal bool SearchEnabled
     {
-        get => _searchHost.Visible;
+        get => _searchEnabled;
         set
         {
+            if (_searchEnabled == value)
+            {
+                return;
+            }
+
+            _searchEnabled = value;
             _searchHost.Visible = value;
             PerformLayout();
         }
@@ -97,7 +104,7 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
 
     internal void FocusSearch()
     {
-        if (_searchHost.Visible)
+        if (_searchEnabled)
         {
             _searchEditor.FocusEditorAtEnd();
         }
@@ -109,7 +116,7 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
 
     internal void ForwardCharacter(char character)
     {
-        if (!_searchHost.Visible || char.IsControl(character)) return;
+        if (!_searchEnabled || char.IsControl(character)) return;
         _searchEditor.AppendCharacter(character);
     }
 
@@ -129,7 +136,7 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
     public override Size GetPreferredSize(Size proposedSize)
     {
         var results = _resultsView.GetPreferredSize(proposedSize);
-        var searchHeight = _searchHost.Visible ? _searchHost.Height : 0;
+        var searchHeight = _searchEnabled ? _searchHost.Height : 0;
         return new Size(Math.Max(160, proposedSize.Width), searchHeight + results.Height);
     }
 

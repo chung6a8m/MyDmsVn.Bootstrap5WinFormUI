@@ -90,6 +90,7 @@ public sealed class BootstrapSelectDropDownContentTests
 
         Assert.Multiple((Action)(() =>
         {
+            Assert.That(content.SearchEnabled, Is.False);
             Assert.That(searchHost.Visible, Is.False);
             Assert.That(results.Bounds, Is.EqualTo(content.ClientRectangle));
         }));
@@ -99,8 +100,31 @@ public sealed class BootstrapSelectDropDownContentTests
 
         Assert.Multiple((Action)(() =>
         {
+            Assert.That(content.SearchEnabled, Is.True);
             Assert.That(searchHost.Visible, Is.True);
             Assert.That(Descendants(content).OfType<BootstrapTextBox>().Single(), Is.SameAs(search));
+        }));
+    }
+
+    [Test]
+    public void HiddenAncestorDoesNotDisableLogicalSearchOrShrinkPreferredHeight()
+    {
+        using var host = new Panel { Visible = true };
+        using var content = CreatePresentedContent(96);
+        content.SetResults(CreateItemResults(5));
+        host.Controls.Add(content);
+
+        var proposed = new Size(340, 320);
+        var visiblePreferred = content.GetPreferredSize(proposed);
+
+        host.Visible = false;
+        var hiddenPreferred = content.GetPreferredSize(proposed);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(content.SearchEnabled, Is.True);
+            Assert.That(hiddenPreferred.Height, Is.EqualTo(visiblePreferred.Height));
+            Assert.That(hiddenPreferred.Width, Is.EqualTo(visiblePreferred.Width));
         }));
     }
 
@@ -174,6 +198,15 @@ public sealed class BootstrapSelectDropDownContentTests
             dpi);
         content.PerformLayout();
         return content;
+    }
+
+    private static BootstrapSelectResultSet CreateItemResults(int count)
+    {
+        return new BootstrapSelectResultSet(
+            Enumerable.Range(1, count)
+                .Select(index => BootstrapSelectResultRow.ItemRow(
+                    new BootstrapSelectItem(index, "Item " + index),
+                    isSelected: false)));
     }
 
     private static IEnumerable<Control> Descendants(Control root)
