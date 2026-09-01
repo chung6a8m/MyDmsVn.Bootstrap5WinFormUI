@@ -281,6 +281,11 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
 
     private void OnWindowDeactivated(IntPtr activatedWindow)
     {
+        if (_disposed || !_isOpen)
+        {
+            return;
+        }
+
         var ownerForm = _owner.FindForm();
         if (BootstrapOverlayActivationDomain.IsOwnerWindow(activatedWindow, ownerForm)
             || BootstrapOverlayActivationDomain.IsPopupWindow(activatedWindow, _dropDown, _surface))
