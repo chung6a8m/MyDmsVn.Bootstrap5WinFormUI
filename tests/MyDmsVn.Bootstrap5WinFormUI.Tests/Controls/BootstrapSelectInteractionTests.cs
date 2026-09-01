@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Demo;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -15,6 +16,11 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapSelectInteractionTests
 {
+    private const int WmActivate = 0x0006;
+    private const uint InputMouse = 0;
+    private const uint MouseEventLeftDown = 0x0002;
+    private const uint MouseEventLeftUp = 0x0004;
+
     [Test]
     public void ProgrammaticSelectionKeepsAllSelectionViewsCoherent()
     {
@@ -221,6 +227,100 @@ public sealed class BootstrapSelectInteractionTests
     }
 
     [Test]
+    public void LeftMouseDownFromAnotherControlKeepsPopupSearchFocusAndOwnerActivationOpen()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var focusSource = new Button { Bounds = new Rectangle(20, 70, 100, 30), Text = "Focus source" };
+        using var select = new TestBootstrapSelect { Bounds = new Rectangle(20, 20, 220, 32) };
+        select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        form.Controls.Add(focusSource);
+        form.Controls.Add(select);
+        form.Show();
+        form.Activate();
+        Assert.That(focusSource.Focus(), Is.True);
+        Application.DoEvents();
+        Assert.That(focusSource.Focused, Is.True);
+
+        select.RaiseLeftMouseDownForTest(new Point(select.Width / 2, select.Height / 2));
+        Application.DoEvents();
+        var searchEditor = Descendants(select.DropDownContentForTest!)
+            .OfType<TextBox>()
+            .Single();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(searchEditor.Focused, Is.True);
+        }));
+
+        SendMessage(select.DropDownHandleForTest, WmActivate, IntPtr.Zero, select.Handle);
+        Application.DoEvents();
+
+        Assert.That(select.IsDropDownOpenForTest, Is.True);
+    }
+
+    [TestCase(false, TestName = "Native first content click from another control keeps popup and search focus")]
+    [TestCase(true, TestName = "Native first arrow click from another control keeps popup and search focus")]
+    [Explicit("Requires an interactive Windows desktop because it opens the integrated demo and uses SendInput.")]
+    public void NativeFirstClickFromAnotherControlKeepsPopupAndSearchFocus(bool clickArrow)
+    {
+        using var form = new BootstrapSelectDemoForm
+        {
+            ShowInTaskbar = false,
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(100, 100)
+        };
+        form.Show();
+        form.Activate();
+        Application.DoEvents();
+        var select = Descendants(form)
+            .OfType<BootstrapSelect>()
+            .Single(control => control.AccessibleName == "Local customer select");
+        var focusSource = Descendants(form)
+            .OfType<BootstrapSelect>()
+            .Single(control => control.AccessibleName == "Product search with custom results");
+        Assert.That(focusSource.Focus(), Is.True);
+        for (Control? ancestor = select.Parent; ancestor is not null; ancestor = ancestor.Parent)
+        {
+            if (ancestor is ScrollableControl scrollable) scrollable.ScrollControlIntoView(select);
+        }
+        Application.DoEvents();
+        Assert.That(focusSource.Focused, Is.True, "Precondition: a different demo control owns focus before the first click.");
+        var formDeactivations = 0;
+        form.Deactivate += (_, _) => formDeactivations++;
+
+        // Interactive trace on net48 observed WA_INACTIVE naming the owner Form.
+        // Form.Deactivate also fired once, and the existing ContainsFocus guard retained the popup.
+        void ClickSelect(Point clientPoint)
+        {
+            var clickPoint = select.PointToScreen(clientPoint);
+            Assert.That(SetCursorPos(clickPoint.X, clickPoint.Y), Is.True);
+            var inputs = new[]
+            {
+                new NativeInput { Type = InputMouse, Mouse = new NativeMouseInput { Flags = MouseEventLeftDown } },
+                new NativeInput { Type = InputMouse, Mouse = new NativeMouseInput { Flags = MouseEventLeftUp } }
+            };
+            Assert.That(
+                SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(NativeInput))),
+                Is.EqualTo((uint)inputs.Length));
+            for (var turn = 0; turn < 8; turn++) Application.DoEvents();
+        }
+
+        ClickSelect(clickArrow
+            ? new Point(select.Width - 8, select.Height / 2)
+            : new Point(select.Width / 2, select.Height / 2));
+        var searchEditor = Descendants(select.DropDownContentForTest!)
+            .OfType<TextBox>()
+            .Single();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(formDeactivations, Is.GreaterThanOrEqualTo(1));
+            Assert.That(select.IsDropDownOpenForTest, Is.True, clickArrow ? "Arrow click" : "Content click");
+            Assert.That(searchEditor.Focused, Is.True, "The popup search editor must retain focus after mouse down/up.");
+        }));
+    }
+
+    [Test]
     public void TabFromFocusedNativeSearchEditorClosesPopupAndContinuesForwardOwnerTraversal()
     {
         using var form = new Form
@@ -409,6 +509,11 @@ public sealed class BootstrapSelectInteractionTests
 
     private sealed class TestBootstrapSelect : BootstrapSelect
     {
+        internal void RaiseLeftMouseDownForTest(Point location)
+        {
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, location.X, location.Y, 0));
+        }
+
         internal void RaisePrintableKeyForTest(char character)
         {
             OnKeyPress(new KeyPressEventArgs(character));
@@ -418,5 +523,34 @@ public sealed class BootstrapSelectInteractionTests
         {
             return ProcessDialogKey(keyData);
         }
+    }
+
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint inputCount, NativeInput[] inputs, int inputSize);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeInput
+    {
+        internal uint Type;
+        internal NativeMouseInput Mouse;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMouseInput
+    {
+        internal int X;
+        internal int Y;
+        internal uint MouseData;
+        internal uint Flags;
+        internal uint Time;
+        internal UIntPtr ExtraInfo;
     }
 }

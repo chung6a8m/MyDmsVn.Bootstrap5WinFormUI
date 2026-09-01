@@ -14,7 +14,9 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapSelectPopupTests
 {
+    private const int WmActivate = 0x0006;
     private const int WmActivateApp = 0x001C;
+    private const int WaInactive = 0;
 
     [Test]
     public void PopupIsLazyReusedAndRaisesLifecycleEvents()
@@ -110,6 +112,96 @@ public sealed class BootstrapSelectPopupTests
         {
             Assert.That(select.IsDropDownOpenForTest, Is.False);
             Assert.That(closed, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void PopupDeactivateWithNoReplacementWhilePopupKeepsFocusDoesNotClose()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var select = CreateSearchableSelect();
+        form.Controls.Add(select);
+        ShowAndOpen(form, select);
+        var searchEditor = FindSearchEditor(select);
+        Assert.That(searchEditor.Focus(), Is.True);
+        Application.DoEvents();
+
+        SendWindowDeactivate(select.DropDownHandleForTest, IntPtr.Zero);
+        Application.DoEvents();
+
+        Assert.That(select.IsDropDownOpenForTest, Is.True);
+    }
+
+    [Test]
+    public void PopupDeactivateToOwnerControlKeepsPopupOpen()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var select = CreateSearchableSelect();
+        form.Controls.Add(select);
+        ShowAndOpen(form, select);
+
+        SendWindowDeactivate(select.DropDownHandleForTest, select.Handle);
+        Application.DoEvents();
+
+        Assert.That(select.IsDropDownOpenForTest, Is.True);
+    }
+
+    [Test]
+    public void PopupDeactivateToPopupSurfaceAndHostedControlKeepsPopupOpen()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var select = CreateSearchableSelect();
+        form.Controls.Add(select);
+        ShowAndOpen(form, select);
+        var searchEditor = FindSearchEditor(select);
+
+        SendWindowDeactivate(select.DropDownHandleForTest, select.DropDownSurfaceHandleForTest);
+        Application.DoEvents();
+        Assert.That(select.IsDropDownOpenForTest, Is.True, "The overlay surface belongs to the popup activation domain.");
+
+        SendWindowDeactivate(select.DropDownHandleForTest, searchEditor.Handle);
+        Application.DoEvents();
+        Assert.That(select.IsDropDownOpenForTest, Is.True, "Hosted descendants belong to the popup activation domain.");
+    }
+
+    [Test]
+    public void PopupDeactivateToSecondApplicationFormClosesPopup()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var secondForm = new Form { ShowInTaskbar = false };
+        using var select = CreateSearchableSelect();
+        form.Controls.Add(select);
+        ShowAndOpen(form, select);
+        var secondFormHandle = secondForm.Handle;
+
+        SendWindowDeactivate(select.DropDownHandleForTest, secondFormHandle);
+        Application.DoEvents();
+
+        Assert.That(select.IsDropDownOpenForTest, Is.False);
+    }
+
+    [Test]
+    public void QueuedZeroDeactivationFromPreviousOpenDoesNotCloseReopenedPopup()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var select = CreateSearchableSelect();
+        form.Controls.Add(select);
+        ShowAndOpen(form, select);
+        var creationCount = select.DropDownCreationCountForTest;
+
+        for (var cycle = 0; cycle < 5; cycle++)
+        {
+            SendWindowDeactivate(select.DropDownHandleForTest, IntPtr.Zero);
+            select.CloseDropDownInternal(false);
+            select.OpenDropDownInternal();
+            Application.DoEvents();
+            Assert.That(select.IsDropDownOpenForTest, Is.True, $"Reopen cycle {cycle}");
+        }
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.DropDownCreationCountForTest, Is.EqualTo(creationCount));
         }));
     }
 
@@ -373,6 +465,53 @@ public sealed class BootstrapSelectPopupTests
         {
             OnDeactivate(EventArgs.Empty);
         }
+    }
+
+    private static BootstrapSelect CreateSearchableSelect()
+    {
+        var select = new BootstrapSelect { SearchEnabled = true, Width = 240 };
+        select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        return select;
+    }
+
+    private static void ShowAndOpen(Form form, BootstrapSelect select)
+    {
+        form.Show();
+        form.Activate();
+        select.Focus();
+        Application.DoEvents();
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+        Assert.That(select.IsDropDownOpenForTest, Is.True);
+    }
+
+    private static TextBox FindSearchEditor(BootstrapSelect select)
+    {
+        var content = select.DropDownContentForTest!;
+        foreach (Control child in content.Controls)
+        {
+            var editor = FindDescendantTextBox(child);
+            if (editor is not null) return editor;
+        }
+
+        throw new AssertionException("The popup search editor was not found.");
+    }
+
+    private static TextBox? FindDescendantTextBox(Control control)
+    {
+        if (control is TextBox textBox) return textBox;
+        foreach (Control child in control.Controls)
+        {
+            var result = FindDescendantTextBox(child);
+            if (result is not null) return result;
+        }
+
+        return null;
+    }
+
+    private static void SendWindowDeactivate(IntPtr popupHandle, IntPtr activatedWindow)
+    {
+        SendMessage(popupHandle, WmActivate, (IntPtr)WaInactive, activatedWindow);
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
