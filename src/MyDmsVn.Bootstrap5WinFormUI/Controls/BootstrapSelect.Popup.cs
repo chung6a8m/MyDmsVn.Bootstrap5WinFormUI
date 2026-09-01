@@ -46,6 +46,29 @@ public partial class BootstrapSelect
         _dropDownController.Open();
     }
 
+    internal bool ContinueDialogTabNavigation(bool reverse)
+    {
+        Control current = this;
+        var container = Parent;
+        while (container is not null)
+        {
+            if (container.SelectNextControl(
+                current,
+                forward: !reverse,
+                tabStopOnly: true,
+                nested: true,
+                wrap: false))
+            {
+                return true;
+            }
+
+            current = container;
+            container = container.Parent;
+        }
+
+        return false;
+    }
+
     internal void CloseDropDownInternal(bool restoreFocus)
     {
         _dropDownController?.Close(restoreFocus);

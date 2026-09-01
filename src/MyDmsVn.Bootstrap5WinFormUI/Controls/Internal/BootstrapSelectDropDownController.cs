@@ -198,18 +198,17 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
 
         _owner.BeginInvoke(new Action(() =>
         {
-            if (_owner.IsDisposed || !_owner.Enabled)
+            if (_owner.IsDisposed || !_owner.IsHandleCreated || !_owner.Visible || !_owner.Enabled || !_owner.CanFocus)
             {
                 return;
             }
 
-            var container = (Control?)_owner.FindForm() ?? _owner.Parent;
-            container?.SelectNextControl(
-                _owner,
-                forward: !reverse,
-                tabStopOnly: true,
-                nested: true,
-                wrap: true);
+            if (!_owner.Focus())
+            {
+                return;
+            }
+
+            _owner.ContinueDialogTabNavigation(reverse);
         }));
     }
 

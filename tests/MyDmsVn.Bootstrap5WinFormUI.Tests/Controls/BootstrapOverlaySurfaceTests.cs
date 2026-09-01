@@ -13,17 +13,26 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapOverlaySurfaceTests
 {
+    private static readonly Color OpaqueContentColor = Color.Fuchsia;
+
     [Test]
     public void AttachDetachPreservesCallerOwnership()
     {
         using var surface = new BootstrapOverlaySurface();
+        using var callerRegion = new Region(new Rectangle(0, 0, 80, 30));
         using var content = new PreferredSizeControl(new Size(100, 40));
+        content.Region = callerRegion;
         var disposed = 0;
         content.Disposed += (_, _) => disposed++;
 
         Assert.That(surface.HostedContent, Is.Null);
         surface.AttachContent(content);
-        Assert.That(content.Parent, Is.SameAs(surface));
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(content.Parent, Is.Not.Null);
+            Assert.That(content.Parent!.Parent, Is.SameAs(surface));
+            Assert.That(content.Region, Is.SameAs(callerRegion));
+        }));
         Assert.Throws<InvalidOperationException>((Action)(() => surface.AttachContent(new Panel())));
 
         var detached = surface.DetachContent();
@@ -31,6 +40,8 @@ public sealed class BootstrapOverlaySurfaceTests
         {
             Assert.That(detached, Is.SameAs(content));
             Assert.That(content.Parent, Is.Null);
+            Assert.That(content.Region, Is.SameAs(callerRegion));
+            Assert.That(callerRegion.IsVisible(10, 10), Is.True);
             Assert.That(disposed, Is.Zero);
         }));
     }
@@ -65,6 +76,160 @@ public sealed class BootstrapOverlaySurfaceTests
         surface.ApplyTheme(BootstrapTheme.CreateDefault(BootstrapThemeMode.Light), dpi);
 
         Assert.That(surface.GetPreferredSize(Size.Empty), Is.EqualTo(new Size(expectedWidth, expectedHeight)));
+    }
+
+    [TestCase(96, 4, 16)]
+    [TestCase(120, 5, 20)]
+    [TestCase(144, 6, 24)]
+    [TestCase(168, 7, 28)]
+    [TestCase(192, 8, 32)]
+    public void OpaqueZeroPaddingContentCannotPaintOverAnyRoundedInteriorCorner(
+        int dpi,
+        int expectedBorderWidth,
+        int expectedRadius)
+    {
+        using var surface = new BootstrapOverlaySurface
+        {
+            Size = new Size(140, 80),
+            LogicalContentPadding = Padding.Empty,
+            LogicalBorderRadius = 16
+        };
+        using var content = new Panel { BackColor = OpaqueContentColor };
+        surface.AttachContent(content);
+        surface.ApplyTheme(CreateThickBorderTheme(), dpi);
+        surface.CreateControl();
+        content.CreateControl();
+        surface.PerformLayout();
+        Application.DoEvents();
+
+        using var bitmap = ComposeHostedContent(surface, content);
+
+        var host = content.Parent!;
+        Assert.That(
+            bitmap.GetPixel(bitmap.Width / 2, bitmap.Height / 2).ToArgb(),
+            Is.EqualTo(OpaqueContentColor.ToArgb()),
+            "The composed bitmap must contain the opaque hosted content before corner pixels are evaluated.");
+        Assert.That(host.Region, Is.Not.Null, "Opaque hosted content requires an inner rounded clip region.");
+        var hostRegion = host.Region!;
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(host.Bounds, Is.EqualTo(new Rectangle(
+                expectedBorderWidth,
+                expectedBorderWidth,
+                surface.Width - (2 * expectedBorderWidth),
+                surface.Height - (2 * expectedBorderWidth))));
+            Assert.That(hostRegion.IsVisible(0.5f, 0.5f), Is.False);
+            Assert.That(hostRegion.IsVisible(host.Width / 2f, host.Height / 2f), Is.True);
+        }));
+        Assert.Multiple((Action)(() =>
+        {
+            AssertCornerExcludesOpaqueContent(host, bitmap, expectedRadius, expectedRadius - expectedBorderWidth, Corner.TopLeft);
+            AssertCornerExcludesOpaqueContent(host, bitmap, expectedRadius, expectedRadius - expectedBorderWidth, Corner.TopRight);
+            AssertCornerExcludesOpaqueContent(host, bitmap, expectedRadius, expectedRadius - expectedBorderWidth, Corner.BottomLeft);
+            AssertCornerExcludesOpaqueContent(host, bitmap, expectedRadius, expectedRadius - expectedBorderWidth, Corner.BottomRight);
+        }));
+    }
+
+    private static BootstrapTheme CreateThickBorderTheme()
+    {
+        var defaults = BootstrapThemeMetrics.Default;
+        var metrics = new BootstrapThemeMetrics(
+            defaults.ControlHeightSmall,
+            defaults.ControlHeight,
+            defaults.ControlHeightLarge,
+            defaults.RadiusSmall,
+            defaults.Radius,
+            defaults.RadiusLarge,
+            borderWidth: 4,
+            defaults.FocusBorderWidth,
+            defaults.SpacingXS,
+            defaults.SpacingSM,
+            defaults.SpacingMD,
+            defaults.SpacingLG,
+            defaults.SpacingXL);
+        return new BootstrapTheme(
+            BootstrapThemeMode.Light,
+            BootstrapThemeColors.CreateDefault(BootstrapThemeMode.Light),
+            metrics,
+            BootstrapThemeTypography.Default);
+    }
+
+    private static Bitmap ComposeHostedContent(BootstrapOverlaySurface surface, Control content)
+    {
+        var bitmap = new Bitmap(surface.Width, surface.Height);
+        using var contentBitmap = new Bitmap(content.Width, content.Height);
+        content.DrawToBitmap(contentBitmap, content.ClientRectangle);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.Transparent);
+
+        if (surface.Region is not null)
+        {
+            using var outerClip = surface.Region.Clone();
+            graphics.SetClip(outerClip, System.Drawing.Drawing2D.CombineMode.Replace);
+        }
+
+        var host = content.Parent!;
+        if (!ReferenceEquals(host, surface) && host.Region is not null)
+        {
+            using var innerClip = host.Region.Clone();
+            innerClip.Translate(host.Left, host.Top);
+            graphics.SetClip(innerClip, System.Drawing.Drawing2D.CombineMode.Intersect);
+        }
+
+        graphics.DrawImageUnscaled(
+            contentBitmap,
+            host.Left + content.Left,
+            host.Top + content.Top);
+        return bitmap;
+    }
+
+    private static void AssertCornerExcludesOpaqueContent(
+        Control host,
+        Bitmap bitmap,
+        int outerRadius,
+        int innerRadius,
+        Corner corner)
+    {
+        var sampled = 0;
+        var opaquePixels = 0;
+        for (var y = 0; y < outerRadius; y++)
+        {
+            for (var x = 0; x < outerRadius; x++)
+            {
+                var dx = innerRadius - (x + 0.5d);
+                var dy = innerRadius - (y + 0.5d);
+                var distance = Math.Sqrt((dx * dx) + (dy * dy));
+                if (distance <= innerRadius + 1d || distance >= outerRadius - 1d)
+                {
+                    continue;
+                }
+
+                var localX = corner == Corner.TopLeft || corner == Corner.BottomLeft
+                    ? x
+                    : host.Width - 1 - x;
+                var localY = corner == Corner.TopLeft || corner == Corner.TopRight
+                    ? y
+                    : host.Height - 1 - y;
+                var sampleX = host.Left + localX;
+                var sampleY = host.Top + localY;
+                sampled++;
+                if (bitmap.GetPixel(sampleX, sampleY).ToArgb() == OpaqueContentColor.ToArgb())
+                {
+                    opaquePixels++;
+                }
+            }
+        }
+
+        Assert.That(sampled, Is.GreaterThan(0));
+        Assert.That(opaquePixels, Is.Zero, $"Opaque content covered the {corner} rounded interior corner.");
+    }
+
+    private enum Corner
+    {
+        TopLeft,
+        TopRight,
+        BottomLeft,
+        BottomRight
     }
 
     private sealed class PreferredSizeControl : Control
