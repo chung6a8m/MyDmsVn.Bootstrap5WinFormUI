@@ -129,6 +129,30 @@ public sealed class BootstrapSelectDropDownContentTests
     }
 
     [Test]
+    public void PreferredHeightUsesConfiguredUniformResultRowsWithAndWithoutSearch()
+    {
+        using var content = new BootstrapSelectDropDownContent { Size = new Size(340, 240) };
+        content.ApplyPresentation(
+            new BootstrapSelectRenderer(),
+            BootstrapThemeManager.CurrentTheme,
+            96,
+            logicalResultRowHeight: 48);
+        content.SetResults(CreateItemResults(3));
+        content.PerformLayout();
+        var searchHostHeight = Descendants(content).OfType<BootstrapTextBox>().Single().Parent!.Height;
+
+        var withSearch = content.GetPreferredSize(new Size(340, 500));
+        content.SearchEnabled = false;
+        var withoutSearch = content.GetPreferredSize(new Size(340, 500));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(withSearch.Height, Is.EqualTo(searchHostHeight + (3 * 48)));
+            Assert.That(withoutSearch.Height, Is.EqualTo(3 * 48));
+        }));
+    }
+
+    [Test]
     public void SearchTextAndSilentClearPreserveLogicalEventSemantics()
     {
         using var content = CreatePresentedContent(96);

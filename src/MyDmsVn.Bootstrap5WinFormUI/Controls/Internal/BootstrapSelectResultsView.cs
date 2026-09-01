@@ -163,6 +163,14 @@ internal sealed class BootstrapSelectResultsView : Control
         CheckNearEnd();
     }
 
+    internal void ScrollByWheelDelta(int delta, int scrollLines)
+    {
+        var rows = Math.Max(1, scrollLines);
+        var deltaRows = delta > 0 ? -rows : rows;
+        var requested = Math.Max(0, _scrollOffset + (deltaRows * RowHeight));
+        SetScrollOffset(requested);
+    }
+
     public override Size GetPreferredSize(Size proposedSize)
     {
         var rows = Math.Max(1, Math.Min(8, _results.Rows.Count));
@@ -219,10 +227,7 @@ internal sealed class BootstrapSelectResultsView : Control
     protected override void OnMouseWheel(MouseEventArgs e)
     {
         base.OnMouseWheel(e);
-        var rows = Math.Max(1, SystemInformation.MouseWheelScrollLines);
-        var deltaRows = e.Delta > 0 ? -rows : rows;
-        var next = Math.Max(0, _scrollOffset + (deltaRows * RowHeight));
-        SetScrollOffset(next);
+        ScrollByWheelDelta(e.Delta, SystemInformation.MouseWheelScrollLines);
     }
 
     protected override void OnResize(EventArgs e)

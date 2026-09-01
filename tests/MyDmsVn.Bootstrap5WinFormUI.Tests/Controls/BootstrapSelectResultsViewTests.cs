@@ -40,6 +40,66 @@ public sealed class BootstrapSelectResultsViewTests
         Assert.That(layout.LastVisibleIndex, Is.EqualTo(3));
     }
 
+    [Test]
+    public void ConstantHeightLayoutSupportsFortyEightPixelRows()
+    {
+        var layout = BootstrapSelectResultLayout.Create(
+            rowCount: 100,
+            rowHeight: 48,
+            viewportHeight: 144,
+            scrollOffset: 96);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(layout.FirstVisibleIndex, Is.EqualTo(2));
+            Assert.That(layout.LastVisibleIndex, Is.EqualTo(4));
+            Assert.That(layout.HitTestIndex(0), Is.EqualTo(2));
+            Assert.That(layout.HitTestIndex(143), Is.EqualTo(4));
+        }));
+    }
+
+    [Test]
+    public void PreferredSizeAndPagingUseConfiguredEffectiveRowHeight()
+    {
+        using var view = new BootstrapSelectResultsView { Size = new Size(320, 144) };
+        view.ApplyPresentation(
+            new BootstrapSelectRenderer(),
+            BootstrapThemeManager.CurrentTheme,
+            96,
+            logicalRowHeight: 48);
+        view.SetResults(CreateItemResults(8));
+
+        Assert.That(view.GetPreferredSize(new Size(320, 500)).Height, Is.EqualTo(8 * 48));
+        Assert.That(view.Page(1), Is.True);
+        Assert.That(view.HighlightedRow!.Item!.Value, Is.EqualTo(4));
+        Assert.That(view.Page(-1), Is.True);
+        Assert.That(view.HighlightedRow!.Item!.Value, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void WheelScrollingUsesRowsUntilExactEndClamp()
+    {
+        using var view = new BootstrapSelectResultsView { Size = new Size(320, 130) };
+        view.ApplyPresentation(
+            new BootstrapSelectRenderer(),
+            BootstrapThemeManager.CurrentTheme,
+            96,
+            logicalRowHeight: 48);
+        view.SetResults(CreateItemResults(10));
+
+        view.SetScrollOffset(48);
+        view.ScrollByWheelDelta(delta: -120, scrollLines: 2);
+        Assert.That(view.ScrollOffset, Is.EqualTo(144));
+
+        view.SetScrollOffset(300);
+        view.ScrollByWheelDelta(delta: -120, scrollLines: 3);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(view.ScrollOffset, Is.EqualTo(350));
+            Assert.That(view.ScrollOffset % 48, Is.Not.EqualTo(0));
+        }));
+    }
+
     [TestCase(96, 48)]
     [TestCase(144, 72)]
     [TestCase(192, 96)]
@@ -152,6 +212,15 @@ public sealed class BootstrapSelectResultsViewTests
             .Concat(Enumerable.Range(startValue, count).Select(value =>
                 BootstrapSelectResultRow.ItemRow(new BootstrapSelectItem(value, "Item " + value), false)));
         return new BootstrapSelectResultSet(rows);
+    }
+
+    private static BootstrapSelectResultSet CreateItemResults(int count)
+    {
+        return new BootstrapSelectResultSet(
+            Enumerable.Range(1, count).Select(value =>
+                BootstrapSelectResultRow.ItemRow(
+                    new BootstrapSelectItem(value, "Item " + value),
+                    false)));
     }
 
     private sealed class OrdinalIgnoreCaseObjectComparer : IEqualityComparer<object>

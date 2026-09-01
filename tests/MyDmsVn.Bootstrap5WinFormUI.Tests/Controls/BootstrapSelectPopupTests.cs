@@ -297,6 +297,43 @@ public sealed class BootstrapSelectPopupTests
         }));
     }
 
+    [Test]
+    public void ChangingResultRowHeightReflowsOpenPopupWithoutRecreation()
+    {
+        using var form = new Form { Size = new Size(800, 700), StartPosition = FormStartPosition.Manual, Location = new Point(100, 100) };
+        using var select = new BootstrapSelect
+        {
+            Location = new Point(40, 40),
+            Width = 320,
+            MaxDropDownHeight = 320
+        };
+        for (var value = 1; value <= 12; value++)
+        {
+            select.Items.Add(new BootstrapSelectItem(value, "Item " + value));
+        }
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+        var creationCount = select.DropDownCreationCountForTest;
+        var initialBounds = select.DropDownBoundsForTest;
+
+        select.ResultRowHeight = 48;
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.DropDownCreationCountForTest, Is.EqualTo(creationCount));
+            Assert.That(select.EffectiveResultRowHeightForTest, Is.EqualTo(48));
+            Assert.That(select.DropDownBoundsForTest.Height, Is.GreaterThan(initialBounds.Height));
+            Assert.That(select.DropDownBoundsForTest.Height, Is.LessThanOrEqualTo(320));
+            Assert.That(Screen.FromControl(select).WorkingArea.Contains(select.DropDownBoundsForTest), Is.True);
+        }));
+    }
+
     private sealed class TestForm : Form
     {
         internal void RaiseDeactivate()
