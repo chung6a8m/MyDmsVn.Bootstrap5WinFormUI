@@ -46,10 +46,51 @@ internal sealed class BootstrapSelectResultsView : Control
 
     internal void SetResults(BootstrapSelectResultSet results)
     {
-        _results = results ?? throw new ArgumentNullException(nameof(results));
-        _scrollOffset = 0;
+        SetResults(
+            results,
+            BootstrapSelectResultsUpdateMode.ResetNavigation,
+            EqualityComparer<object>.Default);
+    }
+
+    internal void SetResults(
+        BootstrapSelectResultSet results,
+        BootstrapSelectResultsUpdateMode updateMode,
+        IEqualityComparer<object> valueComparer)
+    {
+        if (results is null) throw new ArgumentNullException(nameof(results));
+        if (valueComparer is null) throw new ArgumentNullException(nameof(valueComparer));
+
+        var previousRow = HighlightedRow;
+        var previousIndex = _highlightedIndex;
+        var previousScrollOffset = _scrollOffset;
+        _results = results;
         _hotIndex = -1;
-        _highlightedIndex = FindFirstSelectable(preferSelected: true);
+
+        switch (updateMode)
+        {
+            case BootstrapSelectResultsUpdateMode.ResetNavigation:
+                _scrollOffset = 0;
+                _highlightedIndex = FindFirstSelectable(preferSelected: true);
+                break;
+
+            case BootstrapSelectResultsUpdateMode.PreserveNavigation:
+                _highlightedIndex = FindEquivalentItemIndex(previousRow, valueComparer);
+                if (_highlightedIndex < 0)
+                {
+                    _highlightedIndex = FindNearestSelectable(previousIndex);
+                }
+                if (_highlightedIndex < 0)
+                {
+                    _highlightedIndex = FindFirstSelectable(preferSelected: true);
+                }
+                _scrollOffset = Math.Max(0, previousScrollOffset);
+                ClampScroll();
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(updateMode), updateMode, "Unsupported result update mode.");
+        }
+
         EnsureHighlightedVisible();
         Invalidate();
         CheckNearEnd();
@@ -228,6 +269,56 @@ internal sealed class BootstrapSelectResultsView : Control
         {
             if (IsSelectable(_results.Rows[i])) return i;
         }
+        return -1;
+    }
+
+    private int FindEquivalentItemIndex(
+        BootstrapSelectResultRow? previousRow,
+        IEqualityComparer<object> valueComparer)
+    {
+        if (previousRow?.Kind != BootstrapSelectResultRowKind.Item || previousRow.Item is null)
+        {
+            return -1;
+        }
+
+        for (var index = 0; index < _results.Rows.Count; index++)
+        {
+            var candidate = _results.Rows[index];
+            if (candidate.Kind == BootstrapSelectResultRowKind.Item
+                && candidate.Item is not null
+                && IsSelectable(candidate)
+                && valueComparer.Equals(previousRow.Item.Value, candidate.Item.Value))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private int FindNearestSelectable(int previousIndex)
+    {
+        if (_results.Rows.Count == 0 || previousIndex < 0)
+        {
+            return -1;
+        }
+
+        var origin = Math.Min(previousIndex, _results.Rows.Count - 1);
+        for (var distance = 0; distance < _results.Rows.Count; distance++)
+        {
+            var after = origin + distance;
+            if (after < _results.Rows.Count && IsSelectable(_results.Rows[after]))
+            {
+                return after;
+            }
+
+            var before = origin - distance;
+            if (distance > 0 && before >= 0 && IsSelectable(_results.Rows[before]))
+            {
+                return before;
+            }
+        }
+
         return -1;
     }
 
