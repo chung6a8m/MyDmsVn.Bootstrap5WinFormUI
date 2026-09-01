@@ -22,6 +22,7 @@ public partial class BootstrapSelect
     internal int DropDownCreationCountForTest => _dropDownController?.CreationCount ?? 0;
     internal Rectangle DropDownBoundsForTest => _dropDownController?.CurrentBounds ?? Rectangle.Empty;
     internal IntPtr DropDownHandleForTest => _dropDownController?.DropDownHandle ?? IntPtr.Zero;
+    internal IntPtr DropDownSurfaceHandleForTest => _dropDownController?.SurfaceHandle ?? IntPtr.Zero;
     internal string? HighlightedResultTextForTest => _dropDownController?.Content?.HighlightedRow?.Text;
     internal int ResultScrollOffsetForTest => _dropDownController?.Content?.ScrollOffset ?? 0;
     internal int EffectiveResultRowHeightForTest => _dropDownController?.Content?.ResultRowHeight ?? 0;

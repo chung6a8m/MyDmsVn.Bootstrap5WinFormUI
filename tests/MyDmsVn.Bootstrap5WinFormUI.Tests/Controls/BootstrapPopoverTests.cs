@@ -18,6 +18,7 @@ public sealed class BootstrapPopoverTests
 {
     private const int WmActivate = 0x0006;
     private const int WmActivateApp = 0x001C;
+    private const int WaInactive = 0;
 
     private sealed class TestForm : Form
     {
@@ -495,6 +496,49 @@ public sealed class BootstrapPopoverTests
     }
 
     [Test]
+    public void PopupDeactivateWithNoReplacementWhileContentKeepsFocusDoesNotClosePopover()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = false;
+        fixture.Show();
+        Assert.That(fixture.Editor.Focused, Is.True);
+
+        SendWindowDeactivate(fixture.Popover.DropDownHandleForTest, IntPtr.Zero);
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.True);
+    }
+
+    [Test]
+    public void PopupDeactivateToTargetControlKeepsPopoverOpen()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = false;
+        fixture.Show();
+
+        SendWindowDeactivate(fixture.Popover.DropDownHandleForTest, fixture.Target.Handle);
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.True);
+    }
+
+    [Test]
+    public void PopupDeactivateToPopoverSurfaceAndHostedControlKeepsPopoverOpen()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = false;
+        fixture.Show();
+
+        SendWindowDeactivate(fixture.Popover.DropDownHandleForTest, fixture.Popover.SurfaceHandleForTest);
+        Application.DoEvents();
+        Assert.That(fixture.Popover.IsOpen, Is.True, "The overlay surface belongs to the popup activation domain.");
+
+        SendWindowDeactivate(fixture.Popover.DropDownHandleForTest, fixture.Editor.Handle);
+        Application.DoEvents();
+        Assert.That(fixture.Popover.IsOpen, Is.True, "Hosted descendants belong to the popup activation domain.");
+    }
+
+    [Test]
     public void PopupDeactivateToSecondApplicationFormClosesPopoverWhenOutsideCloseIsDisabled()
     {
         using var fixture = new InteractivePopoverFixture();
@@ -928,6 +972,11 @@ public sealed class BootstrapPopoverTests
     {
         Assert.That(GetWindowRect(handle, out var bounds), Is.True);
         return Rectangle.FromLTRB(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+    }
+
+    private static void SendWindowDeactivate(IntPtr popupHandle, IntPtr activatedWindow)
+    {
+        SendMessage(popupHandle, WmActivate, (IntPtr)WaInactive, activatedWindow);
     }
 
     private static void SendTab(Control content, bool forward)

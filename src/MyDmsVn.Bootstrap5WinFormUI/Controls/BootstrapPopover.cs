@@ -271,6 +271,7 @@ public class BootstrapPopover : Component
     public bool IsOpen => _dropDown.Visible;
 
     internal IntPtr DropDownHandleForTest => _dropDown.IsHandleCreated ? _dropDown.Handle : IntPtr.Zero;
+    internal IntPtr SurfaceHandleForTest => _surface.IsHandleCreated ? _surface.Handle : IntPtr.Zero;
 
     /// <summary>Occurs after the native popup has opened.</summary>
     public event EventHandler? Opened;

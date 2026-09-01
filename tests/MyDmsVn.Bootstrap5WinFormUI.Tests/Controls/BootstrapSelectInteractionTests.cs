@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Demo;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -15,6 +16,11 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapSelectInteractionTests
 {
+    private const int WmActivate = 0x0006;
+    private const uint InputMouse = 0;
+    private const uint MouseEventLeftDown = 0x0002;
+    private const uint MouseEventLeftUp = 0x0004;
+
     [Test]
     public void ProgrammaticSelectionKeepsAllSelectionViewsCoherent()
     {
@@ -221,6 +227,71 @@ public sealed class BootstrapSelectInteractionTests
     }
 
     [Test]
+    public void LeftMouseDownOpensPopupAndOwnerControlActivationKeepsItOpen()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var select = new TestBootstrapSelect { Bounds = new Rectangle(20, 20, 220, 32) };
+        select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        form.Controls.Add(select);
+        form.Show();
+        form.Activate();
+        Application.DoEvents();
+
+        select.RaiseLeftMouseDownForTest(new Point(select.Width / 2, select.Height / 2));
+        Application.DoEvents();
+        Assert.That(select.IsDropDownOpenForTest, Is.True);
+
+        SendMessage(select.DropDownHandleForTest, WmActivate, IntPtr.Zero, select.Handle);
+        Application.DoEvents();
+
+        Assert.That(select.IsDropDownOpenForTest, Is.True);
+    }
+
+    [Test]
+    [Explicit("Requires an interactive Windows desktop because it opens the integrated demo and uses SendInput.")]
+    public void NativeLeftClickOnIntegratedDemoSelectOpensAndRemainsOpen()
+    {
+        using var form = new BootstrapSelectDemoForm
+        {
+            ShowInTaskbar = false,
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(100, 100)
+        };
+        form.Show();
+        form.Activate();
+        Application.DoEvents();
+        var select = Descendants(form)
+            .OfType<BootstrapSelect>()
+            .Single(control => control.AccessibleName == "Local customer select");
+        for (Control? ancestor = select.Parent; ancestor is not null; ancestor = ancestor.Parent)
+        {
+            if (ancestor is ScrollableControl scrollable) scrollable.ScrollControlIntoView(select);
+        }
+        Assert.That(select.Focus(), Is.True);
+        Application.DoEvents();
+        var formDeactivations = 0;
+        form.Deactivate += (_, _) => formDeactivations++;
+
+        // Interactive trace on net48 observed WA_INACTIVE naming the owner Form.
+        // Form.Deactivate also fired once, and the existing ContainsFocus guard retained the popup.
+        var clickPoint = select.PointToScreen(new Point(select.Width / 2, select.Height / 2));
+        Assert.That(SetCursorPos(clickPoint.X, clickPoint.Y), Is.True);
+        var inputs = new[]
+        {
+            new NativeInput { Type = InputMouse, Mouse = new NativeMouseInput { Flags = MouseEventLeftDown } },
+            new NativeInput { Type = InputMouse, Mouse = new NativeMouseInput { Flags = MouseEventLeftUp } }
+        };
+        Assert.That(SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(NativeInput))), Is.EqualTo((uint)inputs.Length));
+        for (var turn = 0; turn < 8; turn++) Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(formDeactivations, Is.EqualTo(1));
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+        }));
+    }
+
+    [Test]
     public void TabFromFocusedNativeSearchEditorClosesPopupAndContinuesForwardOwnerTraversal()
     {
         using var form = new Form
@@ -409,6 +480,11 @@ public sealed class BootstrapSelectInteractionTests
 
     private sealed class TestBootstrapSelect : BootstrapSelect
     {
+        internal void RaiseLeftMouseDownForTest(Point location)
+        {
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, location.X, location.Y, 0));
+        }
+
         internal void RaisePrintableKeyForTest(char character)
         {
             OnKeyPress(new KeyPressEventArgs(character));
@@ -418,5 +494,34 @@ public sealed class BootstrapSelectInteractionTests
         {
             return ProcessDialogKey(keyData);
         }
+    }
+
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint inputCount, NativeInput[] inputs, int inputSize);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeInput
+    {
+        internal uint Type;
+        internal NativeMouseInput Mouse;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMouseInput
+    {
+        internal int X;
+        internal int Y;
+        internal uint MouseData;
+        internal uint Flags;
+        internal uint Time;
+        internal UIntPtr ExtraInfo;
     }
 }

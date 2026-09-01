@@ -34,6 +34,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     internal int CreationCount => _creationCount;
     internal Rectangle CurrentBounds => _currentBounds;
     internal IntPtr DropDownHandle => _dropDown?.IsHandleCreated == true ? _dropDown.Handle : IntPtr.Zero;
+    internal IntPtr SurfaceHandle => _surface?.IsHandleCreated == true ? _surface.Handle : IntPtr.Zero;
     internal BootstrapSelectDropDownContent? Content => _content;
     internal string CurrentSearchText => _content?.SearchText ?? string.Empty;
 
