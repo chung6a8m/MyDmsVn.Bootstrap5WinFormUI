@@ -49,6 +49,7 @@ public class BootstrapPopover : Component
         };
         _dropDown.EscapeRequested = OnEscapeRequested;
         _dropDown.TabNavigationRequested = OnTabNavigationRequested;
+        _dropDown.ApplicationDeactivated += OnApplicationDeactivated;
         _dropDown.Opened += OnDropDownOpened;
         _dropDown.Closed += OnDropDownClosed;
     }
@@ -268,6 +269,8 @@ public class BootstrapPopover : Component
     [Browsable(false)]
     public bool IsOpen => _dropDown.Visible;
 
+    internal IntPtr DropDownHandleForTest => _dropDown.IsHandleCreated ? _dropDown.Handle : IntPtr.Zero;
+
     /// <summary>Occurs after the native popup has opened.</summary>
     public event EventHandler? Opened;
 
@@ -336,6 +339,7 @@ public class BootstrapPopover : Component
             StopOpenLifecycle();
             _dropDown.Opened -= OnDropDownOpened;
             _dropDown.Closed -= OnDropDownClosed;
+            _dropDown.ApplicationDeactivated -= OnApplicationDeactivated;
             _dropDown.EscapeRequested = null;
             _dropDown.TabNavigationRequested = null;
             _dropDown.Dispose();
@@ -381,9 +385,14 @@ public class BootstrapPopover : Component
 
     private void OnDropDownOpened(object? sender, EventArgs e)
     {
-        StartOpenLifecycle();
         FocusFirstContentControl();
+        StartOpenLifecycle();
         Opened?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnApplicationDeactivated(object? sender, EventArgs e)
+    {
+        Hide();
     }
 
     private void OnDropDownClosed(object? sender, ToolStripDropDownClosedEventArgs e)

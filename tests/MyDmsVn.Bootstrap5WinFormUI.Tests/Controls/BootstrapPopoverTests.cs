@@ -16,6 +16,8 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapPopoverTests
 {
+    private const int WmActivateApp = 0x001C;
+
     private sealed class TestForm : Form
     {
         internal void RaiseDeactivate()
@@ -454,6 +456,26 @@ public sealed class BootstrapPopoverTests
         Assert.That(fixture.Popover.IsOpen, Is.False);
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void ApplicationDeactivateMessageAfterContentFocusClosesPopover(bool closeOnClickOutside)
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = closeOnClickOutside;
+        fixture.Show();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(fixture.Popover.IsOpen, Is.True);
+            Assert.That(fixture.Editor.Focused, Is.True);
+            Assert.That(fixture.Popover.DropDownHandleForTest, Is.Not.EqualTo(IntPtr.Zero));
+        }));
+
+        SendMessage(fixture.Popover.DropDownHandleForTest, WmActivateApp, IntPtr.Zero, IntPtr.Zero);
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.False);
+    }
+
     [TestCase(true, false)]
     [TestCase(false, true)]
     public void EscapeHonorsClosePolicyAndRestoresTargetFocus(bool closeOnEscape, bool remainsOpen)
@@ -887,4 +909,7 @@ public sealed class BootstrapPopoverTests
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetWindowRect(IntPtr handle, out NativeRectangle bounds);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
 }

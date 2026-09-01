@@ -30,6 +30,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     internal bool IsOpen => _isOpen;
     internal int CreationCount => _creationCount;
     internal Rectangle CurrentBounds => _currentBounds;
+    internal IntPtr DropDownHandle => _dropDown?.IsHandleCreated == true ? _dropDown.Handle : IntPtr.Zero;
     internal BootstrapSelectDropDownContent? Content => _content;
     internal string CurrentSearchText => _content?.SearchText ?? string.Empty;
 
@@ -121,6 +122,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         _tracker = null;
         if (_dropDown is not null)
         {
+            _dropDown.ApplicationDeactivated -= OnApplicationDeactivated;
             _dropDown.Closed -= OnDropDownClosed;
             if (!_dropDown.IsDisposed) _dropDown.Dispose();
         }
@@ -148,6 +150,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
             CloseOnEscape = true,
             EscapeRequested = () => Close(true)
         };
+        _dropDown.ApplicationDeactivated += OnApplicationDeactivated;
         _dropDown.Closed += OnDropDownClosed;
         _creationCount++;
         ApplyPresentation();
@@ -231,6 +234,11 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     private void OnDropDownClosed(object? sender, ToolStripDropDownClosedEventArgs e)
     {
         CompleteClose();
+    }
+
+    private void OnApplicationDeactivated(object? sender, EventArgs e)
+    {
+        Close(false);
     }
 
     private void CompleteClose()

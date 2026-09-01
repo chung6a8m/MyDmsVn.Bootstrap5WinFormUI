@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -12,6 +13,8 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapSelectPopupTests
 {
+    private const int WmActivateApp = 0x001C;
+
     [Test]
     public void PopupIsLazyReusedAndRaisesLifecycleEvents()
     {
@@ -68,6 +71,38 @@ public sealed class BootstrapSelectPopupTests
         Assert.That(select.IsDropDownOpenForTest, Is.True);
 
         form.RaiseDeactivate();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.False);
+            Assert.That(closed, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void ApplicationDeactivateMessageAfterPopupFocusClosesOpenPopup()
+    {
+        using var form = new Form();
+        using var select = new BootstrapSelect { SearchEnabled = true };
+        select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        form.Controls.Add(select);
+        form.Show();
+        form.Activate();
+        select.Focus();
+        Application.DoEvents();
+        var closed = 0;
+        select.DropDownClosed += (_, _) => closed++;
+
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.DropDownHandleForTest, Is.Not.EqualTo(IntPtr.Zero));
+        }));
+
+        SendMessage(select.DropDownHandleForTest, WmActivateApp, IntPtr.Zero, IntPtr.Zero);
         Application.DoEvents();
 
         Assert.Multiple((Action)(() =>
@@ -202,4 +237,7 @@ public sealed class BootstrapSelectPopupTests
             OnDeactivate(EventArgs.Empty);
         }
     }
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
 }
