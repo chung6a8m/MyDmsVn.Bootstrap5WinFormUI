@@ -123,6 +123,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         if (_dropDown is not null)
         {
             _dropDown.ApplicationDeactivated -= OnApplicationDeactivated;
+            _dropDown.WindowDeactivated -= OnWindowDeactivated;
             _dropDown.Closed -= OnDropDownClosed;
             if (!_dropDown.IsDisposed) _dropDown.Dispose();
         }
@@ -151,6 +152,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
             EscapeRequested = () => Close(true)
         };
         _dropDown.ApplicationDeactivated += OnApplicationDeactivated;
+        _dropDown.WindowDeactivated += OnWindowDeactivated;
         _dropDown.Closed += OnDropDownClosed;
         _creationCount++;
         ApplyPresentation();
@@ -238,6 +240,17 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
 
     private void OnApplicationDeactivated(object? sender, EventArgs e)
     {
+        Close(false);
+    }
+
+    private void OnWindowDeactivated(IntPtr activatedWindow)
+    {
+        var ownerForm = _owner.FindForm();
+        if (ownerForm?.IsHandleCreated == true && ownerForm.Handle == activatedWindow)
+        {
+            return;
+        }
+
         Close(false);
     }
 

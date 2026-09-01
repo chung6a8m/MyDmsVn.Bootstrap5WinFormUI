@@ -50,6 +50,7 @@ public class BootstrapPopover : Component
         _dropDown.EscapeRequested = OnEscapeRequested;
         _dropDown.TabNavigationRequested = OnTabNavigationRequested;
         _dropDown.ApplicationDeactivated += OnApplicationDeactivated;
+        _dropDown.WindowDeactivated += OnWindowDeactivated;
         _dropDown.Opened += OnDropDownOpened;
         _dropDown.Closed += OnDropDownClosed;
     }
@@ -340,6 +341,7 @@ public class BootstrapPopover : Component
             _dropDown.Opened -= OnDropDownOpened;
             _dropDown.Closed -= OnDropDownClosed;
             _dropDown.ApplicationDeactivated -= OnApplicationDeactivated;
+            _dropDown.WindowDeactivated -= OnWindowDeactivated;
             _dropDown.EscapeRequested = null;
             _dropDown.TabNavigationRequested = null;
             _dropDown.Dispose();
@@ -392,6 +394,17 @@ public class BootstrapPopover : Component
 
     private void OnApplicationDeactivated(object? sender, EventArgs e)
     {
+        Hide();
+    }
+
+    private void OnWindowDeactivated(IntPtr activatedWindow)
+    {
+        var ownerForm = _target?.FindForm();
+        if (ownerForm?.IsHandleCreated == true && ownerForm.Handle == activatedWindow)
+        {
+            return;
+        }
+
         Hide();
     }
 

@@ -16,6 +16,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapPopoverTests
 {
+    private const int WmActivate = 0x0006;
     private const int WmActivateApp = 0x001C;
 
     private sealed class TestForm : Form
@@ -471,6 +472,42 @@ public sealed class BootstrapPopoverTests
         }));
 
         SendMessage(fixture.Popover.DropDownHandleForTest, WmActivateApp, IntPtr.Zero, IntPtr.Zero);
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.False);
+    }
+
+    [Test]
+    public void PopupDeactivateBackToOwnerKeepsPopoverWhenOutsideCloseIsDisabled()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = false;
+        fixture.Show();
+
+        SendMessage(
+            fixture.Popover.DropDownHandleForTest,
+            WmActivate,
+            IntPtr.Zero,
+            fixture.Form.Handle);
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.True);
+    }
+
+    [Test]
+    public void PopupDeactivateToSecondApplicationFormClosesPopoverWhenOutsideCloseIsDisabled()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        using var secondForm = new Form { ShowInTaskbar = false };
+        fixture.Popover.CloseOnClickOutside = false;
+        fixture.Show();
+        var secondFormHandle = secondForm.Handle;
+
+        SendMessage(
+            fixture.Popover.DropDownHandleForTest,
+            WmActivate,
+            IntPtr.Zero,
+            secondFormHandle);
         Application.DoEvents();
 
         Assert.That(fixture.Popover.IsOpen, Is.False);
