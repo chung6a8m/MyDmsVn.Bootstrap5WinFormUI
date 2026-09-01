@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Threading;
@@ -16,6 +17,77 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapSelectProviderIntegrationTests
 {
+    [Test]
+    public void FirstPageCompletionReflowsOpenPopupFromLoadingHeight()
+    {
+        RunOnIsolatedWinFormsThread(FirstPageCompletionReflowsOpenPopupFromLoadingHeightCore);
+    }
+
+    private static void FirstPageCompletionReflowsOpenPopupFromLoadingHeightCore()
+    {
+        var provider = new BootstrapSelectControlledProvider(honorCancellation: false);
+        using var form = CreatePopupSizingForm();
+        using var select = CreatePopupSizingSelect(provider);
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+        using var winFormsContext = new WindowsFormsSynchronizationContext();
+        using var synchronizationContext = new SynchronizationContextScope(winFormsContext);
+
+        select.OpenDropDownInternal();
+        PumpUntil(() => provider.Queries.Count == 1, TimeSpan.FromSeconds(5));
+        var loadingHeight = select.DropDownBoundsForTest.Height;
+
+        provider.Complete(string.Empty, 1, CreateItems("First page", 20));
+        PumpUntil(() => select.VisibleResultItemTextsForTest.Count == 20, TimeSpan.FromSeconds(5));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.VisibleResultItemTextsForTest, Has.Count.EqualTo(20));
+            Assert.That(select.DropDownBoundsForTest.Height, Is.GreaterThan(loadingHeight));
+        }));
+    }
+
+    [Test]
+    public void SearchCompletionReflowsOpenPopupForTwentyRaceMatches()
+    {
+        RunOnIsolatedWinFormsThread(SearchCompletionReflowsOpenPopupForTwentyRaceMatchesCore);
+    }
+
+    private static void SearchCompletionReflowsOpenPopupForTwentyRaceMatchesCore()
+    {
+        var provider = new BootstrapSelectControlledProvider(honorCancellation: false);
+        using var form = CreatePopupSizingForm();
+        using var select = CreatePopupSizingSelect(provider);
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+        using var winFormsContext = new WindowsFormsSynchronizationContext();
+        using var synchronizationContext = new SynchronizationContextScope(winFormsContext);
+
+        select.OpenDropDownInternal();
+        PumpUntil(() => provider.Queries.Count == 1, TimeSpan.FromSeconds(5));
+        provider.Complete(string.Empty, 1, CreateItems("Initial", 5));
+        PumpUntil(() => select.VisibleResultItemTextsForTest.Count == 5, TimeSpan.FromSeconds(5));
+
+        select.SetSearchTextForTest("race");
+        PumpUntil(
+            () => provider.Queries.Any(query => query.SearchText == "race" && query.Page == 1),
+            TimeSpan.FromSeconds(5));
+        var loadingHeight = select.DropDownBoundsForTest.Height;
+
+        provider.Complete("race", 1, CreateItems("Race sample", 20));
+        PumpUntil(() => select.VisibleResultItemTextsForTest.Count == 20, TimeSpan.FromSeconds(5));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.VisibleResultItemTextsForTest, Has.Count.EqualTo(20));
+            Assert.That(select.DropDownBoundsForTest.Height, Is.GreaterThan(loadingHeight));
+        }));
+    }
+
     [Test]
     public void AsyncProviderMergeAndSelectedSnapshotRefreshStayOnOwningUiThread()
     {
@@ -190,6 +262,34 @@ public sealed class BootstrapSelectProviderIntegrationTests
         }
 
         Assert.That(condition(), Is.True, "Timed out while pumping the WinForms message loop.");
+    }
+
+    private static Form CreatePopupSizingForm()
+    {
+        return new Form
+        {
+            Size = new Size(800, 700),
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(100, 100)
+        };
+    }
+
+    private static BootstrapSelect CreatePopupSizingSelect(IBootstrapSelectDataProvider provider)
+    {
+        return new BootstrapSelect
+        {
+            Location = new Point(40, 40),
+            Width = 340,
+            SearchDebounce = TimeSpan.Zero,
+            PageSize = 20,
+            DataProvider = provider
+        };
+    }
+
+    private static IEnumerable<BootstrapSelectItem> CreateItems(string prefix, int count)
+    {
+        return Enumerable.Range(1, count)
+            .Select(index => new BootstrapSelectItem(prefix + "-" + index, prefix + " " + index.ToString("00")));
     }
 
     private sealed class ThreadPoolProvider : IBootstrapSelectDataProvider
