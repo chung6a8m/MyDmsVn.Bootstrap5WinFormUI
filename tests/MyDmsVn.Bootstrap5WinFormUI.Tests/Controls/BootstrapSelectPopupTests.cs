@@ -181,6 +181,27 @@ public sealed class BootstrapSelectPopupTests
     }
 
     [Test]
+    public void QueuedZeroDeactivationFromPreviousOpenDoesNotCloseReopenedPopup()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var select = CreateSearchableSelect();
+        form.Controls.Add(select);
+        ShowAndOpen(form, select);
+        var creationCount = select.DropDownCreationCountForTest;
+
+        SendWindowDeactivate(select.DropDownHandleForTest, IntPtr.Zero);
+        select.CloseDropDownInternal(false);
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.DropDownCreationCountForTest, Is.EqualTo(creationCount));
+        }));
+    }
+
+    [Test]
     public void LocalSinglePopupKeepsStableHeightAcrossRepeatedOpenCycles()
     {
         using var form = new Form

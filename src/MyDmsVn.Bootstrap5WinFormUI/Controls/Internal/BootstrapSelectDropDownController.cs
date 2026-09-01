@@ -19,6 +19,8 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     private Rectangle _currentBounds;
     private int _creationCount;
     private int _effectiveDpi = DpiScaler.DefaultDpi;
+    private int _activationGeneration;
+    private int _queuedWindowDeactivationGeneration = -1;
 
     internal BootstrapSelectDropDownController(BootstrapSelect owner)
     {
@@ -52,6 +54,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         RefreshResults();
         ApplyPresentation(_effectiveDpi);
         _currentBounds = ComputeBounds();
+        _activationGeneration++;
         _isOpen = true;
         _restoreFocusOnClosed = false;
         _dropDown!.ShowAt(_currentBounds);
@@ -136,6 +139,8 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _activationGeneration++;
+        _queuedWindowDeactivationGeneration = -1;
         _owner.Items.Changed -= OnItemsChanged;
         _owner.DpiChangedAfterParent -= OnOwnerDpiChangedAfterParent;
         BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
@@ -277,17 +282,85 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     private void OnWindowDeactivated(IntPtr activatedWindow)
     {
         var ownerForm = _owner.FindForm();
-        if (ownerForm?.IsHandleCreated == true && ownerForm.Handle == activatedWindow)
+        if (BootstrapOverlayActivationDomain.IsOwnerWindow(activatedWindow, ownerForm)
+            || BootstrapOverlayActivationDomain.IsPopupWindow(activatedWindow, _dropDown, _surface))
         {
             return;
         }
 
-        Close(false);
+        if (activatedWindow != IntPtr.Zero)
+        {
+            Close(false);
+            return;
+        }
+
+        QueueWindowDeactivationCheck();
+    }
+
+    private void QueueWindowDeactivationCheck()
+    {
+        if (_dropDown is null
+            || _dropDown.IsDisposed
+            || !_dropDown.IsHandleCreated)
+        {
+            return;
+        }
+
+        var generation = _activationGeneration;
+        if (_queuedWindowDeactivationGeneration == generation)
+        {
+            return;
+        }
+
+        _queuedWindowDeactivationGeneration = generation;
+        try
+        {
+            _dropDown.BeginInvoke((Action)(() =>
+            {
+                if (_queuedWindowDeactivationGeneration == generation)
+                {
+                    _queuedWindowDeactivationGeneration = -1;
+                }
+
+                if (_disposed || !_isOpen || generation != _activationGeneration)
+                {
+                    return;
+                }
+
+                var popupStillOwnsFocus = _dropDown?.ContainsFocus == true
+                    || _surface?.ContainsFocus == true
+                    || _content?.ContainsFocus == true;
+                var ownerForm = _owner.FindForm();
+                var ownerStillActive = ownerForm?.IsHandleCreated == true
+                    && (ownerForm.ContainsFocus || Form.ActiveForm == ownerForm);
+
+                if (!popupStillOwnsFocus && !ownerStillActive)
+                {
+                    Close(false);
+                }
+            }));
+        }
+        catch (ObjectDisposedException)
+        {
+            if (_queuedWindowDeactivationGeneration == generation)
+            {
+                _queuedWindowDeactivationGeneration = -1;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            if (_queuedWindowDeactivationGeneration == generation)
+            {
+                _queuedWindowDeactivationGeneration = -1;
+            }
+        }
     }
 
     private void CompleteClose()
     {
         if (!_isOpen) return;
+        _activationGeneration++;
+        _queuedWindowDeactivationGeneration = -1;
         _isOpen = false;
         _tracker?.Dispose();
         _tracker = null;
