@@ -274,20 +274,32 @@ public sealed class BootstrapSelectInteractionTests
 
         // Interactive trace on net48 observed WA_INACTIVE naming the owner Form.
         // Form.Deactivate also fired once, and the existing ContainsFocus guard retained the popup.
-        var clickPoint = select.PointToScreen(new Point(select.Width / 2, select.Height / 2));
-        Assert.That(SetCursorPos(clickPoint.X, clickPoint.Y), Is.True);
-        var inputs = new[]
+        void ClickSelect(Point clientPoint)
         {
-            new NativeInput { Type = InputMouse, Mouse = new NativeMouseInput { Flags = MouseEventLeftDown } },
-            new NativeInput { Type = InputMouse, Mouse = new NativeMouseInput { Flags = MouseEventLeftUp } }
-        };
-        Assert.That(SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(NativeInput))), Is.EqualTo((uint)inputs.Length));
-        for (var turn = 0; turn < 8; turn++) Application.DoEvents();
+            var clickPoint = select.PointToScreen(clientPoint);
+            Assert.That(SetCursorPos(clickPoint.X, clickPoint.Y), Is.True);
+            var inputs = new[]
+            {
+                new NativeInput { Type = InputMouse, Mouse = new NativeMouseInput { Flags = MouseEventLeftDown } },
+                new NativeInput { Type = InputMouse, Mouse = new NativeMouseInput { Flags = MouseEventLeftUp } }
+            };
+            Assert.That(
+                SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(NativeInput))),
+                Is.EqualTo((uint)inputs.Length));
+            for (var turn = 0; turn < 8; turn++) Application.DoEvents();
+        }
+
+        ClickSelect(new Point(select.Width / 2, select.Height / 2));
+        Assert.That(select.IsDropDownOpenForTest, Is.True, "Content click");
+
+        select.CloseDropDownInternal(false);
+        Application.DoEvents();
+        ClickSelect(new Point(select.Width - 8, select.Height / 2));
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(formDeactivations, Is.EqualTo(1));
-            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(formDeactivations, Is.GreaterThanOrEqualTo(1));
+            Assert.That(select.IsDropDownOpenForTest, Is.True, "Arrow click");
         }));
     }
 
