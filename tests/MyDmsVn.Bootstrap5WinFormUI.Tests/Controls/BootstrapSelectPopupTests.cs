@@ -234,13 +234,22 @@ public sealed class BootstrapSelectPopupTests
     [Test]
     public void OwnerDpiRefreshReappliesOpenPopupWithoutRecreation()
     {
-        using var form = new Form { Size = new Size(800, 700), StartPosition = FormStartPosition.Manual, Location = new Point(100, 100) };
+        var workingArea = Screen.PrimaryScreen!.WorkingArea;
+        var formSize = new Size(640, 520);
+        using var form = new Form
+        {
+            Size = formSize,
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(
+                workingArea.Left + Math.Max(0, (workingArea.Width - formSize.Width) / 2),
+                workingArea.Top + Math.Max(0, (workingArea.Height - formSize.Height) / 2))
+        };
         using var select = new BootstrapSelect
         {
-            Location = new Point(40, 40),
+            Location = new Point(150, 220),
             Width = 320,
             ResultRowHeight = 48,
-            MaxDropDownHeight = 320
+            MaxDropDownHeight = 120
         };
         for (var value = 1; value <= 12; value++)
         {
@@ -264,10 +273,34 @@ public sealed class BootstrapSelectPopupTests
                 Assert.That(select.IsDropDownOpenForTest, Is.True);
                 Assert.That(select.DropDownCreationCountForTest, Is.EqualTo(creationCount));
                 Assert.That(select.EffectiveResultRowHeightForTest, Is.EqualTo(DpiScaler.Scale(48, dpi)));
-                Assert.That(select.DropDownBoundsForTest.Height, Is.LessThanOrEqualTo(DpiScaler.Scale(320, dpi)));
+                Assert.That(select.DropDownBoundsForTest.Height, Is.LessThanOrEqualTo(DpiScaler.Scale(120, dpi)));
                 Assert.That(Screen.FromControl(select).WorkingArea.Contains(select.DropDownBoundsForTest), Is.True);
             }));
         }
+    }
+
+    [Test]
+    public void OwnerDpiAppliedBeforeFirstOpenControlsInitialPopupPresentation()
+    {
+        using var form = new Form { Size = new Size(700, 600), StartPosition = FormStartPosition.Manual, Location = new Point(100, 100) };
+        using var select = new BootstrapSelect { Width = 300, ResultRowHeight = 48 };
+        select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+
+        select.ApplyDropDownDpiForTest(144);
+        Assert.That(select.IsDropDownCreatedForTest, Is.False);
+
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.DropDownCreationCountForTest, Is.EqualTo(1));
+            Assert.That(select.EffectiveResultRowHeightForTest, Is.EqualTo(72));
+        }));
     }
 
     [Test]

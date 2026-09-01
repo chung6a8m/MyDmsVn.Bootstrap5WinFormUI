@@ -100,7 +100,8 @@ public partial class BootstrapSelect
 
     internal void ApplyDropDownDpiForTest(int dpi)
     {
-        _dropDownController?.ApplyOwnerDpiChange(dpi);
+        _dropDownController ??= new BootstrapSelectDropDownController(this);
+        _dropDownController.ApplyOwnerDpiChange(dpi);
     }
 
     internal BootstrapSelectResultSet BuildCurrentLocalResultSet(string searchText)
