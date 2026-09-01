@@ -65,10 +65,49 @@ public sealed class BootstrapOverlayAnchorTrackerTests
     }
 
     [Test]
+    public void FormDeactivateRequestsClose()
+    {
+        using var form = new TestForm();
+        using var target = new Button();
+        form.Controls.Add(target);
+        var reposition = 0;
+        var close = 0;
+        using var tracker = new BootstrapOverlayAnchorTracker(
+            target,
+            () => reposition++,
+            () => close++);
+
+        form.RaiseDeactivate();
+
+        Assert.That(close, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void ReparentingToAnotherFormMovesDeactivateSubscription()
+    {
+        using var firstForm = new TestForm();
+        using var secondForm = new TestForm();
+        using var target = new Button();
+        firstForm.Controls.Add(target);
+        var close = 0;
+        using var tracker = new BootstrapOverlayAnchorTracker(target, () => { }, () => close++);
+
+        secondForm.Controls.Add(target);
+        var afterReparent = close;
+        firstForm.RaiseDeactivate();
+        Assert.That(close, Is.EqualTo(afterReparent));
+
+        secondForm.RaiseDeactivate();
+        Assert.That(close, Is.EqualTo(afterReparent + 1));
+    }
+
+    [Test]
     public void DisposeRemovesAllReactions()
     {
+        using var form = new TestForm();
         using var parent = new TestScrollablePanel();
         using var target = new Button();
+        form.Controls.Add(parent);
         parent.Controls.Add(target);
         var reposition = 0;
         var close = 0;
@@ -79,6 +118,7 @@ public sealed class BootstrapOverlayAnchorTrackerTests
         parent.Location = new Point(2, 2);
         parent.RaiseScroll();
         target.Visible = false;
+        form.RaiseDeactivate();
 
         Assert.Multiple((Action)(() =>
         {
@@ -92,6 +132,14 @@ public sealed class BootstrapOverlayAnchorTrackerTests
         public void RaiseScroll()
         {
             OnScroll(new ScrollEventArgs(ScrollEventType.ThumbPosition, 1));
+        }
+    }
+
+    private sealed class TestForm : Form
+    {
+        internal void RaiseDeactivate()
+        {
+            OnDeactivate(EventArgs.Empty);
         }
     }
 }

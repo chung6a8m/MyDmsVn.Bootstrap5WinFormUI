@@ -7,6 +7,10 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
 {
+    private const int WmActivate = 0x0006;
+    private const int WmActivateApp = 0x001C;
+    private const long WaInactive = 0;
+
     private readonly BootstrapOverlaySurface _surface;
     private readonly ToolStripControlHost _host;
     private Region? _ownedRegion;
@@ -36,6 +40,9 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
     public Action? EscapeRequested { get; set; }
 
     public Func<bool, bool>? TabNavigationRequested { get; set; }
+
+    internal event EventHandler? ApplicationDeactivated;
+    internal event Action<IntPtr>? WindowDeactivated;
 
     public void ShowAt(Rectangle screenBounds)
     {
@@ -106,6 +113,23 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
         base.OnClosing(e);
     }
 
+    protected override void WndProc(ref Message m)
+    {
+        var applicationDeactivated = m.Msg == WmActivateApp && m.WParam == IntPtr.Zero;
+        var windowDeactivated = m.Msg == WmActivate
+            && (m.WParam.ToInt64() & 0xFFFFL) == WaInactive;
+        var activatedWindow = m.LParam;
+        base.WndProc(ref m);
+        if (applicationDeactivated && !IsDisposed)
+        {
+            ApplicationDeactivated?.Invoke(this, EventArgs.Empty);
+        }
+        if (windowDeactivated && !IsDisposed)
+        {
+            WindowDeactivated?.Invoke(activatedWindow);
+        }
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -114,6 +138,8 @@ internal sealed class BootstrapOverlayDropDown : ToolStripDropDown
             _boundsCorrectionQueued = false;
             EscapeRequested = null;
             TabNavigationRequested = null;
+            ApplicationDeactivated = null;
+            WindowDeactivated = null;
             Region = null;
             _ownedRegion?.Dispose();
             _ownedRegion = null;

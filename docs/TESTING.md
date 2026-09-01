@@ -756,3 +756,24 @@ Run this manual sequence on the integrated **Feedback** page:
 
 Repeat the sequence in Light and Dark themes and at a non-100% Windows DPI setting. Focus cues must remain visible, and theme/DPI changes must not alter keyboard behavior or overlay placement.
 
+### Anchored overlay lifecycle and BootstrapSelect navigation regression matrix
+
+Verify the shared anchored-overlay lifecycle with these manual checks:
+
+- Open a searchable BootstrapSelect and press/release Alt only; the popup remains open.
+- With the searchable BootstrapSelect open, Alt+Tab to an unrelated application; the popup disappears immediately. Alt+Tab back and confirm no stale Select popup remains.
+- Open a BootstrapPopover with `CloseOnClickOutside = false`, then Alt+Tab; the Popover still closes because owner deactivation is an application-lifecycle close, not an outside-click close.
+- While the owning form remains active, confirm `CloseOnClickOutside = false` still prevents ordinary outside-click dismissal.
+- Press Escape and confirm the existing close and focus-restoration behavior remains unchanged.
+
+Verify stay-open selection navigation by opening a Multiple Select, or a Select with `CloseOnSelect = false`, navigating away from the first row, and selecting or deselecting the highlighted row. The popup must stay open with the same logical row highlighted and the viewport preserved.
+
+Verify asynchronous paging navigation in the Async Single demo:
+
+1. Wait for page 1 while keeping focus in the search textbox.
+2. Navigate with Down until near-end paging loads page 2. Completion must preserve the highlighted logical item and viewport instead of jumping to the reset state.
+3. Repeat using PageDown, then continue far enough to load page 3; navigation must remain stable after each completion.
+4. Start a new search, for example `race`. Page 1 must discard navigation from the previous query and choose the normal preferred selected/selectable reset target; the viewport may scroll only as needed to reveal that target.
+
+Run the matrix for local Single/Multiple and async Single/Multiple scenarios in Light and Dark themes, at 100% and at least one non-100% Windows scale. For Alt+Tab, use an unrelated application window and confirm the popup never remains floating above it. Do not add demo-only key/deactivation handlers, page delays, or manual popup hiding; the demo validates library behavior unchanged.
+

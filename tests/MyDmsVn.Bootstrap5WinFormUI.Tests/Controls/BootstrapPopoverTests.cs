@@ -16,11 +16,22 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapPopoverTests
 {
+    private const int WmActivate = 0x0006;
+    private const int WmActivateApp = 0x001C;
+
+    private sealed class TestForm : Form
+    {
+        internal void RaiseDeactivate()
+        {
+            OnDeactivate(EventArgs.Empty);
+        }
+    }
+
     private sealed class InteractivePopoverFixture : IDisposable
     {
         public InteractivePopoverFixture()
         {
-            Form = new Form
+            Form = new TestForm
             {
                 ShowInTaskbar = false,
                 StartPosition = FormStartPosition.Manual,
@@ -85,7 +96,7 @@ public sealed class BootstrapPopoverTests
             };
         }
 
-        public Form Form { get; }
+        public TestForm Form { get; }
 
         public Button Target { get; }
 
@@ -429,6 +440,77 @@ public sealed class BootstrapPopoverTests
             Assert.That(fixture.Popover.IsOpen, Is.True);
             Assert.That(fixture.Editor.Focused, Is.True);
         }));
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void OwningFormDeactivateClosesPopover(bool closeOnClickOutside)
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = closeOnClickOutside;
+        fixture.Show();
+        Assert.That(fixture.Editor.Focused, Is.True);
+
+        fixture.Form.RaiseDeactivate();
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.False);
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void ApplicationDeactivateMessageAfterContentFocusClosesPopover(bool closeOnClickOutside)
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = closeOnClickOutside;
+        fixture.Show();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(fixture.Popover.IsOpen, Is.True);
+            Assert.That(fixture.Editor.Focused, Is.True);
+            Assert.That(fixture.Popover.DropDownHandleForTest, Is.Not.EqualTo(IntPtr.Zero));
+        }));
+
+        SendMessage(fixture.Popover.DropDownHandleForTest, WmActivateApp, IntPtr.Zero, IntPtr.Zero);
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.False);
+    }
+
+    [Test]
+    public void PopupDeactivateBackToOwnerKeepsPopoverWhenOutsideCloseIsDisabled()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = false;
+        fixture.Show();
+
+        SendMessage(
+            fixture.Popover.DropDownHandleForTest,
+            WmActivate,
+            IntPtr.Zero,
+            fixture.Form.Handle);
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.True);
+    }
+
+    [Test]
+    public void PopupDeactivateToSecondApplicationFormClosesPopoverWhenOutsideCloseIsDisabled()
+    {
+        using var fixture = new InteractivePopoverFixture();
+        using var secondForm = new Form { ShowInTaskbar = false };
+        fixture.Popover.CloseOnClickOutside = false;
+        fixture.Show();
+        var secondFormHandle = secondForm.Handle;
+
+        SendMessage(
+            fixture.Popover.DropDownHandleForTest,
+            WmActivate,
+            IntPtr.Zero,
+            secondFormHandle);
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.False);
     }
 
     [TestCase(true, false)]
@@ -864,4 +946,7 @@ public sealed class BootstrapPopoverTests
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetWindowRect(IntPtr handle, out NativeRectangle bounds);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
 }

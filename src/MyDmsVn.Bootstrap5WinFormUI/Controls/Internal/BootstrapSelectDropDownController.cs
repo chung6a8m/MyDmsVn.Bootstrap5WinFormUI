@@ -30,6 +30,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     internal bool IsOpen => _isOpen;
     internal int CreationCount => _creationCount;
     internal Rectangle CurrentBounds => _currentBounds;
+    internal IntPtr DropDownHandle => _dropDown?.IsHandleCreated == true ? _dropDown.Handle : IntPtr.Zero;
     internal BootstrapSelectDropDownContent? Content => _content;
     internal string CurrentSearchText => _content?.SearchText ?? string.Empty;
 
@@ -49,9 +50,9 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         _currentBounds = ComputeBounds();
         _isOpen = true;
         _restoreFocusOnClosed = false;
-        _tracker = new BootstrapOverlayAnchorTracker(_owner, Reposition, () => Close(false));
         _dropDown!.ShowAt(_currentBounds);
         _content!.FocusSearch();
+        _tracker = new BootstrapOverlayAnchorTracker(_owner, Reposition, () => Close(false));
         _owner.NotifyDropDownOpened();
         _owner.NotifyPopupSearchTextChanged(_content.SearchText);
     }
@@ -71,10 +72,14 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         _dropDown.MoveTo(_currentBounds);
     }
 
-    internal void RefreshResults()
+    internal void RefreshResults(
+        BootstrapSelectResultsUpdateMode updateMode = BootstrapSelectResultsUpdateMode.ResetNavigation)
     {
         if (_content is null) return;
-        _content.SetResults(_owner.BuildCurrentPopupResultSet(_content.SearchEnabled ? _content.SearchText : string.Empty));
+        _content.SetResults(
+            _owner.BuildCurrentPopupResultSet(_content.SearchEnabled ? _content.SearchText : string.Empty),
+            updateMode,
+            _owner.ValueComparer);
         if (_isOpen) Reposition();
     }
 
@@ -117,6 +122,8 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         _tracker = null;
         if (_dropDown is not null)
         {
+            _dropDown.ApplicationDeactivated -= OnApplicationDeactivated;
+            _dropDown.WindowDeactivated -= OnWindowDeactivated;
             _dropDown.Closed -= OnDropDownClosed;
             if (!_dropDown.IsDisposed) _dropDown.Dispose();
         }
@@ -144,6 +151,8 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
             CloseOnEscape = true,
             EscapeRequested = () => Close(true)
         };
+        _dropDown.ApplicationDeactivated += OnApplicationDeactivated;
+        _dropDown.WindowDeactivated += OnWindowDeactivated;
         _dropDown.Closed += OnDropDownClosed;
         _creationCount++;
         ApplyPresentation();
@@ -183,7 +192,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         if (_owner.ActivateResultRow(row, reason))
         {
             if (_owner.CloseOnSelect) Close(true);
-            else RefreshResults();
+            else RefreshResults(BootstrapSelectResultsUpdateMode.PreserveNavigation);
         }
     }
 
@@ -227,6 +236,22 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
     private void OnDropDownClosed(object? sender, ToolStripDropDownClosedEventArgs e)
     {
         CompleteClose();
+    }
+
+    private void OnApplicationDeactivated(object? sender, EventArgs e)
+    {
+        Close(false);
+    }
+
+    private void OnWindowDeactivated(IntPtr activatedWindow)
+    {
+        var ownerForm = _owner.FindForm();
+        if (ownerForm?.IsHandleCreated == true && ownerForm.Handle == activatedWindow)
+        {
+            return;
+        }
+
+        Close(false);
     }
 
     private void CompleteClose()

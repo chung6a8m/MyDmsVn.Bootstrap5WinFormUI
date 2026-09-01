@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -9,8 +10,11 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 
 [TestFixture]
 [Apartment(ApartmentState.STA)]
+[NonParallelizable]
 public sealed class BootstrapSelectPopupTests
 {
+    private const int WmActivateApp = 0x001C;
+
     [Test]
     public void PopupIsLazyReusedAndRaisesLifecycleEvents()
     {
@@ -46,6 +50,64 @@ public sealed class BootstrapSelectPopupTests
         {
             Assert.That(select.DropDownCreationCountForTest, Is.EqualTo(creationCount));
             Assert.That(opened, Is.EqualTo(2));
+            Assert.That(closed, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void OwningFormDeactivateClosesOpenPopup()
+    {
+        using var form = new TestForm();
+        using var select = new BootstrapSelect();
+        select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+        var closed = 0;
+        select.DropDownClosed += (_, _) => closed++;
+
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+        Assert.That(select.IsDropDownOpenForTest, Is.True);
+
+        form.RaiseDeactivate();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.False);
+            Assert.That(closed, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void ApplicationDeactivateMessageAfterPopupFocusClosesOpenPopup()
+    {
+        using var form = new Form();
+        using var select = new BootstrapSelect { SearchEnabled = true };
+        select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        form.Controls.Add(select);
+        form.Show();
+        form.Activate();
+        select.Focus();
+        Application.DoEvents();
+        var closed = 0;
+        select.DropDownClosed += (_, _) => closed++;
+
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.DropDownHandleForTest, Is.Not.EqualTo(IntPtr.Zero));
+        }));
+
+        SendMessage(select.DropDownHandleForTest, WmActivateApp, IntPtr.Zero, IntPtr.Zero);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.False);
             Assert.That(closed, Is.EqualTo(1));
         }));
     }
@@ -131,4 +193,51 @@ public sealed class BootstrapSelectPopupTests
         select.OpenDropDownInternal();
         Assert.That(select.HighlightedResultTextForTest, Is.EqualTo("Enabled"));
     }
+
+    [Test]
+    public void SelectionRefreshWithCloseOnSelectFalsePreservesNavigation()
+    {
+        using var form = new Form { Size = new Size(600, 500) };
+        using var select = new BootstrapSelect
+        {
+            SelectionMode = BootstrapSelectMode.Multiple,
+            CloseOnSelect = false,
+            Width = 320
+        };
+        for (var value = 1; value <= 12; value++)
+        {
+            select.Items.Add(new BootstrapSelectItem(value, "Item " + value));
+        }
+        Assert.That(select.SelectValue(1), Is.True);
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+        Assert.That(select.MoveHighlightedResultForTest(8), Is.True);
+        var highlighted = select.HighlightedResultTextForTest;
+        var scrollOffset = select.ResultScrollOffsetForTest;
+
+        Assert.That(select.ActivateHighlightedResultForTest(), Is.True);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.HighlightedResultTextForTest, Is.EqualTo(highlighted));
+            Assert.That(select.ResultScrollOffsetForTest, Is.EqualTo(scrollOffset));
+        }));
+    }
+
+    private sealed class TestForm : Form
+    {
+        internal void RaiseDeactivate()
+        {
+            OnDeactivate(EventArgs.Empty);
+        }
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
 }

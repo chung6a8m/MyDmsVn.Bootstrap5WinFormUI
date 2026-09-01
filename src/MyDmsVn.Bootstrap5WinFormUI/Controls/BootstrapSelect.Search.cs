@@ -149,7 +149,10 @@ public partial class BootstrapSelect
 
     private void PublishRemoteCompletion(BootstrapSelectSearchController controller, string searchText, int page)
     {
-        _dropDownController?.RefreshResults();
+        var updateMode = page > 1
+            ? BootstrapSelectResultsUpdateMode.PreserveNavigation
+            : BootstrapSelectResultsUpdateMode.ResetNavigation;
+        _dropDownController?.RefreshResults(updateMode);
         if (controller.LastError is Exception error && controller.FailedPage == page)
         {
             SearchFailed?.Invoke(this, new BootstrapSelectSearchFailedEventArgs(searchText, page, error));

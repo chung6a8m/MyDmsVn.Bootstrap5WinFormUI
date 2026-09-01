@@ -91,6 +91,16 @@ internal sealed class BootstrapOverlayAnchorTracker : IDisposable
         RequestClose();
     }
 
+    private void OnFormDeactivate(object? sender, EventArgs e)
+    {
+        if (_form?.ContainsFocus == true)
+        {
+            return;
+        }
+
+        RequestClose();
+    }
+
     private void RebuildAncestorSubscriptions()
     {
         UnsubscribeAncestors();
@@ -120,6 +130,7 @@ internal sealed class BootstrapOverlayAnchorTracker : IDisposable
             _form.Move += OnAncestorGeometryChanged;
             _form.Resize += OnAncestorGeometryChanged;
             _form.FormClosed += OnFormClosed;
+            _form.Deactivate += OnFormDeactivate;
         }
     }
 
@@ -143,6 +154,7 @@ internal sealed class BootstrapOverlayAnchorTracker : IDisposable
             _form.Move -= OnAncestorGeometryChanged;
             _form.Resize -= OnAncestorGeometryChanged;
             _form.FormClosed -= OnFormClosed;
+            _form.Deactivate -= OnFormDeactivate;
             _form = null;
         }
     }

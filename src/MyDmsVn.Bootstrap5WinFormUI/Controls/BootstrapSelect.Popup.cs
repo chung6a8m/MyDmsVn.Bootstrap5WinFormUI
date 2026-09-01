@@ -21,7 +21,9 @@ public partial class BootstrapSelect
     internal bool IsDropDownOpenForTest => _dropDownController?.IsOpen == true;
     internal int DropDownCreationCountForTest => _dropDownController?.CreationCount ?? 0;
     internal Rectangle DropDownBoundsForTest => _dropDownController?.CurrentBounds ?? Rectangle.Empty;
+    internal IntPtr DropDownHandleForTest => _dropDownController?.DropDownHandle ?? IntPtr.Zero;
     internal string? HighlightedResultTextForTest => _dropDownController?.Content?.HighlightedRow?.Text;
+    internal int ResultScrollOffsetForTest => _dropDownController?.Content?.ScrollOffset ?? 0;
     internal BootstrapSelectDropDownContent? DropDownContentForTest => _dropDownController?.Content;
 
     internal IReadOnlyList<string> VisibleResultItemTextsForTest
@@ -83,6 +85,16 @@ public partial class BootstrapSelect
     internal bool ActivateHighlightedResultForTest()
     {
         return _dropDownController?.ActivateHighlighted(BootstrapSelectChangeReason.Keyboard) == true;
+    }
+
+    internal bool MoveHighlightedResultForTest(int delta)
+    {
+        return _dropDownController?.Content?.MoveHighlight(delta) == true;
+    }
+
+    internal bool PageHighlightedResultForTest(int direction)
+    {
+        return _dropDownController?.Content?.Page(direction) == true;
     }
 
     internal BootstrapSelectResultSet BuildCurrentLocalResultSet(string searchText)

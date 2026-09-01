@@ -55,6 +55,139 @@ public sealed class BootstrapSelectProviderIntegrationTests
         RunOnIsolatedWinFormsThread(SearchCompletionReflowsOpenPopupForTwentyRaceMatchesCore);
     }
 
+    [Test]
+    public void LaterPageCompletionPreservesMoveHighlightNavigation()
+    {
+        RunOnIsolatedWinFormsThread(LaterPageCompletionPreservesMoveHighlightNavigationCore);
+    }
+
+    private static void LaterPageCompletionPreservesMoveHighlightNavigationCore()
+    {
+        var provider = new BootstrapSelectControlledProvider(honorCancellation: false);
+        using var form = CreatePopupSizingForm();
+        using var select = CreatePopupSizingSelect(provider);
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+        using var winFormsContext = new WindowsFormsSynchronizationContext();
+        using var synchronizationContext = new SynchronizationContextScope(winFormsContext);
+
+        select.OpenDropDownInternal();
+        PumpUntil(() => provider.Queries.Count == 1, TimeSpan.FromSeconds(5));
+        provider.Complete(string.Empty, 1, CreateItems("Page one", 20), hasMore: true);
+        PumpUntil(() => select.VisibleResultItemTextsForTest.Count == 20, TimeSpan.FromSeconds(5));
+
+        Assert.That(select.MoveHighlightedResultForTest(19), Is.True);
+        PumpUntil(() => provider.Queries.Any(query => query.Page == 2), TimeSpan.FromSeconds(5));
+        var pageTwoHighlight = select.HighlightedResultTextForTest;
+        var pageTwoScrollOffset = select.ResultScrollOffsetForTest;
+        provider.Complete(string.Empty, 2, CreateItems("Page two", 20), hasMore: true);
+        PumpUntil(() => select.VisibleResultItemTextsForTest.Count == 40, TimeSpan.FromSeconds(5));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.HighlightedResultTextForTest, Is.EqualTo(pageTwoHighlight));
+            Assert.That(select.ResultScrollOffsetForTest, Is.EqualTo(pageTwoScrollOffset));
+        }));
+
+        Assert.That(select.MoveHighlightedResultForTest(20), Is.True);
+        PumpUntil(() => provider.Queries.Any(query => query.Page == 3), TimeSpan.FromSeconds(5));
+        var pageThreeHighlight = select.HighlightedResultTextForTest;
+        var pageThreeScrollOffset = select.ResultScrollOffsetForTest;
+        provider.Complete(string.Empty, 3, CreateItems("Page three", 20));
+        PumpUntil(() => select.VisibleResultItemTextsForTest.Count == 60, TimeSpan.FromSeconds(5));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.HighlightedResultTextForTest, Is.EqualTo(pageThreeHighlight));
+            Assert.That(select.ResultScrollOffsetForTest, Is.EqualTo(pageThreeScrollOffset));
+        }));
+    }
+
+    [Test]
+    public void LaterPageCompletionPreservesPageDownNavigation()
+    {
+        RunOnIsolatedWinFormsThread(LaterPageCompletionPreservesPageDownNavigationCore);
+    }
+
+    private static void LaterPageCompletionPreservesPageDownNavigationCore()
+    {
+        var provider = new BootstrapSelectControlledProvider(honorCancellation: false);
+        using var form = CreatePopupSizingForm();
+        using var select = CreatePopupSizingSelect(provider);
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+        using var winFormsContext = new WindowsFormsSynchronizationContext();
+        using var synchronizationContext = new SynchronizationContextScope(winFormsContext);
+
+        select.OpenDropDownInternal();
+        PumpUntil(() => provider.Queries.Count == 1, TimeSpan.FromSeconds(5));
+        provider.Complete(string.Empty, 1, CreateItems("Page one", 20), hasMore: true);
+        PumpUntil(() => select.VisibleResultItemTextsForTest.Count == 20, TimeSpan.FromSeconds(5));
+
+        Assert.That(select.PageHighlightedResultForTest(1), Is.True);
+        Assert.That(select.PageHighlightedResultForTest(1), Is.True);
+        Assert.That(select.PageHighlightedResultForTest(1), Is.True);
+        PumpUntil(() => provider.Queries.Any(query => query.Page == 2), TimeSpan.FromSeconds(5));
+        var highlighted = select.HighlightedResultTextForTest;
+        var scrollOffset = select.ResultScrollOffsetForTest;
+
+        provider.Complete(string.Empty, 2, CreateItems("Page two", 20));
+        PumpUntil(() => select.VisibleResultItemTextsForTest.Count == 40, TimeSpan.FromSeconds(5));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.HighlightedResultTextForTest, Is.EqualTo(highlighted));
+            Assert.That(select.ResultScrollOffsetForTest, Is.EqualTo(scrollOffset));
+        }));
+    }
+
+    [Test]
+    public void LaterPageFailureAndRetryPreserveMoveHighlightNavigation()
+    {
+        RunOnIsolatedWinFormsThread(LaterPageFailureAndRetryPreserveMoveHighlightNavigationCore);
+    }
+
+    private static void LaterPageFailureAndRetryPreserveMoveHighlightNavigationCore()
+    {
+        var provider = new BootstrapSelectControlledProvider(honorCancellation: false);
+        using var form = CreatePopupSizingForm();
+        using var select = CreatePopupSizingSelect(provider);
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+        using var winFormsContext = new WindowsFormsSynchronizationContext();
+        using var synchronizationContext = new SynchronizationContextScope(winFormsContext);
+        var failures = 0;
+        select.SearchFailed += (_, _) => failures++;
+
+        select.OpenDropDownInternal();
+        PumpUntil(() => provider.Queries.Count == 1, TimeSpan.FromSeconds(5));
+        provider.Complete(string.Empty, 1, CreateItems("Page one", 20), hasMore: true);
+        PumpUntil(() => select.VisibleResultItemTextsForTest.Count == 20, TimeSpan.FromSeconds(5));
+
+        Assert.That(select.MoveHighlightedResultForTest(19), Is.True);
+        PumpUntil(() => provider.Queries.Any(query => query.Page == 2), TimeSpan.FromSeconds(5));
+        provider.Fail(string.Empty, 2, new InvalidOperationException("Page two failed."));
+        PumpUntil(() => failures == 1, TimeSpan.FromSeconds(5));
+        var highlighted = select.HighlightedResultTextForTest;
+        var scrollOffset = select.ResultScrollOffsetForTest;
+
+        select.RetryRemoteLastFailure();
+        PumpUntil(() => provider.Queries.Count(query => query.Page == 2) == 2, TimeSpan.FromSeconds(5));
+        provider.Complete(string.Empty, 2, CreateItems("Page two", 20));
+        PumpUntil(() => select.VisibleResultItemTextsForTest.Count == 40, TimeSpan.FromSeconds(5));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.HighlightedResultTextForTest, Is.EqualTo(highlighted));
+            Assert.That(select.ResultScrollOffsetForTest, Is.EqualTo(scrollOffset));
+        }));
+    }
+
     private static void SearchCompletionReflowsOpenPopupForTwentyRaceMatchesCore()
     {
         var provider = new BootstrapSelectControlledProvider(honorCancellation: false);
