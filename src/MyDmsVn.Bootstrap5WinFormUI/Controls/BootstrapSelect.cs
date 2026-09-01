@@ -618,13 +618,18 @@ public partial class BootstrapSelect : UserControl
     /// <inheritdoc />
     protected override void OnMouseDown(MouseEventArgs e)
     {
+        var shouldHandleLeftClick = Enabled && e.Button == MouseButtons.Left;
+        if (shouldHandleLeftClick)
+        {
+            Focus();
+        }
+
         base.OnMouseDown(e);
-        if (!Enabled || e.Button != MouseButtons.Left)
+        if (!shouldHandleLeftClick)
         {
             return;
         }
 
-        Focus();
         var hit = HitTestSelectionSurface(e.Location);
         if (hit.Target == BootstrapSelectHitTarget.Clear)
         {

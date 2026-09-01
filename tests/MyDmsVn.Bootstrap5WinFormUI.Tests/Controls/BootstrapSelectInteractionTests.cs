@@ -227,19 +227,30 @@ public sealed class BootstrapSelectInteractionTests
     }
 
     [Test]
-    public void LeftMouseDownOpensPopupAndOwnerControlActivationKeepsItOpen()
+    public void LeftMouseDownFromAnotherControlKeepsPopupSearchFocusAndOwnerActivationOpen()
     {
         using var form = new Form { ShowInTaskbar = false };
+        using var focusSource = new Button { Bounds = new Rectangle(20, 70, 100, 30), Text = "Focus source" };
         using var select = new TestBootstrapSelect { Bounds = new Rectangle(20, 20, 220, 32) };
         select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        form.Controls.Add(focusSource);
         form.Controls.Add(select);
         form.Show();
         form.Activate();
+        Assert.That(focusSource.Focus(), Is.True);
         Application.DoEvents();
+        Assert.That(focusSource.Focused, Is.True);
 
         select.RaiseLeftMouseDownForTest(new Point(select.Width / 2, select.Height / 2));
         Application.DoEvents();
-        Assert.That(select.IsDropDownOpenForTest, Is.True);
+        var searchEditor = Descendants(select.DropDownContentForTest!)
+            .OfType<TextBox>()
+            .Single();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(searchEditor.Focused, Is.True);
+        }));
 
         SendMessage(select.DropDownHandleForTest, WmActivate, IntPtr.Zero, select.Handle);
         Application.DoEvents();
@@ -247,9 +258,10 @@ public sealed class BootstrapSelectInteractionTests
         Assert.That(select.IsDropDownOpenForTest, Is.True);
     }
 
-    [Test]
+    [TestCase(false, TestName = "Native first content click from another control keeps popup and search focus")]
+    [TestCase(true, TestName = "Native first arrow click from another control keeps popup and search focus")]
     [Explicit("Requires an interactive Windows desktop because it opens the integrated demo and uses SendInput.")]
-    public void NativeLeftClickOnIntegratedDemoSelectOpensAndRemainsOpen()
+    public void NativeFirstClickFromAnotherControlKeepsPopupAndSearchFocus(bool clickArrow)
     {
         using var form = new BootstrapSelectDemoForm
         {
@@ -263,12 +275,16 @@ public sealed class BootstrapSelectInteractionTests
         var select = Descendants(form)
             .OfType<BootstrapSelect>()
             .Single(control => control.AccessibleName == "Local customer select");
+        var focusSource = Descendants(form)
+            .OfType<BootstrapSelect>()
+            .Single(control => control.AccessibleName == "Product search with custom results");
+        Assert.That(focusSource.Focus(), Is.True);
         for (Control? ancestor = select.Parent; ancestor is not null; ancestor = ancestor.Parent)
         {
             if (ancestor is ScrollableControl scrollable) scrollable.ScrollControlIntoView(select);
         }
-        Assert.That(select.Focus(), Is.True);
         Application.DoEvents();
+        Assert.That(focusSource.Focused, Is.True, "Precondition: a different demo control owns focus before the first click.");
         var formDeactivations = 0;
         form.Deactivate += (_, _) => formDeactivations++;
 
@@ -289,17 +305,18 @@ public sealed class BootstrapSelectInteractionTests
             for (var turn = 0; turn < 8; turn++) Application.DoEvents();
         }
 
-        ClickSelect(new Point(select.Width / 2, select.Height / 2));
-        Assert.That(select.IsDropDownOpenForTest, Is.True, "Content click");
-
-        select.CloseDropDownInternal(false);
-        Application.DoEvents();
-        ClickSelect(new Point(select.Width - 8, select.Height / 2));
+        ClickSelect(clickArrow
+            ? new Point(select.Width - 8, select.Height / 2)
+            : new Point(select.Width / 2, select.Height / 2));
+        var searchEditor = Descendants(select.DropDownContentForTest!)
+            .OfType<TextBox>()
+            .Single();
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(formDeactivations, Is.GreaterThanOrEqualTo(1));
-            Assert.That(select.IsDropDownOpenForTest, Is.True, "Arrow click");
+            Assert.That(select.IsDropDownOpenForTest, Is.True, clickArrow ? "Arrow click" : "Content click");
+            Assert.That(searchEditor.Focused, Is.True, "The popup search editor must retain focus after mouse down/up.");
         }));
     }
 
