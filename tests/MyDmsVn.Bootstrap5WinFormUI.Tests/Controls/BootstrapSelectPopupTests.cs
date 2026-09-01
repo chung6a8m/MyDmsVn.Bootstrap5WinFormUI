@@ -9,6 +9,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 
 [TestFixture]
 [Apartment(ApartmentState.STA)]
+[NonParallelizable]
 public sealed class BootstrapSelectPopupTests
 {
     [Test]
@@ -46,6 +47,32 @@ public sealed class BootstrapSelectPopupTests
         {
             Assert.That(select.DropDownCreationCountForTest, Is.EqualTo(creationCount));
             Assert.That(opened, Is.EqualTo(2));
+            Assert.That(closed, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void OwningFormDeactivateClosesOpenPopup()
+    {
+        using var form = new TestForm();
+        using var select = new BootstrapSelect();
+        select.Items.Add(new BootstrapSelectItem(1, "Alpha"));
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+        var closed = 0;
+        select.DropDownClosed += (_, _) => closed++;
+
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+        Assert.That(select.IsDropDownOpenForTest, Is.True);
+
+        form.RaiseDeactivate();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.False);
             Assert.That(closed, Is.EqualTo(1));
         }));
     }
@@ -130,5 +157,13 @@ public sealed class BootstrapSelectPopupTests
 
         select.OpenDropDownInternal();
         Assert.That(select.HighlightedResultTextForTest, Is.EqualTo("Enabled"));
+    }
+
+    private sealed class TestForm : Form
+    {
+        internal void RaiseDeactivate()
+        {
+            OnDeactivate(EventArgs.Empty);
+        }
     }
 }

@@ -16,11 +16,19 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapPopoverTests
 {
+    private sealed class TestForm : Form
+    {
+        internal void RaiseDeactivate()
+        {
+            OnDeactivate(EventArgs.Empty);
+        }
+    }
+
     private sealed class InteractivePopoverFixture : IDisposable
     {
         public InteractivePopoverFixture()
         {
-            Form = new Form
+            Form = new TestForm
             {
                 ShowInTaskbar = false,
                 StartPosition = FormStartPosition.Manual,
@@ -85,7 +93,7 @@ public sealed class BootstrapPopoverTests
             };
         }
 
-        public Form Form { get; }
+        public TestForm Form { get; }
 
         public Button Target { get; }
 
@@ -429,6 +437,21 @@ public sealed class BootstrapPopoverTests
             Assert.That(fixture.Popover.IsOpen, Is.True);
             Assert.That(fixture.Editor.Focused, Is.True);
         }));
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void OwningFormDeactivateClosesPopover(bool closeOnClickOutside)
+    {
+        using var fixture = new InteractivePopoverFixture();
+        fixture.Popover.CloseOnClickOutside = closeOnClickOutside;
+        fixture.Show();
+        Assert.That(fixture.Editor.Focused, Is.True);
+
+        fixture.Form.RaiseDeactivate();
+        Application.DoEvents();
+
+        Assert.That(fixture.Popover.IsOpen, Is.False);
     }
 
     [TestCase(true, false)]

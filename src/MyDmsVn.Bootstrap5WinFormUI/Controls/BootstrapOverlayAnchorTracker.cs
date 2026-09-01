@@ -93,6 +93,11 @@ internal sealed class BootstrapOverlayAnchorTracker : IDisposable
 
     private void OnFormDeactivate(object? sender, EventArgs e)
     {
+        if (_form?.ContainsFocus == true)
+        {
+            return;
+        }
+
         RequestClose();
     }
 
