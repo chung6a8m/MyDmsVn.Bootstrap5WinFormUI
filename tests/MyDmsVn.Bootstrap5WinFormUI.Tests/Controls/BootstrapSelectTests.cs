@@ -27,6 +27,7 @@ public sealed class BootstrapSelectTests
             Assert.That(select.PageSize, Is.EqualTo(20));
             Assert.That(select.DropDownWidth, Is.EqualTo(0));
             Assert.That(select.MaxDropDownHeight, Is.EqualTo(320));
+            Assert.That(select.ResultRowHeight, Is.EqualTo(32));
             Assert.That(select.MaximumSelectionRows, Is.EqualTo(3));
             Assert.That(select.ValidationState, Is.EqualTo(BootstrapValidationState.None));
             Assert.That(select.BorderRadius, Is.EqualTo(-1));
@@ -48,6 +49,10 @@ public sealed class BootstrapSelectTests
         Assert.That((Action)(() => select.PageSize = 0), Throws.TypeOf<ArgumentOutOfRangeException>());
         Assert.That((Action)(() => select.DropDownWidth = -1), Throws.TypeOf<ArgumentOutOfRangeException>());
         Assert.That((Action)(() => select.MaxDropDownHeight = 0), Throws.TypeOf<ArgumentOutOfRangeException>());
+        select.ResultRowHeight = 48;
+        Assert.That((Action)(() => select.ResultRowHeight = 0), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That((Action)(() => select.ResultRowHeight = -1), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(select.ResultRowHeight, Is.EqualTo(48));
         Assert.That((Action)(() => select.MaximumSelectionRows = 0), Throws.TypeOf<ArgumentOutOfRangeException>());
         Assert.That((Action)(() => select.BorderRadius = -2), Throws.TypeOf<ArgumentOutOfRangeException>());
         Assert.That((Action)(() => select.Matcher = null!), Throws.TypeOf<ArgumentNullException>());

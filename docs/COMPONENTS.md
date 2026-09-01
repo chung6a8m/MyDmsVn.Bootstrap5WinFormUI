@@ -309,6 +309,7 @@ BootstrapSelect.SearchDebounce
 BootstrapSelect.PageSize
 BootstrapSelect.DropDownWidth
 BootstrapSelect.MaxDropDownHeight
+BootstrapSelect.ResultRowHeight
 BootstrapSelect.MaximumSelectionRows
 BootstrapSelect.Matcher
 BootstrapSelect.Renderer
@@ -338,6 +339,9 @@ Behavior:
 - Newly loaded items with an already-selected logical value may refresh the selected snapshot metadata without raising a false selection change. A provider changing an item's disabled state does not silently remove an existing selection.
 - Group headers are non-selectable and preserve provider/local encounter order. Filtering removes empty local groups; page append logic avoids duplicate adjacent group headers across page boundaries.
 - `IBootstrapSelectRenderer` is presentation-only. It receives item/state/theme/DPI/bounds contexts for result rows, group headers, single selection, and chips. Layout, hit testing, scrolling, selection, keyboard behavior, provider calls, and popup lifetime remain control-owned.
+- `ResultRowHeight` is a positive `int` expressed in logical pixels at 96 DPI. Its default is `32`, and it defines one uniform height for selectable, loading, empty, retry, create, and other popup result rows. Variable-height measurement and hosted/HTML-like row templates are outside the contract.
+- Custom result metadata belongs in caller-owned `BootstrapSelectItem.Tag`. Local and provider-created items use the same `IBootstrapSelectRenderer.DrawResult` path; `DrawSelection` independently controls the closed single-selection presentation.
+- Changing `ResultRowHeight` while open refreshes and repositions the existing popup. DPI transitions refresh presentation before placement, with one effective DPI used throughout that refresh. Wheel steps are row-based, while the exact final clamp may be non-row-aligned.
 - The popup reuses the existing internal overlay host/surface/anchor tracking and `BootstrapOverlayPlacementEngine`. Bottom-start is preferred; flip/shift keeps the popup inside the current monitor working area. No second Popper-like engine, custom top-level `Form`, or global mouse/keyboard hook is introduced.
 - Closed keyboard paths include Alt+Down/F4/Enter/Space open and printable-input search. Open popup uses Up/Down, Home/End, PageUp/PageDown, Enter, Escape, and normal Tab traversal. Search editing remains a real WinForms text editor so caret, clipboard, selection, IME, and Vietnamese input remain native responsibilities.
 - The outer control exposes ComboBox-style accessibility semantics, focusability, expanded/collapsed state, selected text in Single mode, and a stable selected-count summary in Multiple mode. Retry, custom-value creation, clear, and chip removal have keyboard equivalents.

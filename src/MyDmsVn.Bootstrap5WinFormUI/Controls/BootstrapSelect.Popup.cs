@@ -24,6 +24,7 @@ public partial class BootstrapSelect
     internal IntPtr DropDownHandleForTest => _dropDownController?.DropDownHandle ?? IntPtr.Zero;
     internal string? HighlightedResultTextForTest => _dropDownController?.Content?.HighlightedRow?.Text;
     internal int ResultScrollOffsetForTest => _dropDownController?.Content?.ScrollOffset ?? 0;
+    internal int EffectiveResultRowHeightForTest => _dropDownController?.Content?.ResultRowHeight ?? 0;
     internal BootstrapSelectDropDownContent? DropDownContentForTest => _dropDownController?.Content;
 
     internal IReadOnlyList<string> VisibleResultItemTextsForTest
@@ -95,6 +96,12 @@ public partial class BootstrapSelect
     internal bool PageHighlightedResultForTest(int direction)
     {
         return _dropDownController?.Content?.Page(direction) == true;
+    }
+
+    internal void ApplyDropDownDpiForTest(int dpi)
+    {
+        _dropDownController ??= new BootstrapSelectDropDownController(this);
+        _dropDownController.ApplyOwnerDpiChange(dpi);
     }
 
     internal BootstrapSelectResultSet BuildCurrentLocalResultSet(string searchText)
@@ -228,5 +235,19 @@ public partial class BootstrapSelect
         DisposeSearchInfrastructure();
         _dropDownController?.Dispose();
         _dropDownController = null;
+    }
+
+    private void RefreshDropDownPresentationAndLayout()
+    {
+        if (_dropDownController is null)
+        {
+            return;
+        }
+
+        _dropDownController.ApplyPresentation();
+        if (_dropDownController.IsOpen)
+        {
+            _dropDownController.Reposition();
+        }
     }
 }

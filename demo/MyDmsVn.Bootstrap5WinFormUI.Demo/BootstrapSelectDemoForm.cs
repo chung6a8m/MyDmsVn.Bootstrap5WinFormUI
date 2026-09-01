@@ -94,6 +94,36 @@ public sealed class BootstrapSelectDemoForm : Form
         AddScenario(grid, "Single / local search / clear", single, _singleStatus,
             "Type to filter, select the long row, then use the clear affordance. Disabled results remain visible but cannot be newly selected.");
 
+        var productSearch = new BootstrapSelect
+        {
+            Name = "productSearchSelect",
+            Width = 420,
+            Placeholder = "Tìm sản phẩm...",
+            SearchEnabled = true,
+            SelectionMode = BootstrapSelectMode.Single,
+            ResultRowHeight = 48,
+            DropDownWidth = 420,
+            Renderer = new BootstrapSelectProductRenderer(),
+            AccessibleName = "Product search with custom results"
+        };
+        var products = new[]
+        {
+            new BootstrapSelectProduct(101, "Cà phê rang xay Arabica", "Gói 500 g", 185000m, 42),
+            new BootstrapSelectProduct(102, "Trà ô long cao sơn", "Hộp 20 túi", 128000m, 18),
+            new BootstrapSelectProduct(103, "Mật ong hoa cà phê", "Chai 500 ml", 215000m, 7),
+            new BootstrapSelectProduct(104, "Hạt điều rang muối", "Hũ 350 g", 149000m, 0)
+        };
+        foreach (var product in products)
+        {
+            productSearch.Items.Add(new BootstrapSelectItem(product.Id, product.Name)
+            {
+                Tag = product,
+                Disabled = product.StockQuantity == 0
+            });
+        }
+        AddScenario(grid, "Custom product result template", productSearch, null,
+            "Each 48px result composes product name, unit, price, and stock metadata while the closed selection keeps the normal Select renderer.");
+
         var multiple = new BootstrapSelect
         {
             Width = 420,

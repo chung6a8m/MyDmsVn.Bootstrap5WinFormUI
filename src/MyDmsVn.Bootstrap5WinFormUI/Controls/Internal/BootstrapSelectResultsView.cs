@@ -13,6 +13,7 @@ internal sealed class BootstrapSelectResultsView : Control
     private IBootstrapSelectRenderer _renderer = new BootstrapSelectRenderer();
     private BootstrapTheme _theme = BootstrapThemeManager.CurrentTheme;
     private int _dpi = DpiScaler.DefaultDpi;
+    private int _logicalRowHeight = 32;
     private int _scrollOffset;
     private int _highlightedIndex = -1;
     private int _hotIndex = -1;
@@ -31,16 +32,23 @@ internal sealed class BootstrapSelectResultsView : Control
     internal int HighlightedIndex => _highlightedIndex;
     internal BootstrapSelectResultRow? HighlightedRow => _highlightedIndex >= 0 && _highlightedIndex < _results.Rows.Count ? _results.Rows[_highlightedIndex] : null;
     internal int ScrollOffset => _scrollOffset;
-    internal int RowHeight => DpiScaler.Scale(32, _dpi);
+    internal int RowHeight => DpiScaler.Scale(_logicalRowHeight, _dpi);
 
-    internal void ApplyPresentation(IBootstrapSelectRenderer renderer, BootstrapTheme theme, int dpi)
+    internal void ApplyPresentation(
+        IBootstrapSelectRenderer renderer,
+        BootstrapTheme theme,
+        int dpi,
+        int logicalRowHeight)
     {
         _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
         _theme = theme ?? throw new ArgumentNullException(nameof(theme));
         if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
+        if (logicalRowHeight <= 0) throw new ArgumentOutOfRangeException(nameof(logicalRowHeight));
         _dpi = dpi;
+        _logicalRowHeight = logicalRowHeight;
         BackColor = theme.Colors.Surface;
         ClampScroll();
+        EnsureHighlightedVisible();
         Invalidate();
     }
 
@@ -155,6 +163,14 @@ internal sealed class BootstrapSelectResultsView : Control
         CheckNearEnd();
     }
 
+    internal void ScrollByWheelDelta(int delta, int scrollLines)
+    {
+        var rows = Math.Max(1, scrollLines);
+        var deltaRows = delta > 0 ? -rows : rows;
+        var requested = Math.Max(0, _scrollOffset + (deltaRows * RowHeight));
+        SetScrollOffset(requested);
+    }
+
     public override Size GetPreferredSize(Size proposedSize)
     {
         var rows = Math.Max(1, Math.Min(8, _results.Rows.Count));
@@ -211,10 +227,7 @@ internal sealed class BootstrapSelectResultsView : Control
     protected override void OnMouseWheel(MouseEventArgs e)
     {
         base.OnMouseWheel(e);
-        var rows = Math.Max(1, SystemInformation.MouseWheelScrollLines);
-        var deltaRows = e.Delta > 0 ? -rows : rows;
-        var next = Math.Max(0, _scrollOffset + (deltaRows * RowHeight));
-        SetScrollOffset(next);
+        ScrollByWheelDelta(e.Delta, SystemInformation.MouseWheelScrollLines);
     }
 
     protected override void OnResize(EventArgs e)
