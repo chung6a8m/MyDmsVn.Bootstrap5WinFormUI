@@ -4,9 +4,9 @@
 
 **Goal:** Extend `BootstrapSelect` with a configurable, DPI-aware **uniform popup result-row height** so callers can use the existing renderer abstraction for Select2-style custom results, including a two-line product search result whose first line is product name and second line is `Unit | Unit price | Stock quantity`.
 
-**Architecture:** Keep `IBootstrapSelectRenderer` as the only public custom-paint extension point and keep `BootstrapSelectItem.Tag` as caller-owned metadata. Add one public logical-pixel property, `BootstrapSelect.ResultRowHeight`, defaulting to `32`, then pass it through `BootstrapSelectDropDownController -> BootstrapSelectDropDownContent -> BootstrapSelectResultsView`. `BootstrapSelectResultsView` continues to use one constant row height for every row, so existing O(1) scrolling, hit testing, PageUp/PageDown, near-end paging, and visible-range calculations remain intact. The demo implements a product renderer through `IBootstrapSelectRenderer` and delegates group headers, the closed single-selection surface, and chips to `BootstrapSelectRenderer` by composition.
+**Architecture:** Keep `IBootstrapSelectRenderer` as the only public custom-paint extension point and keep `BootstrapSelectItem.Tag` as caller-owned metadata. Add one public logical-pixel property, `BootstrapSelect.ResultRowHeight`, defaulting to `32`, then pass it through `BootstrapSelectDropDownController -> BootstrapSelectDropDownContent -> BootstrapSelectResultsView`. `BootstrapSelectResultsView` continues to use one constant row height for every row, so existing O(1) scrolling, hit testing, PageUp/PageDown, near-end paging, and visible-range calculations remain intact. The internal dropdown controller owns the popup's effective DPI and subscribes to the inherited `Control.DpiChangedAfterParent` event so an already-created/open popup reapplies presentation before it is repositioned when the owner moves between monitors. Do **not** add a `BootstrapSelect.OnDpiChangedAfterParent` override because protected declared members participate in the public API fingerprint. The demo implements a product renderer through `IBootstrapSelectRenderer`, measures secondary text with the same `Graphics` device context used for drawing, and delegates group headers, the closed single-selection surface, and chips to `BootstrapSelectRenderer` by composition.
 
-**Tech Stack:** C# 12, Windows Forms owner painting, `System.Drawing`, `TextRenderer`, existing `DpiScaler`/theme infrastructure, `IBootstrapSelectRenderer`, `BootstrapSelectItem.Tag`, `net48;net8.0-windows`, NUnit 4, STA WinForms tests.
+**Tech Stack:** C# 12, Windows Forms owner painting, `System.Drawing`, `TextRenderer`, existing `DpiScaler`/theme infrastructure, inherited WinForms `DpiChangedAfterParent`, `IBootstrapSelectRenderer`, `BootstrapSelectItem.Tag`, `net48;net8.0-windows`, NUnit 4, STA WinForms tests.
 
 **Spec:** `docs/superpowers/specs/2026-08-29-bootstrap-select-design.md`
 
@@ -47,21 +47,11 @@ Contract:
 - Effective device height: `DpiScaler.Scale(ResultRowHeight, effectiveDpi)`.
 - All popup rows for one control use the same effective height, including item, group, loading, empty, instruction, error/retry, and create-value rows.
 - Changing the property while the popup is already created reapplies presentation; when the popup is open it also recomputes/repositions popup bounds immediately.
-- The property does not change the closed control height, chip height, search textbox height, fonts, renderer ownership, item ownership, or selection semantics.
+- When the owner DPI changes after the popup has been created, the controller reapplies **all popup presentation metrics** at the new DPI before computing/moving bounds. Search-host height, result-row height, renderer contexts, surface radius/theme metrics, and popup placement therefore use one coherent effective DPI.
+- DPI refresh is implemented by subscribing inside `BootstrapSelectDropDownController` to inherited `Control.DpiChangedAfterParent`; it does not add a new declared public/protected member to `BootstrapSelect`.
+- The property does not change the closed control height, chip height, search textbox logical height, fonts, renderer ownership, item ownership, or selection semantics.
 - `IBootstrapSelectRenderer` signatures remain unchanged.
 - No measure callback, per-item height, hosted row control, template object model, or HTML-like rendering layer is added.
-
-Recommended product result at 100% DPI:
-
-```text
-┌────────────────────────────────────────────────────────────┐
-│ Sữa tươi Vinamilk 100% 1L                                │
-│ Hộp | 36.500 | Tồn: 128                                  │
-├────────────────────────────────────────────────────────────┤
-│ Coca-Cola lon 330ml                                       │
-│ Lon | 10.000 | Tồn: 56                                   │
-└────────────────────────────────────────────────────────────┘
-```
 
 Recommended demo configuration:
 
@@ -79,16 +69,21 @@ productSelect.Renderer = new BootstrapSelectProductRenderer();
 | Existing caller does not set `ResultRowHeight` | Existing 32-logical-pixel row behavior remains unchanged. |
 | `ResultRowHeight = 48`, DPI = 96 | Effective row height is 48 px. |
 | `ResultRowHeight = 48`, DPI = 144 | Effective row height is `DpiScaler.Scale(48, 144)`. |
+| `ResultRowHeight = 48`, DPI = 192 | Effective row height is `DpiScaler.Scale(48, 192)`. |
 | Setter receives `0` or a negative value | Throw `ArgumentOutOfRangeException`; previous valid value remains. |
 | Property changes before popup creation | First popup uses the configured height. |
 | Property changes after popup creation while closed | Next open uses the new height without recreating the popup solely for this change. |
 | Property changes while popup is open | Popup remains open, result geometry updates, and overlay bounds are recomputed/repositioned. |
+| Popup is created, then owner DPI changes while closed | Cached popup presentation is reapplied at the new DPI; next open uses the new metrics without recreating solely for DPI. |
+| Popup is open, then owner DPI changes 96 -> 144 -> 192 | Popup remains open; presentation is reapplied first, bounds are then recomputed/repositioned, and creation count is unchanged. |
 | Mouse click with custom height | Hit testing identifies the row using the custom effective height. |
-| Mouse wheel with custom height | Scroll increments remain row-based and use the custom effective height. |
+| Mouse wheel away from the scroll boundary | Scroll delta is row-based and uses the effective custom row height. |
+| Mouse wheel reaches the last viewport | Offset is clamped to `totalHeight - viewportHeight`; the clamped value is **not required** to be a multiple of row height. |
 | PageDown/PageUp | Number of rows moved is based on `ClientSize.Height / RowHeight`. |
 | Async paging | Existing near-end and navigation-preservation behavior remains correct. |
 | Group/loading/empty/error/create-value row | Uses the same uniform row height. |
 | Custom renderer | Can read `context.Item.Tag` without the control interpreting or owning the object. |
+| Product secondary text measurement | Uses the same `Graphics`/device context as `TextRenderer.DrawText`; primary and secondary bounds do not overlap at 96/144/192 DPI. |
 | Selected product after popup closes | Closed surface still displays the normal single-line `BootstrapSelectItem.Text` unless caller also customizes `DrawSelection`. |
 | Multiple chips | Existing chip behavior remains unless caller customizes `DrawChip`. |
 
@@ -107,7 +102,11 @@ productSelect.Renderer = new BootstrapSelectProductRenderer();
 - [ ] Reuse `DpiScaler`, `BootstrapTheme`, and theme colors; do not hard-code semantic colors where theme tokens exist.
 - [ ] Dispose demo-owned GDI objects created during painting. Never dispose `context.Font`, `context.Theme`, `context.Item`, `context.Item.Tag`, or caller-owned renderer instances.
 - [ ] Preserve popup sizing/reposition behavior from plan `20260901-002`.
-- [ ] Preserve reset/preserve navigation semantics from plan `20260901-003` if present; presentation geometry changes must not reset logical navigation state.
+- [ ] Preserve reset/preserve navigation semantics from plan `20260901-003`; presentation/DPI geometry changes must not reset logical result/navigation state.
+- [ ] Subscribe to inherited `_owner.DpiChangedAfterParent` from the internal controller and unsubscribe in `Dispose`. Do **not** add a declared protected DPI override to `BootstrapSelect`, because the release fingerprint intentionally includes protected declared surface.
+- [ ] Keep one controller-owned effective DPI and use it for both `ApplyPresentation` and `ComputeBounds`; do not read one DPI for painting and another for placement during one update.
+- [ ] Mouse-wheel tests must distinguish an ordinary row-sized movement from the final clamp boundary. Never change correct clamp math merely to make `ScrollOffset % RowHeight == 0` true.
+- [ ] Product text measurement must use the same `Graphics` device context as drawing. Do not use `TextRenderer.MeasureText(string, Font)` for the secondary line.
 - [ ] Use TDD: failing focused test -> observe failure -> minimal implementation -> focused pass -> broader regression tests.
 - [ ] Because this is an additive public API change after the release-candidate baseline, review the emitted API surface before updating the approved fingerprint.
 
@@ -118,24 +117,31 @@ productSelect.Renderer = new BootstrapSelectProductRenderer();
 ### Core files to modify
 
 - `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs`
-  - Add backing field and public `ResultRowHeight` property.
+  - Add backing field and public `ResultRowHeight` property only.
 
 - `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.Popup.cs`
   - Add a narrow private helper for reapplying/repositioning popup presentation after layout-property changes.
+  - Add test-only forwarding/accessors only when needed; keep them internal.
 
 - `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectDropDownController.cs`
   - Forward `_owner.ResultRowHeight` into content presentation.
+  - Own the popup effective DPI.
+  - Subscribe/unsubscribe inherited `_owner.DpiChangedAfterParent`.
+  - Reapply presentation before repositioning on DPI change.
 
 - `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectDropDownContent.cs`
   - Forward logical result row height into the results view.
+  - Expose effective results-row height internally if required for deterministic tests.
 
 - `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultsView.cs`
   - Store logical row height and derive effective `RowHeight` from DPI.
+  - Add a narrow internal wheel-scroll helper so row-step and clamp behavior can be tested without `SendKeys`.
 
 ### Core files to inspect, not change by default
 
 - `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultLayout.cs`
   - Already accepts `rowHeight`; keep it generic and constant-height.
+  - Preserve the existing clamp rule `maxOffset = max(0, totalHeight - viewportHeight)` exactly.
 
 - `src/MyDmsVn.Bootstrap5WinFormUI/Controls/IBootstrapSelectRenderer.cs`
 - `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelectRenderContexts.cs`
@@ -146,6 +152,7 @@ productSelect.Renderer = new BootstrapSelectProductRenderer();
 
 - Create: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectProduct.cs`
 - Create: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectProductRenderer.cs`
+- Create when useful for deterministic geometry tests: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectProductResultLayout.cs`
 - Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectDemoForm.cs`
 
 ### Test files
@@ -167,31 +174,25 @@ productSelect.Renderer = new BootstrapSelectProductRenderer();
 
 ---
 
-## Task 1: Record the uniform-row-height design change
+## Task 1: Record the uniform-row-height and DPI-lifecycle design change
 
 **Files:**
 
 - Modify: `docs/superpowers/specs/2026-08-29-bootstrap-select-design.md`
 
-**Interfaces:**
-
-- Produces documented contract: `public int ResultRowHeight { get; set; }`, default `32`, uniform logical pixels.
-- Preserves the existing non-goals for variable-height rows and HTML-like templates.
-
 - [ ] **Step 1: Extend the approved public surface**
 
-Add the property beside popup/layout members:
+Add only:
 
 ```csharp
-public int DropDownWidth { get; set; }
-public int MaxDropDownHeight { get; set; }
 public int ResultRowHeight { get; set; }
-public int MaximumSelectionRows { get; set; }
 ```
+
+Place it beside `DropDownWidth` / `MaxDropDownHeight` / `MaximumSelectionRows`.
 
 - [ ] **Step 2: Add exact semantics**
 
-Document these rules in the spec:
+Document:
 
 ```text
 ResultRowHeight is uniform for every popup result row.
@@ -200,15 +201,16 @@ The default is 32.
 The value must be greater than zero.
 The effective height is DPI-scaled through DpiScaler.
 Changing it while open reapplies presentation and repositions the popup.
-Variable-height rows remain unsupported.
-Renderer measurement callbacks remain unsupported.
+An owner DPI transition also reapplies popup presentation before repositioning.
+The DPI lifecycle implementation remains internal and adds no new declared public/protected BootstrapSelect member.
+Variable-height rows and renderer measurement callbacks remain unsupported.
 ```
 
-- [ ] **Step 3: Keep the non-goal section explicit**
+- [ ] **Step 3: Preserve non-goals**
 
-Retain `variable-height result rows` and `HTML-like templates`. Add one sentence that caller-configurable **uniform** row height is supported and does not imply per-item measurement.
+Retain `variable-height result rows` and `HTML-like templates`. State explicitly that caller-configurable **uniform** row height does not imply per-item measurement.
 
-- [ ] **Step 4: Commit the design change**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-08-29-bootstrap-select-design.md
@@ -217,12 +219,13 @@ git commit -m "docs: define BootstrapSelect result row height"
 
 ---
 
-## Task 2: Add and propagate `ResultRowHeight`
+## Task 2: Add `ResultRowHeight`, propagate it, and make popup DPI refresh coherent
 
 **Files:**
 
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectTests.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectResultsViewTests.cs`
+- Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectPopupTests.cs`
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs`
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.Popup.cs`
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectDropDownController.cs`
@@ -231,48 +234,19 @@ git commit -m "docs: define BootstrapSelect result row height"
 
 **Interfaces:**
 
-- Produces: `public int BootstrapSelect.ResultRowHeight { get; set; }`.
-- `BootstrapSelectDropDownContent.ApplyPresentation(IBootstrapSelectRenderer renderer, BootstrapTheme theme, int dpi, int logicalResultRowHeight)`.
-- `BootstrapSelectResultsView.ApplyPresentation(IBootstrapSelectRenderer renderer, BootstrapTheme theme, int dpi, int logicalRowHeight)`.
-- Effective `BootstrapSelectResultsView.RowHeight` remains internal.
+- New exported member: `public int BootstrapSelect.ResultRowHeight { get; set; }`.
+- Internal presentation overloads receive logical row height and effective DPI.
+- No new public/protected DPI member is declared on `BootstrapSelect`.
 
-- [ ] **Step 1: Write failing public-property tests**
+- [ ] **Step 1: Write failing property tests**
 
-```csharp
-[Test]
-public void ResultRowHeightDefaultsToThirtyTwo()
-{
-    using var select = new BootstrapSelect();
-    Assert.That(select.ResultRowHeight, Is.EqualTo(32));
-}
+Cover default `32`, valid assignment, and rejection of `0/-1` while retaining the prior valid value.
 
-[TestCase(0)]
-[TestCase(-1)]
-public void ResultRowHeightRejectsNonPositiveValues(int value)
-{
-    using var select = new BootstrapSelect { ResultRowHeight = 48 };
-
-    Assert.Throws<ArgumentOutOfRangeException>(() => select.ResultRowHeight = value);
-    Assert.That(select.ResultRowHeight, Is.EqualTo(48));
-}
-```
-
-- [ ] **Step 2: Run the focused public tests and observe failure**
-
-```bash
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectTests"
-```
-
-Expected: compile/test failure because `ResultRowHeight` does not exist.
-
-- [ ] **Step 3: Add the public property**
-
-In `BootstrapSelect.cs`:
+- [ ] **Step 2: Add the property**
 
 ```csharp
 private int _resultRowHeight = 32;
 
-/// <summary>Gets or sets the uniform popup result-row height in logical pixels.</summary>
 [Category("Layout")]
 [DefaultValue(32)]
 public int ResultRowHeight
@@ -281,14 +255,8 @@ public int ResultRowHeight
     set
     {
         if (value <= 0)
-        {
             throw new ArgumentOutOfRangeException(nameof(value), value, "Result row height must be positive.");
-        }
-
-        if (_resultRowHeight == value)
-        {
-            return;
-        }
+        if (_resultRowHeight == value) return;
 
         _resultRowHeight = value;
         RefreshDropDownPresentationAndLayout();
@@ -296,17 +264,12 @@ public int ResultRowHeight
 }
 ```
 
-- [ ] **Step 4: Add the popup refresh helper**
-
-In `BootstrapSelect.Popup.cs`:
+- [ ] **Step 3: Add the popup refresh helper**
 
 ```csharp
 private void RefreshDropDownPresentationAndLayout()
 {
-    if (_dropDownController is null)
-    {
-        return;
-    }
+    if (_dropDownController is null) return;
 
     _dropDownController.ApplyPresentation();
     if (_dropDownController.IsOpen)
@@ -316,51 +279,13 @@ private void RefreshDropDownPresentationAndLayout()
 }
 ```
 
-Do not close/recreate the popup solely because row height changed.
-
-- [ ] **Step 5: Write failing results-view propagation tests**
-
-```csharp
-[Test]
-public void ApplyPresentationUsesConfiguredLogicalRowHeight()
-{
-    using var view = new BootstrapSelectResultsView();
-    view.ApplyPresentation(new BootstrapSelectRenderer(), BootstrapThemeManager.CurrentTheme, 96, 48);
-
-    Assert.That(view.RowHeight, Is.EqualTo(48));
-}
-
-[Test]
-public void ApplyPresentationScalesConfiguredRowHeightForDpi()
-{
-    using var view = new BootstrapSelectResultsView();
-    view.ApplyPresentation(new BootstrapSelectRenderer(), BootstrapThemeManager.CurrentTheme, 144, 48);
-
-    Assert.That(view.RowHeight, Is.EqualTo(DpiScaler.Scale(48, 144)));
-}
-```
-
-- [ ] **Step 6: Run the results-view tests and observe failure**
-
-```bash
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectResultsViewTests"
-```
-
-Expected: failure because current presentation methods do not accept logical row height and `RowHeight` still scales hard-coded `32`.
-
-- [ ] **Step 7: Replace the hard-coded results-view height**
-
-In `BootstrapSelectResultsView.cs`:
+- [ ] **Step 4: Make results-view row height configurable**
 
 ```csharp
 private int _logicalRowHeight = 32;
 
 internal int RowHeight => DpiScaler.Scale(_logicalRowHeight, _dpi);
-```
 
-Update presentation:
-
-```csharp
 internal void ApplyPresentation(
     IBootstrapSelectRenderer renderer,
     BootstrapTheme theme,
@@ -381,31 +306,103 @@ internal void ApplyPresentation(
 }
 ```
 
-If plan 003 has added explicit reset/preserve navigation modes, retain them. `ApplyPresentation` may clamp/reveal the existing highlight after geometry changes but must not replace results or choose a new highlight.
+If plan 003 has introduced explicit reset/preserve navigation modes, retain them. Presentation changes may clamp/reveal the existing highlight but must not replace results or choose a new logical highlight.
 
-- [ ] **Step 8: Forward height through content/controller**
+- [ ] **Step 5: Forward height through content/controller**
 
-`BootstrapSelectDropDownContent.ApplyPresentation` receives `logicalResultRowHeight` and forwards:
+`BootstrapSelectDropDownContent.ApplyPresentation(...)` receives `logicalResultRowHeight` and calls:
 
 ```csharp
 _resultsView.ApplyPresentation(renderer, theme, dpi, logicalResultRowHeight);
 ```
 
-`BootstrapSelectDropDownController.ApplyPresentation` calls:
+- [ ] **Step 6: Add one controller-owned effective DPI**
+
+Do not let `ApplyPresentation()` and `ComputeBounds()` independently sample owner DPI during one transition. Use one field:
 
 ```csharp
-_content.ApplyPresentation(_owner.Renderer, theme, dpi, _owner.ResultRowHeight);
+private int _effectiveDpi = DpiScaler.DefaultDpi;
+
+private int ResolveOwnerDpi()
+    => _owner.DeviceDpi > 0 ? _owner.DeviceDpi : DpiScaler.DefaultDpi;
+
+internal void ApplyPresentation()
+    => ApplyPresentation(ResolveOwnerDpi());
+
+internal void ApplyPresentation(int dpi)
+{
+    if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
+    if (_surface is null || _content is null) return;
+
+    _effectiveDpi = dpi;
+    var theme = BootstrapThemeManager.CurrentTheme;
+    _surface.LogicalBorderRadius = _owner.BorderRadius;
+    _surface.ApplyTheme(theme, dpi);
+    _content.Font = _owner.Font;
+    _content.SearchEnabled = _owner.SearchEnabled;
+    _content.ApplyPresentation(_owner.Renderer, theme, dpi, _owner.ResultRowHeight);
+}
 ```
 
-- [ ] **Step 9: Rerun focused tests**
+`ComputeBounds()` must use `_effectiveDpi` rather than independently reading `_owner.DeviceDpi`.
+
+- [ ] **Step 7: Subscribe to inherited DPI lifecycle without widening declared API**
+
+In the controller constructor/disposal path:
+
+```csharp
+_owner.DpiChangedAfterParent += OnOwnerDpiChangedAfterParent;
+```
+
+and:
+
+```csharp
+_owner.DpiChangedAfterParent -= OnOwnerDpiChangedAfterParent;
+```
+
+Handle it internally:
+
+```csharp
+private void OnOwnerDpiChangedAfterParent(object? sender, EventArgs e)
+{
+    ApplyOwnerDpiChange(ResolveOwnerDpi());
+}
+
+internal void ApplyOwnerDpiChange(int dpi)
+{
+    if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
+    if (_dropDown is null) return;
+
+    ApplyPresentation(dpi);
+    if (_isOpen)
+    {
+        Reposition();
+    }
+}
+```
+
+Do **not** add `protected override void OnDpiChangedAfterParent(...)` to `BootstrapSelect`.
+
+- [ ] **Step 8: Add deterministic DPI lifecycle tests**
+
+Using existing STA popup patterns, open one select with `ResultRowHeight = 48`, capture `DropDownCreationCountForTest`, then drive the controller's internal DPI-change core through `96 -> 144 -> 192`. Assert after each transition:
+
+```text
+popup remains open
+creation count is unchanged
+effective result row height == DpiScaler.Scale(48, dpi)
+bounds are recomputed and remain within working-area / MaxDropDownHeight constraints
+```
+
+Also test a created-but-closed popup: DPI change updates presentation and the next open uses the new row height without popup recreation.
+
+Do not fake a Windows monitor switch in a unit test. The real monitor transition remains part of Task 6 manual acceptance; automated tests freeze the shared DPI-change core that the inherited event calls.
+
+- [ ] **Step 9: Run focused tests and commit**
 
 ```bash
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectTests|FullyQualifiedName~BootstrapSelectResultsViewTests"
+dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectTests|FullyQualifiedName~BootstrapSelectResultsViewTests|FullyQualifiedName~BootstrapSelectPopupTests"
 ```
-
-Expected: PASS.
-
-- [ ] **Step 10: Commit the core API/propagation**
 
 ```bash
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs \
@@ -414,66 +411,95 @@ git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapSelect.cs \
         src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectDropDownContent.cs \
         src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultsView.cs \
         tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectTests.cs \
-        tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectResultsViewTests.cs
+        tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectResultsViewTests.cs \
+        tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectPopupTests.cs
 git commit -m "feat: add BootstrapSelect result row height"
 ```
 
 ---
 
-## Task 3: Lock sizing, hit testing, scrolling, paging, and open-popup behavior
+## Task 3: Lock sizing, hit testing, wheel scrolling, paging, and open-popup behavior
 
 **Files:**
 
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectResultsViewTests.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectDropDownContentTests.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectPopupTests.cs`
-- Modify product files from Task 2 only if a failing regression exposes an actual missing propagation path.
+- Modify `BootstrapSelectResultsView.cs` only for the narrow testable wheel helper described below.
 
-**Interfaces:** Keep using `BootstrapSelectResultLayout.Create(rowCount, rowHeight, viewportHeight, scrollOffset)` unchanged.
-
-- [ ] **Step 1: Add custom-height layout/hit-test coverage**
+- [ ] **Step 1: Prove existing constant-height layout supports 48px rows**
 
 ```csharp
-[Test]
-public void CustomRowHeightDrivesVisibleRangeAndHitTesting()
-{
-    var layout = BootstrapSelectResultLayout.Create(
-        rowCount: 100,
-        rowHeight: 48,
-        viewportHeight: 144,
-        scrollOffset: 96);
+var layout = BootstrapSelectResultLayout.Create(
+    rowCount: 100,
+    rowHeight: 48,
+    viewportHeight: 144,
+    scrollOffset: 96);
 
-    Assert.Multiple((Action)(() =>
-    {
-        Assert.That(layout.FirstVisibleIndex, Is.EqualTo(2));
-        Assert.That(layout.LastVisibleIndex, Is.EqualTo(4));
-        Assert.That(layout.HitTestIndex(0), Is.EqualTo(2));
-        Assert.That(layout.HitTestIndex(143), Is.EqualTo(4));
-    }));
-}
+Assert.That(layout.FirstVisibleIndex, Is.EqualTo(2));
+Assert.That(layout.LastVisibleIndex, Is.EqualTo(4));
+Assert.That(layout.HitTestIndex(0), Is.EqualTo(2));
+Assert.That(layout.HitTestIndex(143), Is.EqualTo(4));
 ```
 
-This should pass without changing `BootstrapSelectResultLayout`, proving the constant-height primitive already supports the feature.
+No production change to `BootstrapSelectResultLayout` should be required.
 
-- [ ] **Step 2: Add preferred-size and PageDown tests**
+- [ ] **Step 2: Add preferred-size and PageDown/PageUp tests**
 
-Build a deterministic result set with at least eight selectable item rows. Apply a 48 logical-pixel row height at 96 DPI, set a controlled client height, and assert:
+With at least eight selectable rows and a 48 logical-pixel row at 96 DPI, assert:
 
 ```text
 GetPreferredSize(...).Height == visibleRowCount * 48
 Page(1) moves by max(1, ClientSize.Height / 48) selectable rows
-Page(-1) reverses by the same page-row calculation when enough rows exist
+Page(-1) uses the same page-row calculation in reverse
 ```
 
-Use internal methods directly instead of `SendKeys`.
+Use internal methods directly, not `SendKeys`.
 
-- [ ] **Step 3: Add mouse-wheel offset coverage**
+- [ ] **Step 3: Extract a deterministic wheel helper**
 
-Invoke the existing mouse-wheel path using the test technique already used in this repository. Assert that the resulting `ScrollOffset` is a valid multiple of the effective custom `RowHeight` and is clamped by `BootstrapSelectResultLayout`.
+Keep the production behavior unchanged while making it directly testable:
 
-- [ ] **Step 4: Add dropdown-content preferred-size tests**
+```csharp
+internal void ScrollByWheelDelta(int delta, int scrollLines)
+{
+    var rows = Math.Max(1, scrollLines);
+    var deltaRows = delta > 0 ? -rows : rows;
+    var requested = Math.Max(0, _scrollOffset + (deltaRows * RowHeight));
+    SetScrollOffset(requested);
+}
 
-At 96 DPI, configure three rows and `logicalResultRowHeight = 48`. Verify:
+protected override void OnMouseWheel(MouseEventArgs e)
+{
+    base.OnMouseWheel(e);
+    ScrollByWheelDelta(e.Delta, SystemInformation.MouseWheelScrollLines);
+}
+```
+
+- [ ] **Step 4: Test ordinary wheel movement and boundary clamping separately**
+
+Ordinary movement: choose geometry where no clamp occurs and assert the offset changes by the expected whole-row amount.
+
+Boundary case: freeze the case that disproves the old incorrect invariant:
+
+```csharp
+var layout = BootstrapSelectResultLayout.Create(
+    rowCount: 10,
+    rowHeight: 48,
+    viewportHeight: 130,
+    scrollOffset: int.MaxValue);
+
+Assert.That(layout.ScrollOffset, Is.EqualTo(350)); // 10 * 48 - 130
+Assert.That(layout.ScrollOffset % 48, Is.Not.EqualTo(0));
+```
+
+Then drive `ScrollByWheelDelta` to the same end boundary and assert `ScrollOffset == 350`.
+
+**Do not** assert that every clamped offset is a multiple of `RowHeight`, and do not round `350` to `336` or `384` merely to manufacture row alignment. The authoritative invariant is `BootstrapSelectResultLayout` clamping.
+
+- [ ] **Step 5: Add dropdown-content preferred-size tests**
+
+At 96 DPI with three rows and `logicalResultRowHeight = 48`, verify:
 
 ```text
 results contribution = 3 * 48
@@ -483,87 +509,62 @@ search-disabled preferred height = results contribution
 
 Derive search host height from active theme metrics/DPI rather than duplicating a magic number.
 
-- [ ] **Step 5: Add an open-popup property-change regression**
+- [ ] **Step 6: Add open-popup row-height change regression**
 
-Using existing STA/non-parallel popup-test patterns:
+Open a popup with enough items, capture creation count/bounds, set `ResultRowHeight = 48`, and assert:
 
-1. Create a visible host form and `BootstrapSelect` with enough items to make height observable.
-2. Open the popup.
-3. Capture `DropDownCreationCountForTest` and `DropDownBoundsForTest`.
-4. Set `select.ResultRowHeight = 48`.
-5. Assert popup remains open.
-6. Assert creation count is unchanged.
-7. Assert bounds are recomputed and remain within `MaxDropDownHeight`/working-area constraints.
-
-Do not require one exact X/Y coordinate because overlay collision logic may flip/shift legitimately.
-
-- [ ] **Step 6: Run focused geometry/popup tests**
-
-```bash
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectResultsViewTests|FullyQualifiedName~BootstrapSelectDropDownContentTests|FullyQualifiedName~BootstrapSelectPopupTests"
+```text
+popup remains open
+creation count unchanged
+effective result row height updated
+bounds recomputed and still respect MaxDropDownHeight / working area
 ```
 
-Expected: PASS.
-
-- [ ] **Step 7: Run paging/navigation regressions**
+- [ ] **Step 7: Run navigation/paging regressions**
 
 ```bash
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectProviderIntegrationTests|FullyQualifiedName~BootstrapSelectPagingTests|FullyQualifiedName~BootstrapSelectInteractionTests"
+dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectResultsViewTests|FullyQualifiedName~BootstrapSelectDropDownContentTests|FullyQualifiedName~BootstrapSelectPopupTests|FullyQualifiedName~BootstrapSelectProviderIntegrationTests|FullyQualifiedName~BootstrapSelectPagingTests|FullyQualifiedName~BootstrapSelectInteractionTests"
 ```
 
-Expected: PASS. Custom geometry must not reintroduce highlight/scroll reset during async paging.
+Custom geometry must not reintroduce the highlight/scroll reset fixed by plan 003.
 
-- [ ] **Step 8: Commit geometry/regression coverage**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectResultsViewTests.cs \
+git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapSelectResultsView.cs \
+        tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectResultsViewTests.cs \
         tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectDropDownContentTests.cs \
         tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectPopupTests.cs
 git commit -m "test: cover BootstrapSelect custom row geometry"
 ```
 
-Include a core-file correction in this commit only if a new failing test proved it necessary.
-
 ---
 
-## Task 4: Add a two-line Product Search demo renderer
+## Task 4: Add a two-line Product Search demo renderer with DPI-correct text measurement
 
 **Files:**
 
 - Create: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectProduct.cs`
 - Create: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectProductRenderer.cs`
+- Create if used: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectProductResultLayout.cs`
 - Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectDemoForm.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/BootstrapSelectDemoContractTests.cs`
 
-**Interfaces:**
+- [ ] **Step 1: Add the demo contract test**
 
-- Product metadata lives only in `BootstrapSelectItem.Tag`.
-- `BootstrapSelectItem.Text` remains the product name so default matching and the closed selection surface stay useful.
-- Custom popup drawing consumes `BootstrapSelectResultRenderContext`.
+Locate the sample using `Name = "productSearchSelect"` and assert:
 
-- [ ] **Step 1: Add a failing demo contract test**
-
-Locate the product sample by a stable control name (`productSearchSelect`) and assert:
-
-```csharp
-Assert.That(productSelect.ResultRowHeight, Is.EqualTo(48));
-Assert.That(productSelect.Renderer.GetType().Name, Is.EqualTo("BootstrapSelectProductRenderer"));
-Assert.That(productSelect.Items.Count, Is.GreaterThanOrEqualTo(3));
-Assert.That(productSelect.Items[0].Tag, Is.Not.Null);
-Assert.That(productSelect.Items[0].Tag!.GetType().Name, Is.EqualTo("BootstrapSelectProduct"));
+```text
+ResultRowHeight == 48
+renderer type == BootstrapSelectProductRenderer
+at least three items exist
+every item Tag is product metadata
+item.Text equals metadata Name
 ```
 
-For every sample item, use reflection on the demo-only `Tag` object to verify its `Name` property equals `BootstrapSelectItem.Text`. This avoids making demo implementation types public just for tests.
+Keep demo metadata types internal.
 
-- [ ] **Step 2: Run the demo contract test and observe failure**
-
-```bash
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectDemoContractTests"
-```
-
-Expected: FAIL because the product sample is not present.
-
-- [ ] **Step 3: Add the demo-only product type**
+- [ ] **Step 2: Add the demo-only product type**
 
 ```csharp
 internal sealed class BootstrapSelectProduct
@@ -585,109 +586,82 @@ internal sealed class BootstrapSelectProduct
 }
 ```
 
-Keep this type in the demo assembly only.
+- [ ] **Step 3: Implement product text layout using the same `Graphics` device context**
 
-- [ ] **Step 4: Implement the custom renderer completely**
-
-Use composition instead of inheritance:
+The old form below is explicitly forbidden because measurement is detached from the drawing device context:
 
 ```csharp
-using System;
-using System.Drawing;
-using System.Globalization;
-using System.Windows.Forms;
-using MyDmsVn.Bootstrap5WinFormUI.Controls;
-using MyDmsVn.Bootstrap5WinFormUI.Rendering;
-
-namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
-
-internal sealed class BootstrapSelectProductRenderer : IBootstrapSelectRenderer
-{
-    private static readonly CultureInfo DisplayCulture = CultureInfo.GetCultureInfo("vi-VN");
-    private readonly BootstrapSelectRenderer _defaultRenderer = new BootstrapSelectRenderer();
-
-    public void DrawResult(Graphics graphics, BootstrapSelectResultRenderContext context)
-    {
-        if (graphics is null) throw new ArgumentNullException(nameof(graphics));
-        if (context is null) throw new ArgumentNullException(nameof(context));
-
-        if (context.Item.Tag is not BootstrapSelectProduct product)
-        {
-            _defaultRenderer.DrawResult(graphics, context);
-            return;
-        }
-
-        var colors = context.Theme.Colors;
-        var highlighted = (context.State & BootstrapSelectRenderState.Highlighted) != 0;
-        var selected = (context.State & BootstrapSelectRenderState.Selected) != 0;
-        var hot = (context.State & BootstrapSelectRenderState.Hot) != 0;
-        var disabled = (context.State & BootstrapSelectRenderState.Disabled) != 0;
-        var background = highlighted || selected
-            ? colors.Active
-            : hot
-                ? colors.Hover
-                : colors.Surface;
-
-        using (var backgroundBrush = new SolidBrush(background))
-        {
-            graphics.FillRectangle(backgroundBrush, context.Bounds);
-        }
-
-        var horizontalInset = DpiScaler.Scale(8, context.Dpi);
-        var verticalInset = DpiScaler.Scale(4, context.Dpi);
-        var lineGap = DpiScaler.Scale(1, context.Dpi);
-        var contentBounds = Rectangle.Inflate(context.Bounds, -horizontalInset, -verticalInset);
-        var secondaryFontSize = Math.Max(6f, context.Font.SizeInPoints - 1f);
-        using var secondaryFont = new Font(
-            context.Font.FontFamily,
-            secondaryFontSize,
-            context.Font.Style,
-            GraphicsUnit.Point);
-
-        var secondaryHeight = TextRenderer.MeasureText("Ag", secondaryFont).Height;
-        var primaryHeight = Math.Max(0, contentBounds.Height - secondaryHeight - lineGap);
-        var primaryBounds = new Rectangle(
-            contentBounds.Left,
-            contentBounds.Top,
-            contentBounds.Width,
-            primaryHeight);
-        var secondaryBounds = new Rectangle(
-            contentBounds.Left,
-            contentBounds.Bottom - secondaryHeight,
-            contentBounds.Width,
-            secondaryHeight);
-
-        var primaryColor = disabled ? colors.MutedText : colors.Text;
-        var secondaryColor = colors.MutedText;
-        var secondaryText = product.Unit
-            + " | " + product.UnitPrice.ToString("N0", DisplayCulture)
-            + " | Tồn: " + product.StockQuantity.ToString("N0", DisplayCulture);
-        const TextFormatFlags flags = TextFormatFlags.Left
-            | TextFormatFlags.VerticalCenter
-            | TextFormatFlags.EndEllipsis
-            | TextFormatFlags.SingleLine
-            | TextFormatFlags.NoPrefix;
-
-        TextRenderer.DrawText(graphics, product.Name, context.Font, primaryBounds, primaryColor, flags);
-        TextRenderer.DrawText(graphics, secondaryText, secondaryFont, secondaryBounds, secondaryColor, flags);
-    }
-
-    public void DrawGroupHeader(Graphics graphics, BootstrapSelectGroupRenderContext context)
-        => _defaultRenderer.DrawGroupHeader(graphics, context);
-
-    public void DrawSelection(Graphics graphics, BootstrapSelectSelectionRenderContext context)
-        => _defaultRenderer.DrawSelection(graphics, context);
-
-    public void DrawChip(Graphics graphics, BootstrapSelectChipRenderContext context)
-        => _defaultRenderer.DrawChip(graphics, context);
-}
+// Do not use this:
+TextRenderer.MeasureText("Ag", secondaryFont).Height;
 ```
 
-This code intentionally mirrors the default background-state precedence, uses theme colors, scales spacing by DPI, disposes its derived font/brush, and delegates non-product/fallback rendering to the framework renderer.
+Measure with the popup `Graphics` object used for drawing:
 
-- [ ] **Step 5: Add the product sample to the demo form**
+```csharp
+const TextFormatFlags drawFlags = TextFormatFlags.Left
+    | TextFormatFlags.VerticalCenter
+    | TextFormatFlags.EndEllipsis
+    | TextFormatFlags.SingleLine
+    | TextFormatFlags.NoPrefix;
 
-Create a normal Single `BootstrapSelect`:
+const TextFormatFlags measureFlags = TextFormatFlags.Left
+    | TextFormatFlags.SingleLine
+    | TextFormatFlags.NoPrefix;
+
+var proposedMeasureSize = new Size(
+    Math.Max(1, contentBounds.Width),
+    Math.Max(1, contentBounds.Height));
+
+var secondaryHeight = TextRenderer.MeasureText(
+    graphics,
+    "Ag",
+    secondaryFont,
+    proposedMeasureSize,
+    measureFlags).Height;
+
+secondaryHeight = Math.Min(contentBounds.Height, secondaryHeight);
+var primaryHeight = Math.Max(0, contentBounds.Height - secondaryHeight - lineGap);
+var primaryBounds = new Rectangle(
+    contentBounds.Left,
+    contentBounds.Top,
+    contentBounds.Width,
+    primaryHeight);
+var secondaryBounds = new Rectangle(
+    contentBounds.Left,
+    Math.Min(contentBounds.Bottom, primaryBounds.Bottom + lineGap),
+    contentBounds.Width,
+    secondaryHeight);
+```
+
+Normalize/clamp the final rectangles so both are contained in `contentBounds` and `primaryBounds.Bottom <= secondaryBounds.Top`. If this geometry is easier to test as a small demo-only helper, extract `BootstrapSelectProductResultLayout`; do not move product-specific layout into the core assembly.
+
+- [ ] **Step 4: Implement renderer composition**
+
+`BootstrapSelectProductRenderer.DrawResult` must:
+
+1. Delegate to `BootstrapSelectRenderer` when `Tag` is not `BootstrapSelectProduct`.
+2. Mirror the default highlight/selected/hot background precedence.
+3. Use theme text/muted colors and disabled state.
+4. Scale horizontal/vertical inset and line gap with `DpiScaler`.
+5. Create/dispose only renderer-owned `Brush`/derived `Font` objects.
+6. Draw both lines with the same `Graphics` object used in Step 3.
+7. Delegate `DrawGroupHeader`, `DrawSelection`, and `DrawChip` to the default renderer.
+
+- [ ] **Step 5: Add 96/144/192 geometry coverage**
+
+Use a `Bitmap`/`Graphics` test harness and the demo-only layout helper (or reflection over an internal helper without making it public) to calculate product text bounds at 96, 144, and 192 DPI-equivalent row geometry. Assert:
+
+```text
+primary bounds are contained in row content bounds
+secondary bounds are contained in row content bounds
+primary.Bottom <= secondary.Top
+both bounds have non-negative width/height
+long primary text can be ellipsized without entering secondary bounds
+```
+
+The purpose is to freeze the renderer's device-context-aware layout contract; a pixel-perfect screenshot test is not required.
+
+- [ ] **Step 6: Add the product sample**
 
 ```csharp
 var productSelect = new BootstrapSelect
@@ -702,40 +676,25 @@ var productSelect = new BootstrapSelect
 };
 ```
 
-Populate realistic data:
+Populate realistic `BootstrapSelectProduct` objects through `BootstrapSelectItem.Tag`, leaving `BootstrapSelectItem.Text` equal to the product name.
 
-```csharp
-var products = new[]
-{
-    new BootstrapSelectProduct(1001, "Sữa tươi Vinamilk 100% 1L", "Hộp", 36500m, 128m),
-    new BootstrapSelectProduct(1002, "Coca-Cola lon 330ml", "Lon", 10000m, 56m),
-    new BootstrapSelectProduct(1003, "Nước khoáng Lavie 500ml", "Chai", 6000m, 240m)
-};
+- [ ] **Step 7: Run demo tests/build and commit**
 
-foreach (var product in products)
-{
-    productSelect.Items.Add(new BootstrapSelectItem(product.Id, product.Name)
-    {
-        Tag = product
-    });
-}
+```bash
+dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelectDemoContractTests"
+dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.Demo.csproj -c Release -f net8.0-windows
 ```
-
-Place the sample in the existing BootstrapSelect demo layout using the same spacing/theme conventions as adjacent samples.
-
-- [ ] **Step 6: Rerun the demo contract test**
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit the demo**
 
 ```bash
 git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectProduct.cs \
         demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectProductRenderer.cs \
+        demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectProductResultLayout.cs \
         demo/MyDmsVn.Bootstrap5WinFormUI.Demo/BootstrapSelectDemoForm.cs \
         tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/BootstrapSelectDemoContractTests.cs
 git commit -m "demo: add BootstrapSelect product result template"
 ```
+
+If no separate layout helper file was created, omit it from `git add` rather than creating an empty file.
 
 ---
 
@@ -749,11 +708,9 @@ git commit -m "demo: add BootstrapSelect product result template"
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Release/Phase16PublicApiBaselineTests.cs`
 - Modify: `docs/PUBLIC_API_BASELINE.md`
 
-**Interfaces:** The only intended new exported member from this plan is `BootstrapSelect.ResultRowHeight : int`.
-
 - [ ] **Step 1: Document `ResultRowHeight` and renderer templating**
 
-In `docs/BOOTSTRAP_SELECT.md`, document:
+Document:
 
 ```text
 ResultRowHeight
@@ -764,7 +721,7 @@ Validation: > 0
 Meaning: uniform popup result-row height
 ```
 
-Add this conceptual mapping, while clearly stating that the APIs are not JavaScript-compatible:
+Include the conceptual mapping:
 
 ```text
 Select2 templateResult        -> IBootstrapSelectRenderer.DrawResult
@@ -772,78 +729,55 @@ Select2 templateSelection     -> IBootstrapSelectRenderer.DrawSelection
 Custom result metadata        -> BootstrapSelectItem.Tag
 ```
 
-Include a complete product example using `ResultRowHeight = 48`, `Renderer`, and `Tag`. Explain that provider-backed results work identically when provider-created items carry the metadata in `Tag`.
+Explain that provider-backed results work identically when provider-created items carry metadata in `Tag`.
 
-- [ ] **Step 2: Update component/testing docs**
+- [ ] **Step 2: Document DPI lifecycle and wheel boundary semantics**
 
-In `docs/COMPONENTS.md`, add `ResultRowHeight` to the BootstrapSelect property/layout summary and keep variable-height rows explicitly unsupported.
-
-In `docs/TESTING.md`, add manual checks for:
+`docs/BOOTSTRAP_SELECT.md` / `docs/TESTING.md` must say:
 
 ```text
-- default 32 logical px and custom 48 logical px;
-- Light and Dark themes;
-- 100%, 150%, and 200% DPI;
-- disabled/hot/highlighted/selected rows;
-- long product-name ellipsis;
-- Down/PageDown/PageUp/Home/End;
-- mouse wheel and click hit testing;
-- MaxDropDownHeight and collision behavior;
-- closed selected value remains single-line.
+- changing ResultRowHeight while open reapplies presentation/repositions without recreation;
+- moving an open popup between DPI contexts reapplies presentation before placement;
+- all popup metrics use one effective DPI for each refresh;
+- normal wheel increments are row-based;
+- the final clamped ScrollOffset may be a partial-row offset because maxOffset = totalHeight - viewportHeight;
+- product secondary text is measured and drawn with the same device context.
 ```
 
-- [ ] **Step 3: Run the existing public API fingerprint test before editing the approved hash**
+- [ ] **Step 3: Run the public API fingerprint test before editing the approved hash**
 
 ```bash
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~ExportedApiMatchesApprovedV1Baseline"
 ```
 
-Expected: FAIL and print `Actual fingerprint:` plus the reconstructed exported API.
+Expected: FAIL and print the actual fingerprint/exported surface.
 
-- [ ] **Step 4: Review the emitted surface**
+- [ ] **Step 4: Review emitted surface**
 
-Confirm the only intended exported delta caused by this plan is:
+The only intended exported delta is:
 
 ```text
 MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapSelect
   public property System.Int32 ResultRowHeight
 ```
 
-If any additional exported type/member appears, correct its visibility first and rerun Step 3. Do not update the baseline until the surface is clean.
+Specifically verify there is **no** newly declared protected `OnDpiChangedAfterParent` override or other DPI member on `BootstrapSelect`. The controller's subscription to the inherited event is implementation-only.
 
-- [ ] **Step 5: Add a semantic release-contract test**
+If any extra exported member appears, correct visibility/design first; do not approve the hash.
 
-```csharp
-[Test]
-public void BootstrapSelectRowTemplateApiRemainsUniformHeightOnly()
-{
-    var property = typeof(BootstrapSelect).GetProperty(nameof(BootstrapSelect.ResultRowHeight));
+- [ ] **Step 5: Keep a semantic release-contract test**
 
-    Assert.Multiple((Action)(() =>
-    {
-        Assert.That(property, Is.Not.Null);
-        Assert.That(property!.PropertyType, Is.EqualTo(typeof(int)));
-        Assert.That(typeof(BootstrapSelect).GetEvent("MeasureResultItem"), Is.Null);
-        Assert.That(typeof(BootstrapSelect).GetProperty("ItemTemplate"), Is.Null);
-    }));
-}
-```
+Assert `ResultRowHeight` exists and remains `int`, while `MeasureResultItem` and `ItemTemplate` remain absent. Also assert no newly declared `BootstrapSelect` DPI member was introduced by this plan if the baseline helper can express that check cleanly.
 
-- [ ] **Step 6: Update the approved fingerprint with the exact emitted value**
+- [ ] **Step 6: Update the approved hash from actual compiled output only**
 
-After Step 4 confirms the API delta, copy the exact fingerprint printed by the failing test into `ApprovedV1Fingerprint`. The plan deliberately does not contain or guess that future compiled hash.
+Copy the exact fingerprint printed by the failing compatibility test after Step 4 has confirmed the intended surface. Update `docs/PUBLIC_API_BASELINE.md` with the same reviewed value and state that the DPI lifecycle implementation is internal.
 
-Update `docs/PUBLIC_API_BASELINE.md` with the same reviewed hash and a sentence that BootstrapSelect adds only `ResultRowHeight : int`; no existing signature, renderer method, template/measurement type, or `AssemblyVersion` changed.
-
-- [ ] **Step 7: Rerun release baseline tests**
+- [ ] **Step 7: Run release baseline tests and commit**
 
 ```bash
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~Phase16PublicApiBaselineTests"
 ```
-
-Expected: PASS.
-
-- [ ] **Step 8: Commit docs/baseline**
 
 ```bash
 git add docs/BOOTSTRAP_SELECT.md \
@@ -858,20 +792,12 @@ git commit -m "docs: document BootstrapSelect custom result rendering"
 
 ## Task 6: Full verification and manual acceptance
 
-**Files:**
-
-- No planned changes. Fix only verified regressions and keep each fix scoped to its originating task.
-
-**Interfaces:** Final public API and behavior from Tasks 1-5.
-
 - [ ] **Step 1: Build core for both targets**
 
 ```bash
 dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -c Release -f net48
 dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -c Release -f net8.0-windows
 ```
-
-Expected: PASS.
 
 - [ ] **Step 2: Build demo for both targets**
 
@@ -880,16 +806,12 @@ dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.D
 dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.Demo.csproj -c Release -f net8.0-windows
 ```
 
-Expected: PASS.
-
 - [ ] **Step 3: Run BootstrapSelect-focused tests for both targets**
 
 ```bash
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net48 --filter "FullyQualifiedName~BootstrapSelect"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "FullyQualifiedName~BootstrapSelect"
 ```
-
-Expected: PASS.
 
 - [ ] **Step 4: Run complete tests for both targets**
 
@@ -898,24 +820,25 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows
 ```
 
-Expected: PASS.
-
 - [ ] **Step 5: Manual Product Search acceptance**
 
-Verify all of these in the demo:
+Verify:
 
 ```text
 1. Each product popup row shows exactly two visual lines at ResultRowHeight = 48.
 2. Line 1 is product name.
 3. Line 2 is Unit | Unit price | Stock quantity.
-4. Long product names ellipsize without overlapping the second line.
-5. Hot, highlighted, selected, and disabled states remain readable in Light/Dark.
-6. Down, Up, Home, End, PageDown, PageUp, Enter, mouse wheel, and mouse click target the expected row.
+4. Long product names ellipsize without overlapping line 2.
+5. Hot/highlighted/selected/disabled states remain readable in Light/Dark.
+6. Down/Up/Home/End/PageDown/PageUp/Enter/mouse wheel/mouse click target expected rows.
 7. Async paging/navigation regressions from plan 003 remain fixed.
 8. Changing ResultRowHeight while open keeps the popup open and recomputes bounds.
-9. MaxDropDownHeight and screen collision handling still work.
-10. Selected product displays as normal single-line text after closing.
-11. 100%, 150%, and 200% DPI preserve spacing, text clipping, scrolling, and hit testing.
+9. MaxDropDownHeight and collision handling remain correct.
+10. Selected product displays normal single-line text after closing.
+11. At 100%, 150%, and 200% DPI, spacing/text clipping/hit testing remain correct.
+12. With the popup open, move the owner Form between monitors with different DPI (where available): popup stays open, row/search/surface metrics rescale, bounds reposition, and no stale-DPI painting remains.
+13. Move back to the original DPI and verify scaling reverses without popup recreation or navigation reset.
+14. At the last scroll viewport, wheel scrolling reaches the true clamped end even when the final offset is not row-aligned.
 ```
 
 - [ ] **Step 6: Final diff/API/resource review**
@@ -927,8 +850,11 @@ Confirm:
 - IBootstrapSelectRenderer signatures did not change;
 - no variable-height or measurement API exists;
 - no external package was added;
+- BootstrapSelect declares no new protected DPI override;
+- controller subscribes/unsubscribes DpiChangedAfterParent safely;
+- ComputeBounds and presentation use the same controller-owned effective DPI;
 - the only intended exported API addition is ResultRowHeight;
-- the reviewed fingerprint in test/docs matches the compiled assembly;
+- the reviewed fingerprint matches the compiled assembly;
 - no bin/, obj/, package, or IDE-state files are staged.
 ```
 
@@ -940,17 +866,19 @@ Do not create an empty verification commit. Commit only an actual correction dis
 
 - `BootstrapSelect.ResultRowHeight` exists, defaults to `32`, rejects non-positive values, and uses logical pixels.
 - Existing callers retain current appearance/layout without setting the new property.
-- Custom height is DPI-scaled and drives row painting bounds, preferred size, visible-range math, hit testing, mouse wheel, and PageUp/PageDown through the existing constant-height model.
-- Changing the height while open reapplies presentation/repositions popup without recreating it solely for that property change.
+- Custom height is DPI-scaled and drives painting bounds, preferred size, visible-range math, hit testing, wheel scrolling, and PageUp/PageDown through the existing constant-height model.
+- Changing height while open reapplies presentation/repositions without recreation.
+- Owner DPI transitions reapply popup presentation before placement, with one controller-owned effective DPI used consistently for search metrics, row geometry, render contexts, surface theme/radius, and bounds.
+- DPI lifecycle uses inherited `DpiChangedAfterParent` subscription from internal code and adds no declared public/protected `BootstrapSelect` DPI member.
+- Ordinary wheel increments are row-based, while the final clamp remains the exact `totalHeight - viewportHeight` even when that value is not divisible by `RowHeight`.
 - `IBootstrapSelectRenderer` and render-context signatures are unchanged.
 - Variable-height rows, measure callbacks, hosted row controls, and HTML-like templates remain unsupported.
-- The demo contains a product search sample whose `BootstrapSelectItem.Text` is product name and whose `Tag` contains unit, price, and stock metadata.
-- Product popup results render two lines with theme-aware state colors and DPI-aware spacing.
-- Closed selection/group/chip behavior delegates to the framework default renderer in the demo.
+- Product metadata remains demo-only in `BootstrapSelectItem.Tag`.
+- Product results render two lines with theme-aware colors and DPI-aware spacing.
+- Product secondary text is measured with the same `Graphics` device context used to draw it, and automated 96/144/192 geometry checks prove the two line rectangles do not overlap.
 - Paging/navigation behavior from plan `20260901-003` remains stable.
-- Public API review confirms the only intended exported addition is `BootstrapSelect.ResultRowHeight` and the fingerprint is deliberately updated from actual compiled output.
-- Core, demo, and test projects build/pass for both `net48` and `net8.0-windows`.
-- Manual Light/Dark and 100%/150%/200% DPI acceptance passes.
+- Public API review confirms the only intended exported addition is `BootstrapSelect.ResultRowHeight` and the fingerprint is updated only from actual compiled output.
+- Core, demo, and tests pass for `net48` and `net8.0-windows`.
 
 ---
 
@@ -958,10 +886,16 @@ Do not create an empty verification commit. Commit only an actual correction dis
 
 Before declaring implementation complete:
 
-- [ ] Every result-row vertical calculation reads effective `RowHeight`; the only remaining hard-coded logical `32` values in this path are the documented default and tests that intentionally assert it.
-- [ ] `BootstrapSelectResultLayout` remains generic constant-height math.
-- [ ] Presentation geometry changes preserve current logical results/navigation state.
+- [ ] Every result-row vertical calculation reads effective `RowHeight`; hard-coded logical `32` remains only as the documented/default value and intentional tests.
+- [ ] `BootstrapSelectResultLayout` remains generic constant-height math and its clamp semantics are unchanged.
+- [ ] No test incorrectly requires the final clamped scroll offset to be row-aligned.
+- [ ] Presentation/DPI changes preserve logical result/navigation state.
+- [ ] The internal controller unsubscribes `DpiChangedAfterParent` during disposal.
+- [ ] No declared protected DPI override was added to `BootstrapSelect`.
+- [ ] Popup `ApplyPresentation` and `ComputeBounds` use the same effective DPI for one transition.
 - [ ] Demo-owned GDI objects are disposed; caller-owned context/data objects are not disposed.
+- [ ] Product secondary-line measurement uses the same `Graphics` device context as drawing.
+- [ ] 96/144/192 product layout tests prove primary/secondary bounds are contained and non-overlapping.
 - [ ] Product/culture formatting remains demo-only.
 - [ ] Public docs and fingerprint match actual compiled API.
 - [ ] No unfinished marker or guessed API hash is committed.
