@@ -756,15 +756,31 @@ Run this manual sequence on the integrated **Feedback** page:
 
 Repeat the sequence in Light and Dark themes and at a non-100% Windows DPI setting. Focus cues must remain visible, and theme/DPI changes must not alter keyboard behavior or overlay placement.
 
-### Anchored overlay lifecycle and BootstrapSelect navigation regression matrix
+### Anchored overlay activation and BootstrapSelect navigation regression matrix
 
-Verify the shared anchored-overlay lifecycle with these manual checks:
+Run the following BootstrapSelect checks on the integrated **Select** page:
 
-- Open a searchable BootstrapSelect and press/release Alt only; the popup remains open.
-- With the searchable BootstrapSelect open, Alt+Tab to an unrelated application; the popup disappears immediately. Alt+Tab back and confirm no stale Select popup remains.
-- Open a BootstrapPopover with `CloseOnClickOutside = false`, then Alt+Tab; the Popover still closes because owner deactivation is an application-lifecycle close, not an outside-click close.
-- While the owning form remains active, confirm `CloseOnClickOutside = false` still prevents ordinary outside-click dismissal.
-- Press Escape and confirm the existing close and focus-restoration behavior remains unchanged.
+1. Click the selection content with a real left mouse click; the popup opens and remains visible without a flash-close cycle.
+2. Close it, click the arrow with a real left mouse click, and verify the popup again remains visible.
+3. Set `SearchEnabled = true`; the native search editor receives focus while the popup remains visible.
+4. Press and release Alt only; the popup remains open with its current focus.
+5. Alt+Tab to an unrelated application; the popup closes promptly and does not remain topmost or reappear after returning.
+6. Open another Form in the same application; the popup closes without restoring focus to the Select.
+7. Press Escape and verify the existing Select focus-restoration behavior.
+8. Use Tab and Shift+Tab at both popup boundaries and verify owner-relative traversal without wrapping or trapping focus.
+9. Click outside and verify native `AutoClose` behavior and clicked-control focus.
+10. Repeat the click, search, selection, and dismissal checks for Local Single, Local Multiple, Async Single, and the custom product-result example.
+11. In automated lifecycle coverage, queue an ambiguous zero-target deactivation, close and reopen before pumping messages, and verify the reopened generation remains open through repeated cycles.
+
+Run the equivalent BootstrapPopover checks on the integrated **Feedback** page:
+
+1. Click the target and verify the Popover opens, remains visible, and its focused interactive content remains usable.
+2. Press and release Alt only; the Popover remains open with content focus unchanged.
+3. Alt+Tab to an unrelated application; the Popover closes promptly.
+4. Activate another Form in the same application; the Popover closes without applying Escape-style target focus restoration.
+5. With `CloseOnClickOutside = false`, verify ordinary outside clicks do not dismiss the Popover, while application and window lifecycle deactivation still closes it.
+6. Press Escape and verify the existing target-focus restoration behavior remains unchanged.
+7. In automated lifecycle coverage, close and reopen around an ambiguous deferred transition and verify an earlier generation cannot close the reopened Popover.
 
 Verify stay-open selection navigation by opening a Multiple Select, or a Select with `CloseOnSelect = false`, navigating away from the first row, and selecting or deselecting the highlighted row. The popup must stay open with the same logical row highlighted and the viewport preserved.
 
