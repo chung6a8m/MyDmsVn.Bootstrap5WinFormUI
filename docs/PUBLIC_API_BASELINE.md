@@ -70,6 +70,8 @@ The formatted-input fingerprint was approved only after the public-API gate deli
 
 `Phase16PublicApiBaselineTests.ExportedApiMatchesApprovedV1Baseline` deterministically reconstructs the surface with reflection and fails when the fingerprint changes. Its failure output contains the reconstructed surface so reviewers can inspect the change before approving a new fingerprint.
 
+The custom-result-rendering update deliberately failed the formatted-input baseline before approval. Review of the compiled export confirmed the only addition is the `System.Int32 BootstrapSelect.ResultRowHeight` property. `IBootstrapSelectRenderer` and its render contexts are unchanged; variable-height measurement/template APIs and product-specific types remain non-exported; and the popup DPI lifecycle is implemented internally through the inherited event subscription rather than a newly declared public/protected DPI member. The reviewed fingerprint is `8bf5a56063e1b0f758577474c2be2243fc32ee848fe675032a5e1d7bae88230b`.
+
 ## Version compatibility policy
 
 - `1.0.0-rc.*`: release-candidate validation of the proposed v1 surface. Any API change requires explicit review, documentation, and an intentional baseline update.

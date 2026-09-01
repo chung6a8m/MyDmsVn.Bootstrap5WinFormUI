@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "9e559718fc7c4c3f1f0df64455d09f2fc0e1b7ef98ca6f868fce0c21daaa4181";
+    private const string ApprovedV1Fingerprint = "8bf5a56063e1b0f758577474c2be2243fc32ee848fe675032a5e1d7bae88230b";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -34,6 +34,33 @@ public sealed class Phase16PublicApiBaselineTests
     public void V1CompatibilityAssemblyVersionIsStable()
     {
         Assert.That(typeof(BootstrapButton).Assembly.GetName().Version, Is.EqualTo(new Version(1, 0, 0, 0)));
+    }
+
+    [Test]
+    public void BootstrapSelectCustomResultRenderingApiExportsOnlyTheReviewedContract()
+    {
+        const BindingFlags declaredInstance = BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic
+            | BindingFlags.DeclaredOnly;
+        var resultRowHeight = typeof(BootstrapSelect).GetProperty(
+            nameof(BootstrapSelect.ResultRowHeight),
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
+        var visibleDpiMethods = typeof(BootstrapSelect).GetMethods(declaredInstance)
+            .Where(method => !method.IsSpecialName
+                             && (method.IsPublic || method.IsFamily || method.IsFamilyOrAssembly)
+                             && method.Name.IndexOf("Dpi", StringComparison.OrdinalIgnoreCase) >= 0)
+            .Select(method => method.Name)
+            .ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(resultRowHeight, Is.Not.Null);
+            Assert.That(resultRowHeight!.PropertyType, Is.EqualTo(typeof(int)));
+            Assert.That(typeof(BootstrapSelect).GetMember("MeasureResultItem", declaredInstance), Is.Empty);
+            Assert.That(typeof(BootstrapSelect).GetProperty("ItemTemplate", declaredInstance), Is.Null);
+            Assert.That(visibleDpiMethods, Is.Empty);
+        }));
     }
 
     [Test]

@@ -181,6 +181,18 @@ Async query diagnostics use `SearchStarted`, `SearchCompleted`, and `SearchFaile
 
 `Renderer` accepts an `IBootstrapSelectRenderer`. Renderers receive item/state/theme/DPI context for result rows, group headers, the single selected value, and multiple-selection chips. The control still owns layout, hit testing, scrolling, keyboard behavior, selection, paging, and popup lifecycle.
 
+`ResultRowHeight` configures one uniform popup result-row height. It is an `int`, defaults to `32`, must be greater than zero, and is expressed in logical pixels at 96 DPI. The value applies to every popup result row; variable-height rows, measurement callbacks, hosted row controls, and HTML-like templates are not supported.
+
+The equivalent extension points for common Select2 concepts are:
+
+```text
+Select2 templateResult        -> IBootstrapSelectRenderer.DrawResult
+Select2 templateSelection     -> IBootstrapSelectRenderer.DrawSelection
+Custom result metadata        -> BootstrapSelectItem.Tag
+```
+
+Provider-backed results use the same model: provider-created `BootstrapSelectItem` instances can carry caller-owned metadata in `Tag`, and the configured renderer receives it through the normal result context.
+
 A custom renderer can delegate unchanged surfaces to the framework renderer and customize only result presentation:
 
 ```csharp
@@ -240,6 +252,8 @@ productSelect.Renderer = new CodeSelectRenderer();
 
 Renderer implementations are presentation-only. They should not change selection state, issue provider calls, own popup controls, or dispose the supplied `Font`, theme, item, or `Graphics` objects.
 
+For multi-line drawing, measure and draw text with the same supplied `Graphics` device context. The product-search demo composes the framework renderer for unchanged surfaces and uses a 48-logical-pixel result row with two non-overlapping, DPI-aware text lines.
+
 ## Keyboard and focus behavior
 
 Closed control:
@@ -274,7 +288,11 @@ Searchable popups inset the themed search field from the rounded overlay edge us
 
 `DropDownWidth = 0` uses owner-relative automatic width. `MaxDropDownHeight` caps popup height in logical pixels. Popup geometry repositions with owner movement and shared overlay tracking.
 
-Selection geometry and result metrics are DPI-scaled. The implementation is validated by automated geometry/rendering tests at 96/120/144/192 DPI (100/125/150/200%). Synthetic popup-content DPI tests cover only the search host's theme-derived inset and allocated height; the nested `BootstrapTextBox` follows its normal primitive contract and paints using its real `DeviceDpi` and `BootstrapThemeManager.CurrentTheme`. `RightToLeft.Yes` mirrors major horizontal selection-surface affordances. Real-monitor DPI/multi-monitor behavior remains part of the manual desktop matrix.
+Selection geometry and result metrics are DPI-scaled. Each popup refresh uses one controller-owned effective DPI for search metrics, result rows, render contexts, surface metrics, and placement. Moving an open popup between DPI contexts reapplies presentation before placement. Changing `ResultRowHeight` while open reapplies presentation and repositions the existing popup without recreating it.
+
+Normal mouse-wheel increments are row-based. At the scroll boundary, the final clamped `ScrollOffset` may be a partial-row offset because the exact maximum is `totalHeight - viewportHeight`.
+
+The implementation is validated by automated geometry/rendering tests at 96/120/144/192 DPI (100/125/150/200%). Synthetic popup-content DPI tests cover only the search host's theme-derived inset and allocated height; the nested `BootstrapTextBox` follows its normal primitive contract and paints using its real `DeviceDpi` and `BootstrapThemeManager.CurrentTheme`. `RightToLeft.Yes` mirrors major horizontal selection-surface affordances. Real-monitor DPI/multi-monitor behavior remains part of the manual desktop matrix.
 
 ## Ownership and disposal
 
