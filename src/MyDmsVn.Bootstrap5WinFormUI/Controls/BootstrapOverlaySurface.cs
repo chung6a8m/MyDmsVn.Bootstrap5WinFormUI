@@ -9,6 +9,9 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 internal sealed class BootstrapOverlaySurface : Panel
 {
+    private const float AntiAliasClipAllowance = 1f;
+
+    private readonly BootstrapOverlayContentHost _contentHost;
     private BootstrapTheme _theme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
     private Padding _logicalContentPadding = new Padding(12, 8, 12, 8);
     private int _logicalBorderRadius = -1;
@@ -16,6 +19,7 @@ internal sealed class BootstrapOverlaySurface : Panel
     private int _borderWidth = 1;
     private int _radius = 6;
     private Region? _ownedRegion;
+    private Region? _ownedContentHostRegion;
 
     public BootstrapOverlaySurface()
     {
@@ -28,6 +32,14 @@ internal sealed class BootstrapOverlaySurface : Panel
         Margin = Padding.Empty;
         Padding = Padding.Empty;
         BackColor = _theme.Colors.Surface;
+        _contentHost = new BootstrapOverlayContentHost
+        {
+            BackColor = _theme.Colors.Surface,
+            Margin = Padding.Empty,
+            TabStop = false,
+            Visible = false
+        };
+        Controls.Add(_contentHost);
     }
 
     public Control? HostedContent { get; private set; }
@@ -66,6 +78,7 @@ internal sealed class BootstrapOverlaySurface : Panel
             _logicalBorderRadius = value;
             ResolveMetrics();
             ReplaceRegion();
+            ReplaceContentHostRegion();
             Invalidate();
         }
     }
@@ -87,7 +100,7 @@ internal sealed class BootstrapOverlaySurface : Panel
             throw new InvalidOperationException("Detach the existing overlay content before attaching another control.");
         }
 
-        if (content.Parent is not null && !ReferenceEquals(content.Parent, this))
+        if (content.Parent is not null && !ReferenceEquals(content.Parent, _contentHost))
         {
             throw new InvalidOperationException("Overlay content must be unparented when attached.");
         }
@@ -98,7 +111,8 @@ internal sealed class BootstrapOverlaySurface : Panel
         }
 
         HostedContent = content;
-        Controls.Add(content);
+        _contentHost.AttachContent(content);
+        _contentHost.Visible = true;
         PerformLayout();
     }
 
@@ -110,7 +124,8 @@ internal sealed class BootstrapOverlaySurface : Panel
             return null;
         }
 
-        Controls.Remove(content);
+        _contentHost.DetachContent(content);
+        _contentHost.Visible = false;
         HostedContent = null;
         PerformLayout();
         return content;
@@ -126,6 +141,7 @@ internal sealed class BootstrapOverlaySurface : Panel
 
         _dpi = dpi;
         BackColor = theme.Colors.Surface;
+        _contentHost.BackColor = theme.Colors.Surface;
         ResolveMetrics();
         PerformLayout();
         ReplaceRegion();
@@ -144,18 +160,14 @@ internal sealed class BootstrapOverlaySurface : Panel
     protected override void OnLayout(LayoutEventArgs levent)
     {
         base.OnLayout(levent);
-        var content = HostedContent;
-        if (content is null)
-        {
-            return;
-        }
-
         var padding = DpiScaler.Scale(_logicalContentPadding, _dpi);
-        var x = Math.Min(ClientSize.Width, padding.Left + _borderWidth);
-        var y = Math.Min(ClientSize.Height, padding.Top + _borderWidth);
-        var width = Math.Max(0, ClientSize.Width - x - padding.Right - _borderWidth);
-        var height = Math.Max(0, ClientSize.Height - y - padding.Bottom - _borderWidth);
-        content.Bounds = new Rectangle(x, y, width, height);
+        var x = Math.Min(ClientSize.Width, _borderWidth);
+        var y = Math.Min(ClientSize.Height, _borderWidth);
+        var width = Math.Max(0, ClientSize.Width - x - _borderWidth);
+        var height = Math.Max(0, ClientSize.Height - y - _borderWidth);
+        _contentHost.Bounds = new Rectangle(x, y, width, height);
+        _contentHost.Padding = padding;
+        ReplaceContentHostRegion();
     }
 
     protected override void OnSizeChanged(EventArgs e)
@@ -176,17 +188,11 @@ internal sealed class BootstrapOverlaySurface : Panel
             return;
         }
 
-        var borderInset = _borderWidth / 2f;
-        var bounds = new RectangleF(
-            borderInset,
-            borderInset,
-            Math.Max(0f, ClientSize.Width - _borderWidth),
-            Math.Max(0f, ClientSize.Height - _borderWidth));
         var previous = e.Graphics.SmoothingMode;
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         try
         {
-            using var path = RoundedPath.Create(bounds, new CornerRadius(_radius));
+            using var path = CreatePaintPath();
             using var background = new SolidBrush(_theme.Colors.Surface);
             e.Graphics.FillPath(background, path);
             if (_borderWidth > 0)
@@ -205,6 +211,9 @@ internal sealed class BootstrapOverlaySurface : Panel
     {
         if (disposing)
         {
+            _contentHost.Region = null;
+            _ownedContentHostRegion?.Dispose();
+            _ownedContentHostRegion = null;
             Region = null;
             _ownedRegion?.Dispose();
             _ownedRegion = null;
@@ -225,13 +234,52 @@ internal sealed class BootstrapOverlaySurface : Panel
         Region? next = null;
         if (ClientSize.Width > 0 && ClientSize.Height > 0)
         {
-            using var path = RoundedPath.Create(new RectangleF(0, 0, ClientSize.Width, ClientSize.Height), new CornerRadius(_radius));
-            next = new Region(path);
+            using var paintPath = CreatePaintPath();
+            using var clipEnvelope = (GraphicsPath)paintPath.Clone();
+            using var envelopePen = new Pen(
+                Color.Black,
+                _borderWidth + (2f * AntiAliasClipAllowance))
+            {
+                LineJoin = LineJoin.Round
+            };
+            clipEnvelope.Widen(envelopePen);
+            next = new Region(paintPath);
+            next.Union(clipEnvelope);
+            next.Intersect(ClientRectangle);
         }
 
         var previous = _ownedRegion;
         _ownedRegion = next;
         Region = next;
+        previous?.Dispose();
+    }
+
+    private GraphicsPath CreatePaintPath()
+    {
+        var borderInset = _borderWidth / 2f;
+        var bounds = new RectangleF(
+            borderInset,
+            borderInset,
+            Math.Max(0f, ClientSize.Width - _borderWidth),
+            Math.Max(0f, ClientSize.Height - _borderWidth));
+        return RoundedPath.Create(bounds, new CornerRadius(_radius));
+    }
+
+    private void ReplaceContentHostRegion()
+    {
+        Region? next = null;
+        if (_contentHost.ClientSize.Width > 0 && _contentHost.ClientSize.Height > 0)
+        {
+            var innerRadius = Math.Max(0, _radius - _borderWidth);
+            using var path = RoundedPath.Create(
+                new RectangleF(0, 0, _contentHost.ClientSize.Width, _contentHost.ClientSize.Height),
+                new CornerRadius(innerRadius));
+            next = new Region(path);
+        }
+
+        var previous = _ownedContentHostRegion;
+        _ownedContentHostRegion = next;
+        _contentHost.Region = next;
         previous?.Dispose();
     }
 
@@ -245,6 +293,40 @@ internal sealed class BootstrapOverlaySurface : Panel
         if (padding.Left < 0 || padding.Top < 0 || padding.Right < 0 || padding.Bottom < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(padding), padding, "Overlay content padding cannot contain negative edges.");
+        }
+    }
+
+    private sealed class BootstrapOverlayContentHost : Panel
+    {
+        private Control? _content;
+
+        internal void AttachContent(Control content)
+        {
+            _content = content;
+            Controls.Add(content);
+            PerformLayout();
+        }
+
+        internal void DetachContent(Control content)
+        {
+            Controls.Remove(content);
+            _content = null;
+        }
+
+        protected override void OnLayout(LayoutEventArgs levent)
+        {
+            base.OnLayout(levent);
+            if (_content is null)
+            {
+                return;
+            }
+
+            var display = DisplayRectangle;
+            _content.Bounds = new Rectangle(
+                display.X,
+                display.Y,
+                Math.Max(0, display.Width),
+                Math.Max(0, display.Height));
         }
     }
 }

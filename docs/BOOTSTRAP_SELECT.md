@@ -256,9 +256,9 @@ Open popup:
 - `PageUp` / `PageDown` page the result viewport.
 - `Enter` activates the highlighted item, create action, or retry action.
 - `Esc` closes and restores focus appropriately.
-- `Tab` closes without stealing normal WinForms tab traversal.
+- `Tab` and `Shift+Tab` from the native search editor are handled as dialog navigation: they close the popup and resume owner-relative WinForms traversal in the corresponding direction. Traversal uses non-wrapping parent scopes, bubbles through nested containers, and leaves focus on the owner when no eligible tab stop remains instead of wrapping from last to first or first to last.
 
-Search editing stays on a real WinForms text editor so caret, selection, clipboard, IME, and Vietnamese input remain native editing responsibilities.
+Search editing stays on one real, borderless WinForms text editor inside a themed `BootstrapTextBox` presentation shell, so caret, selection, clipboard, IME, and Vietnamese input remain native editing responsibilities. The wrapper is a presentation/container node rather than a second accessible text input; the native editor remains the single logical accessible search field.
 
 ## Accessibility
 
@@ -268,11 +268,13 @@ Primary mouse operations have keyboard equivalents, including retry and custom-v
 
 ## Theme, DPI, RTL, and popup placement
 
-The selection surface and popup consume the existing framework theme/render/DPI infrastructure. Popup placement reuses the shared overlay placement/collision engine with bottom-start preference plus flip/shift behavior within the monitor working area.
+The selection surface and popup consume the existing framework theme/render/DPI infrastructure. The closed shell insets its rounded stroke by half of the actual DPI-scaled width, uses `BorderWidth` when unfocused and `FocusBorderWidth` when focused, and anti-aliases the rounded path. Validation continues to select the established success/danger border color without changing stroke geometry.
+
+Searchable popups inset the themed search field from the rounded overlay edge using the current theme spacing. The shared overlay surface places hosted HWND content inside an owned inner host clipped to the border's rounded interior, so opaque zero-padding content cannot overpaint the outer corner arcs. Its outer binary window clip conservatively encloses the painted anti-aliased stroke instead of sharing the exact paint boundary, preserving smooth corner coverage at the HWND edge. The host does not mutate caller content regions or transfer caller ownership. The outer overlay border and inner input border therefore remain visually distinct while the nested native editor stays borderless. Popup placement reuses the shared overlay placement/collision engine with bottom-start preference plus flip/shift behavior within the monitor working area.
 
 `DropDownWidth = 0` uses owner-relative automatic width. `MaxDropDownHeight` caps popup height in logical pixels. Popup geometry repositions with owner movement and shared overlay tracking.
 
-Selection geometry and result metrics are DPI-scaled. The implementation is validated by automated geometry/rendering tests at 96/120/144/192 DPI (100/125/150/200%). `RightToLeft.Yes` mirrors major horizontal selection-surface affordances. Real-monitor DPI/multi-monitor behavior remains part of the manual desktop matrix.
+Selection geometry and result metrics are DPI-scaled. The implementation is validated by automated geometry/rendering tests at 96/120/144/192 DPI (100/125/150/200%). Synthetic popup-content DPI tests cover only the search host's theme-derived inset and allocated height; the nested `BootstrapTextBox` follows its normal primitive contract and paints using its real `DeviceDpi` and `BootstrapThemeManager.CurrentTheme`. `RightToLeft.Yes` mirrors major horizontal selection-surface affordances. Real-monitor DPI/multi-monitor behavior remains part of the manual desktop matrix.
 
 ## Ownership and disposal
 

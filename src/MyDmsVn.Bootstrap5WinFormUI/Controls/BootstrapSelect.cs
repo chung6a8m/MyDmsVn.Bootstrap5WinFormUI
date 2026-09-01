@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
@@ -634,14 +635,38 @@ public partial class BootstrapSelect : UserControl
         base.OnPaint(e);
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        var radius = DpiScaler.Scale(_borderRadius >= 0 ? _borderRadius : theme.Metrics.Radius, dpi);
-        var bounds = new RectangleF(0.5f, 0.5f, Math.Max(0, ClientSize.Width - 1f), Math.Max(0, ClientSize.Height - 1f));
-        using (var path = RoundedPath.Create(bounds, new CornerRadius(radius)))
-        using (var background = new SolidBrush(Enabled ? theme.Colors.Surface : theme.Colors.SurfaceSecondary))
-        using (var pen = new Pen(BootstrapTextBoxRenderLogic.ResolveBorderColor(theme.Colors, _validationState, ContainsFocus || Focused, Enabled), DpiScaler.Scale((float)theme.Metrics.BorderWidth, dpi)))
+        var containsFocus = ContainsFocus || Focused;
+        var metrics = BootstrapSelectRenderLogic.ResolveMetrics(
+            ClientSize,
+            theme.Metrics,
+            dpi,
+            _borderRadius,
+            containsFocus);
+
+        var graphics = e.Graphics;
+        var previousSmoothing = graphics.SmoothingMode;
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        try
         {
-            e.Graphics.FillPath(background, path);
-            e.Graphics.DrawPath(pen, path);
+            using var path = RoundedPath.Create(
+                metrics.BorderBounds,
+                new CornerRadius(metrics.Radius));
+            using var background = new SolidBrush(
+                Enabled ? theme.Colors.Surface : theme.Colors.SurfaceSecondary);
+            using var pen = new Pen(
+                BootstrapTextBoxRenderLogic.ResolveBorderColor(
+                    theme.Colors,
+                    _validationState,
+                    containsFocus,
+                    Enabled),
+                metrics.BorderWidth);
+
+            graphics.FillPath(background, path);
+            graphics.DrawPath(pen, path);
+        }
+        finally
+        {
+            graphics.SmoothingMode = previousSmoothing;
         }
 
         var layout = CreateSelectionLayout();

@@ -22,6 +22,7 @@ public partial class BootstrapSelect
     internal int DropDownCreationCountForTest => _dropDownController?.CreationCount ?? 0;
     internal Rectangle DropDownBoundsForTest => _dropDownController?.CurrentBounds ?? Rectangle.Empty;
     internal string? HighlightedResultTextForTest => _dropDownController?.Content?.HighlightedRow?.Text;
+    internal BootstrapSelectDropDownContent? DropDownContentForTest => _dropDownController?.Content;
 
     internal IReadOnlyList<string> VisibleResultItemTextsForTest
     {
@@ -43,6 +44,29 @@ public partial class BootstrapSelect
         if (IsDisposed || !Enabled || !Visible) return;
         _dropDownController ??= new BootstrapSelectDropDownController(this);
         _dropDownController.Open();
+    }
+
+    internal bool ContinueDialogTabNavigation(bool reverse)
+    {
+        Control current = this;
+        var container = Parent;
+        while (container is not null)
+        {
+            if (container.SelectNextControl(
+                current,
+                forward: !reverse,
+                tabStopOnly: true,
+                nested: true,
+                wrap: false))
+            {
+                return true;
+            }
+
+            current = container;
+            container = container.Parent;
+        }
+
+        return false;
     }
 
     internal void CloseDropDownInternal(bool restoreFocus)

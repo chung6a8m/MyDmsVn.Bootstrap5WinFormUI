@@ -154,6 +154,13 @@ BootstrapComboBox Stage 6 pure tests cover:
 - Closed-item icon/text layout containment for normal, narrow, empty, and malformed rectangles without negative geometry
 - Long-text bounds suitable for single-line ellipsis while retaining native `GetItemText` as the source of display text
 
+BootstrapSelect border-rendering pure tests cover:
+
+- Shell metrics at logical DPI 96/120/144/192, including normal/focus stroke widths, explicit/theme radius, and half-stroke path inset
+- Null theme metrics, non-positive DPI, invalid radius, and malformed/tiny client geometry without negative drawable bounds
+- Popup search-host inset and height allocation from `SpacingXS` and `ControlHeightSmall` at synthetic logical DPI 96/120/144/192
+- The explicit boundary that synthetic `ApplyPresentation` DPI changes search-host allocation only and does not mutate the nested `BootstrapTextBox.DeviceDpi`
+
 BootstrapDropdown Stage 7 pure tests cover:
 
 - Every semantic `BootstrapVariant` under Light/Dark through `BootstrapVariantColorResolver`, with normal surface/text/border tokens, selected background blending, and disabled muted/accent tokens
@@ -289,6 +296,17 @@ BootstrapComboBox Stage 6 STA tests verify:
 - Disposal before/after handle creation/theme changes releases the static theme subscription and framework-owned font, and repeated lifecycle stress returns handler count to baseline
 - Advanced Inputs demo coverage includes native unbound/bound lists, editable autocomplete, selection-only mode, long text, leading-icon/no-icon, valid/invalid, disabled, radius, and OS-owned popup/edit/arrow note
 
+BootstrapSelect border-rendering STA tests verify:
+
+- Focused bitmap coverage uses a shown Form and confirms the Select actually owns focus before sampling the focus-border thickness
+- Rounded invalid-border right/bottom containment and the full configured focused stroke inside client bounds
+- Popup search composition contains one themed `BootstrapTextBox` wrapper and exactly one borderless native WinForms `TextBox`
+- Search-disabled layout removes the complete search band while the owner-rendered result viewport remains full-width and re-enabling reuses the same wrapper
+- Search text/event preservation, silent clear, forwarded printable filtering, and existing navigation/selection behavior
+- Tab through the focused native editor's `PreProcessMessage` / `ProcessDialogKey` path closes the popup and continues owner-relative WinForms traversal
+- One logical accessible Text node with stable `Search` name rather than wrapper/native duplication
+- Real `BootstrapThemeManager.CurrentTheme` Light/Dark switching reuses the same search/results controls without losing search state
+
 BootstrapDropdown Stage 7 STA tests verify:
 
 - Designer-safe defaults: null target, one stable empty `Items` collection, Primary variant, zero minimum width, and no popup transition from `Close()` on a new component
@@ -353,6 +371,8 @@ For BootstrapNumericBox Stage 5, choose **Advanced Inputs**. Verify integer/defa
 For `BootstrapFormattedTextBox`, remain on **Advanced Inputs** and verify General, Numeral (including Vietnamese display separators), Date, Time, CreditCard, and Custom scenarios against their live RawValue feedback. Exercise partial input, middle insertion, selection replacement, raw and already-formatted paste, cut, clear, separator-adjacent Backspace/Delete, multiple undo/redo steps, Tab/Shift+Tab, and Alt shortcuts. Switch Light/Dark and repeat at 100/125/150/175/200% real Windows scaling. Perform a Vietnamese IME composition smoke test and confirm only committed text is canonicalized; automated tests do not substitute for this OS/IME check.
 
 For BootstrapComboBox Stage 6, stay on **Advanced Inputs**. Verify unbound items, a bound object list using `DisplayMember`/`ValueMember`, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` with `ListItems`, long text/ellipsis, leading-icon and no-icon comparison, Valid/Invalid, disabled, and explicit radius examples. Exercise the native arrow and popup plus Up/Down/Enter/Escape, free typing, Tab/Shift+Tab, selected-value changes, and runtime Light/Dark switching without losing binding or selection. Repeat at 100/125/150/175/200% real Windows scaling. Native editable child, arrow button, and popup chrome may remain OS-themed/square; the framework must not replace them merely for visual uniformity.
+
+For BootstrapSelect border rendering, choose **Select** and compare neutral, focused, valid, invalid, and explicit-radius shells in Light and Dark. Confirm rounded right/bottom strokes remain continuous, the popup's rounded outer border stays distinct from the inset themed search field, and no native square search border touches the overlay corners. With the native search caret active, verify Tab/Shift+Tab close the popup and continue forward/reverse form traversal, then inspect that accessibility exposes one search editor. Repeat at real Windows 100/125/150/200% scaling; these checks cover the nested `BootstrapTextBox` at its real monitor `DeviceDpi` and are not replaced by synthetic host-allocation tests.
 
 For BootstrapDropdown and `BootstrapSplitButton`, use the **Navigation / Tabs** basic/icon/state/long/stress/nested/hosted/mixed/split scenarios. Verify primary versus chevron mouse routing, Tab/Shift+Tab between regions, Enter/Space on each region, native Up/Down/Home/End/Right/Left/Enter/Escape submenu navigation, and outside-click dismissal. Focus/edit/toggle hosted controls, navigate back to menu rows, dismiss, reopen, and confirm the documented fresh-snapshot policy. Cover disabled leaves/submenus/hosts, checked leaves, split loading, Light/Dark changes while root/submenus are visible, default and caller-owned fonts, and primary/menu accessibility names before/after outer `Text` and `AccessibleName` changes. Repeat at 100/125/150/175/200% real Windows scaling and at bottom/right/secondary-monitor edges. Stress repeated open/close/rebuild, hosted disposal, and form disposal while nested content is open; check focus restoration, stale windows, duplicate events, GDI growth, and disposed-object failures. Inherited split `Controls` are observable but must not be mutated or disposed by application code.
 
@@ -426,6 +446,8 @@ TabControl pure tests cover 96/120/144/168/192 logical header sizing, padding, s
 NumericBox pure tests cover 96/120/144/168/192 logical shell metrics and native-editor bounds. The Advanced Inputs page remains the OS-level gate for `DeviceDpi`, native `NumericUpDown` text/spin layout, culture-sensitive editing, wheel behavior, focus cues, and physical rounded-border rendering.
 
 ComboBox pure tests cover 96/120/144/168/192 logical item/icon/padding/border/focus/radius metrics. The Advanced Inputs page remains the ComboBox OS-level gate for actual native edit/arrow/popup geometry, `DeviceDpi`, owner-drawn text/icon alignment, keyboard behavior, and physical shell-border rendering.
+
+BootstrapSelect pure tests cover logical shell stroke/radius/inset and popup search-host allocation at 96/120/144/192 DPI. STA tests drive Tab and Shift+Tab through the native editor's `PreProcessMessage` path, including both boundaries and nested-container bubbling without wrap. Shared-overlay bitmap tests use opaque zero-padding content at 96/120/144/168/192 DPI: composition coverage independently protects all four rounded interior corners, while real `DrawToBitmap` surface rendering verifies that the conservative surface/dropdown window clips retain every blended anti-alias edge pixel without making the silhouette rectangular. The Select page remains the OS-level gate for physical rounded validation/focus strokes, outer/inner popup-border separation, nested `BootstrapTextBox.DeviceDpi`, native text editing/IME, and monitor transitions.
 
 Dropdown pure tests cover 96/120/144/168/192 logical item padding, icon size, separator inset, border width, and target-relative minimum-width scaling. The Navigation page remains the OS-level gate for actual `ToolStripDropDownMenu` `DeviceDpi`, item/text/check geometry, monitor-edge placement, focus restoration, and native keyboard/AutoClose behavior.
 
@@ -702,7 +724,7 @@ The public/protected API fingerprint must fail against the prior approved hash b
 
 Pure tests cover all explicit placements, deterministic Auto selection, exact-opposite Flip, cross-axis Shift, FlipAndShift ordering, RTL Start/End, padded boundaries, oversized popups, negative coordinates, saturation, and invalid values on both TFMs.
 
-STA tests cover Tooltip native-default compatibility and managed properties; surface/host ownership; Popover Target/Content/trigger/focus/open-close behavior; anchor/form/scroll tracking; transient theme subscriptions; external disposal; and repeated cleanup. Independent `GetWindowRect` checks verify that overlay `ShowAt`/`MoveTo`, Popover, and managed Tooltip HWNDs match the placement-engine rectangle at working-area edges, including intentional `None` overflow and `Flip` without cross-axis shift. Tooltip remains text-only with one native `ToolTip`; Popover content remains caller-owned.
+STA tests cover Tooltip native-default compatibility and managed properties; surface/host ownership; rounded inner-host clipping without caller `Region` mutation; Popover Target/Content/trigger/focus/open-close behavior; anchor/form/scroll tracking; transient theme subscriptions; external disposal; and repeated cleanup. Independent `GetWindowRect` checks verify that overlay `ShowAt`/`MoveTo`, Popover, and managed Tooltip HWNDs match the placement-engine rectangle at working-area edges, including intentional `None` overflow and `Flip` without cross-axis shift. Tooltip remains text-only with one native `ToolTip`; Popover content remains caller-owned.
 
 Tooltip race tests invalidate a native Popup request through mouse leave/down, visibility loss, target disposal, Native-mode switching, and component teardown before draining the message queue. They assert that no second show/draw occurs, no managed request survives, and the native tooltip window does not reappear. Popover tests cover focusable root content, native nested tab order with ineligible controls skipped, and `Closed` reentrancy that replaces a disposing Target or Content without losing the replacement or transferring caller ownership.
 
