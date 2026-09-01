@@ -50,8 +50,8 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         _isOpen = true;
         _restoreFocusOnClosed = false;
         _dropDown!.ShowAt(_currentBounds);
-        _tracker = new BootstrapOverlayAnchorTracker(_owner, Reposition, () => Close(false));
         _content!.FocusSearch();
+        _tracker = new BootstrapOverlayAnchorTracker(_owner, Reposition, () => Close(false));
         _owner.NotifyDropDownOpened();
         _owner.NotifyPopupSearchTextChanged(_content.SearchText);
     }
