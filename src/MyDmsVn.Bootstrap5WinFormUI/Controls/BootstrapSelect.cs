@@ -16,7 +16,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// </summary>
 [DefaultEvent(nameof(SelectionChanged))]
 [DefaultProperty(nameof(Placeholder))]
-public partial class BootstrapSelect : UserControl
+public partial class BootstrapSelect : UserControl, IBootstrapConnectedControl
 {
     private BootstrapSelectMode _selectionMode = BootstrapSelectMode.Single;
     private BootstrapSelectSelectionState _selectionState;
@@ -35,6 +35,8 @@ public partial class BootstrapSelect : UserControl
     private int _maximumSelectionRows = 3;
     private BootstrapValidationState _validationState;
     private int _borderRadius = -1;
+    private CornerRadius? _connectedCornerRadius;
+    private BootstrapConnectedControlSize? _connectedSizeOverride;
     private IBootstrapSelectMatcher _matcher = new BootstrapSelectTextMatcher();
     private IBootstrapSelectRenderer _renderer = new BootstrapSelectRenderer();
 
@@ -81,6 +83,11 @@ public partial class BootstrapSelect : UserControl
             if (_selectionMode == value)
             {
                 return;
+            }
+
+            if (_connectedSizeOverride.HasValue && value == BootstrapSelectMode.Multiple)
+            {
+                throw new NotSupportedException("BootstrapSelect supports Multiple mode only when it is not connected to an input group.");
             }
 
             var mutation = _selectionState.PreviewModeChange(value);
@@ -413,6 +420,46 @@ public partial class BootstrapSelect : UserControl
         }
     }
 
+    CornerRadius? IBootstrapConnectedControl.ConnectedCornerRadius
+    {
+        get => _connectedCornerRadius;
+        set
+        {
+            _connectedCornerRadius = value;
+            Invalidate();
+        }
+    }
+
+    BootstrapConnectedControlSize? IBootstrapConnectedControl.ConnectedSizeOverride
+    {
+        get => _connectedSizeOverride;
+        set
+        {
+            if (value.HasValue && _selectionMode == BootstrapSelectMode.Multiple)
+            {
+                throw new NotSupportedException("A Multiple-mode BootstrapSelect cannot be connected to an input group.");
+            }
+
+            _connectedSizeOverride = value;
+            PerformLayout();
+            Invalidate();
+        }
+    }
+
+    int IBootstrapConnectedControl.GetConnectedSafeMinimumHeight(BootstrapConnectedControlSize size, int dpi)
+    {
+        if (dpi <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dpi));
+        }
+
+        var metrics = BootstrapThemeManager.CurrentTheme.Metrics;
+        var logicalHeight = size == BootstrapConnectedControlSize.Small
+            ? metrics.ControlHeightSmall
+            : (size == BootstrapConnectedControlSize.Large ? metrics.ControlHeightLarge : metrics.ControlHeight);
+        return DpiScaler.Scale(logicalHeight, dpi);
+    }
+
     /// <summary>Gets or sets the local-mode matcher. Caller-provided matchers remain caller-owned.</summary>
     [Browsable(false)]
     public IBootstrapSelectMatcher Matcher
@@ -677,9 +724,10 @@ public partial class BootstrapSelect : UserControl
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         try
         {
-            using var path = RoundedPath.Create(
-                metrics.BorderBounds,
-                new CornerRadius(metrics.Radius));
+            var radius = _connectedCornerRadius.HasValue
+                ? ScaleCornerRadius(_connectedCornerRadius.Value, dpi)
+                : new CornerRadius(metrics.Radius);
+            using var path = RoundedPath.Create(metrics.BorderBounds, radius);
             using var background = new SolidBrush(
                 Enabled ? theme.Colors.Surface : theme.Colors.SurfaceSecondary);
             using var pen = new Pen(
@@ -804,5 +852,14 @@ public partial class BootstrapSelect : UserControl
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
     {
         Invalidate();
+    }
+
+    private static CornerRadius ScaleCornerRadius(CornerRadius radius, int dpi)
+    {
+        return new CornerRadius(
+            DpiScaler.Scale(radius.TopLeft, dpi),
+            DpiScaler.Scale(radius.TopRight, dpi),
+            DpiScaler.Scale(radius.BottomRight, dpi),
+            DpiScaler.Scale(radius.BottomLeft, dpi));
     }
 }

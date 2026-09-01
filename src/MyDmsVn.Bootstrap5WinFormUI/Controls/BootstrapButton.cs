@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Icons;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -15,7 +16,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// </summary>
 [DefaultProperty(nameof(Text))]
 [DefaultEvent(nameof(Click))]
-public class BootstrapButton : Button
+public class BootstrapButton : Button, IBootstrapConnectedControl
 {
     private static readonly IIconRenderer DefaultIconRenderer = BootstrapIconRenderer.CreateDefault();
 
@@ -31,6 +32,7 @@ public class BootstrapButton : Button
     private string _loadingText = string.Empty;
     private int _borderRadius = -1;
     private CornerRadius? _groupCornerRadius;
+    private BootstrapConnectedControlSize? _connectedSizeOverride;
     private bool _hovered;
     private bool _pressed;
     private bool _themeSubscribed;
@@ -314,10 +316,11 @@ public class BootstrapButton : Button
         var theme = BootstrapThemeManager.CurrentTheme;
         var metrics = theme.Metrics;
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        var height = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalHeight(metrics, _buttonSize), dpi);
-        var horizontalPadding = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalHorizontalPadding(metrics, _buttonSize), dpi);
-        var spacing = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalContentSpacing(metrics, _buttonSize), dpi);
-        var iconExtent = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalIconSize(metrics, _buttonSize), dpi);
+        var effectiveSize = GetEffectiveButtonSize();
+        var height = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalHeight(metrics, effectiveSize), dpi);
+        var horizontalPadding = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalHorizontalPadding(metrics, effectiveSize), dpi);
+        var spacing = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalContentSpacing(metrics, effectiveSize), dpi);
+        var iconExtent = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalIconSize(metrics, effectiveSize), dpi);
 
         var normalText = MeasureText(Text);
         var normalIcon = _icon is null ? Size.Empty : new Size(iconExtent, iconExtent);
@@ -540,6 +543,41 @@ public class BootstrapButton : Button
         }
     }
 
+    CornerRadius? IBootstrapConnectedControl.ConnectedCornerRadius
+    {
+        get => _groupCornerRadius;
+        set => GroupCornerRadius = value;
+    }
+
+    BootstrapConnectedControlSize? IBootstrapConnectedControl.ConnectedSizeOverride
+    {
+        get => _connectedSizeOverride;
+        set
+        {
+            if (_connectedSizeOverride == value)
+            {
+                return;
+            }
+
+            _connectedSizeOverride = value;
+            ApplyPreferredSize();
+            PerformLayout();
+            Invalidate();
+        }
+    }
+
+    int IBootstrapConnectedControl.GetConnectedSafeMinimumHeight(BootstrapConnectedControlSize size, int dpi)
+    {
+        if (dpi <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dpi));
+        }
+
+        return DpiScaler.Scale(
+            BootstrapButtonRenderLogic.GetLogicalHeight(BootstrapThemeManager.CurrentTheme.Metrics, MapConnectedSize(size)),
+            dpi);
+    }
+
     internal BootstrapButtonPalette ResolveCurrentPalette(BootstrapTheme theme)
     {
         if (theme is null)
@@ -573,8 +611,20 @@ public class BootstrapButton : Button
 
         var radius = _borderRadius >= 0
             ? _borderRadius
-            : BootstrapButtonRenderLogic.GetThemeBorderRadius(metrics, _buttonSize);
+            : BootstrapButtonRenderLogic.GetThemeBorderRadius(metrics, GetEffectiveButtonSize());
         return new CornerRadius(radius);
+    }
+
+    private BootstrapButtonSize GetEffectiveButtonSize()
+    {
+        return _connectedSizeOverride.HasValue ? MapConnectedSize(_connectedSizeOverride.Value) : _buttonSize;
+    }
+
+    private static BootstrapButtonSize MapConnectedSize(BootstrapConnectedControlSize size)
+    {
+        return size == BootstrapConnectedControlSize.Small
+            ? BootstrapButtonSize.Small
+            : (size == BootstrapConnectedControlSize.Large ? BootstrapButtonSize.Large : BootstrapButtonSize.Default);
     }
 
     private void PaintSurface(Graphics graphics, BootstrapTheme theme, BootstrapButtonPalette palette)
@@ -664,8 +714,9 @@ public class BootstrapButton : Button
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
         var metrics = theme.Metrics;
         var padding = GetContentPadding(metrics, dpi);
-        var spacing = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalContentSpacing(metrics, _buttonSize), dpi);
-        var iconExtent = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalIconSize(metrics, _buttonSize), dpi);
+        var effectiveSize = GetEffectiveButtonSize();
+        var spacing = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalContentSpacing(metrics, effectiveSize), dpi);
+        var iconExtent = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalIconSize(metrics, effectiveSize), dpi);
         var iconSize = _icon is null ? Size.Empty : new Size(iconExtent, iconExtent);
         var textSize = MeasureText(Text);
 
@@ -679,8 +730,9 @@ public class BootstrapButton : Button
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
         var metrics = theme.Metrics;
         var padding = GetContentPadding(metrics, dpi);
-        var spacing = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalContentSpacing(metrics, _buttonSize), dpi);
-        var spinnerExtent = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalIconSize(metrics, _buttonSize), dpi);
+        var effectiveSize = GetEffectiveButtonSize();
+        var spacing = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalContentSpacing(metrics, effectiveSize), dpi);
+        var spinnerExtent = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalIconSize(metrics, effectiveSize), dpi);
         var spinnerSize = new Size(spinnerExtent, spinnerExtent);
         var textSize = MeasureText(GetLoadingDisplayText());
         return ContentLayoutHelper.ArrangeHorizontal(
@@ -694,7 +746,7 @@ public class BootstrapButton : Button
 
     private Padding GetContentPadding(BootstrapThemeMetrics metrics, int dpi)
     {
-        var horizontal = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalHorizontalPadding(metrics, _buttonSize), dpi);
+        var horizontal = DpiScaler.Scale(BootstrapButtonRenderLogic.GetLogicalHorizontalPadding(metrics, GetEffectiveButtonSize()), dpi);
         return new Padding(horizontal, 0, horizontal, 0);
     }
 

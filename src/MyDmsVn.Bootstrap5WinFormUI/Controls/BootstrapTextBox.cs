@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Icons;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -14,7 +15,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// </summary>
 [DefaultProperty(nameof(Text))]
 [DefaultEvent(nameof(TextChanged))]
-public class BootstrapTextBox : UserControl
+public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
 {
     private static readonly IIconRenderer DefaultIconRenderer = BootstrapIconRenderer.CreateDefault();
     private static readonly IconDescriptor ClearIcon = IconDescriptor.Framework(FrameworkIconGlyph.Close);
@@ -30,6 +31,8 @@ public class BootstrapTextBox : UserControl
     private bool _showClearButton;
     private bool _editorHasFocus;
     private int _borderRadius = -1;
+    private CornerRadius? _connectedCornerRadius;
+    private BootstrapConnectedControlSize? _connectedSizeOverride;
     private bool _themeSubscribed;
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
@@ -328,6 +331,38 @@ public class BootstrapTextBox : UserControl
         _editor.SelectAll();
     }
 
+    CornerRadius? IBootstrapConnectedControl.ConnectedCornerRadius
+    {
+        get => _connectedCornerRadius;
+        set
+        {
+            _connectedCornerRadius = value;
+            Invalidate();
+        }
+    }
+
+    BootstrapConnectedControlSize? IBootstrapConnectedControl.ConnectedSizeOverride
+    {
+        get => _connectedSizeOverride;
+        set
+        {
+            _connectedSizeOverride = value;
+            PerformLayout();
+            Invalidate();
+        }
+    }
+
+    int IBootstrapConnectedControl.GetConnectedSafeMinimumHeight(BootstrapConnectedControlSize size, int dpi)
+    {
+        if (dpi <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dpi));
+        }
+
+        var target = DpiScaler.Scale(GetLogicalHeight(BootstrapThemeManager.CurrentTheme.Metrics, size), dpi);
+        return Math.Max(target, _editor.PreferredHeight + Math.Max(2, DpiScaler.Scale(2, dpi)));
+    }
+
     /// <inheritdoc />
     protected override void OnEnter(EventArgs e)
     {
@@ -403,8 +438,10 @@ public class BootstrapTextBox : UserControl
             return;
         }
 
-        var logicalRadius = _borderRadius >= 0 ? _borderRadius : theme.Metrics.Radius;
-        var radius = DpiScaler.Scale((float)logicalRadius, dpi);
+        var logicalRadius = _borderRadius >= 0 ? _borderRadius : GetLogicalRadius(theme.Metrics);
+        var radius = _connectedCornerRadius.HasValue
+            ? ScaleCornerRadius(_connectedCornerRadius.Value, dpi)
+            : new CornerRadius(DpiScaler.Scale((float)logicalRadius, dpi));
         var surface = Enabled && !ReadOnly ? theme.Colors.Surface : theme.Colors.SurfaceSecondary;
         var borderColor = BootstrapTextBoxRenderLogic.ResolveBorderColor(
             theme.Colors,
@@ -417,7 +454,7 @@ public class BootstrapTextBox : UserControl
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         try
         {
-            using var path = RoundedPath.Create(bounds, new CornerRadius(radius));
+            using var path = RoundedPath.Create(bounds, radius);
             using var surfaceBrush = new SolidBrush(surface);
             using var borderPen = new Pen(borderColor, borderWidth);
             graphics.FillPath(surfaceBrush, path);
@@ -623,7 +660,7 @@ public class BootstrapTextBox : UserControl
 
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        var horizontalPadding = DpiScaler.Scale(theme.Metrics.SpacingSM, dpi);
+        var horizontalPadding = DpiScaler.Scale(GetLogicalHorizontalPadding(theme.Metrics), dpi);
         var spacing = DpiScaler.Scale(theme.Metrics.SpacingXS, dpi);
         var iconExtent = DpiScaler.Scale(theme.Metrics.SpacingLG, dpi);
 
@@ -666,7 +703,7 @@ public class BootstrapTextBox : UserControl
     private void PaintIcons(Graphics graphics, BootstrapTheme theme, int dpi)
     {
         var iconExtent = DpiScaler.Scale(theme.Metrics.SpacingLG, dpi);
-        var horizontalPadding = DpiScaler.Scale(theme.Metrics.SpacingSM, dpi);
+        var horizontalPadding = DpiScaler.Scale(GetLogicalHorizontalPadding(theme.Metrics), dpi);
         var y = Math.Max(0, (ClientSize.Height - iconExtent) / 2);
         var foreground = Enabled ? theme.Colors.MutedText : theme.Colors.Disabled;
 
@@ -688,5 +725,45 @@ public class BootstrapTextBox : UserControl
                 new Rectangle(x, y, iconExtent, iconExtent),
                 foreground);
         }
+    }
+
+    private int GetLogicalHorizontalPadding(BootstrapThemeMetrics metrics)
+    {
+        if (_connectedSizeOverride == BootstrapConnectedControlSize.Small)
+        {
+            return metrics.SpacingXS;
+        }
+
+        return _connectedSizeOverride == BootstrapConnectedControlSize.Large
+            ? metrics.SpacingMD
+            : metrics.SpacingSM;
+    }
+
+    private int GetLogicalRadius(BootstrapThemeMetrics metrics)
+    {
+        if (_connectedSizeOverride == BootstrapConnectedControlSize.Small)
+        {
+            return metrics.RadiusSmall;
+        }
+
+        return _connectedSizeOverride == BootstrapConnectedControlSize.Large
+            ? metrics.RadiusLarge
+            : metrics.Radius;
+    }
+
+    private static int GetLogicalHeight(BootstrapThemeMetrics metrics, BootstrapConnectedControlSize size)
+    {
+        return size == BootstrapConnectedControlSize.Small
+            ? metrics.ControlHeightSmall
+            : (size == BootstrapConnectedControlSize.Large ? metrics.ControlHeightLarge : metrics.ControlHeight);
+    }
+
+    private static CornerRadius ScaleCornerRadius(CornerRadius radius, int dpi)
+    {
+        return new CornerRadius(
+            DpiScaler.Scale(radius.TopLeft, dpi),
+            DpiScaler.Scale(radius.TopRight, dpi),
+            DpiScaler.Scale(radius.BottomRight, dpi),
+            DpiScaler.Scale(radius.BottomLeft, dpi));
     }
 }
