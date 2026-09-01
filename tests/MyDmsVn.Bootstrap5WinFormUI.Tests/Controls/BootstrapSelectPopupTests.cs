@@ -159,6 +159,42 @@ public sealed class BootstrapSelectPopupTests
         Assert.That(select.HighlightedResultTextForTest, Is.EqualTo("Enabled"));
     }
 
+    [Test]
+    public void SelectionRefreshWithCloseOnSelectFalsePreservesNavigation()
+    {
+        using var form = new Form { Size = new Size(600, 500) };
+        using var select = new BootstrapSelect
+        {
+            SelectionMode = BootstrapSelectMode.Multiple,
+            CloseOnSelect = false,
+            Width = 320
+        };
+        for (var value = 1; value <= 12; value++)
+        {
+            select.Items.Add(new BootstrapSelectItem(value, "Item " + value));
+        }
+        Assert.That(select.SelectValue(1), Is.True);
+        form.Controls.Add(select);
+        form.Show();
+        Application.DoEvents();
+
+        select.OpenDropDownInternal();
+        Application.DoEvents();
+        Assert.That(select.MoveHighlightedResultForTest(8), Is.True);
+        var highlighted = select.HighlightedResultTextForTest;
+        var scrollOffset = select.ResultScrollOffsetForTest;
+
+        Assert.That(select.ActivateHighlightedResultForTest(), Is.True);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True);
+            Assert.That(select.HighlightedResultTextForTest, Is.EqualTo(highlighted));
+            Assert.That(select.ResultScrollOffsetForTest, Is.EqualTo(scrollOffset));
+        }));
+    }
+
     private sealed class TestForm : Form
     {
         internal void RaiseDeactivate()

@@ -74,6 +74,7 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
 
     internal IReadOnlyList<BootstrapSelectResultRow> Rows => _resultsView.Rows;
     internal BootstrapSelectResultRow? HighlightedRow => _resultsView.HighlightedRow;
+    internal int ScrollOffset => _resultsView.ScrollOffset;
 
     internal void ApplyPresentation(IBootstrapSelectRenderer renderer, BootstrapTheme theme, int dpi)
     {
@@ -95,6 +96,24 @@ internal sealed class BootstrapSelectDropDownContent : UserControl
     internal void SetResults(BootstrapSelectResultSet results)
     {
         _resultsView.SetResults(results);
+    }
+
+    internal void SetResults(
+        BootstrapSelectResultSet results,
+        BootstrapSelectResultsUpdateMode updateMode,
+        IEqualityComparer<object> valueComparer)
+    {
+        _resultsView.SetResults(results, updateMode, valueComparer);
+    }
+
+    internal bool MoveHighlight(int delta)
+    {
+        return _resultsView.MoveHighlight(delta);
+    }
+
+    internal bool Page(int direction)
+    {
+        return _resultsView.Page(direction);
     }
 
     internal bool ActivateHighlighted(BootstrapSelectChangeReason reason)

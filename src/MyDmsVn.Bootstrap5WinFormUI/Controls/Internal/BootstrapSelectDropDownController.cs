@@ -71,10 +71,14 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         _dropDown.MoveTo(_currentBounds);
     }
 
-    internal void RefreshResults()
+    internal void RefreshResults(
+        BootstrapSelectResultsUpdateMode updateMode = BootstrapSelectResultsUpdateMode.ResetNavigation)
     {
         if (_content is null) return;
-        _content.SetResults(_owner.BuildCurrentPopupResultSet(_content.SearchEnabled ? _content.SearchText : string.Empty));
+        _content.SetResults(
+            _owner.BuildCurrentPopupResultSet(_content.SearchEnabled ? _content.SearchText : string.Empty),
+            updateMode,
+            _owner.ValueComparer);
         if (_isOpen) Reposition();
     }
 
@@ -183,7 +187,7 @@ internal sealed class BootstrapSelectDropDownController : IDisposable
         if (_owner.ActivateResultRow(row, reason))
         {
             if (_owner.CloseOnSelect) Close(true);
-            else RefreshResults();
+            else RefreshResults(BootstrapSelectResultsUpdateMode.PreserveNavigation);
         }
     }
 
