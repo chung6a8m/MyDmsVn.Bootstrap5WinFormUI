@@ -5,7 +5,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
-internal static class BootstrapConnectedButtonLayoutLogic
+internal static class BootstrapConnectedControlLayoutLogic
 {
     internal static int ResolveSeamOverlap(BootstrapThemeMetrics metrics, int dpi)
     {
@@ -35,12 +35,12 @@ internal static class BootstrapConnectedButtonLayoutLogic
 
         if (count <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(count), count, "Connected button count must be positive.");
+            throw new ArgumentOutOfRangeException(nameof(count), count, "Connected control count must be positive.");
         }
 
         if (index < 0 || index >= count)
         {
-            throw new ArgumentOutOfRangeException(nameof(index), index, "Connected button index is outside the group.");
+            throw new ArgumentOutOfRangeException(nameof(index), index, "Connected control index is outside the group.");
         }
 
         if (radius < 0f || float.IsNaN(radius) || float.IsInfinity(radius))

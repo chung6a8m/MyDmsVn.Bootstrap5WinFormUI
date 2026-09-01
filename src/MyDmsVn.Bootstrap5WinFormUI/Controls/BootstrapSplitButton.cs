@@ -503,12 +503,12 @@ public class BootstrapSplitButton : Control
             : BootstrapButtonRenderLogic.GetThemeBorderRadius(
                 BootstrapThemeManager.CurrentTheme.Metrics,
                 _buttonSize);
-        _primaryButton.GroupCornerRadius = BootstrapConnectedButtonLayoutLogic.ResolveCornerRadius(
+        _primaryButton.GroupCornerRadius = BootstrapConnectedControlLayoutLogic.ResolveCornerRadius(
             Orientation.Horizontal,
             0,
             2,
             radius);
-        _dropDownButton.GroupCornerRadius = BootstrapConnectedButtonLayoutLogic.ResolveCornerRadius(
+        _dropDownButton.GroupCornerRadius = BootstrapConnectedControlLayoutLogic.ResolveCornerRadius(
             Orientation.Horizontal,
             1,
             2,
@@ -518,7 +518,7 @@ public class BootstrapSplitButton : Control
     private int ResolveSeamOverlap()
     {
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        return BootstrapConnectedButtonLayoutLogic.ResolveSeamOverlap(
+        return BootstrapConnectedControlLayoutLogic.ResolveSeamOverlap(
             BootstrapThemeManager.CurrentTheme.Metrics,
             dpi);
     }

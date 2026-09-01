@@ -161,7 +161,7 @@ public sealed class BootstrapSplitButtonTests
         split.Size = new Size(preferred.Width + 80, preferred.Height);
         split.PerformLayout();
         var (primary, menu) = GetRegions(split);
-        var overlap = BootstrapConnectedButtonLayoutLogic.ResolveSeamOverlap(
+        var overlap = BootstrapConnectedControlLayoutLogic.ResolveSeamOverlap(
             BootstrapThemeManager.CurrentTheme.Metrics,
             split.DeviceDpi);
 
