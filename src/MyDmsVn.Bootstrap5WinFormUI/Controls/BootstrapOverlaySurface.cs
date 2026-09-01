@@ -9,6 +9,8 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 internal sealed class BootstrapOverlaySurface : Panel
 {
+    private const float AntiAliasClipAllowance = 1f;
+
     private readonly BootstrapOverlayContentHost _contentHost;
     private BootstrapTheme _theme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
     private Padding _logicalContentPadding = new Padding(12, 8, 12, 8);
@@ -186,17 +188,11 @@ internal sealed class BootstrapOverlaySurface : Panel
             return;
         }
 
-        var borderInset = _borderWidth / 2f;
-        var bounds = new RectangleF(
-            borderInset,
-            borderInset,
-            Math.Max(0f, ClientSize.Width - _borderWidth),
-            Math.Max(0f, ClientSize.Height - _borderWidth));
         var previous = e.Graphics.SmoothingMode;
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         try
         {
-            using var path = RoundedPath.Create(bounds, new CornerRadius(_radius));
+            using var path = CreatePaintPath();
             using var background = new SolidBrush(_theme.Colors.Surface);
             e.Graphics.FillPath(background, path);
             if (_borderWidth > 0)
@@ -238,14 +234,35 @@ internal sealed class BootstrapOverlaySurface : Panel
         Region? next = null;
         if (ClientSize.Width > 0 && ClientSize.Height > 0)
         {
-            using var path = RoundedPath.Create(new RectangleF(0, 0, ClientSize.Width, ClientSize.Height), new CornerRadius(_radius));
-            next = new Region(path);
+            using var paintPath = CreatePaintPath();
+            using var clipEnvelope = (GraphicsPath)paintPath.Clone();
+            using var envelopePen = new Pen(
+                Color.Black,
+                _borderWidth + (2f * AntiAliasClipAllowance))
+            {
+                LineJoin = LineJoin.Round
+            };
+            clipEnvelope.Widen(envelopePen);
+            next = new Region(paintPath);
+            next.Union(clipEnvelope);
+            next.Intersect(ClientRectangle);
         }
 
         var previous = _ownedRegion;
         _ownedRegion = next;
         Region = next;
         previous?.Dispose();
+    }
+
+    private GraphicsPath CreatePaintPath()
+    {
+        var borderInset = _borderWidth / 2f;
+        var bounds = new RectangleF(
+            borderInset,
+            borderInset,
+            Math.Max(0f, ClientSize.Width - _borderWidth),
+            Math.Max(0f, ClientSize.Height - _borderWidth));
+        return RoundedPath.Create(bounds, new CornerRadius(_radius));
     }
 
     private void ReplaceContentHostRegion()

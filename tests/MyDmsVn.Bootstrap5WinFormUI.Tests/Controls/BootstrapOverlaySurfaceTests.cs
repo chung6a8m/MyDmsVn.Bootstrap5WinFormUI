@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -96,7 +97,8 @@ public sealed class BootstrapOverlaySurfaceTests
         };
         using var content = new Panel { BackColor = OpaqueContentColor };
         surface.AttachContent(content);
-        surface.ApplyTheme(CreateThickBorderTheme(), dpi);
+        var theme = CreateThickBorderTheme();
+        surface.ApplyTheme(theme, dpi);
         surface.CreateControl();
         content.CreateControl();
         surface.PerformLayout();
@@ -127,6 +129,45 @@ public sealed class BootstrapOverlaySurfaceTests
             AssertCornerExcludesOpaqueContent(host, bitmap, expectedRadius, expectedRadius - expectedBorderWidth, Corner.TopRight);
             AssertCornerExcludesOpaqueContent(host, bitmap, expectedRadius, expectedRadius - expectedBorderWidth, Corner.BottomLeft);
             AssertCornerExcludesOpaqueContent(host, bitmap, expectedRadius, expectedRadius - expectedBorderWidth, Corner.BottomRight);
+        }));
+    }
+
+    [TestCase(96, 16)]
+    [TestCase(120, 20)]
+    [TestCase(144, 24)]
+    [TestCase(168, 28)]
+    [TestCase(192, 32)]
+    public void OuterClipPreservesRenderedAntiAliasCoverageAtEveryCorner(int dpi, int expectedRadius)
+    {
+        using var surface = new BootstrapOverlaySurface
+        {
+            Size = new Size(140, 80),
+            LogicalContentPadding = Padding.Empty,
+            LogicalBorderRadius = 16
+        };
+        using var content = new Panel { BackColor = OpaqueContentColor };
+        surface.AttachContent(content);
+        var theme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+        surface.ApplyTheme(theme, dpi);
+        surface.CreateControl();
+        content.CreateControl();
+        surface.PerformLayout();
+        Application.DoEvents();
+
+        Assert.That(surface.Region, Is.Not.Null);
+        using var outerClip = surface.Region!.Clone();
+        surface.Region = null;
+        using var rendered = new Bitmap(surface.Width, surface.Height, PixelFormat.Format32bppArgb);
+        surface.DrawToBitmap(rendered, surface.ClientRectangle);
+        using var clipped = ApplyClip(rendered, outerClip);
+
+        Assert.Multiple((Action)(() =>
+        {
+            AssertCornerPreservesAntiAliasCoverage(rendered, clipped, expectedRadius, theme, Corner.TopLeft);
+            AssertCornerPreservesAntiAliasCoverage(rendered, clipped, expectedRadius, theme, Corner.TopRight);
+            AssertCornerPreservesAntiAliasCoverage(rendered, clipped, expectedRadius, theme, Corner.BottomLeft);
+            AssertCornerPreservesAntiAliasCoverage(rendered, clipped, expectedRadius, theme, Corner.BottomRight);
+            Assert.That(outerClip.IsVisible(0.5f, 0.5f), Is.False, "The conservative clip must keep the rounded window silhouette.");
         }));
     }
 
@@ -181,6 +222,61 @@ public sealed class BootstrapOverlaySurfaceTests
             host.Left + content.Left,
             host.Top + content.Top);
         return bitmap;
+    }
+
+    private static Bitmap ApplyClip(Bitmap source, Region clip)
+    {
+        var bitmap = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.Transparent);
+        graphics.SetClip(clip, System.Drawing.Drawing2D.CombineMode.Replace);
+        graphics.DrawImageUnscaled(source, Point.Empty);
+        return bitmap;
+    }
+
+    private static void AssertCornerPreservesAntiAliasCoverage(
+        Bitmap rendered,
+        Bitmap clipped,
+        int radius,
+        BootstrapTheme theme,
+        Corner corner)
+    {
+        var antiAliasedPixels = 0;
+        var lostPixels = 0;
+        var outside = Color.Black.ToArgb();
+        var surface = theme.Colors.Surface.ToArgb();
+        var border = theme.Colors.Border.ToArgb();
+        var content = OpaqueContentColor.ToArgb();
+        for (var y = 0; y <= radius; y++)
+        {
+            for (var x = 0; x <= radius; x++)
+            {
+                var sampleX = corner == Corner.TopLeft || corner == Corner.BottomLeft
+                    ? x
+                    : rendered.Width - 1 - x;
+                var sampleY = corner == Corner.TopLeft || corner == Corner.TopRight
+                    ? y
+                    : rendered.Height - 1 - y;
+                var before = rendered.GetPixel(sampleX, sampleY);
+                var beforeArgb = before.ToArgb();
+                if (beforeArgb == outside
+                    || beforeArgb == surface
+                    || beforeArgb == border
+                    || beforeArgb == content)
+                {
+                    continue;
+                }
+
+                antiAliasedPixels++;
+                if (clipped.GetPixel(sampleX, sampleY).ToArgb() != beforeArgb)
+                {
+                    lostPixels++;
+                }
+            }
+        }
+
+        Assert.That(antiAliasedPixels, Is.GreaterThan(0), $"The real surface render must contain anti-aliased coverage at {corner}.");
+        Assert.That(lostPixels, Is.Zero, $"The outer Region discarded anti-aliased coverage at {corner}.");
     }
 
     private static void AssertCornerExcludesOpaqueContent(
