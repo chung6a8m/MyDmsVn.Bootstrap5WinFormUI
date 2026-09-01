@@ -545,10 +545,14 @@ public sealed class BootstrapPopoverTests
         fixture.Popover.CloseOnClickOutside = false;
         fixture.Show();
 
-        SendWindowDeactivate(fixture.Popover.DropDownHandleForTest, IntPtr.Zero);
-        fixture.Popover.Hide();
-        fixture.Popover.Show();
-        Application.DoEvents();
+        for (var cycle = 0; cycle < 5; cycle++)
+        {
+            SendWindowDeactivate(fixture.Popover.DropDownHandleForTest, IntPtr.Zero);
+            fixture.Popover.Hide();
+            fixture.Popover.Show();
+            Application.DoEvents();
+            Assert.That(fixture.Popover.IsOpen, Is.True, $"Reopen cycle {cycle}");
+        }
 
         Assert.That(fixture.Popover.IsOpen, Is.True);
     }

@@ -189,10 +189,14 @@ public sealed class BootstrapSelectPopupTests
         ShowAndOpen(form, select);
         var creationCount = select.DropDownCreationCountForTest;
 
-        SendWindowDeactivate(select.DropDownHandleForTest, IntPtr.Zero);
-        select.CloseDropDownInternal(false);
-        select.OpenDropDownInternal();
-        Application.DoEvents();
+        for (var cycle = 0; cycle < 5; cycle++)
+        {
+            SendWindowDeactivate(select.DropDownHandleForTest, IntPtr.Zero);
+            select.CloseDropDownInternal(false);
+            select.OpenDropDownInternal();
+            Application.DoEvents();
+            Assert.That(select.IsDropDownOpenForTest, Is.True, $"Reopen cycle {cycle}");
+        }
 
         Assert.Multiple((Action)(() =>
         {
