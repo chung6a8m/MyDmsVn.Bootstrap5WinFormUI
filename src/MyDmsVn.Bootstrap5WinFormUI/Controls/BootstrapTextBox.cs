@@ -25,7 +25,8 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
     private readonly Button _clearButton = new Button();
     private Control? _frameworkTrailingAccessory;
     private string _placeholderText = string.Empty;
-    private BootstrapValidationState _validationState = BootstrapValidationState.None;
+    private BootstrapValidationState _applicationValidationState = BootstrapValidationState.None;
+    private BootstrapValidationState? _transientValidationState;
     private IconDescriptor? _icon;
     private IconDescriptor? _trailingIcon;
     private IIconRenderer _iconRenderer = DefaultIconRenderer;
@@ -142,6 +143,22 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
         Invalidate();
     }
 
+    internal void SetTransientValidationStateOverride(BootstrapValidationState? state)
+    {
+        if (state.HasValue)
+        {
+            BootstrapTextBoxRenderLogic.ValidateState(state.Value);
+        }
+
+        if (_transientValidationState == state)
+        {
+            return;
+        }
+
+        _transientValidationState = state;
+        Invalidate();
+    }
+
     /// <inheritdoc />
     [Browsable(true)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
@@ -188,17 +205,20 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
     [DefaultValue(BootstrapValidationState.None)]
     public BootstrapValidationState ValidationState
     {
-        get => _validationState;
+        get => _transientValidationState ?? _applicationValidationState;
         set
         {
             BootstrapTextBoxRenderLogic.ValidateState(value);
-            if (_validationState == value)
+            if (_applicationValidationState == value)
             {
                 return;
             }
 
-            _validationState = value;
-            Invalidate();
+            _applicationValidationState = value;
+            if (!_transientValidationState.HasValue)
+            {
+                Invalidate();
+            }
         }
     }
 
@@ -473,7 +493,7 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
         var surface = Enabled && !ReadOnly ? theme.Colors.Surface : theme.Colors.SurfaceSecondary;
         var borderColor = BootstrapTextBoxRenderLogic.ResolveBorderColor(
             theme.Colors,
-            _validationState,
+            _transientValidationState ?? _applicationValidationState,
             ContainsFocus,
             Enabled);
 
