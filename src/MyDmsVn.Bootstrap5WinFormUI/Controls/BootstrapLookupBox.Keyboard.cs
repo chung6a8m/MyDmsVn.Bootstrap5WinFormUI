@@ -119,7 +119,7 @@ public partial class BootstrapLookupBox
 
         grid.ClearSelection();
         grid.Rows[current].Selected = true;
-        if (grid.Columns.Count > 0) grid.CurrentCell = grid.Rows[current].Cells[0];
+        grid.CurrentCell = FindFirstVisibleCell(grid.Rows[current]);
         var sourceItem = _dropDownContent.GetSourceItem(current);
         SetHighlightedItem(sourceItem?.Item);
         _dropDownContent.UpdateStatus(current + 1, count, false, MinimumSearchLength);
@@ -161,9 +161,11 @@ public partial class BootstrapLookupBox
 
         CloseDropDown();
         if (EnterKeyBehavior == BootstrapLookupEnterKeyBehavior.CommitSelectionAndMoveNext)
-            ContinueDialogNavigation(false);
+            ContinueOwnerNavigation(false);
         return true;
     }
+
+    private protected virtual bool ContinueOwnerNavigation(bool reverse) => ContinueDialogNavigation(reverse);
 
     private bool ContinueDialogNavigation(bool reverse)
     {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -121,6 +122,26 @@ public sealed class BootstrapLookupDataGridViewInteractionTests
         host.Grid.CancelEdit();
     }
 
+    [Test]
+    public void CommitAndMoveNextEnterUsesNativeGridTraversal()
+    {
+        using var host = new GridHost();
+        host.LookupColumn.EnterKeyBehavior = BootstrapLookupEnterKeyBehavior.CommitSelectionAndMoveNext;
+        host.Grid.Columns[1].Visible = true;
+        host.Grid.Columns.Insert(2, new DataGridViewTextBoxColumn { Visible = false });
+        var editor = host.BeginLookupEdit();
+        editor.Text = "Beta";
+
+        SendEditorKey(editor, Keys.Enter);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(host.Rows[0].ProductId, Is.EqualTo(2));
+            Assert.That(host.Grid.CurrentCell!.ColumnIndex, Is.EqualTo(3), "Native traversal must skip visible read-only and hidden cells.");
+            Assert.That(host.Grid.IsCurrentCellInEditMode, Is.False);
+        }));
+    }
+
     private static bool SendDialogKey(BootstrapLookupBox lookup, Keys key)
     {
         var native = Descendants(lookup).OfType<TextBox>().Single();
@@ -133,6 +154,15 @@ public sealed class BootstrapLookupDataGridViewInteractionTests
         var native = Descendants(lookup).OfType<TextBox>().Single();
         var message = Message.Create(native.Handle, 0x0100, (IntPtr)(int)key, IntPtr.Zero);
         native.PreProcessMessage(ref message);
+        Application.DoEvents();
+    }
+
+    private static void SendEditorKey(BootstrapLookupBox lookup, Keys key)
+    {
+        var onEditorKeyDown = typeof(BootstrapLookupBox).GetMethod(
+            "OnEditorKeyDown",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        onEditorKeyDown.Invoke(lookup, new object[] { new KeyEventArgs(key) });
         Application.DoEvents();
     }
 

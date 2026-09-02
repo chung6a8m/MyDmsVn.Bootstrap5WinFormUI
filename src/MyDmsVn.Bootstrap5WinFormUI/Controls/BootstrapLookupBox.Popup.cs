@@ -74,16 +74,18 @@ public partial class BootstrapLookupBox
         }
         var row = ResultsGrid.Rows[rowIndex];
         row.Selected = true;
-        System.Windows.Forms.DataGridViewCell? firstVisibleCell = null;
-        foreach (System.Windows.Forms.DataGridViewCell cell in row.Cells)
-        {
-            if (!cell.Visible) continue;
-            firstVisibleCell = cell;
-            break;
-        }
-        if (firstVisibleCell is not null) ResultsGrid.CurrentCell = firstVisibleCell;
+        ResultsGrid.CurrentCell = FindFirstVisibleCell(row);
         if (ResultsGrid.DisplayedRowCount(false) > 0)
             ResultsGrid.FirstDisplayedScrollingRowIndex = rowIndex;
+    }
+
+    private static System.Windows.Forms.DataGridViewCell? FindFirstVisibleCell(System.Windows.Forms.DataGridViewRow row)
+    {
+        foreach (System.Windows.Forms.DataGridViewCell cell in row.Cells)
+        {
+            if (cell.Visible) return cell;
+        }
+        return null;
     }
 
     internal void RequestExplicitAddNew()

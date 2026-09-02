@@ -68,6 +68,69 @@ public sealed class BootstrapLookupInteractionTests
         Assert.That(lookup.SelectedValue, Is.EqualTo(2));
     }
 
+    [TestCase(Keys.Down)]
+    [TestCase(Keys.PageDown)]
+    public void NavigationUsesFirstVisibleResultCellWhenLeadingColumnIsHidden(Keys key)
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        lookup.Columns.Add(new BootstrapLookupColumnDefinition
+        {
+            DataPropertyName = "Id",
+            HeaderText = "Id",
+            Visible = false
+        });
+        lookup.Columns.Add(new BootstrapLookupColumnDefinition
+        {
+            DataPropertyName = "Name",
+            HeaderText = "Name"
+        });
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.OpenDropDown();
+
+        lookup.SendKey(key);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.ResultsGrid.CurrentCell?.ColumnIndex, Is.EqualTo(1));
+            Assert.That(lookup.ResultsGrid.CurrentCell?.RowIndex, Is.EqualTo(1));
+            Assert.That(lookup.ResultsGrid.SelectedRows[0].Index, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void NavigationWithNoVisibleResultColumnsStillMovesHighlight()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        lookup.Columns.Add(new BootstrapLookupColumnDefinition
+        {
+            DataPropertyName = "Id",
+            HeaderText = "Id",
+            Visible = false
+        });
+        lookup.Columns.Add(new BootstrapLookupColumnDefinition
+        {
+            DataPropertyName = "Name",
+            HeaderText = "Name",
+            Visible = false
+        });
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.OpenDropDown();
+
+        lookup.SendKey(Keys.Down);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.ResultsGrid.CurrentCell, Is.Null);
+            Assert.That(lookup.ResultsGrid.SelectedRows[0].Index, Is.EqualTo(1));
+        }));
+    }
+
     [Test]
     public void ProgrammaticSelectionAndClearSynchronizeAnOpenPopup()
     {

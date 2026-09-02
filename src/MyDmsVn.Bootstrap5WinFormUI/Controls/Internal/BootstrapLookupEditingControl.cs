@@ -70,6 +70,50 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
             (key == Keys.Enter && (IsDropDownOpen || ClosedEnterKeyBehavior != BootstrapLookupClosedEnterKeyBehavior.DataGridViewDefault));
     }
 
+    private protected override bool ContinueOwnerNavigation(bool reverse)
+    {
+        var grid = EditingControlDataGridView;
+        if (grid?.CurrentCell is not DataGridViewCell currentCell)
+            return base.ContinueOwnerNavigation(reverse);
+        if (!grid.EndEdit()) return true;
+
+        var nextCell = FindNextEditableCell(grid, currentCell, reverse);
+        if (nextCell is null) return false;
+        grid.CurrentCell = nextCell;
+        return true;
+    }
+
+    private static DataGridViewCell? FindNextEditableCell(DataGridView grid, DataGridViewCell currentCell, bool reverse)
+    {
+        var rowIndex = currentCell.RowIndex;
+        var column = currentCell.OwningColumn;
+        while (rowIndex >= 0 && column is not null)
+        {
+            column = reverse
+                ? grid.Columns.GetPreviousColumn(column, DataGridViewElementStates.Visible, DataGridViewElementStates.None)
+                : grid.Columns.GetNextColumn(column, DataGridViewElementStates.Visible, DataGridViewElementStates.None);
+            while (column is not null)
+            {
+                var candidate = grid.Rows[rowIndex].Cells[column.Index];
+                if (!candidate.ReadOnly) return candidate;
+                column = reverse
+                    ? grid.Columns.GetPreviousColumn(column, DataGridViewElementStates.Visible, DataGridViewElementStates.None)
+                    : grid.Columns.GetNextColumn(column, DataGridViewElementStates.Visible, DataGridViewElementStates.None);
+            }
+
+            rowIndex = reverse
+                ? grid.Rows.GetPreviousRow(rowIndex, DataGridViewElementStates.Visible)
+                : grid.Rows.GetNextRow(rowIndex, DataGridViewElementStates.Visible);
+            if (rowIndex < 0) return null;
+            column = reverse
+                ? grid.Columns.GetLastColumn(DataGridViewElementStates.Visible, DataGridViewElementStates.None)
+                : grid.Columns.GetFirstColumn(DataGridViewElementStates.Visible);
+            if (column is not null && !grid.Rows[rowIndex].Cells[column.Index].ReadOnly)
+                return grid.Rows[rowIndex].Cells[column.Index];
+        }
+        return null;
+    }
+
     private void OnLookupSelectionCommitted(object? sender, BootstrapLookupSelectionCommittedEventArgs e)
     {
         if (_configuring || _column is null) return;
