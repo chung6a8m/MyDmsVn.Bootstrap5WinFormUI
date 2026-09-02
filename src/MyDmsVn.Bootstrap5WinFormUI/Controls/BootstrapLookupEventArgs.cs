@@ -80,4 +80,22 @@ public class BootstrapLookupCellEventArgs : EventArgs
     public int RowIndex { get; }
     /// <summary>Gets the column index.</summary>
     public int ColumnIndex { get; }
+    /// <summary>Gets or sets the item associated with the lookup operation.</summary>
+    public object? Item { get; set; }
+    /// <summary>Gets the committed logical value, when applicable.</summary>
+    public object? Value { get; internal set; }
+    /// <summary>Gets the committed display text, when applicable.</summary>
+    public string DisplayText { get; internal set; } = string.Empty;
+    /// <summary>Gets the commit reason, when applicable.</summary>
+    public BootstrapLookupCommitReason Reason { get; internal set; }
+    /// <summary>Gets the active query text.</summary>
+    public string QueryText { get; internal set; } = string.Empty;
+    /// <summary>Gets the original unmatched text.</summary>
+    public string OriginalText { get; internal set; } = string.Empty;
+    /// <summary>Gets the normalized unmatched text.</summary>
+    public string NormalizedText { get; internal set; } = string.Empty;
+    /// <summary>Gets or sets the item returned by an Add New workflow.</summary>
+    public object? NewItem { get; set; }
+    /// <summary>Gets or sets whether the operation is canceled.</summary>
+    public bool Cancel { get; set; }
 }
