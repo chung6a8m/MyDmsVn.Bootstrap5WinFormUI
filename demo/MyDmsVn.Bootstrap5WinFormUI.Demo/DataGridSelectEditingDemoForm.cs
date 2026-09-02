@@ -355,7 +355,7 @@ public sealed class DataGridSelectEditingDemoForm : Form
     private void OnDataError(object? sender, DataGridViewDataErrorEventArgs e)
     {
         e.ThrowException = false;
-        _status.Text = "Invalid edit value: " + e.Exception.Message;
+        _status.Text = "Invalid edit value: " + (e.Exception?.Message ?? "Unknown data error.");
     }
 
     private static decimal ReadDecimal(object? value)
