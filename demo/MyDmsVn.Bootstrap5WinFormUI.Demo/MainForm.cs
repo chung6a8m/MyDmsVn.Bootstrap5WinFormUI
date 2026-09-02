@@ -243,8 +243,10 @@ public sealed class MainForm : Form
 
         AddPage(
             "DataGrid",
-            "Bound tabular data, empty state, loading overlay, sorting/selection, and 10,000-row manual performance scenario.",
-            () => new DataGridDemoForm());
+            "Bound data, states, large-row performance, and editable product cells using BootstrapSelect through the native editing lifecycle.",
+            () => new DemoPageHostForm(
+                new DemoPageSection("Basic / states", () => new DataGridDemoForm()),
+                new DemoPageSection("Editable + BootstrapSelect", () => new DataGridSelectEditingDemoForm())));
 
         AddPage(
             "Pagination",
