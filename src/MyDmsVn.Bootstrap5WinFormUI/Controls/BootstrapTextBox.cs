@@ -23,6 +23,7 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
     private readonly TextBox _editor = new TextBox();
     private readonly Label _placeholder = new Label();
     private readonly Button _clearButton = new Button();
+    private Control? _frameworkTrailingAccessory;
     private string _placeholderText = string.Empty;
     private BootstrapValidationState _validationState = BootstrapValidationState.None;
     private IconDescriptor? _icon;
@@ -113,6 +114,33 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
     /// Gets the native text editor used by this composite control.
     /// </summary>
     protected TextBox Editor => _editor;
+
+    internal void SetFrameworkTrailingAccessory(Control? accessory)
+    {
+        if (ReferenceEquals(_frameworkTrailingAccessory, accessory))
+        {
+            return;
+        }
+
+        var previous = _frameworkTrailingAccessory;
+        _frameworkTrailingAccessory = null;
+        if (previous is not null)
+        {
+            Controls.Remove(previous);
+            previous.Dispose();
+        }
+
+        if (accessory is not null)
+        {
+            accessory.TabStop = false;
+            _frameworkTrailingAccessory = accessory;
+            Controls.Add(accessory);
+            accessory.BringToFront();
+        }
+
+        PerformLayout();
+        Invalidate();
+    }
 
     /// <inheritdoc />
     [Browsable(true)]
@@ -671,6 +699,13 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
         }
 
         var right = Math.Max(left, ClientSize.Width - horizontalPadding);
+        if (_frameworkTrailingAccessory is not null)
+        {
+            var accessoryLeft = Math.Max(left, right - iconExtent);
+            _frameworkTrailingAccessory.Bounds = new Rectangle(accessoryLeft, (ClientSize.Height - iconExtent) / 2, iconExtent, iconExtent);
+            right = Math.Max(left, accessoryLeft - spacing);
+        }
+
         if (_clearButton.Visible)
         {
             var clearLeft = Math.Max(left, right - iconExtent);
@@ -698,6 +733,8 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
         {
             _clearButton.BringToFront();
         }
+
+        _frameworkTrailingAccessory?.BringToFront();
     }
 
     private void PaintIcons(Graphics graphics, BootstrapTheme theme, int dpi)
@@ -718,7 +755,10 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
 
         if (_trailingIcon is not null && !_clearButton.Visible)
         {
-            var x = Math.Max(horizontalPadding, ClientSize.Width - horizontalPadding - iconExtent);
+            var right = _frameworkTrailingAccessory is null
+                ? ClientSize.Width - horizontalPadding
+                : _frameworkTrailingAccessory.Left - DpiScaler.Scale(theme.Metrics.SpacingXS, dpi);
+            var x = Math.Max(horizontalPadding, right - iconExtent);
             _iconRenderer.TryRender(
                 graphics,
                 _trailingIcon,
