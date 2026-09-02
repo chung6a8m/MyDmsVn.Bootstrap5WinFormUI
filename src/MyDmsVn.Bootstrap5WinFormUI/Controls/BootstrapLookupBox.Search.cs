@@ -48,6 +48,7 @@ public partial class BootstrapLookupBox
         if (TypingPopupBehavior == BootstrapLookupTypingPopupBehavior.AutoOpen &&
             normalized.Length >= MinimumSearchLength &&
             normalized.Length > 0 &&
+            ContainsFocus &&
             !IsDropDownOpen)
         {
             _dropDownController.Open();

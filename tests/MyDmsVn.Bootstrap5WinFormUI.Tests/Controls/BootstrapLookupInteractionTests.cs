@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
@@ -89,6 +90,57 @@ public sealed class BootstrapLookupInteractionTests
 
         Assert.That(next.Focused, Is.True);
         Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void PendingDebounceCannotReopenAfterEditorLosesFocus()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        using var next = new Button { Top = 50, Text = "Next" };
+        lookup.SearchDebounceMilliseconds = 60;
+        form.Controls.AddRange(new Control[] { lookup, next });
+        form.Show(); lookup.Focus(); Application.DoEvents();
+
+        lookup.Text = "Alpha";
+        next.Focus();
+        Application.DoEvents();
+        PumpMessagesFor(180);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(next.Focused, Is.True);
+            Assert.That(lookup.IsDropDownOpen, Is.False);
+            Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void ProgrammaticTextOnUnfocusedLookupDoesNotAutoOpen()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        using var focused = new Button { Top = 50 };
+        lookup.SearchDebounceMilliseconds = 40;
+        form.Controls.AddRange(new Control[] { lookup, focused });
+        form.Show(); focused.Focus(); Application.DoEvents();
+
+        lookup.Text = "Beta";
+        PumpMessagesFor(140);
+
+        Assert.That(lookup.IsDropDownOpen, Is.False);
+        Assert.That(focused.Focused, Is.True);
+    }
+
+    private static void PumpMessagesFor(int milliseconds)
+    {
+        var watch = Stopwatch.StartNew();
+        while (watch.ElapsedMilliseconds < milliseconds)
+        {
+            Application.DoEvents();
+            Thread.Sleep(5);
+        }
+        Application.DoEvents();
     }
 
     private static TestLookup Create() => new TestLookup

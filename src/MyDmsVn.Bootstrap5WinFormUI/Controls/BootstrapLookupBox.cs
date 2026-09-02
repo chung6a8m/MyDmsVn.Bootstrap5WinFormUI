@@ -217,6 +217,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     protected override void OnLeave(EventArgs e)
     {
         base.OnLeave(e);
+        _searchDebouncer.Cancel();
         if (IsDisposed || Disposing || Form.ActiveForm != FindForm()) return;
         var resolution = ResolvePendingText(BootstrapLookupCommitReason.ExactMatch);
         if (!resolution.NavigationAllowed) OpenDropDown();

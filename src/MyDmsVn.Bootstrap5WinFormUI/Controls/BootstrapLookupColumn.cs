@@ -23,16 +23,24 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     private Func<string, string> _searchTextNormalizer = BootstrapLookupTextNormalization.NormalizeSearchText;
     private Func<string, string> _textNormalizer = value => (value ?? string.Empty).Trim();
     private IEqualityComparer<string> _textComparer = StringComparer.CurrentCultureIgnoreCase;
+    private object? _dataSource;
+    private string _displayMember = string.Empty;
+    private string _valueMember = string.Empty;
+    private BootstrapLookupDataAdapter? _formatAdapter;
+    private Dictionary<object, string> _displayByValue = new Dictionary<object, string>();
 
     /// <summary>Initializes a lookup column.</summary>
-    public BootstrapLookupColumn() : base(new BootstrapLookupCell()) { }
+    public BootstrapLookupColumn() : base(new BootstrapLookupCell())
+    {
+        Disposed += OnColumnDisposed;
+    }
 
     /// <summary>Gets or sets the lookup data source.</summary>
-    [DefaultValue(null)] public object? DataSource { get; set; }
+    [DefaultValue(null)] public object? DataSource { get => _dataSource; set { if (!ReferenceEquals(_dataSource, value)) ReplaceFormatAdapter(value, _displayMember, _valueMember); } }
     /// <summary>Gets or sets the lookup display member.</summary>
-    [DefaultValue("")] public string DisplayMember { get; set; } = string.Empty;
+    [DefaultValue("")] public string DisplayMember { get => _displayMember; set { var next = value ?? string.Empty; if (!string.Equals(_displayMember, next, StringComparison.Ordinal)) ReplaceFormatAdapter(_dataSource, next, _valueMember); } }
     /// <summary>Gets or sets the lookup value member.</summary>
-    [DefaultValue("")] public string ValueMember { get; set; } = string.Empty;
+    [DefaultValue("")] public string ValueMember { get => _valueMember; set { var next = value ?? string.Empty; if (!string.Equals(_valueMember, next, StringComparison.Ordinal)) ReplaceFormatAdapter(_dataSource, _displayMember, next); } }
     /// <summary>Gets result column definitions.</summary>
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Content)] public BootstrapLookupColumnDefinitionCollection LookupColumns => _lookupColumns;
     /// <summary>Gets ordered searchable members.</summary>
@@ -76,17 +84,20 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
         var clone = (BootstrapLookupColumn)base.Clone();
         clone._lookupColumns = new BootstrapLookupColumnDefinitionCollection();
         clone._searchMembers = new BootstrapLookupSearchMemberCollection();
-        clone.DataSource = DataSource;
-        clone.DisplayMember = DisplayMember;
-        clone.ValueMember = ValueMember;
+        clone._formatAdapter = null;
+        clone._displayByValue = new Dictionary<object, string>();
+        clone._dataSource = null;
+        clone._displayMember = string.Empty;
+        clone._valueMember = string.Empty;
+        clone.ReplaceFormatAdapter(DataSource, DisplayMember, ValueMember);
         clone.CopyConfigurationFrom(this);
         return clone;
     }
 
     internal string ResolveDisplayText(object? value)
     {
-        using var adapter = new BootstrapLookupDataAdapter(DataSource, DisplayMember, ValueMember);
-        return value is not null && adapter.TryFindByValue(value, out var item) ? item!.DisplayText : string.Empty;
+        if (_formatAdapter is null) ReplaceFormatAdapter(_dataSource, _displayMember, _valueMember);
+        return value is not null && _displayByValue.TryGetValue(value, out var display) ? display : string.Empty;
     }
 
     private void CopyConfigurationFrom(BootstrapLookupColumn source)
@@ -114,5 +125,56 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     private static void ValidateEnum<T>(T value) where T : struct
     {
         if (!Enum.IsDefined(typeof(T), value)) throw new InvalidEnumArgumentException(nameof(value), Convert.ToInt32(value), typeof(T));
+    }
+
+    private void ReplaceFormatAdapter(object? dataSource, string displayMember, string valueMember)
+    {
+        var replacement = new BootstrapLookupDataAdapter(dataSource, displayMember, valueMember);
+        var replacementIndex = BuildDisplayIndex(replacement);
+        DisposeFormatAdapter();
+        _dataSource = dataSource;
+        _displayMember = displayMember;
+        _valueMember = valueMember;
+        _formatAdapter = replacement;
+        _displayByValue = replacementIndex;
+        _formatAdapter.SourceChanged += OnFormatSourceChanged;
+        InvalidateOwningColumn();
+    }
+
+    private void OnFormatSourceChanged(object? sender, EventArgs e)
+    {
+        if (_formatAdapter is null) return;
+        _displayByValue = BuildDisplayIndex(_formatAdapter);
+        InvalidateOwningColumn();
+    }
+
+    private static Dictionary<object, string> BuildDisplayIndex(BootstrapLookupDataAdapter adapter)
+    {
+        var result = new Dictionary<object, string>();
+        foreach (var item in adapter.Snapshot)
+        {
+            if (item.Value is not null && !result.ContainsKey(item.Value)) result.Add(item.Value, item.DisplayText);
+        }
+        return result;
+    }
+
+    private void DisposeFormatAdapter()
+    {
+        if (_formatAdapter is null) return;
+        _formatAdapter.SourceChanged -= OnFormatSourceChanged;
+        _formatAdapter.Dispose();
+        _formatAdapter = null;
+        _displayByValue.Clear();
+    }
+
+    private void OnColumnDisposed(object? sender, EventArgs e)
+    {
+        Disposed -= OnColumnDisposed;
+        DisposeFormatAdapter();
+    }
+
+    private void InvalidateOwningColumn()
+    {
+        if (DataGridView is not null && !DataGridView.IsDisposed && Index >= 0) DataGridView.InvalidateColumn(Index);
     }
 }
