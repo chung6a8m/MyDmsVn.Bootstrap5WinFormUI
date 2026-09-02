@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -13,11 +14,13 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// </summary>
 [DefaultProperty(nameof(Value))]
 [DefaultEvent(nameof(ValueChanged))]
-public class BootstrapNumericBox : UserControl
+public class BootstrapNumericBox : UserControl, IBootstrapConnectedControl
 {
     private readonly NumericUpDown _editor = new NumericUpDown();
     private BootstrapValidationState _validationState = BootstrapValidationState.None;
     private int _borderRadius = -1;
+    private CornerRadius? _connectedCornerRadius;
+    private BootstrapConnectedControlSize? _connectedSizeOverride;
     private Font? _themeFont;
     private bool _useThemeFont = true;
     private bool _settingThemeFont;
@@ -75,6 +78,40 @@ public class BootstrapNumericBox : UserControl
     [Category("Action")]
     [Description("Occurs when the native numeric value changes.")]
     public event EventHandler? ValueChanged;
+
+    CornerRadius? IBootstrapConnectedControl.ConnectedCornerRadius
+    {
+        get => _connectedCornerRadius;
+        set
+        {
+            _connectedCornerRadius = value;
+            Invalidate();
+        }
+    }
+
+    BootstrapConnectedControlSize? IBootstrapConnectedControl.ConnectedSizeOverride
+    {
+        get => _connectedSizeOverride;
+        set
+        {
+            _connectedSizeOverride = value;
+            PerformLayout();
+            Invalidate();
+        }
+    }
+
+    int IBootstrapConnectedControl.GetConnectedSafeMinimumHeight(BootstrapConnectedControlSize size, int dpi)
+    {
+        if (dpi <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dpi));
+        }
+
+        var metrics = BootstrapThemeManager.CurrentTheme.Metrics;
+        var target = DpiScaler.Scale(GetLogicalHeight(metrics, size), dpi);
+        var shellInsets = Math.Max(2, DpiScaler.Scale(metrics.BorderWidth * 2, dpi));
+        return Math.Max(target, _editor.PreferredHeight + shellInsets);
+    }
 
     /// <summary>
     /// Gets or sets the current native numeric value.
@@ -278,7 +315,7 @@ public class BootstrapNumericBox : UserControl
     {
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        var metrics = BootstrapNumericBoxRenderLogic.ResolveMetrics(theme.Metrics, dpi, _borderRadius);
+        var metrics = ResolveMetrics(theme.Metrics, dpi);
         var palette = BootstrapNumericBoxRenderLogic.ResolvePalette(
             theme.Colors,
             _validationState,
@@ -305,7 +342,10 @@ public class BootstrapNumericBox : UserControl
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         try
         {
-            using var path = RoundedPath.Create(bounds, new CornerRadius(metrics.Radius));
+            var radius = _connectedCornerRadius.HasValue
+                ? ScaleCornerRadius(_connectedCornerRadius.Value, dpi)
+                : new CornerRadius(metrics.Radius);
+            using var path = RoundedPath.Create(bounds, radius);
             using var surfaceBrush = new SolidBrush(palette.Background);
             using var borderPen = new Pen(palette.Border, borderWidth);
             graphics.FillPath(surfaceBrush, path);
@@ -446,17 +486,46 @@ public class BootstrapNumericBox : UserControl
     private void LayoutEditor()
     {
         var nativePreferredHeight = Math.Max(1, _editor.PreferredHeight);
-        if (ClientSize.Height < nativePreferredHeight)
+        if (!_connectedSizeOverride.HasValue && ClientSize.Height < nativePreferredHeight)
         {
             Height = nativePreferredHeight;
         }
 
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        var metrics = BootstrapNumericBoxRenderLogic.ResolveMetrics(theme.Metrics, dpi, _borderRadius);
+        var metrics = ResolveMetrics(theme.Metrics, dpi);
         _editor.Bounds = BootstrapNumericBoxRenderLogic.CalculateNativeBounds(
             ClientSize,
             nativePreferredHeight,
             metrics);
+    }
+
+    private BootstrapNumericBoxMetrics ResolveMetrics(BootstrapThemeMetrics metrics, int dpi)
+    {
+        var radius = _borderRadius;
+        if (radius < 0 && _connectedSizeOverride.HasValue)
+        {
+            radius = _connectedSizeOverride == BootstrapConnectedControlSize.Small
+                ? metrics.RadiusSmall
+                : (_connectedSizeOverride == BootstrapConnectedControlSize.Large ? metrics.RadiusLarge : metrics.Radius);
+        }
+
+        return BootstrapNumericBoxRenderLogic.ResolveMetrics(metrics, dpi, radius);
+    }
+
+    private static int GetLogicalHeight(BootstrapThemeMetrics metrics, BootstrapConnectedControlSize size)
+    {
+        return size == BootstrapConnectedControlSize.Small
+            ? metrics.ControlHeightSmall
+            : (size == BootstrapConnectedControlSize.Large ? metrics.ControlHeightLarge : metrics.ControlHeight);
+    }
+
+    private static CornerRadius ScaleCornerRadius(CornerRadius radius, int dpi)
+    {
+        return new CornerRadius(
+            DpiScaler.Scale(radius.TopLeft, dpi),
+            DpiScaler.Scale(radius.TopRight, dpi),
+            DpiScaler.Scale(radius.BottomRight, dpi),
+            DpiScaler.Scale(radius.BottomLeft, dpi));
     }
 }

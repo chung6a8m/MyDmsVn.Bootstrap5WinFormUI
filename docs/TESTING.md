@@ -660,6 +660,10 @@ Pagination, Badge, Alert, Tooltip, TabControl, NumericBox, FormattedTextBox, Com
 
 ## 11. Definition of done for a component
 
+BootstrapInputGroup automated coverage includes pure natural/fixed/emergency width allocation, seam overlap, deterministic integer remainders, zero/narrow containment, preferred size, and RTL mirroring. STA coverage includes supported/atomic rejected admission, Single-only grouped Select, two-pass common height, NumericBox native-height non-oscillation, hidden/removal cleanup, `SetChildIndex` canonical reorder, child Tab ownership, and integrated demo bounds.
+
+Manual **Input Groups** verification covers Light/Dark, 100/125/150/175/200% Windows scaling, Small/Default/Large including NumericBox floor, Tab/Shift+Tab, Button/SplitButton Enter/Space, Single Select popup Escape/Tab, validation/disabled states, hover/pressed/focus seams, hide/remove/reparent/reorder, RTL, constrained compression, and Designer construction. Standalone Multiple Select remains a separate regression path; grouped Multiple is rejected.
+
 A component is complete only when:
 
 - Both target builds succeed.

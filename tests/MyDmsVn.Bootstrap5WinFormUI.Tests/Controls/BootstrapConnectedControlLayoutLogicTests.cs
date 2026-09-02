@@ -12,7 +12,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 
 [TestFixture]
 [Apartment(ApartmentState.STA)]
-public sealed class BootstrapConnectedButtonLayoutLogicTests
+public sealed class BootstrapConnectedControlLayoutLogicTests
 {
     [TestCase(96, 1)]
     [TestCase(120, 1)]
@@ -71,8 +71,8 @@ public sealed class BootstrapConnectedButtonLayoutLogicTests
     private static object Invoke(string methodName, params object[] arguments)
     {
         var type = typeof(BootstrapButtonGroup).Assembly.GetType(
-            "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapConnectedButtonLayoutLogic");
-        Assert.That(type, Is.Not.Null, "The shared connected-button layout helper must exist.");
+            "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapConnectedControlLayoutLogic");
+        Assert.That(type, Is.Not.Null, "The shared connected-control layout helper must exist.");
         var method = type!.GetMethods(BindingFlags.Static | BindingFlags.NonPublic)
             .SingleOrDefault(candidate => candidate.Name == methodName);
         Assert.That(method, Is.Not.Null, $"Missing internal layout method {methodName}.");

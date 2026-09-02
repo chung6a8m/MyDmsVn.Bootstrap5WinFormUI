@@ -57,6 +57,8 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapNumericBox`
 - `BootstrapComboBox`
 - `BootstrapSelect`
+- `BootstrapInputGroup`
+- `BootstrapInputGroupText`
 - `BootstrapDatePicker`
 - `BootstrapCalendar`
 - `BootstrapCalendarPicker`
@@ -83,7 +85,7 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 
 ## Integrated demo
 
-The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Advanced Inputs, Select, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, Pagination, and Navigation / Tabs. Light/Dark switching and Reduced motion remain available while navigating.
+The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Advanced Inputs, Select, Input Groups, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, Pagination, and Navigation / Tabs. Light/Dark switching and Reduced motion remain available while navigating.
 
 The Advanced Inputs page is the shared native-backed input showcase. Stage 5 adds `BootstrapNumericBox` examples for integer/default values, decimal formatting/increments, thousands separators, signed ranges, validation states, read-only behavior, disabled behavior, and live `ValueChanged` feedback. Stage 6 extends the same page with `BootstrapComboBox` examples for native unbound and bound items, `DisplayMember` / `ValueMember`, editable `DropDown`, selection-only `DropDownList`, native autocomplete, long text/ellipsis, optional leading icons, validation, disabled state, explicit radius, and live native selection feedback. Stage 9 adds `BootstrapDatePicker` Long/Short/Time and custom date/date-time formats, optional unchecked checkbox, constrained range, valid/invalid, disabled, explicit-radius, and live `ValueChanged` scenarios. ComboBox popup chrome and DatePicker calendar/localized rendering remain WinForms/OS-owned.
 
@@ -98,6 +100,8 @@ The Navigation / Tabs page demonstrates native-backed Tabs plus Dropdown basic/i
 Earlier Rendering / DPI, Icons, and Animation diagnostics remain available below the Theme navigation item.
 
 See [Phase 14 — Integrated Demo Application](docs/PHASE14_INTEGRATED_DEMO.md) for the original navigation contract, [BootstrapSelect guide](docs/BOOTSTRAP_SELECT.md) for the Select2-style selector contract, and [Component contracts](docs/COMPONENTS.md) for current component behavior.
+
+See [BootstrapInputGroup guide](docs/BOOTSTRAP_INPUT_GROUP.md) for connected addon/input/button composition, supported child types, sizing, compression, reorder, RTL, and verification.
 
 ## Native ComboBox usage
 

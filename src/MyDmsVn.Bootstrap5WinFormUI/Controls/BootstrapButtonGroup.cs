@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -235,7 +236,7 @@ public class BootstrapButtonGroup : Panel
             button.SizeChanged -= OnButtonLayoutRelevantChanged;
             button.VisibleChanged -= OnButtonLayoutRelevantChanged;
             button.TextChanged -= OnButtonLayoutRelevantChanged;
-            button.GroupCornerRadius = null;
+            ((IBootstrapConnectedControl)button).ConnectedCornerRadius = null;
         }
 
         base.OnControlRemoved(e);
@@ -288,7 +289,7 @@ public class BootstrapButtonGroup : Panel
                     button.SizeChanged -= OnButtonLayoutRelevantChanged;
                     button.VisibleChanged -= OnButtonLayoutRelevantChanged;
                     button.TextChanged -= OnButtonLayoutRelevantChanged;
-                    button.GroupCornerRadius = null;
+                    ((IBootstrapConnectedControl)button).ConnectedCornerRadius = null;
                 }
             }
         }
@@ -348,7 +349,7 @@ public class BootstrapButtonGroup : Panel
         if (buttons.Count == 1)
         {
             var radius = ResolveLogicalRadius(buttons[0]);
-            buttons[0].GroupCornerRadius = BootstrapConnectedButtonLayoutLogic.ResolveCornerRadius(
+            ((IBootstrapConnectedControl)buttons[0]).ConnectedCornerRadius = BootstrapConnectedControlLayoutLogic.ResolveCornerRadius(
                 _orientation,
                 0,
                 1,
@@ -359,7 +360,7 @@ public class BootstrapButtonGroup : Panel
         for (var i = 0; i < buttons.Count; i++)
         {
             var radius = ResolveLogicalRadius(buttons[i]);
-            buttons[i].GroupCornerRadius = BootstrapConnectedButtonLayoutLogic.ResolveCornerRadius(
+            ((IBootstrapConnectedControl)buttons[i]).ConnectedCornerRadius = BootstrapConnectedControlLayoutLogic.ResolveCornerRadius(
                 _orientation,
                 i,
                 buttons.Count,
@@ -507,7 +508,7 @@ public class BootstrapButtonGroup : Panel
     private int GetSeamOverlap()
     {
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        return BootstrapConnectedButtonLayoutLogic.ResolveSeamOverlap(
+        return BootstrapConnectedControlLayoutLogic.ResolveSeamOverlap(
             BootstrapThemeManager.CurrentTheme.Metrics,
             dpi);
     }

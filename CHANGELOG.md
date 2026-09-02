@@ -6,6 +6,9 @@ All notable release-facing changes to this project are documented here.
 
 ### Added
 
+- `BootstrapInputGroup`, `BootstrapInputGroupText`, and `BootstrapInputGroupSize` for connected horizontal addon/input/button composition, with two-pass safe-height measurement, deterministic constrained-width compression, canonical `Controls.SetChildIndex` reorder, RTL mirroring, and Single-only grouped `BootstrapSelect` support.
+- Integrated **Input Groups** demo and automated coverage for sizing, native-height floors, validation, visibility/removal cleanup, reorder, keyboard ownership, RTL, and narrow layouts.
+
 - `BootstrapPagination`, a data-source-agnostic composite page-navigation control built from the existing `BootstrapButtonGroup` and `BootstrapButton` controls.
 - Bounded numeric page windows with ellipses, First/Previous/Next/Last navigation, Small/Default/Large button sizing, semantic variants, and connected outer-radius forwarding.
 - Integrated Pagination demo including caller-owned `BootstrapDataGridView` page slicing through `PageChanged`.

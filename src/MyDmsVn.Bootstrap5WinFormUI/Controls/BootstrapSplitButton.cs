@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Icons;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -15,7 +16,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// </summary>
 [DefaultProperty(nameof(Text))]
 [DefaultEvent(nameof(Click))]
-public class BootstrapSplitButton : Control
+public class BootstrapSplitButton : Control, IBootstrapConnectedControl
 {
     private static readonly IIconRenderer DefaultIconRenderer = BootstrapIconRenderer.CreateDefault();
 
@@ -31,6 +32,8 @@ public class BootstrapSplitButton : Control
     private bool _loading;
     private string _loadingText = string.Empty;
     private int _borderRadius = -1;
+    private CornerRadius? _connectedCornerRadius;
+    private BootstrapConnectedControlSize? _connectedSizeOverride;
     private int _minimumWidth;
     private bool _initialized;
     private bool _performingLayout;
@@ -318,6 +321,37 @@ public class BootstrapSplitButton : Control
     /// </summary>
     public event EventHandler? Closed;
 
+    CornerRadius? IBootstrapConnectedControl.ConnectedCornerRadius
+    {
+        get => _connectedCornerRadius;
+        set
+        {
+            _connectedCornerRadius = value;
+            ApplyConnectedCorners();
+            Invalidate();
+        }
+    }
+
+    BootstrapConnectedControlSize? IBootstrapConnectedControl.ConnectedSizeOverride
+    {
+        get => _connectedSizeOverride;
+        set
+        {
+            _connectedSizeOverride = value;
+            ((IBootstrapConnectedControl)_primaryButton).ConnectedSizeOverride = value;
+            ((IBootstrapConnectedControl)_dropDownButton).ConnectedSizeOverride = value;
+            ApplyPreferredSize();
+            PerformLayout();
+        }
+    }
+
+    int IBootstrapConnectedControl.GetConnectedSafeMinimumHeight(BootstrapConnectedControlSize size, int dpi)
+    {
+        var primary = ((IBootstrapConnectedControl)_primaryButton).GetConnectedSafeMinimumHeight(size, dpi);
+        var menu = ((IBootstrapConnectedControl)_dropDownButton).GetConnectedSafeMinimumHeight(size, dpi);
+        return Math.Max(primary, menu);
+    }
+
     /// <summary>
     /// Requests opening the dropdown when current state permits it.
     /// </summary>
@@ -498,17 +532,25 @@ public class BootstrapSplitButton : Control
 
     private void ApplyConnectedCorners()
     {
+        if (_connectedCornerRadius.HasValue)
+        {
+            var outer = _connectedCornerRadius.Value;
+            _primaryButton.GroupCornerRadius = new CornerRadius(outer.TopLeft, 0f, 0f, outer.BottomLeft);
+            _dropDownButton.GroupCornerRadius = new CornerRadius(0f, outer.TopRight, outer.BottomRight, 0f);
+            return;
+        }
+
         var radius = _borderRadius >= 0
             ? _borderRadius
             : BootstrapButtonRenderLogic.GetThemeBorderRadius(
                 BootstrapThemeManager.CurrentTheme.Metrics,
                 _buttonSize);
-        _primaryButton.GroupCornerRadius = BootstrapConnectedButtonLayoutLogic.ResolveCornerRadius(
+        _primaryButton.GroupCornerRadius = BootstrapConnectedControlLayoutLogic.ResolveCornerRadius(
             Orientation.Horizontal,
             0,
             2,
             radius);
-        _dropDownButton.GroupCornerRadius = BootstrapConnectedButtonLayoutLogic.ResolveCornerRadius(
+        _dropDownButton.GroupCornerRadius = BootstrapConnectedControlLayoutLogic.ResolveCornerRadius(
             Orientation.Horizontal,
             1,
             2,
@@ -518,7 +560,7 @@ public class BootstrapSplitButton : Control
     private int ResolveSeamOverlap()
     {
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        return BootstrapConnectedButtonLayoutLogic.ResolveSeamOverlap(
+        return BootstrapConnectedControlLayoutLogic.ResolveSeamOverlap(
             BootstrapThemeManager.CurrentTheme.Metrics,
             dpi);
     }

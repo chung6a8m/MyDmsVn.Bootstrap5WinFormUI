@@ -203,6 +203,11 @@ public sealed class MainForm : Form
             () => new BootstrapSelectDemoForm());
 
         AddPage(
+            "Input Groups",
+            "Connected addons, inputs, buttons, Single Select, split commands, sizing, validation, reorder, RTL, and constrained-width behavior.",
+            () => new InputGroupDemoForm());
+
+        AddPage(
             "Cards",
             "Themed surfaces with Header/Body/Footer composition, borders, radius, and shadow states.",
             () => new TextBoxCardDemoForm());
