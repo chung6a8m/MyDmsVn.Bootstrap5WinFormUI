@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "db39fa1cd730ef0be8bb6cbd76ae587b6df92b62336e3f274d904caa25064865";
+    private const string ApprovedV1Fingerprint = "710217615c5f348340c04d2a4927c3ef601a375bddb1cb02f8cd51057b5b8db5";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -34,6 +34,37 @@ public sealed class Phase16PublicApiBaselineTests
     public void V1CompatibilityAssemblyVersionIsStable()
     {
         Assert.That(typeof(BootstrapButton).Assembly.GetName().Version, Is.EqualTo(new Version(1, 0, 0, 0)));
+    }
+
+    [Test]
+    public void BootstrapLookupExportsOnlyReviewedEntryPointsAndKeepsInfrastructureInternal()
+    {
+        var assembly = typeof(BootstrapLookupBox).Assembly;
+        var lookup = typeof(BootstrapLookupBox);
+        var requiredProperties = new[] { "ResultsGrid", "SearchTextNormalizer", "TextNormalizer", "TextComparer", "ValidationMessage" };
+        var requiredMethods = new[] { "CancelPendingEdit" };
+        var internalTypes = new[]
+        {
+            "BootstrapLookupCell", "BootstrapLookupEditingControl", "BootstrapLookupDropDownAffordance",
+            "BootstrapLookupDropDownController", "BootstrapLookupDropDownContent", "BootstrapLookupFooter",
+            "BootstrapLookupDataAdapter", "BootstrapLookupSearchEngine", "BootstrapLookupMemberAccessor"
+        };
+        var accessory = typeof(BootstrapTextBox).GetMethod("SetFrameworkTrailingAccessory", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+        var validation = typeof(BootstrapTextBox).GetMethod("SetTransientValidationStateOverride", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.GetEvent("ResultsChanged", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly), Is.Not.Null);
+            foreach (var name in requiredProperties) Assert.That(lookup.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly), Is.Not.Null, name);
+            foreach (var name in requiredMethods) Assert.That(lookup.GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly), Is.Not.Null, name);
+            foreach (var name in internalTypes)
+            {
+                var type = assembly.GetTypes().Single(candidate => candidate.Name == name);
+                Assert.That(type.IsPublic || type.IsNestedPublic, Is.False, name);
+            }
+            Assert.That(accessory, Is.Not.Null); Assert.That(accessory!.IsAssembly, Is.True);
+            Assert.That(validation, Is.Not.Null); Assert.That(validation!.IsAssembly, Is.True);
+        }));
     }
 
     [Test]

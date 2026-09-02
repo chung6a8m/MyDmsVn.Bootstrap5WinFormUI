@@ -6,6 +6,9 @@ All notable release-facing changes to this project are documented here.
 
 ### Added
 
+- `BootstrapLookupBox` and `BootstrapLookupColumn` for local, Vietnamese-insensitive single-selection lookup, multi-column results, explicit Refresh/Add New, ambiguity-safe exact commits, keyboard-first popup interaction, raw DataGridView value binding, native new-row support, and reuse-safe editing-control lifecycle.
+- Replaced the DataGrid + hidden `BootstrapSelect` editing workaround demo with typed `BindingList<T>` models and native lookup columns.
+
 - `BootstrapInputGroup`, `BootstrapInputGroupText`, and `BootstrapInputGroupSize` for connected horizontal addon/input/button composition, with two-pass safe-height measurement, deterministic constrained-width compression, canonical `Controls.SetChildIndex` reorder, RTL mirroring, and Single-only grouped `BootstrapSelect` support.
 - Integrated **Input Groups** demo and automated coverage for sizing, native-height floors, validation, visibility/removal cleanup, reorder, keyboard ownership, RTL, and narrow layouts.
 
@@ -38,6 +41,8 @@ All notable release-facing changes to this project are documented here.
 - Added the integrated **Select** demo route with local/grouped/custom-value scenarios and a deterministic 300+ row async provider covering paging, first-page retry, later-page retry, cancellation latency, and rapid-typing stale-result protection.
 
 ### Changed
+
+- Reviewed the additive BootstrapLookup public family and updated the approved v1 API fingerprint to `710217615c5f348340c04d2a4927c3ef601a375bddb1cb02f8cd51057b5b8db5`; lookup cell, editing control, adapter, search engine, popup, footer, and TextBox integration hooks remain internal.
 
 - Hardened `BootstrapSelect` border rendering with focus-aware DPI-scaled stroke insets and anti-aliased rounded shells, replaced the popup's flush native `FixedSingle` search border with an inset Bootstrap-themed search surface, clipped opaque hosted HWND content to the shared overlay's rounded interior, preserved the popup's anti-aliased edge outside its hard window clip, and retained native text editing plus non-wrapping WinForms Tab/Shift+Tab traversal at container boundaries.
 - Reviewed and intentionally updated the proposed v1 public API fingerprint to include the compatible exported `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabStyle`, `BootstrapTabControl`, `BootstrapNumericBox`, `BootstrapComboBox`, advanced `BootstrapDropdown` / `BootstrapSplitButton`, `BootstrapToastPlacement`, `BootstrapToast`, `BootstrapToastContainer`, `BootstrapToastOptions`, `BootstrapToastHistoryItem`, `BootstrapToastService`, `BootstrapDatePicker`, `BootstrapSelect`, `BootstrapCalendarSelectionMode`, `BootstrapCalendar`, and `BootstrapCalendarPicker` public families. Global Toast host/center/history/DPI/dispatcher helpers and Calendar selection/focus/layout/popup-host helpers remain internal, existing exported signatures are unchanged, `AssemblyVersion` remains `1.0.0.0`, and the approved combined fingerprint is `4e9893379e322029068a2c32e195679311ed5a844549c5d0e22685cb6e60da32`.
