@@ -36,6 +36,7 @@ V1 must support:
 - strict lookup modes and dynamic-suggest `CommitAndAdd` mode;
 - explicit Refresh and Add New footer actions;
 - highlighted-row position / result-total status in the footer;
+- a built-in mouse dropdown affordance;
 - full keyboard navigation while focus remains in the main editor;
 - explicit Enter, Tab, Escape, F4, Alt+Down, arrow, Home/End, and PageUp/PageDown behavior;
 - application-deactivation handling that closes the popup without committing or rolling back pending text;
@@ -203,6 +204,8 @@ Rules:
 - `SelectedValue` and `SelectedItem` always represent committed state.
 - manual typing changes `Text` and `HasPendingText`, but does not mutate committed selection.
 - `SelectItem` verifies that the item belongs to the logical lookup source before committing it.
+- V1 logical value identity uses `EqualityComparer<object>.Default`; there is no separate public value-comparer strategy in V1.
+- `null` is reserved for the cleared-selection state. When `ValueMember` is non-empty, an item whose resolved value is `null` may be displayed/searched but cannot be committed as a valid selection.
 
 `DataPropertyName` belongs to `BootstrapLookupColumn`, not to `BootstrapLookupBox`.
 
@@ -255,7 +258,7 @@ Application code may use `ResultsGrid` for formatting/painting/style customizati
 public BootstrapLookupSearchMemberCollection SearchMembers { get; }
 ```
 
-The collection contains property/member names in priority order. If empty, search falls back to `DisplayMember`. Search members do not need to be visible result columns; e.g. Barcode may be searchable but hidden.
+The collection contains property/member names in priority order. If empty, search falls back to `DisplayMember`; if both `SearchMembers` and `DisplayMember` are empty, search uses `item?.ToString() ?? ""`. Search members do not need to be visible result columns; e.g. Barcode may be searchable but hidden.
 
 ### 7.4 Search configuration
 
@@ -287,9 +290,14 @@ public Func<string, string> TextNormalizer { get; set; }
 
 [Browsable(false)]
 public IEqualityComparer<string> TextComparer { get; set; }
+
+public string InvalidTextMessage { get; set; }
+
+[Browsable(false)]
+public string ValidationMessage { get; }
 ```
 
-Default exact semantics are Trim + `StringComparer.CurrentCultureIgnoreCase`.
+Default exact semantics are Trim + `StringComparer.CurrentCultureIgnoreCase`. `InvalidTextMessage` defaults to `"Please select a valid value."`. `ValidationMessage` exposes the current lookup-generated transient validation message; it is empty when no lookup-generated validation failure is active.
 
 ```csharp
 public enum BootstrapLookupUnmatchedTextBehavior
@@ -306,9 +314,9 @@ Default:
 RestorePreviousSelection
 ```
 
-Empty/whitespace text after normal lookup normalization is a separate case: it clears the selection and commits `null`; it does not enter `UnmatchedTextBehavior`.
+Empty/whitespace text after applying `TextNormalizer` is a separate case: it clears the selection and commits `null`; it does not enter `UnmatchedTextBehavior`.
 
-`CommitAndAdd` must first perform exact-match detection against `DisplayMember`. If an existing item matches, that item is selected and no duplicate is added.
+`CommitAndAdd` must first perform exact-match detection against `DisplayMember` (or item text when `DisplayMember` is empty). If an existing item matches, that item is selected and no duplicate is added.
 
 ### 7.6 Keyboard configuration
 
@@ -351,6 +359,8 @@ public void CloseDropDown();
 public void RefreshResults();
 public void CancelPendingEdit();
 ```
+
+V1 includes an always-visible lookup dropdown affordance on the editor surface; clicking it opens/toggles the lookup popup without committing the current text. Configurability of that affordance is deferred beyond V1.
 
 `CloseDropDown()` is presentation-only: it does not commit, validate, or roll back. `CancelPendingEdit()` restores committed display text, clears lookup-generated transient validation, and closes the popup.
 
@@ -442,9 +452,9 @@ All commit/navigation paths share one resolver:
 
 ```text
 ResolvePendingText
-1. empty?
+1. empty after TextNormalizer?
    -> clear selection, commit null
-2. exact DisplayMember match?
+2. exact DisplayMember/item-text match?
    -> select existing item
 3. unmatched
    -> apply UnmatchedTextBehavior
@@ -456,7 +466,7 @@ Discard pending text, restore `Text = CommittedDisplayText`, keep the previous c
 
 ### 11.2 KeepFocusWithValidationError
 
-Do not commit. Set lookup-generated invalid state/message, open or reopen the popup, highlight the best current candidate, retain editor focus, and cancel DataGridView end-edit/navigation.
+Do not commit. Set inherited `ValidationState = BootstrapValidationState.Invalid`, set `ValidationMessage = InvalidTextMessage`, open or reopen the popup, highlight the best current candidate, retain editor focus, and cancel DataGridView end-edit/navigation. Typing again clears only this lookup-generated transient validation state/message.
 
 ### 11.3 CommitAndAdd
 
@@ -475,7 +485,7 @@ adapter.Add(item)
 -> navigate if the triggering action requires navigation
 ```
 
-If creation is unavailable, no item is returned, the source is read-only, or the add capability is unavailable, `CommitAndAdd` falls back to `KeepFocusWithValidationError`. Raw unmatched text is never committed without a corresponding datasource item.
+If creation is unavailable, no item is returned, the source is read-only, the add capability is unavailable, or the created item's resolved `ValueMember` is null, `CommitAndAdd` falls back to `KeepFocusWithValidationError`. Raw unmatched text is never committed without a corresponding datasource item.
 
 Unexpected exceptions thrown by application event handlers or actual `Add()` operations are not silently converted into validation failures; they propagate after internal busy-state cleanup.
 
@@ -535,11 +545,11 @@ user clicks Add New
 
 On cancellation, no committed state changes and pending query is preserved.
 
-On success, `NewItem` is automatically selected and committed. The lookup refreshes/reconciles its source, but explicit Add New does not require the framework itself to own business datasource insertion because the application create workflow may already have persisted/refreshed that entity. If source reconciliation cannot immediately find the returned item, the returned `NewItem` may still be committed by its `ValueMember`; a later refresh can reconcile the source view.
+On success, `NewItem` is automatically selected and committed. The lookup refreshes/reconciles its source, but explicit Add New does not require the framework itself to own business datasource insertion because the application create workflow may already have persisted/refreshed that entity. If source reconciliation cannot immediately find the returned item, the returned `NewItem` may still be committed by its non-null `ValueMember` (or by the item itself when `ValueMember` is empty); a later refresh can reconcile the source view. If the returned item cannot produce a valid non-null logical value, no commit occurs and the lookup remains in its prior committed state.
 
 V1 does not automatically move to the next cell after explicit footer Add New.
 
-## 14. Keyboard and focus lifecycle
+## 14. Keyboard, mouse, and focus lifecycle
 
 Hard invariant: while the popup is open for keyboard interaction, focus remains in `BootstrapLookupBox.Editor`.
 
@@ -564,7 +574,11 @@ Down/F4/Alt+Down -> flush search as needed and open popup
 Enter            -> ResolvePendingText or DataGridView default, based on ClosedEnterKeyBehavior
 ```
 
-### 14.2 Enter
+### 14.2 Mouse result activation
+
+A left-click on a selectable `ResultsGrid` row commits that row immediately and closes the popup. Mouse highlighting/hover that does not activate a row must not mutate committed state. Footer clicks remain inside the lookup activation domain.
+
+### 14.3 Enter
 
 After a successful commit:
 
@@ -575,7 +589,7 @@ CommitSelectionAndMoveNext -> delegate next-focus/cell navigation to the owner
 
 If resolve fails and validation blocks the edit, navigation never occurs.
 
-### 14.3 Tab
+### 14.4 Tab
 
 Tab always resolves pending text before allowing navigation:
 
@@ -588,7 +602,7 @@ unmatched       -> apply unmatched-text policy
 
 No implementation may hard-code `ColumnIndex + 1`; DataGridView must retain responsibility for finding the next editable cell.
 
-### 14.4 Escape
+### 14.5 Escape
 
 Escape cancels pending debounce, closes the popup, restores `Text = CommittedDisplayText`, clears lookup-generated transient validation, and leaves committed selection unchanged.
 
@@ -610,7 +624,7 @@ no rollback
 no navigation
 ```
 
-When the application is activated again, the popup remains closed. It reopens only after a new user trigger such as typing under AutoOpen, Down, F4, Alt+Down, or a popup-button action.
+When the application is activated again, the popup remains closed. It reopens only after a new user trigger such as typing under AutoOpen, Down, F4, Alt+Down, or clicking the dropdown affordance.
 
 Clicking another control/cell inside the same application is different: it is an attempt to end the edit and therefore runs the normal pending-text resolver. `KeepFocusWithValidationError` cancels that transition and returns focus to the editor.
 
@@ -630,7 +644,7 @@ Supported V1 shapes include `BindingSource`, `BindingList<T>`, `IList`, `IListSo
 
 The adapter must not implement search by assigning `BindingSource.Filter`, because plain `BindingList<T>` does not naturally implement `IBindingListView`, and because filtering the caller's source would mutate currency/position.
 
-Member access should prefer cached `PropertyDescriptor` metadata where appropriate rather than repeated reflection on every search keystroke. Null member values are treated as empty display/search text and are not errors.
+Member access should prefer cached `PropertyDescriptor` metadata where appropriate rather than repeated reflection on every search keystroke. Null display/search member values are treated as empty text and are not errors. A null resolved logical value is not a valid selection value because null is reserved for the cleared-selection state.
 
 Invalid `DisplayMember`, `ValueMember`, or `SearchMembers` should fail early when metadata is available. Setting a member before `DataSource` may defer validation until the source is assigned.
 
@@ -642,7 +656,7 @@ Predictable capability limitations are handled as lookup outcomes rather than UI
 
 Application/business exceptions thrown from `CreateItemFromText`, `AddNewRequested`, Refresh handlers, or unexpected source mutation operations are not swallowed. Internal reentrancy/busy flags must be restored using `try/finally` before exceptions propagate.
 
-Lookup-generated validation must be distinguishable internally from external/application validation so that new typing can clear only the transient lookup error without erasing unrelated business validation.
+Lookup-generated validation is tracked separately from external/application validation so that new typing can clear only the transient lookup error without erasing unrelated business validation. `ValidationMessage` refers only to the lookup-generated transient message; the inherited `ValidationState` remains the visual validation state.
 
 A committed value that is no longer present in the lookup datasource is not automatically cleared. The raw committed value is preserved until the user explicitly changes/clears it.
 
@@ -660,6 +674,8 @@ It implements the normal WinForms editing-control contract, including the owning
 `EditingControlWantsInputKey` must retain lookup keys such as arrows, PageUp/PageDown, Home/End, F4, Enter, and Escape when lookup semantics require them. Tab and navigation remain coordinated with DataGridView rather than simulated.
 
 ### 18.2 `BootstrapLookupCell`
+
+`BootstrapLookupCell` is an internal implementation detail in V1. The public `BootstrapLookupColumn` creates and owns its cell template; consumers are not expected to instantiate or subclass the lookup cell directly.
 
 The cell sets `EditType` to `BootstrapLookupEditingControl`, initializes the editor with the raw cell value, and maps raw value <-> formatted display text using `ValueMember` / `DisplayMember`.
 
@@ -749,7 +765,7 @@ Do not mark the grid dirty for:
 
 Mark the grid dirty only when committed logical value changes, including selecting a different item, clearing a non-null value, `CommitAndAdd`, or successful explicit Add New.
 
-Value changes are compared with the lookup's logical value comparer/equality semantics before `EditingControlValueChanged` and `NotifyCurrentCellDirty(true)` are raised.
+Value changes are compared with `EqualityComparer<object>.Default` in V1 before `EditingControlValueChanged` and `NotifyCurrentCellDirty(true)` are raised.
 
 ## 21. Commit ordering and reentrancy
 
@@ -792,7 +808,6 @@ Public in V1:
 ```text
 BootstrapLookupBox
 BootstrapLookupColumn
-BootstrapLookupCell only if required by DataGridView CellTemplate/public construction
 BootstrapLookupColumnDefinition
 BootstrapLookupColumnDefinitionCollection
 BootstrapLookupSearchMemberCollection
@@ -802,6 +817,7 @@ public enums and event args
 Internal in V1:
 
 ```text
+BootstrapLookupCell
 BootstrapLookupEditingControl
 BootstrapLookupDropDownController
 BootstrapLookupDropDownContent
@@ -948,6 +964,7 @@ The feature is not complete merely because a demo renders. V1 acceptance require
 ```text
 Selection                  = Single only
 DataSource API              = non-generic object DataSource
+Logical value comparer      = EqualityComparer<object>.Default
 SearchDebounceMilliseconds  = 150
 MinimumSearchLength         = 0
 EmptyQueryBehavior          = ShowAll
@@ -957,10 +974,12 @@ EnterKeyBehavior            = CommitSelection
 ClosedEnterKeyBehavior      = ResolvePendingText
 ShowRefreshButton           = false
 ShowAddNewButton            = false
+Dropdown affordance         = always visible in V1
 Search normalization        = Trim + case-insensitive + remove diacritics + Đ/đ mapping
 Exact-match normalization   = Trim
 Exact-match comparer        = CurrentCultureIgnoreCase
 Empty text                  = clear/commit null
+Null logical value          = reserved for cleared selection
 Alt+Tab                     = close popup only; preserve pending edit
 Reactivation                = keep popup closed
 Highlight refresh           = preserve previous highlight when possible
