@@ -15,6 +15,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
     private BootstrapOverlayAnchorTracker? _tracker;
     private bool _isOpen;
     private bool _disposed;
+    private int _effectiveDpi = DpiScaler.DefaultDpi;
     private int _activationGeneration;
     private int _queuedWindowDeactivationGeneration = -1;
     private bool _messageFilterInstalled;
@@ -23,9 +24,12 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
     {
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
         _content = content ?? throw new ArgumentNullException(nameof(content));
+        _effectiveDpi = ResolveOwnerDpi();
         _content.ResultsGrid.CellMouseClick += OnResultCellMouseClick;
         _content.RefreshRequested += OnRefreshRequested;
         _content.AddNewRequested += OnAddNewRequested;
+        _owner.DpiChangedAfterParent += OnOwnerDpiChangedAfterParent;
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
     }
 
     internal bool IsOpen => _isOpen;
@@ -80,6 +84,8 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
         _content.ResultsGrid.CellMouseClick -= OnResultCellMouseClick;
         _content.RefreshRequested -= OnRefreshRequested;
         _content.AddNewRequested -= OnAddNewRequested;
+        _owner.DpiChangedAfterParent -= OnOwnerDpiChangedAfterParent;
+        BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
         if (_dropDown is not null)
         {
             _dropDown.ApplicationDeactivated -= OnApplicationDeactivated;
@@ -110,21 +116,33 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
         _dropDown.ApplicationDeactivated += OnApplicationDeactivated;
         _dropDown.WindowDeactivated += OnWindowDeactivated;
         _dropDown.Closed += OnDropDownClosed;
-        ApplyPresentation();
+        ApplyPresentation(_effectiveDpi);
     }
 
     private void ApplyPresentation()
     {
+        ApplyPresentation(ResolveOwnerDpi());
+    }
+
+    private void ApplyPresentation(int dpi)
+    {
+        if (dpi <= 0) throw new ArgumentOutOfRangeException(nameof(dpi));
+        _effectiveDpi = dpi;
         if (_surface is null) return;
-        var dpi = ResolveDpi();
         _surface.LogicalBorderRadius = _owner.BorderRadius;
         _surface.ApplyTheme(BootstrapThemeManager.CurrentTheme, dpi);
         _content.Font = _owner.Font;
     }
 
+    internal void ApplyOwnerDpiChange(int dpi)
+    {
+        ApplyPresentation(dpi);
+        if (_isOpen) Reposition();
+    }
+
     private Rectangle ComputeBounds()
     {
-        var dpi = ResolveDpi();
+        var dpi = _effectiveDpi;
         var requestedWidth = _owner.DropDownWidth == 0 ? _owner.Width : DpiScaler.Scale(_owner.DropDownWidth, dpi);
         var width = Math.Max(_owner.Width, requestedWidth);
         var maxHeight = DpiScaler.Scale(_owner.MaxDropDownHeight, dpi);
@@ -137,7 +155,19 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
         return BootstrapOverlayPlacementEngine.Compute(request).Bounds;
     }
 
-    private int ResolveDpi() => _owner.DeviceDpi > 0 ? _owner.DeviceDpi : DpiScaler.DefaultDpi;
+    private int ResolveOwnerDpi() => _owner.DeviceDpi > 0 ? _owner.DeviceDpi : DpiScaler.DefaultDpi;
+
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        if (_disposed || _dropDown is null) return;
+        ApplyPresentation();
+        if (_isOpen) Reposition();
+    }
+
+    private void OnOwnerDpiChangedAfterParent(object? sender, EventArgs e)
+    {
+        ApplyOwnerDpiChange(ResolveOwnerDpi());
+    }
 
     private void OnResultCellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
     {
