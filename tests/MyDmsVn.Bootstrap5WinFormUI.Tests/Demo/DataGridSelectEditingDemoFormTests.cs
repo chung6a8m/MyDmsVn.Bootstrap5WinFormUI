@@ -32,7 +32,7 @@ public sealed class DataGridSelectEditingDemoFormTests
     }
 
     [Test]
-    public void ProductCellEditingShowsBootstrapSelectAndCommitsProductMetadata()
+    public void ProductCellEditingUsesBootstrapSelectPopupAndCommitsProductMetadata()
     {
         using var form = CreateAndShowDemoForm();
 
@@ -45,7 +45,18 @@ public sealed class DataGridSelectEditingDemoFormTests
         var select = FindControls<BootstrapSelect>(grid).SingleOrDefault(control => control.Visible);
         Assert.That(select, Is.Not.Null, "EditingControlShowing should replace the visible product editor with BootstrapSelect.");
 
-        Assert.That(select!.SelectValue(2), Is.True);
+        select!.OpenDropDownInternal();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(select.IsDropDownOpenForTest, Is.True, "The Select popup must stay open while the grid cell is being edited.");
+            Assert.That(grid.IsCurrentCellInEditMode, Is.True);
+        }));
+
+        select.SetSearchTextForTest("Trà ô long");
+        Application.DoEvents();
+        Assert.That(select.ActivateHighlightedResultForTest(), Is.True);
         Application.DoEvents();
 
         var row = grid.Rows[0];
