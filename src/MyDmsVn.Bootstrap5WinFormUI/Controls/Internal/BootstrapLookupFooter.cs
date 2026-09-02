@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 
@@ -29,7 +30,9 @@ internal sealed class BootstrapLookupFooter : Panel
         Controls.Add(_status);
         Controls.Add(_refresh);
         Controls.Add(_addNew);
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         ApplyTheme();
+        ApplyDpi();
     }
 
     internal event EventHandler? RefreshRequested;
@@ -44,6 +47,18 @@ internal sealed class BootstrapLookupFooter : Panel
     internal void UpdateStatus(int position, int total, bool waiting, int minimumLength)
     {
         _status.Text = waiting ? $"Type at least {minimumLength} characters" : $"{Math.Max(0, position)} / {Math.Max(0, total)}";
+    }
+
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+        base.OnDpiChangedAfterParent(e);
+        ApplyDpi();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+        base.Dispose(disposing);
     }
 
     private static void ConfigureButton(Button button, string text)
@@ -66,5 +81,17 @@ internal sealed class BootstrapLookupFooter : Panel
         _refresh.ForeColor = colors.Text;
         _addNew.BackColor = colors.SurfaceSecondary;
         _addNew.ForeColor = colors.Text;
+    }
+
+    private void ApplyDpi()
+    {
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        Height = DpiScaler.Scale(32, dpi);
+        Padding = new Padding(DpiScaler.Scale(4, dpi), 0, DpiScaler.Scale(4, dpi), 0);
+    }
+
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        if (!IsDisposed) ApplyTheme();
     }
 }

@@ -14,32 +14,34 @@ public partial class BootstrapLookupBox
     private void SetDataSource(object? value)
     {
         if (ReferenceEquals(_dataSource, value)) return;
-        _dataSource = value;
-        RebuildDataAdapter();
+        ReplaceDataAdapter(value, _displayMember, _valueMember);
     }
 
     private void SetDisplayMember(string? value)
     {
         var normalized = value ?? string.Empty;
         if (string.Equals(_displayMember, normalized, StringComparison.Ordinal)) return;
-        _displayMember = normalized;
-        RebuildDataAdapter();
+        ReplaceDataAdapter(_dataSource, normalized, _valueMember);
     }
 
     private void SetValueMember(string? value)
     {
         var normalized = value ?? string.Empty;
         if (string.Equals(_valueMember, normalized, StringComparison.Ordinal)) return;
-        _valueMember = normalized;
-        RebuildDataAdapter();
+        ReplaceDataAdapter(_dataSource, _displayMember, normalized);
     }
 
-    private void RebuildDataAdapter()
+    private void ReplaceDataAdapter(object? dataSource, string displayMember, string valueMember)
     {
+        var replacement = new BootstrapLookupDataAdapter(dataSource, displayMember, valueMember);
         DisposeDataAdapter();
-        _dataAdapter = new BootstrapLookupDataAdapter(_dataSource, _displayMember, _valueMember);
+        _dataSource = dataSource;
+        _displayMember = displayMember;
+        _valueMember = valueMember;
+        _dataAdapter = replacement;
         _dataAdapter.SourceChanged += OnLookupSourceChanged;
         ReconcileCommittedSelection();
+        ExecuteSearchNow();
     }
 
     private void DisposeDataAdapter()

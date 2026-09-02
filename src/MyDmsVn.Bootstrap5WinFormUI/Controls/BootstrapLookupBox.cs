@@ -32,6 +32,11 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     private int _minimumSearchLength;
     private int _dropDownWidth;
     private int _maxDropDownHeight = 320;
+    private BootstrapLookupEmptyQueryBehavior _emptyQueryBehavior;
+    private BootstrapLookupTypingPopupBehavior _typingPopupBehavior;
+    private BootstrapLookupUnmatchedTextBehavior _unmatchedTextBehavior;
+    private BootstrapLookupEnterKeyBehavior _enterKeyBehavior;
+    private BootstrapLookupClosedEnterKeyBehavior _closedEnterKeyBehavior;
 
     /// <summary>Initializes a designer-safe lookup editor.</summary>
     public BootstrapLookupBox()
@@ -106,23 +111,23 @@ public partial class BootstrapLookupBox : BootstrapTextBox
 
     /// <summary>Gets or sets empty-query presentation.</summary>
     [DefaultValue(BootstrapLookupEmptyQueryBehavior.ShowAll)]
-    public BootstrapLookupEmptyQueryBehavior EmptyQueryBehavior { get; set; } = BootstrapLookupEmptyQueryBehavior.ShowAll;
+    public BootstrapLookupEmptyQueryBehavior EmptyQueryBehavior { get => _emptyQueryBehavior; set { ValidateEnum(value, nameof(value)); _emptyQueryBehavior = value; } }
 
     /// <summary>Gets or sets typing popup behavior.</summary>
     [DefaultValue(BootstrapLookupTypingPopupBehavior.AutoOpen)]
-    public BootstrapLookupTypingPopupBehavior TypingPopupBehavior { get; set; } = BootstrapLookupTypingPopupBehavior.AutoOpen;
+    public BootstrapLookupTypingPopupBehavior TypingPopupBehavior { get => _typingPopupBehavior; set { ValidateEnum(value, nameof(value)); _typingPopupBehavior = value; } }
 
     /// <summary>Gets or sets unmatched text resolution.</summary>
     [DefaultValue(BootstrapLookupUnmatchedTextBehavior.RestorePreviousSelection)]
-    public BootstrapLookupUnmatchedTextBehavior UnmatchedTextBehavior { get; set; } = BootstrapLookupUnmatchedTextBehavior.RestorePreviousSelection;
+    public BootstrapLookupUnmatchedTextBehavior UnmatchedTextBehavior { get => _unmatchedTextBehavior; set { ValidateEnum(value, nameof(value)); _unmatchedTextBehavior = value; } }
 
     /// <summary>Gets or sets Enter behavior after a commit.</summary>
     [DefaultValue(BootstrapLookupEnterKeyBehavior.CommitSelection)]
-    public BootstrapLookupEnterKeyBehavior EnterKeyBehavior { get; set; } = BootstrapLookupEnterKeyBehavior.CommitSelection;
+    public BootstrapLookupEnterKeyBehavior EnterKeyBehavior { get => _enterKeyBehavior; set { ValidateEnum(value, nameof(value)); _enterKeyBehavior = value; } }
 
     /// <summary>Gets or sets closed-popup Enter behavior.</summary>
     [DefaultValue(BootstrapLookupClosedEnterKeyBehavior.ResolvePendingText)]
-    public BootstrapLookupClosedEnterKeyBehavior ClosedEnterKeyBehavior { get; set; } = BootstrapLookupClosedEnterKeyBehavior.ResolvePendingText;
+    public BootstrapLookupClosedEnterKeyBehavior ClosedEnterKeyBehavior { get => _closedEnterKeyBehavior; set { ValidateEnum(value, nameof(value)); _closedEnterKeyBehavior = value; } }
 
     /// <summary>Gets or sets an explicit logical popup width, or zero for automatic width.</summary>
     [DefaultValue(0)]
@@ -219,6 +224,27 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     }
 
     /// <inheritdoc />
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        if (!Visible) { _searchDebouncer.Cancel(); CloseDropDown(); }
+    }
+
+    /// <inheritdoc />
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        base.OnEnabledChanged(e);
+        if (!Enabled) { _searchDebouncer.Cancel(); CloseDropDown(); }
+    }
+
+    /// <inheritdoc />
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        _searchDebouncer.Cancel(); CloseDropDown();
+        base.OnHandleDestroyed(e);
+    }
+
+    /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -270,5 +296,10 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         if (!Enabled) return;
         Editor.Focus();
         if (IsDropDownOpen) CloseDropDown(); else OpenDropDown();
+    }
+
+    private static void ValidateEnum<T>(T value, string parameterName) where T : struct
+    {
+        if (!Enum.IsDefined(typeof(T), value)) throw new InvalidEnumArgumentException(parameterName, Convert.ToInt32(value), typeof(T));
     }
 }
