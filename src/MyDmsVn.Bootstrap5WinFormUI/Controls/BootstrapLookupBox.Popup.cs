@@ -12,7 +12,11 @@ public partial class BootstrapLookupBox
     public bool IsDropDownOpen => _dropDownController.IsOpen;
 
     /// <summary>Opens the lookup result popup without committing pending text.</summary>
-    public void OpenDropDown() => _dropDownController.Open();
+    public void OpenDropDown()
+    {
+        FlushPendingSearch();
+        _dropDownController.Open();
+    }
 
     /// <summary>Closes only popup presentation without resolving pending text.</summary>
     public void CloseDropDown() => _dropDownController.Close(false);
@@ -23,7 +27,7 @@ public partial class BootstrapLookupBox
         RaiseRefreshRequested(new BootstrapLookupRefreshRequestedEventArgs(Text));
         _dataAdapter?.Refresh();
         ReconcileCommittedSelection();
-        ApplyCurrentResultsToContent();
+        ExecuteSearchNow();
         if (IsDropDownOpen) _dropDownController.Reposition();
     }
 
@@ -38,7 +42,7 @@ public partial class BootstrapLookupBox
             };
         }
         _dropDownContent.ApplyColumns(definitions, ShowColumnHeaders);
-        IReadOnlyList<BootstrapLookupSourceItem> items = _dataAdapter?.Snapshot ?? Array.Empty<BootstrapLookupSourceItem>();
+        IReadOnlyList<BootstrapLookupSourceItem> items = _currentSearchResult.Items;
         _dropDownContent.ApplyResults(items);
         var position = 0;
         for (var i = 0; i < items.Count; i++)
@@ -46,7 +50,7 @@ public partial class BootstrapLookupBox
             if (ReferenceEquals(items[i].Item, HighlightedItem) || Equals(items[i].Item, HighlightedItem)) { position = i + 1; break; }
         }
         _dropDownContent.ConfigureFooter(ShowRefreshButton, ShowAddNewButton);
-        _dropDownContent.UpdateStatus(position, items.Count, false, MinimumSearchLength);
+        _dropDownContent.UpdateStatus(position, items.Count, _currentSearchResult.State == BootstrapLookupSearchState.WaitingForMinimumLength, MinimumSearchLength);
     }
 
     internal void RequestExplicitAddNew()

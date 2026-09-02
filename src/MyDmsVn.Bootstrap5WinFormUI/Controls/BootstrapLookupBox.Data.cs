@@ -50,7 +50,11 @@ public partial class BootstrapLookupBox
         _dataAdapter = null;
     }
 
-    private void OnLookupSourceChanged(object? sender, EventArgs e) => ReconcileCommittedSelection();
+    private void OnLookupSourceChanged(object? sender, EventArgs e)
+    {
+        ReconcileCommittedSelection();
+        ExecuteSearchNow();
+    }
 
     private void ReconcileCommittedSelection()
     {

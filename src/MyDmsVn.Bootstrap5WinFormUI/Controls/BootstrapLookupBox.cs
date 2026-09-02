@@ -16,6 +16,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     private readonly BootstrapLookupDropDownAffordance _dropDownAffordance;
     private readonly BootstrapLookupDropDownContent _dropDownContent;
     private readonly BootstrapLookupDropDownController _dropDownController;
+    private readonly BootstrapUiDebouncer _searchDebouncer;
     private bool _synchronizingText;
     private object? _selectedItem;
     private object? _selectedValue;
@@ -37,6 +38,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     {
         _dropDownContent = new BootstrapLookupDropDownContent();
         _dropDownController = new BootstrapLookupDropDownController(this, _dropDownContent);
+        _searchDebouncer = new BootstrapUiDebouncer();
         _dropDownAffordance = new BootstrapLookupDropDownAffordance();
         _dropDownAffordance.Activated += OnDropDownAffordanceActivated;
         SetFrameworkTrailingAccessory(_dropDownAffordance);
@@ -189,6 +191,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     /// <summary>Discards pending editor text and restores committed display state.</summary>
     public void CancelPendingEdit()
     {
+        _searchDebouncer.Cancel();
         CloseDropDown();
         SynchronizeText(_committedDisplayText);
         _hasPendingText = false;
@@ -202,6 +205,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         if (_synchronizingText) return;
         _hasPendingText = !string.Equals(Text, _committedDisplayText, StringComparison.Ordinal);
         ClearLookupValidation();
+        ScheduleSearchForEditorText();
     }
 
     /// <inheritdoc />
@@ -210,6 +214,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         if (disposing)
         {
             _dropDownAffordance.Activated -= OnDropDownAffordanceActivated;
+            _searchDebouncer.Dispose();
             _dropDownController.Dispose();
             DisposeDataAdapter();
             _dropDownContent.Dispose();
