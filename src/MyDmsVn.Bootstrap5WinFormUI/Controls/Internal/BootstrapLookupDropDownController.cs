@@ -90,7 +90,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
         if (_dropDown is not null) return;
         _surface = new BootstrapOverlaySurface { LogicalContentPadding = Padding.Empty, LogicalBorderRadius = _owner.BorderRadius };
         _surface.AttachContent(_content);
-        _dropDown = new BootstrapOverlayDropDown(_surface) { AutoClose = true, CloseOnEscape = true, EscapeRequested = _owner.CancelPendingEdit };
+        _dropDown = new BootstrapOverlayDropDown(_surface) { AutoClose = false, CloseOnEscape = true, EscapeRequested = _owner.CancelPendingEdit };
         _dropDown.ApplicationDeactivated += OnApplicationDeactivated;
         _dropDown.WindowDeactivated += OnWindowDeactivated;
         _dropDown.Closed += OnDropDownClosed;
@@ -112,8 +112,8 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
         var requestedWidth = _owner.DropDownWidth == 0 ? _owner.Width : DpiScaler.Scale(_owner.DropDownWidth, dpi);
         var width = Math.Max(_owner.Width, requestedWidth);
         var maxHeight = DpiScaler.Scale(_owner.MaxDropDownHeight, dpi);
-        var rowHeight = Math.Max(22, _content.ResultsGrid.RowTemplate.Height);
-        var desiredHeight = Math.Min(maxHeight, Math.Max(64, 34 + Math.Min(8, _content.ResultsGrid.Rows.Count) * rowHeight));
+        var preferred = _content.GetPreferredSize(new Size(width, maxHeight));
+        var desiredHeight = Math.Min(maxHeight, Math.Max(DpiScaler.Scale(64, dpi), preferred.Height));
         _content.Size = new Size(width, desiredHeight);
         var anchor = _owner.RectangleToScreen(_owner.ClientRectangle);
         var request = new BootstrapOverlayPlacementRequest(anchor, new Size(width, desiredHeight), Screen.FromControl(_owner).WorkingArea,

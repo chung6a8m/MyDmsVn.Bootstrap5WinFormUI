@@ -43,6 +43,43 @@ public sealed class BootstrapLookupInteractionTests
     }
 
     [Test]
+    public void VisiblePopupPreservesNativeEditorTypingAndNavigation()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = new TestLookup
+        {
+            DisplayMember = "Name",
+            ValueMember = "Id",
+            DataSource = new BindingList<Product>
+            {
+                new Product(1, "Brazil"),
+                new Product(2, "Brandy")
+            },
+            SearchDebounceMilliseconds = 0
+        };
+        form.Controls.Add(lookup);
+        form.Show();
+        form.Activate();
+        lookup.Focus();
+        Application.DoEvents();
+
+        SendKeys.SendWait("b");
+        Application.DoEvents();
+        Assert.That(lookup.IsDropDownOpen, Is.True);
+
+        SendKeys.SendWait("ra");
+        SendKeys.SendWait("{DOWN}");
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.Text, Is.EqualTo("bra"));
+            Assert.That(lookup.EditorFocused, Is.True);
+            Assert.That(((Product)lookup.HighlightedItem!).Id, Is.EqualTo(2));
+        }));
+    }
+
+    [Test]
     public void EscapeRestoresCommittedTextWithoutAnotherCommit()
     {
         using var lookup = Create();

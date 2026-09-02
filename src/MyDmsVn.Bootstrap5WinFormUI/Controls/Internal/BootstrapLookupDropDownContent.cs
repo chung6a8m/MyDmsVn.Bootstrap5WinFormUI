@@ -102,6 +102,22 @@ internal sealed class BootstrapLookupDropDownContent : UserControl
         ResultsGrid.DataSource = null;
     }
 
+    public override System.Drawing.Size GetPreferredSize(System.Drawing.Size proposedSize)
+    {
+        var width = proposedSize.Width > 0 ? proposedSize.Width : Width;
+        var borderHeight = ResultsGrid.BorderStyle == BorderStyle.None
+            ? 0
+            : ResultsGrid.BorderStyle == BorderStyle.FixedSingle
+                ? SystemInformation.BorderSize.Height * 2
+                : SystemInformation.Border3DSize.Height * 2;
+        var headerHeight = ResultsGrid.ColumnHeadersVisible ? ResultsGrid.ColumnHeadersHeight : 0;
+        var rowsHeight = 0;
+        foreach (DataGridViewRow row in ResultsGrid.Rows) rowsHeight += row.Height;
+        var desiredHeight = _footer.Height + borderHeight + headerHeight + rowsHeight;
+        var height = proposedSize.Height > 0 ? Math.Min(proposedSize.Height, desiredHeight) : desiredHeight;
+        return new System.Drawing.Size(width, height);
+    }
+
     private static string BuildSignature(IEnumerable<BootstrapLookupColumnDefinition> definitions)
     {
         var builder = new StringBuilder();
