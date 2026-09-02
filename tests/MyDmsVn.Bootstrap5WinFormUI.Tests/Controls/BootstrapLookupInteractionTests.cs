@@ -69,6 +69,32 @@ public sealed class BootstrapLookupInteractionTests
     }
 
     [Test]
+    public void ProgrammaticSelectionAndClearSynchronizeAnOpenPopup()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.OpenDropDown();
+        Application.DoEvents();
+
+        lookup.SelectValue(2);
+        var selectedRowAfterValueChange = lookup.ResultsGrid.SelectedRows.Cast<DataGridViewRow>().Single().Index;
+        var currentRowAfterValueChange = lookup.ResultsGrid.CurrentCell?.RowIndex;
+
+        lookup.ClearSelection();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(selectedRowAfterValueChange, Is.EqualTo(1));
+            Assert.That(currentRowAfterValueChange, Is.EqualTo(1));
+            Assert.That(lookup.ResultsGrid.SelectedRows, Is.Empty);
+            Assert.That(lookup.ResultsGrid.CurrentCell, Is.Null);
+        }));
+    }
+
+    [Test]
     public void VisiblePopupPreservesNativeEditorTypingAndNavigation()
     {
         using var form = new Form { ShowInTaskbar = false };

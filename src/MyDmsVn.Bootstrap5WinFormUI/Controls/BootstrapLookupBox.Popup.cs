@@ -66,8 +66,12 @@ public partial class BootstrapLookupBox
                 break;
             }
         }
-        if (rowIndex < 0) return;
         ResultsGrid.ClearSelection();
+        if (rowIndex < 0)
+        {
+            ResultsGrid.CurrentCell = null;
+            return;
+        }
         var row = ResultsGrid.Rows[rowIndex];
         row.Selected = true;
         System.Windows.Forms.DataGridViewCell? firstVisibleCell = null;

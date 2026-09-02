@@ -117,6 +117,7 @@ public partial class BootstrapLookupBox
         _selectedItem = item;
         _selectedValue = value;
         SetHighlightedItem(item);
+        if (IsDropDownOpen) SynchronizeHighlightedResult();
         _committedDisplayText = displayText ?? string.Empty;
         SynchronizeText(_committedDisplayText);
         _hasPendingText = false;
