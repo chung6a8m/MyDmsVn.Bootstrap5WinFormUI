@@ -44,6 +44,43 @@ public sealed class BootstrapInputGroupTests
     }
 
     [Test]
+    public void ChangingDefaultConstructedGroupToLargeExpandsContainerToResolvedRowHeight()
+    {
+        using var group = new BootstrapInputGroup();
+        using var input = new BootstrapTextBox();
+        group.Controls.Add(input);
+        var defaultHeight = group.Height;
+
+        group.InputGroupSize = BootstrapInputGroupSize.Large;
+        group.PerformLayout();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(group.Height, Is.GreaterThan(defaultHeight));
+            Assert.That(group.ClientSize.Height, Is.EqualTo(input.Height));
+            Assert.That(input.Bottom, Is.LessThanOrEqualTo(group.ClientSize.Height));
+        }));
+    }
+
+    [Test]
+    public void ContainerHeightHonorsNativeConnectedSafeMinimum()
+    {
+        using var group = new BootstrapInputGroup { Height = 1, InputGroupSize = BootstrapInputGroupSize.Small };
+        using var numeric = new BootstrapNumericBox();
+        group.Controls.Add(numeric);
+        group.PerformLayout();
+        var connected = (IBootstrapConnectedControl)numeric;
+        var safeMinimum = connected.GetConnectedSafeMinimumHeight(BootstrapConnectedControlSize.Small, numeric.DeviceDpi);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(group.ClientSize.Height, Is.GreaterThanOrEqualTo(safeMinimum));
+            Assert.That(numeric.Height, Is.EqualTo(group.ClientSize.Height));
+            Assert.That(numeric.Bottom, Is.LessThanOrEqualTo(group.ClientSize.Height));
+        }));
+    }
+
+    [Test]
     public void UnsupportedAdmissionIsAtomicAndKeepsPreviousParent()
     {
         using var previous = new Panel();
@@ -98,6 +135,35 @@ public sealed class BootstrapInputGroupTests
         Assert.That(third.Left, Is.EqualTo(0));
         Assert.That(first.Left, Is.GreaterThan(third.Left));
         Assert.That(second.Left, Is.GreaterThan(first.Left));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void MovingChildToBackKeepsCanonicalOrderSynchronizedWithControls(bool useSendToBack)
+    {
+        using var group = new BootstrapInputGroup { Size = new Size(300, 40) };
+        using var first = new BootstrapInputGroupText { Text = "A" };
+        using var second = new BootstrapInputGroupText { Text = "B" };
+        using var third = new BootstrapInputGroupText { Text = "C" };
+        group.Controls.AddRange(new Control[] { first, second, third });
+
+        if (useSendToBack)
+        {
+            first.SendToBack();
+        }
+        else
+        {
+            group.Controls.SetChildIndex(first, -1);
+        }
+        group.PerformLayout();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(group.Controls.GetChildIndex(first), Is.EqualTo(2));
+            Assert.That(second.Left, Is.EqualTo(0));
+            Assert.That(third.Left, Is.GreaterThan(second.Left));
+            Assert.That(first.Left, Is.GreaterThan(third.Left));
+        }));
     }
 
     [Test]

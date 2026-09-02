@@ -17,7 +17,9 @@ Native `TextBox`/`Button`, `BootstrapButtonGroup`, `BootstrapComboBox`, `Bootstr
 
 `InputGroupSize` selects Small, Default, or Large theme height/radius metrics. The group applies internal connected overrides; public child properties such as `ButtonSize`, `BorderRadius`, and `ValidationState` are never rewritten.
 
-Layout is measured in two passes. First, every visible child reports a safe minimum height; the row uses the maximum of those values and the selected theme target. This prevents native-backed editors, especially `BootstrapNumericBox`, from clipping or fighting the assigned height. Second, fixed addons/buttons keep their preferred width while TextBox, FormattedTextBox, NumericBox, and Single Select share remaining width. Constrained widths compress fixed capacity first, then soft minimums proportionally; bounds never become negative or leave the client area.
+Layout is measured in two passes. First, every visible child reports a safe minimum height; the row uses the maximum of those values and the selected theme target, and the container synchronizes its client height to that resolved row. This prevents native-backed editors, especially `BootstrapNumericBox`, from clipping or fighting the assigned height. Second, fixed addons/buttons keep their preferred width while TextBox, FormattedTextBox, NumericBox, and Single Select share remaining width. Constrained widths compress fixed capacity first, then soft minimums proportionally; bounds never become negative or leave the client area.
+
+Overlapped seams use temporary visual stacking so focused, pressed, and hovered borders remain visible, in that priority order. This z-order is presentation-only: caller `Controls.SetChildIndex(...)` order remains canonical and is restored when active state ends. WinForms `-1`/`SendToBack()` normalization is reflected back into canonical order after the native collection operation completes.
 
 Only visible first/last controls keep outer corners. Hiding, removing, or reparenting a child clears its internal connected overrides. `RightToLeft.Yes` mirrors visual placement and corners without changing `Controls` or Tab order.
 

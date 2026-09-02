@@ -14,8 +14,12 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 public class BootstrapInputGroup : Panel
 {
     private readonly List<Control> _canonicalChildren = new List<Control>();
+    private readonly HashSet<Control> _interactionSources = new HashSet<Control>();
+    private readonly HashSet<Control> _hoveredSources = new HashSet<Control>();
+    private readonly HashSet<Control> _pressedSources = new HashSet<Control>();
     private BootstrapInputGroupSize _inputGroupSize = BootstrapInputGroupSize.Default;
     private bool _performingLayout;
+    private bool _updatingVisualOrder;
     private bool _themeSubscribed;
 
     /// <summary>Initializes a designer-safe horizontal input group.</summary>
@@ -135,10 +139,13 @@ public class BootstrapInputGroup : Panel
     {
         if (_canonicalChildren.Contains(child)) return;
         _canonicalChildren.Add(child);
-        child.VisibleChanged += OnChildLayoutChanged;
+        child.VisibleChanged += OnChildVisibleChanged;
+        child.EnabledChanged += OnChildEnabledChanged;
         child.SizeChanged += OnChildLayoutChanged;
         child.TextChanged += OnChildLayoutChanged;
+        AttachInteractionTree(child);
         PerformLayout();
+        UpdateVisualOrder();
     }
 
     private void ChildRemoved(Control child)
@@ -155,18 +162,102 @@ public class BootstrapInputGroup : Panel
         _canonicalChildren.RemoveAt(current);
         _canonicalChildren.Insert(Math.Max(0, Math.Min(newIndex, _canonicalChildren.Count)), child);
         PerformLayout();
+        UpdateVisualOrder();
     }
 
     private void DetachChild(Control child)
     {
-        child.VisibleChanged -= OnChildLayoutChanged;
+        child.VisibleChanged -= OnChildVisibleChanged;
+        child.EnabledChanged -= OnChildEnabledChanged;
         child.SizeChanged -= OnChildLayoutChanged;
         child.TextChanged -= OnChildLayoutChanged;
+        DetachInteractionTree(child);
+        ClearInteractionState(child);
         if (child is IBootstrapConnectedControl connected)
         {
             connected.ConnectedCornerRadius = null;
             connected.ConnectedSizeOverride = null;
         }
+    }
+
+    private void AttachInteractionTree(Control source)
+    {
+        if (!_interactionSources.Add(source)) return;
+        source.Enter += OnChildFocusChanged;
+        source.Leave += OnChildFocusChanged;
+        source.MouseEnter += OnChildMouseEnter;
+        source.MouseLeave += OnChildMouseLeave;
+        source.MouseDown += OnChildMouseDown;
+        source.MouseUp += OnChildMouseUp;
+        source.ControlAdded += OnInteractionControlAdded;
+        source.ControlRemoved += OnInteractionControlRemoved;
+        foreach (Control child in source.Controls) AttachInteractionTree(child);
+    }
+
+    private void DetachInteractionTree(Control source)
+    {
+        foreach (Control child in source.Controls) DetachInteractionTree(child);
+        if (!_interactionSources.Remove(source)) return;
+        source.Enter -= OnChildFocusChanged;
+        source.Leave -= OnChildFocusChanged;
+        source.MouseEnter -= OnChildMouseEnter;
+        source.MouseLeave -= OnChildMouseLeave;
+        source.MouseDown -= OnChildMouseDown;
+        source.MouseUp -= OnChildMouseUp;
+        source.ControlAdded -= OnInteractionControlAdded;
+        source.ControlRemoved -= OnInteractionControlRemoved;
+        _hoveredSources.Remove(source);
+        _pressedSources.Remove(source);
+    }
+
+    private void ClearInteractionState(Control child)
+    {
+        _hoveredSources.RemoveWhere(source => IsWithin(source, child));
+        _pressedSources.RemoveWhere(source => IsWithin(source, child));
+        UpdateVisualOrder();
+    }
+
+    private void UpdateVisualOrder()
+    {
+        if (_updatingVisualOrder || IsDisposed) return;
+        var ordered = _canonicalChildren
+            .Select((child, index) => new { Child = child, Index = index, Priority = GetVisualPriority(child) })
+            .OrderByDescending(item => item.Priority)
+            .ThenBy(item => item.Index)
+            .Select(item => item.Child)
+            .ToArray();
+        _updatingVisualOrder = true;
+        try
+        {
+            for (var i = 0; i < ordered.Length; i++)
+            {
+                if (Controls.GetChildIndex(ordered[i]) != i)
+                {
+                    Controls.SetChildIndex(ordered[i], i);
+                }
+            }
+        }
+        finally
+        {
+            _updatingVisualOrder = false;
+        }
+    }
+
+    private int GetVisualPriority(Control child)
+    {
+        if (child.ContainsFocus) return 3;
+        if (_pressedSources.Any(source => IsWithin(source, child))) return 2;
+        if (_hoveredSources.Any(source => IsWithin(source, child))) return 1;
+        return 0;
+    }
+
+    private static bool IsWithin(Control source, Control ancestor)
+    {
+        for (Control? current = source; current is not null; current = current.Parent)
+        {
+            if (ReferenceEquals(current, ancestor)) return true;
+        }
+        return false;
     }
 
     private void LayoutConnectedChildren()
@@ -178,9 +269,13 @@ public class BootstrapInputGroup : Panel
             connected.ConnectedSizeOverride = null;
         }
         var visible = GetVisibleCanonicalChildren();
+        var rowHeight = ResolveRowHeight(visible);
+        if (ClientSize.Height != rowHeight)
+        {
+            SetClientSizeCore(ClientSize.Width, rowHeight);
+        }
         if (visible.Count == 0) return;
         ApplyConnectedOverrides(visible);
-        var rowHeight = ResolveRowHeight(visible);
         var result = BootstrapInputGroupLayoutLogic.Calculate(
             BuildLayoutItems(visible), Math.Max(0, ClientSize.Width), rowHeight,
             ResolveSeamOverlap(), RightToLeft == RightToLeft.Yes);
@@ -242,6 +337,59 @@ public class BootstrapInputGroup : Panel
         if (!_performingLayout) PerformLayout();
     }
 
+    private void OnChildVisibleChanged(object? sender, EventArgs e)
+    {
+        if (sender is Control child && !child.Visible) ClearInteractionState(child);
+        OnChildLayoutChanged(sender, e);
+    }
+
+    private void OnChildEnabledChanged(object? sender, EventArgs e)
+    {
+        if (sender is Control child && !child.Enabled) ClearInteractionState(child);
+        UpdateVisualOrder();
+    }
+
+    private void OnChildFocusChanged(object? sender, EventArgs e) => UpdateVisualOrder();
+
+    private void OnChildMouseEnter(object? sender, EventArgs e)
+    {
+        if (sender is Control source) _hoveredSources.Add(source);
+        UpdateVisualOrder();
+    }
+
+    private void OnChildMouseLeave(object? sender, EventArgs e)
+    {
+        if (sender is Control source)
+        {
+            _hoveredSources.Remove(source);
+            _pressedSources.Remove(source);
+        }
+        UpdateVisualOrder();
+    }
+
+    private void OnChildMouseDown(object? sender, MouseEventArgs e)
+    {
+        if (sender is Control source && e.Button == MouseButtons.Left) _pressedSources.Add(source);
+        UpdateVisualOrder();
+    }
+
+    private void OnChildMouseUp(object? sender, MouseEventArgs e)
+    {
+        if (sender is Control source) _pressedSources.Remove(source);
+        UpdateVisualOrder();
+    }
+
+    private void OnInteractionControlAdded(object? sender, ControlEventArgs e)
+    {
+        if (e.Control is not null) AttachInteractionTree(e.Control);
+    }
+
+    private void OnInteractionControlRemoved(object? sender, ControlEventArgs e)
+    {
+        if (e.Control is not null) DetachInteractionTree(e.Control);
+        UpdateVisualOrder();
+    }
+
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
     {
         PerformLayout();
@@ -272,7 +420,10 @@ public class BootstrapInputGroup : Panel
         public override void SetChildIndex(Control child, int newIndex)
         {
             base.SetChildIndex(child, newIndex);
-            _owner.ChildReordered(child, newIndex);
+            if (!_owner._updatingVisualOrder)
+            {
+                _owner.ChildReordered(child, GetChildIndex(child));
+            }
         }
     }
 }
