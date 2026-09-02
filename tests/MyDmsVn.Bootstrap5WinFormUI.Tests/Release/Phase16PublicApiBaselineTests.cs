@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "8bf5a56063e1b0f758577474c2be2243fc32ee848fe675032a5e1d7bae88230b";
+    private const string ApprovedV1Fingerprint = "db39fa1cd730ef0be8bb6cbd76ae587b6df92b62336e3f274d904caa25064865";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -132,6 +132,79 @@ public sealed class Phase16PublicApiBaselineTests
             Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("FormattedTextSnapshot"));
             Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("FormattedTextHistory"));
             Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("InputFormatOptionValidation"));
+        }));
+    }
+
+    [Test]
+    public void InputGroupApiExportsOnlyTheReviewedPublicContract()
+    {
+        var assembly = typeof(BootstrapInputGroup).Assembly;
+        var inputGroupExports = assembly.GetExportedTypes()
+            .Select(type => type.FullName)
+            .Where(name => name is not null && name.IndexOf("InputGroup", StringComparison.Ordinal) >= 0)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        var connectedMemberNames = new[]
+        {
+            "ConnectedCornerRadius", "ConnectedSizeOverride", "GetConnectedSafeMinimumHeight"
+        };
+        var connectedControls = new[]
+        {
+            typeof(BootstrapButton), typeof(BootstrapTextBox), typeof(BootstrapNumericBox),
+            typeof(BootstrapSelect), typeof(BootstrapSplitButton), typeof(BootstrapInputGroupText)
+        };
+        const BindingFlags declaredVisible = BindingFlags.Instance | BindingFlags.Public |
+                                             BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(Enum.GetValues(typeof(BootstrapInputGroupSize)), Is.EqualTo(new[]
+            {
+                BootstrapInputGroupSize.Small,
+                BootstrapInputGroupSize.Default,
+                BootstrapInputGroupSize.Large
+            }));
+            Assert.That(inputGroupExports, Is.EqualTo(new[]
+            {
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapInputGroup",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapInputGroupSize",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapInputGroupText"
+            }));
+            Assert.That(GetDeclaredPublicPropertyNames(typeof(BootstrapInputGroup)), Is.EqualTo(new[] { "InputGroupSize" }));
+            Assert.That(GetDeclaredPublicMethodNames(typeof(BootstrapInputGroup)), Is.EqualTo(new[] { "GetPreferredSize" }));
+            Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapInputGroup)), Is.Empty);
+            Assert.That(GetDeclaredProtectedMethodNames(typeof(BootstrapInputGroup)), Is.EqualTo(new[]
+            {
+                "CreateControlsInstance", "Dispose", "OnDpiChangedAfterParent", "OnLayout", "OnRightToLeftChanged"
+            }));
+            Assert.That(GetDeclaredPublicPropertyNames(typeof(BootstrapInputGroupText)), Is.EqualTo(new[]
+            {
+                "BorderRadius", "Icon", "IconRenderer", "Text", "TextAlign"
+            }));
+            Assert.That(GetDeclaredPublicMethodNames(typeof(BootstrapInputGroupText)), Is.EqualTo(new[] { "GetPreferredSize" }));
+            Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapInputGroupText)), Is.Empty);
+            Assert.That(GetDeclaredProtectedMethodNames(typeof(BootstrapInputGroupText)), Is.EqualTo(new[]
+            {
+                "Dispose", "OnFontChanged", "OnPaint", "OnTextChanged"
+            }));
+
+            foreach (var type in connectedControls)
+            {
+                var visibleConnectedMembers = type.GetMembers(declaredVisible)
+                    .Where(member => connectedMemberNames.Contains(member.Name) &&
+                                     (member is MethodBase method && (method.IsPublic || method.IsFamily || method.IsFamilyOrAssembly) ||
+                                      member is PropertyInfo property &&
+                                      ((property.GetMethod?.IsPublic ?? false) || (property.GetMethod?.IsFamily ?? false) ||
+                                       (property.GetMethod?.IsFamilyOrAssembly ?? false) || (property.SetMethod?.IsPublic ?? false) ||
+                                       (property.SetMethod?.IsFamily ?? false) || (property.SetMethod?.IsFamilyOrAssembly ?? false))))
+                    .ToArray();
+                Assert.That(visibleConnectedMembers, Is.Empty, type.Name + " must implement connected members explicitly.");
+            }
+
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("IBootstrapConnectedControl"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapConnectedControlSize"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapConnectedControlLayoutLogic"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapInputGroupLayoutLogic"));
         }));
     }
 
@@ -313,6 +386,15 @@ public sealed class Phase16PublicApiBaselineTests
     {
         return type.GetEvents(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
             .Select(eventInfo => eventInfo.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string[] GetDeclaredProtectedMethodNames(Type type)
+    {
+        return type.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+            .Where(method => !method.IsSpecialName && (method.IsFamily || method.IsFamilyOrAssembly))
+            .Select(method => method.Name)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
     }
