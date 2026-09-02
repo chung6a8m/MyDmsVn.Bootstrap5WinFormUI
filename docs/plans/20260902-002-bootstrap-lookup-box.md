@@ -1,10 +1,10 @@
 # BootstrapLookupBox Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development when executing this plan.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement the approved `BootstrapLookupBox` / `BootstrapLookupColumn` subsystem as a native WinForms single-selection lookup editor with local multi-column search, dynamic-suggest `CommitAndAdd`, Refresh/Add New footer actions, robust keyboard/focus/activation behavior, and a real `IDataGridViewEditingControl` integration that works with `BindingSource` / `BindingList<T>` and native DataGridView new-row editing.
+**Goal:** Implement the approved `BootstrapLookupBox` / `BootstrapLookupColumn` subsystem as a native WinForms single-selection lookup editor with local multi-column search, deterministic Vietnamese-friendly ranking, dynamic-suggest `CommitAndAdd`, Refresh/Add New footer actions, robust keyboard/focus/activation behavior, and a real `IDataGridViewEditingControl` integration that works with `BindingSource` / `BindingList<T>` and native DataGridView new-row editing.
 
-**Architecture:** `BootstrapLookupBox : BootstrapTextBox` owns committed selection, pending query text, and public configuration. Local data is accessed through an internal adapter/member-access layer and searched through a pure search engine that never mutates the caller's `BindingSource`. A new lookup-specific popup controller reuses the repository's generic overlay infrastructure and hosts `BootstrapLookupDropDownContent`, which contains a read-only `BootstrapDataGridView` plus a footer. `BootstrapLookupEditingControl : BootstrapLookupBox, IDataGridViewEditingControl` is the actual grid editor; `BootstrapLookupCell` and public `BootstrapLookupColumn` provide native DataGridView integration. The implementation must not overlay a second editor over `DataGridViewTextBoxEditingControl` and must not use `SendKeys` for navigation.
+**Architecture:** `BootstrapLookupBox : BootstrapTextBox` owns committed selection, pending query text, and public configuration. Two shared `BootstrapTextBox` prerequisites are added first: an internal trailing-accessory slot so the lookup affordance can coexist with inherited clear/trailing visuals without overlay hacks, and a transient validation override so lookup-generated validation never erases application-owned validation. Local data is accessed through an internal adapter/member-access layer and searched through a pure search engine that never mutates the caller's `BindingSource`. A lookup-specific popup controller reuses the generic overlay infrastructure and hosts `BootstrapLookupDropDownContent`, which contains a read-only `BootstrapDataGridView` plus a footer. `BootstrapLookupEditingControl : BootstrapLookupBox, IDataGridViewEditingControl` is the actual grid editor; internal `BootstrapLookupCell` and public `BootstrapLookupColumn` provide native DataGridView integration. The implementation must not overlay a second editor over `DataGridViewTextBoxEditingControl` and must not use `SendKeys` for navigation.
 
 **Tech Stack:** C# / WinForms, `net48;net8.0-windows`, NUnit 4, `BindingSource`, `BindingList<T>`, `IList`, `IListSource`, `PropertyDescriptor`, existing Bootstrap theme/rendering/overlay infrastructure, `System.Windows.Forms.Timer`, Windows message routing for interaction tests.
 
@@ -12,26 +12,32 @@
 
 **Planning base:** `main` after spec commit `da3bca239abc4235510ba88d9d5a30e74c7c4fa0`.
 
+**Review amendments in this plan:** This revision resolves the implementation-plan review findings. Where the written spec was underspecified, this plan locks two implementation clarifications without expanding V1 feature scope: ambiguous exact display matches never auto-commit, and aggregate multi-token ranking uses the exact tuple defined in Task 4. These clarifications must be treated as an approved supplement to the spec during execution and mirrored into the spec if the spec is edited later.
+
 ## Global Constraints
 
 - Before modifying product code, read `AGENTS.md`, `README.md`, `AI_CONTEXT.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/COMPATIBILITY.md`, `docs/TESTING.md`, the relevant section of `docs/COMPONENTS.md`, and the approved lookup spec.
-- The approved spec is the source of truth. Do not add multi-select, remote/async providers, paging, fuzzy matching, arbitrary popup content, generic `BootstrapLookupBox<T>`, or a public provider/ranking abstraction in V1.
+- The approved spec plus the explicit review amendments in this plan are the source of truth. Do not add multi-select, remote/async providers, paging, fuzzy matching, arbitrary popup content, generic `BootstrapLookupBox<T>`, or a public provider/ranking abstraction in V1.
 - Preserve `BootstrapSelect` semantics. Reuse generic overlay primitives, but do not inherit/reuse `BootstrapSelectDropDownController` or `BootstrapSelectDropDownContent` as the lookup implementation.
-- Reuse shared infrastructure instead of duplicating it. In particular, extract the existing `BootstrapSelectDebouncer` into a generic internal UI debouncer before adding lookup debounce behavior.
-- `BootstrapLookupBox` must keep keyboard focus in its inherited native `BootstrapTextBox.Editor` while the popup is open. `ResultsGrid`, Refresh, and Add New must not become Tab stops.
+- Reuse shared infrastructure instead of duplicating it. Extract the existing `BootstrapSelectDebouncer` into a generic internal UI debouncer before adding lookup debounce behavior.
+- Do not implement the lookup dropdown affordance by overlaying a child over `BootstrapTextBox.Editor`. Extend `BootstrapTextBox` with an internal framework-owned trailing-accessory slot and let the base layout reserve the space.
+- Lookup-generated validation is transient framework state. It must visually override application validation while active, but clearing it must reveal the latest application-assigned `ValidationState`, including assignments made while the lookup error was active.
+- `BootstrapLookupBox` must keep keyboard focus in its inherited native `BootstrapTextBox.Editor` while the popup is open. `ResultsGrid`, Refresh, Add New, and the dropdown affordance must not become Tab stops.
 - Typing, searching, highlighting, popup open/close, Refresh, and Alt+Tab must not change committed selection and must not dirty a DataGridView cell.
 - `SelectedItem`, `SelectedValue`, and `CommittedDisplayText` always mean committed state. `Text`, `HasPendingText`, and `HighlightedItem` may represent transient editing/search state.
 - Empty/whitespace text is a distinct resolver outcome: clear selection and commit `null`. It never passes through `UnmatchedTextBehavior`.
+- Exact display-text resolution succeeds only when there is exactly one distinct logical value among exact matches. Multiple exact rows that map to the same logical value count as one logical match; two or more distinct logical values are ambiguous and must block commit/navigation with lookup validation. Ambiguity never invokes `CommitAndAdd` and never creates a duplicate.
 - `CommitAndAdd` is atomic: unmatched raw text must never be committed unless a corresponding datasource item was successfully created/accepted. Predictable inability to add falls back to `KeepFocusWithValidationError`; unexpected application/source exceptions propagate after internal cleanup.
 - Search must operate on a projection. Never implement lookup filtering by changing `BindingSource.Filter`, `BindingSource.Position`, or the caller's source order.
 - `DataPropertyName` on `BootstrapLookupColumn` stores the raw lookup identity. `ValueMember` reads identity from the lookup item. `DisplayMember` supplies display text.
 - Native DataGridView AddNew/new-row lifecycle is required. Do not use `DataTable`, manual `Rows.Add`, or a hidden native textbox with an overlaid lookup editor in the replacement demo.
+- Reused DataGridView editing controls must detach all datasource/column/event state from the previous lookup column before applying the next cell's configuration.
 - Every public type/member requires XML documentation; the core project treats CS1591 as an error.
 - Every product change must compile on both `net48` and `net8.0-windows`. Avoid APIs unavailable on `net48` unless an existing compatibility helper or a justified conditional path is used.
 - Follow TDD task-by-task: add/extend the named test first, run the focused test and observe the expected failure, implement the minimum behavior, rerun focused tests, then commit.
 - Do not update the public API fingerprint until the final API-review task. Focused test filters are expected to avoid the baseline test until then.
 
-## Locked V1 Defaults
+## Locked V1 Defaults and Clarifications
 
 ```text
 Selection                     = single only
@@ -52,12 +58,16 @@ Search normalization           = Trim + case-insensitive + remove Unicode diacri
 Exact-match normalization      = Trim
 Exact-match comparer           = CurrentCultureIgnoreCase
 Empty text                     = clear / commit null
+Ambiguous exact text           = block commit/navigation; preserve pending text/value; show lookup validation
 Alt+Tab                        = close popup only; preserve pending edit
 Reactivation                   = keep popup closed
 Highlight refresh              = preserve previous highlighted logical item when possible
-Search ranking                 = Exact > StartsWith > WordStart > Contains
+Search ranking                 = per-token Exact > StartsWith > WordStart > Contains,
+                                 aggregate by worst token, then total quality,
+                                 DisplayMember best-match count, member priority, source order
 Multi-token search             = AND across tokens; tokens may match different SearchMembers
 Footer buttons                 = not Tab stops
+ResultsChanged                 = fires only when logical result projection/search state changes
 ```
 
 ---
@@ -77,57 +87,35 @@ Footer buttons                 = not Tab stops
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupEventArgs.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupContractsTests.cs`
 
-**Interfaces:** Produces the public enums, collections, result-column definition, and event args consumed by all later tasks. Do not add public types not required by the approved spec.
+**Interfaces:** Produces the public enums, designer collections, result-column definition, and event args consumed by all later tasks. Do not add public types not required by the approved spec/review amendments.
 
-- [ ] **Step 1: Write failing enum/default-contract tests.** Lock enum values and names exactly as approved.
+- [ ] **Step 1: Write failing enum-contract tests.** Lock exact names/values for:
+  - `BootstrapLookupEmptyQueryBehavior`: `ShowAll`, `ShowNone`
+  - `BootstrapLookupTypingPopupBehavior`: `AutoOpen`, `KeepCurrentState`
+  - `BootstrapLookupUnmatchedTextBehavior`: `RestorePreviousSelection`, `KeepFocusWithValidationError`, `CommitAndAdd`
+  - `BootstrapLookupEnterKeyBehavior`: `CommitSelection`, `CommitSelectionAndMoveNext`
+  - `BootstrapLookupClosedEnterKeyBehavior`: `ResolvePendingText`, `DataGridViewDefault`
+  - `BootstrapLookupCommitReason`: `Keyboard`, `Mouse`, `Programmatic`, `ExactMatch`, `CommitAndAdd`, `Clear`
 
-```csharp
-[Test]
-public void LookupBehaviorEnumsExposeOnlyReviewedValues()
-{
-    Assert.That(Enum.GetValues(typeof(BootstrapLookupUnmatchedTextBehavior)), Is.EqualTo(new[]
-    {
-        BootstrapLookupUnmatchedTextBehavior.RestorePreviousSelection,
-        BootstrapLookupUnmatchedTextBehavior.KeepFocusWithValidationError,
-        BootstrapLookupUnmatchedTextBehavior.CommitAndAdd
-    }));
-}
-```
+- [ ] **Step 2: Write failing collection tests.** `BootstrapLookupColumnDefinitionCollection` supports designer content serialization and rejects null entries. `BootstrapLookupSearchMemberCollection` rejects null/empty/whitespace names and ordinal duplicates while preserving insertion order.
 
-Also lock:
+- [ ] **Step 3: Write failing column-definition tests.** Lock defaults: `Width = 100`, `MinimumWidth = 5`, `Visible = true`, `AutoSizeMode = None`, left alignment, empty format/member/header; validate invalid widths.
 
-```text
-BootstrapLookupEmptyQueryBehavior: ShowAll, ShowNone
-BootstrapLookupTypingPopupBehavior: AutoOpen, KeepCurrentState
-BootstrapLookupEnterKeyBehavior: CommitSelection, CommitSelectionAndMoveNext
-BootstrapLookupClosedEnterKeyBehavior: ResolvePendingText, DataGridViewDefault
-BootstrapLookupCommitReason: Keyboard, Mouse, Programmatic, ExactMatch, CommitAndAdd, Clear
-```
+- [ ] **Step 4: Write failing event-args tests.** Cover selection committed, highlighted-item changed, Refresh, Add New, Create From Text, and grid-cell contextual event args. Writable outcome properties (`Cancel`, `NewItem`/`Item`) must match the spec.
 
-- [ ] **Step 2: Write failing collection tests.** `BootstrapLookupColumnDefinitionCollection` must support designer content serialization and reject null entries. `BootstrapLookupSearchMemberCollection` must reject null/empty/whitespace names and duplicate member names using ordinal member-name semantics; preserve insertion order because order affects ranking.
-
-- [ ] **Step 3: Write failing column-definition tests.** Lock defaults (`Width = 100`, `MinimumWidth = 5`, `Visible = true`, `AutoSizeMode = None`, left alignment, empty format/member/header) and range validation for invalid widths.
-
-- [ ] **Step 4: Write failing event-args tests.** Cover selection-committed, highlighted-item-changed, Refresh, Add New, Create From Text, and grid-cell contextual event args. Constructors may be internal where callers only receive events; writable outcome properties (`Cancel`, `NewItem`/`Item`) must match the spec.
-
-- [ ] **Step 5: Run the focused tests and confirm compile/test failure because the contracts do not exist.**
+- [ ] **Step 5: Run the focused test and confirm compile/test failure because contracts do not exist.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupContractsTests"
 ```
 
-- [ ] **Step 6: Implement only the reviewed contracts with XML docs and designer attributes.** Keep `BootstrapLookupCell` out of this public-contract task; it remains internal unless DataGridView construction proves technically impossible without exporting it.
+- [ ] **Step 6: Implement only the reviewed contracts with XML docs/designer attributes.** Keep `BootstrapLookupCell` internal.
 
-- [ ] **Step 7: Run focused tests on both target frameworks.**
+- [ ] **Step 7: Run focused tests on both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupContractsTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupContractsTests"
-```
-
-- [ ] **Step 8: Commit.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookup*.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupContractsTests.cs
 git commit -m "feat: add BootstrapLookup public contracts"
 ```
@@ -143,28 +131,18 @@ git commit -m "feat: add BootstrapLookup public contracts"
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapUiDebouncerTests.cs`
 - Test existing: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapSelectSearchTests.cs`
 
-**Interfaces:** Generalizes the existing `BootstrapSelectDebouncer` without changing Select behavior; later Lookup tasks reuse the shared class.
+**Interfaces:** Generalizes the existing Select debouncer without changing Select behavior; later Lookup tasks reuse it.
 
-- [ ] **Step 1: Write failing tests for the generic debouncer.** Require `Schedule(TimeSpan, Action)`, zero-delay immediate execution, later-schedule replacement, `Cancel`, negative-delay guard, and disposal safety. Use STA because `System.Windows.Forms.Timer` is UI-thread based.
-
-- [ ] **Step 2: Run focused test and confirm the generic type is missing.**
-
-```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapUiDebouncerTests"
-```
-
-- [ ] **Step 3: Move the current debouncer implementation to `BootstrapUiDebouncer` without adding new semantics.** Preserve the current WinForms timer ownership and cleanup behavior.
-
-- [ ] **Step 4: Replace `BootstrapSelectDebouncer` references in `BootstrapSelect.Search.cs` with `BootstrapUiDebouncer`, then remove the Select-specific file.** No public Select API changes are allowed.
-
-- [ ] **Step 5: Run debouncer plus Select search regression tests on both TFMs.**
+- [ ] **Step 1: Write failing tests** for `Schedule(TimeSpan, Action)`, zero-delay immediate execution, replacement, `Cancel`, negative-delay guard, and disposal safety. Use STA.
+- [ ] **Step 2: Run focused tests and confirm the generic type is missing.**
+- [ ] **Step 3: Move the current implementation to `BootstrapUiDebouncer` without new semantics.**
+- [ ] **Step 4: Replace Select references and remove `BootstrapSelectDebouncer.cs`.**
+- [ ] **Step 5: Run generic-debouncer plus Select-search regressions on both TFMs.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapUiDebouncerTests|FullyQualifiedName~BootstrapSelectSearchTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapUiDebouncerTests|FullyQualifiedName~BootstrapSelectSearchTests"
 ```
-
-Expected: all pass; existing Select debounce behavior is unchanged.
 
 - [ ] **Step 6: Commit.**
 
@@ -184,50 +162,14 @@ git commit -m "refactor: share WinForms UI debounce infrastructure"
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupSourceItem.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupDataAdapterTests.cs`
 
-**Interfaces:** Consumes `object DataSource`, `DisplayMember`, `ValueMember`; produces stable source snapshots, display/value access, exact member validation, identity lookup, source-change notifications, refresh/reconciliation, and safe add capability. It must not perform search/ranking.
+**Interfaces:** Consumes `object DataSource`, `DisplayMember`, `ValueMember`; produces stable source snapshots, display/value access, identity lookup, source-change notifications, refresh/reconciliation, and safe add capability. It must not perform search/ranking.
 
-- [ ] **Step 1: Write failing source-shape tests.** Cover direct `BindingList<T>`, `BindingSource -> BindingList<T>`, `List<T>`, arrays, `IListSource`, and `BindingList<string>`. Assert source order is preserved and enumeration does not change `BindingSource.Position`.
-
-```csharp
-[Test]
-public void SnapshotDoesNotMoveBindingSourcePosition()
-{
-    var items = new BindingList<Product> { Product.Create(1, "A"), Product.Create(2, "B") };
-    using var source = new BindingSource { DataSource = items, Position = 1 };
-    using var adapter = new BootstrapLookupDataAdapter(source, "Name", "Id");
-
-    var snapshot = adapter.GetSnapshot();
-
-    Assert.That(snapshot, Has.Count.EqualTo(2));
-    Assert.That(source.Position, Is.EqualTo(1));
-}
-```
-
-- [ ] **Step 2: Write failing member-access tests.** Require `DisplayMember == ""` to use `item?.ToString() ?? ""`; `ValueMember == ""` to use the item itself; null property values to become empty display/search text; invalid members to fail early once metadata is available. Prefer cached `PropertyDescriptor` metadata over repeated reflection.
-
-- [ ] **Step 3: Write failing identity/missing-value tests.** `FindByValue` must distinguish a legitimate null raw value from “not found” using a success/result contract. Preserve a committed raw value even when no source item currently maps to it; do not auto-clear it.
-
-- [ ] **Step 4: Write failing add-capability tests.** Writable `BindingSource`/`IList` accepts a new item through the public source abstraction; arrays/read-only lists report `CanAdd == false` without mutation. Verify add does not bypass `BindingSource` when `DataSource` itself is a `BindingSource`.
-
-- [ ] **Step 5: Write source-change/disposal tests.** Subscribe to `BindingSource.ListChanged` / equivalent notifications only when available, surface one adapter change notification, and unsubscribe on dispose.
-
-- [ ] **Step 6: Run focused tests and confirm failure.**
-
-```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupDataAdapterTests"
-```
-
-- [ ] **Step 7: Implement the adapter and accessor.** Keep these responsibilities separate:
-
-```text
-BootstrapLookupMemberAccessor -> metadata resolution/get-value only
-BootstrapLookupDataAdapter    -> source enumeration/currency/add/change subscriptions
-BootstrapLookupSourceItem     -> item + original source index + display text + logical value
-```
-
-Do not add WinForms popup/search logic here.
-
-- [ ] **Step 8: Run focused tests on both TFMs and commit.**
+- [ ] **Step 1: Write source-shape tests** for direct `BindingList<T>`, `BindingSource -> BindingList<T>`, `List<T>`, arrays, `IListSource`, and `BindingList<string>`. Snapshot enumeration must preserve source order and `BindingSource.Position`.
+- [ ] **Step 2: Write member-access tests.** `DisplayMember == ""` uses `item?.ToString() ?? ""`; `ValueMember == ""` uses the item; null display/search values become empty; invalid members fail early once metadata exists; cache `PropertyDescriptor`.
+- [ ] **Step 3: Write identity/missing-value tests.** `FindByValue` distinguishes legitimate null raw data from “not found”; a committed raw value missing from the source is preserved.
+- [ ] **Step 4: Write add-capability tests.** Writable `BindingSource`/`IList` accepts through the public source abstraction; arrays/read-only lists report `CanAdd == false`. Never bypass a `BindingSource` wrapper.
+- [ ] **Step 5: Write source-change/disposal tests.** Subscribe only when available and unsubscribe on dispose.
+- [ ] **Step 6: Run failing focused tests, implement the adapter/accessor, rerun both TFMs, and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupDataAdapterTests"
@@ -238,7 +180,7 @@ git commit -m "feat: add BootstrapLookup datasource adapter"
 
 ---
 
-## Task 4: Implement pure local search normalization, token matching, and deterministic ranking
+## Task 4: Implement pure local search normalization, token matching, and fully specified deterministic ranking
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupSearchEngine.cs`
@@ -247,9 +189,9 @@ git commit -m "feat: add BootstrapLookup datasource adapter"
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupTextNormalization.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupSearchEngineTests.cs`
 
-**Interfaces:** Pure logic; consumes a source snapshot plus query/search-member configuration and returns ranked result items. No Control handle, BindingSource mutation, popup, or timer dependency.
+**Interfaces:** Pure logic. No handles, timers, popup, or source mutation.
 
-- [ ] **Step 1: Write failing Vietnamese normalization tests.** Lock Trim, case-insensitive search normalization, Unicode combining-diacritic removal, and `Đ/đ -> D/d` behavior.
+- [ ] **Step 1: Write Vietnamese normalization tests.**
 
 ```csharp
 [TestCase("Cà phê sữa", "ca phe sua")]
@@ -260,138 +202,227 @@ public void DefaultSearchNormalizerIsVietnameseFriendly(string input, string exp
 }
 ```
 
-- [ ] **Step 2: Write failing minimum-length and empty-query tests.** `MinimumSearchLength` is applied after normalization. Below the minimum produces a distinct waiting/instruction result, not ordinary “zero matches.” With minimum 0, `ShowAll` returns original source order and `ShowNone` returns none.
+- [ ] **Step 2: Write minimum-length and empty-query tests.** Minimum length is after normalization. Below minimum returns a distinct waiting state. With minimum 0, `ShowAll` preserves source order and `ShowNone` returns no rows.
 
-- [ ] **Step 3: Write failing token tests.** Split normalized query by whitespace, require every token to match, and allow different tokens to match different search members.
+- [ ] **Step 3: Write token tests.** Split normalized query by whitespace; every token must match; different tokens may match different search members.
 
-- [ ] **Step 4: Write failing ranking tests.** Lock per-token quality `Exact > StartsWith > WordStart > Contains`; aggregate deterministically; tie-break by DisplayMember match, then configured SearchMembers order, then original source order. Do not add fuzzy/edit-distance behavior.
+- [ ] **Step 4: Lock per-token candidate selection.** Map quality to scores:
 
-- [ ] **Step 5: Write SearchMembers fallback tests.** An empty search-member collection searches only `DisplayMember`; if `DisplayMember` is empty, search the item string representation. SearchMembers may include hidden members such as Barcode.
+```text
+NoMatch    = 0
+Contains   = 1
+WordStart  = 2
+StartsWith = 3
+Exact      = 4
+```
 
-- [ ] **Step 6: Run focused tests, implement minimum pure engine, rerun both TFMs.**
+For each token, evaluate all configured search members and choose its best candidate by:
+1. higher quality score;
+2. if equal, a candidate whose member is `DisplayMember`;
+3. if still equal, earlier configured `SearchMembers` order.
+
+If `SearchMembers` is empty, the only candidate is `DisplayMember`; if `DisplayMember` is empty, use item text with member priority 0.
+
+- [ ] **Step 5: Lock aggregate ranking with adversarial tests.** Every matching item receives this exact comparison tuple, compared in order:
+
+```text
+1. MinTokenQualityScore          descending
+2. SumTokenQualityScore          descending
+3. DisplayMemberBestMatchCount   descending
+4. SumBestMemberPriority         ascending
+5. OriginalSourceIndex           ascending
+```
+
+This means `[StartsWith, StartsWith]` outranks `[Exact, Contains]` because the worst token is stronger; an Exact match on one token cannot hide a weak Contains match on another. Add explicit tests for that pair, all-equal-quality ties, DisplayMember ties, SearchMembers-order ties, and stable source-order ties.
+
+- [ ] **Step 6: Write SearchMembers fallback/hidden-member tests.**
+- [ ] **Step 7: Run focused tests, implement the pure engine, rerun both TFMs, and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupSearchEngineTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupSearchEngineTests"
-```
-
-- [ ] **Step 7: Commit.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupSearchEngine.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupSearchResult.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupMatchQuality.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupTextNormalization.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupSearchEngineTests.cs
-git commit -m "feat: add BootstrapLookup local search engine"
+git commit -m "feat: add deterministic BootstrapLookup search engine"
 ```
 
 ---
 
-## Task 5: Implement BootstrapLookupBox core binding, committed state, pending text, and public defaults
+## Task 5: Add a framework-owned trailing accessory slot to BootstrapTextBox before Lookup UI work
+
+**Files:**
+- Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapTextBox.cs`
+- Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapTextBoxAccessoryTests.cs`
+- Test existing: BootstrapTextBox/InputGroup tests that cover layout/theme/DPI.
+
+**Interfaces:** Produces one **internal-only** base-layout hook used by `BootstrapLookupBox`; it must not add a new public/protected API surface.
+
+Use this internal contract:
+
+```csharp
+internal void SetFrameworkTrailingAccessory(Control? accessory)
+```
+
+Rules:
+- `null` removes the prior framework accessory;
+- a non-null accessory is parented and owned by `BootstrapTextBox`, forced `TabStop = false`, and laid out by the base class; replacing/removing it disposes the prior accessory unless it is the same instance;
+- the accessory gets the same DPI-scaled logical extent currently used for the clear/trailing icon (`theme.Metrics.SpacingLG`);
+- layout order from right to left is: framework accessory, then clear button when visible, otherwise trailing icon, then editor/placeholder;
+- the inherited clear-button-vs-trailing-icon rule remains unchanged;
+- `PaintIcons` must use the accessory-reserved right edge so a trailing icon cannot paint underneath the accessory;
+- no overlay positioning and no subclass duplicate of private `LayoutChildren()`.
+
+- [ ] **Step 1: Write failing layout tests.** Attach a fake accessory and prove editor width is reduced and the accessory is at the far right.
+- [ ] **Step 2: Write coexistence tests.** Accessory + `ShowClearButton=true` places clear button to its left; accessory + `TrailingIcon` places the icon to its left when clear is hidden. No rectangles overlap at 96/144/192 DPI.
+- [ ] **Step 3: Write behavior tests.** Accessory is not a Tab stop; replacing/removing it disposes the prior owned accessory and leaves no stale child control.
+- [ ] **Step 4: Run focused tests and existing TextBox/InputGroup regressions; confirm failure first.**
+- [ ] **Step 5: Implement the internal slot in the existing base layout/paint path.** Do not make `LayoutChildren`, `_editor`, `_clearButton`, or private layout state protected/public.
+- [ ] **Step 6: Run both TFMs and commit.**
+
+```powershell
+dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapTextBoxAccessoryTests|FullyQualifiedName~BootstrapTextBox|FullyQualifiedName~BootstrapInputGroup"
+dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapTextBoxAccessoryTests|FullyQualifiedName~BootstrapTextBox|FullyQualifiedName~BootstrapInputGroup"
+git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapTextBox.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapTextBoxAccessoryTests.cs
+git commit -m "refactor: add BootstrapTextBox framework accessory slot"
+```
+
+---
+
+## Task 6: Add transient framework validation layering to BootstrapTextBox
+
+**Files:**
+- Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapTextBox.cs`
+- Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapTextBoxValidationLayerTests.cs`
+- Test existing: BootstrapTextBox validation/rendering tests.
+
+**Interfaces:** Lets lookup validation temporarily override the border state without losing application-owned `ValidationState`. No new public/protected member is introduced.
+
+Internal contract:
+
+```csharp
+internal void SetTransientValidationStateOverride(BootstrapValidationState? state)
+```
+
+Required state model:
+
+```text
+application baseline = last value assigned through public ValidationState setter
+transient override    = nullable framework-owned state
+effective getter/render state = transient override ?? application baseline
+```
+
+- [ ] **Step 1: Write failing state-layer tests.** Baseline `Valid` -> transient `Invalid` => public getter/effective render state is `Invalid`; application sets `None` while transient remains active => effective stays `Invalid`; clearing transient => getter/render state becomes latest baseline `None`.
+- [ ] **Step 2: Write no-override regression tests.** With no transient override, public `ValidationState` behavior is byte-for-byte semantically unchanged.
+- [ ] **Step 3: Write replacement/clear tests.** Repeated transient set/clear is idempotent; invalid enum values are rejected; disposal does not retain transient state externally.
+- [ ] **Step 4: Run focused tests and confirm failure.**
+- [ ] **Step 5: Implement separate baseline and transient fields.** Public setter updates only the baseline even while an override is active and always invalidates when the effective state may change. `OnPaint` resolves the effective state through the new layer.
+- [ ] **Step 6: Run both TFMs plus existing TextBox validation tests and commit.**
+
+```powershell
+dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapTextBoxValidationLayerTests|FullyQualifiedName~BootstrapTextBox"
+dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapTextBoxValidationLayerTests|FullyQualifiedName~BootstrapTextBox"
+git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapTextBox.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapTextBoxValidationLayerTests.cs
+git commit -m "refactor: layer transient BootstrapTextBox validation"
+```
+
+---
+
+## Task 7: Implement BootstrapLookupBox core binding, committed state, pending text, public defaults, and dropdown affordance
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.cs`
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Data.cs`
+- Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupDropDownAffordance.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupBoxTests.cs`
 
-**Interfaces:** Public standalone control inheriting `BootstrapTextBox`; consumes the adapter/contracts and establishes the source-of-truth state model. Popup and advanced keyboard behavior are added later.
+**Interfaces:** Public standalone control inheriting `BootstrapTextBox`; establishes committed/pending state and uses Task 5's internal accessory slot. Popup/search behavior comes later.
 
-- [ ] **Step 1: Write failing inheritance/default/designer tests.** Require `BootstrapLookupBox : BootstrapTextBox`, `[DefaultEvent(nameof(SelectionCommitted))]`, `[DefaultProperty(nameof(DisplayMember))]`, locked defaults from this plan, `Columns` and `SearchMembers` content-serialized collections, and `ResultsGrid` hidden from designer serialization once available.
-
-- [ ] **Step 2: Write failing committed-vs-pending state tests.** Programmatically select Product 15, then simulate user text editing and assert:
+- [ ] **Step 1: Write inheritance/default/designer/public-shape tests.** Require `BootstrapLookupBox : BootstrapTextBox`, default event/property, locked defaults, content-serialized `Columns`/`SearchMembers`, and explicitly lock these reviewed public members so they cannot be forgotten later:
 
 ```text
-SelectedItem        remains Product 15
-SelectedValue       remains 15
-CommittedDisplayText remains canonical display text
-Text                becomes pending query
-HasPendingText      becomes true
+SelectedItem
+SelectedValue
+CommittedDisplayText
+HasPendingText
+HighlightedItem
+SelectedValueChanged
+SelectionCommitted
+HighlightedItemChanged
+ResultsChanged
+RefreshRequested
+AddNewRequested
+CreateItemFromText
+SearchTextNormalizer
+TextNormalizer
+TextComparer
+InvalidTextMessage
+ValidationMessage
+CancelPendingEdit()
 ```
 
-Do not mark a selection change merely because `TextChanged` fires.
+`CancelPendingEdit()` is implemented in this task for core state restoration (restore committed text and clear lookup-transient validation/message). Popup-close behavior is added in Task 10 and pending-debounce cancellation is added in Task 11. `OpenDropDown`, `CloseDropDown`, `RefreshResults`, and `ResultsGrid` are added in their owning popup/content tasks; Task 17 verifies the complete set.
 
-- [ ] **Step 3: Write failing programmatic selection tests.** `SelectedValue`, `SelectValue`, `SelectItem`, and `ClearSelection` must resolve against the logical source, synchronize text without creating pending state, and raise `SelectedValueChanged` only when the committed logical value changes. `SelectItem` returns false for an item outside the source.
-
-- [ ] **Step 4: Write missing-source-item tests.** Initializing a raw committed value that no longer exists in datasource must preserve the raw value and best available committed display text; it must not silently clear the model.
-
-- [ ] **Step 5: Run focused tests and confirm failure.**
-
-```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupBoxTests"
-```
-
-- [ ] **Step 6: Implement the minimal partial control.** Reuse protected `BootstrapTextBox.Editor` and override `OnEditorTextChanged` / `OnEditorKeyDown` only through the existing protected extension points. Use synchronization guards so programmatic text updates do not become pending user queries.
-
-Conceptual state fields:
-
-```csharp
-private object? _selectedItem;
-private object? _selectedValue;
-private string _committedDisplayText = string.Empty;
-private bool _hasPendingText;
-private bool _synchronizingText;
-```
-
-Keep all configuration validation in property setters; invalid enum/range/null comparer/normalizer values fail fast.
-
-- [ ] **Step 7: Run focused tests on both TFMs and commit.**
+- [ ] **Step 2: Write committed-vs-pending tests.** Programmatic Product 15 selection followed by user typing keeps committed item/value/display while `Text`/`HasPendingText` become transient.
+- [ ] **Step 3: Write programmatic selection tests.** `SelectedValue`, `SelectValue`, `SelectItem`, `ClearSelection`; `SelectedValueChanged` only on logical value change.
+- [ ] **Step 4: Write missing-source-item tests.** Preserve raw committed values that disappear from source.
+- [ ] **Step 5: Write core `CancelPendingEdit()` tests.** With no popup/search integration yet, it restores `Text = CommittedDisplayText`, sets `HasPendingText = false`, clears only lookup-transient validation/message through Task 6, preserves committed item/value, and raises no selection event.
+- [ ] **Step 6: Write affordance-layout/focus tests.** Lookup owns one always-visible non-selectable dropdown affordance through `SetFrameworkTrailingAccessory`; it coexists with inherited clear/trailing visuals and never focuses itself on mouse activation.
+- [ ] **Step 7: Run failing tests, implement minimal state + core cancellation + affordance, rerun both TFMs, and commit.** Use synchronization guards so programmatic text updates are not pending edits.
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupBoxTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupBoxTests"
-git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Data.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupBoxTests.cs
+git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Data.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupDropDownAffordance.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupBoxTests.cs
 git commit -m "feat: add BootstrapLookupBox core state"
 ```
 
 ---
 
-## Task 6: Implement the shared commit resolver, exact matching, validation fallback, and CommitAndAdd
+## Task 8: Implement the shared commit resolver, exact matching, ambiguity handling, validation fallback, and CommitAndAdd
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Commit.cs`
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupCommitResult.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupCommitTests.cs`
 
-**Interfaces:** Adds one resolver used later by Tab, Enter, focus-leave validation, mouse activation, and DataGridView edit completion.
+**Interfaces:** One resolver later used by Tab, Enter, focus-leave validation, mouse activation, and DataGridView completion.
 
-- [ ] **Step 1: Write failing empty-text tests.** Empty/whitespace after normal lookup text normalization clears committed selection, commits null, clears pending state, and does not invoke `UnmatchedTextBehavior` or Create From Text.
-
-- [ ] **Step 2: Write failing exact-match tests.** Default exact behavior is Trim + `StringComparer.CurrentCultureIgnoreCase`, independent from accent-insensitive search normalization. Existing `"Hà Nội"` must match `" hà nội "`; `"ca phe"` is not automatically exact-equal to `"Cà phê"` unless caller customizes exact normalization/comparison.
-
-- [ ] **Step 3: Write `RestorePreviousSelection` tests.** Unmatched pending text restores canonical committed display text, preserves the old value, clears pending state, and does not raise `SelectedValueChanged` when value is unchanged.
-
-- [ ] **Step 4: Write `KeepFocusWithValidationError` tests.** Resolver reports blocked navigation, preserves pending text, sets lookup-generated invalid state/message (`InvalidTextMessage` default from spec), and leaves committed value untouched. Further user typing clears only the transient lookup-generated error, not unrelated externally assigned validation.
-
-- [ ] **Step 5: Write string `CommitAndAdd` tests.** For `BindingList<string>`, unmatched `" Chai "` with no factory handler adds `"Chai"`, selects it, commits it, and raises `SelectionCommitted` with reason `CommitAndAdd`. An existing normalized exact match must be selected without adding a duplicate.
-
-- [ ] **Step 6: Write object `CommitAndAdd` tests.** `CreateItemFromText` receives both OriginalText and NormalizedText. Successful returned item is added through the adapter then committed. No handler/null item/read-only source/capability unavailable falls back to validation and does not commit raw text.
-
-- [ ] **Step 7: Write exception and event-order tests.** Unexpected handler/source mutation exceptions propagate after flags are reset. Successful order is: mutate committed state -> synchronize Text -> clear pending -> `SelectedValueChanged` if changed -> owner dirty callback later -> `SelectionCommitted`. Event handlers must see fully consistent state.
-
-- [ ] **Step 8: Run focused tests, implement the resolver, rerun both TFMs.**
+- [ ] **Step 1: Write empty-text tests.** Empty after `TextNormalizer` clears/commits null and bypasses unmatched logic.
+- [ ] **Step 2: Write unique exact-match tests.** Default Trim + `CurrentCultureIgnoreCase`, separate from accent-insensitive search.
+- [ ] **Step 3: Write ambiguous-exact tests.** Source contains two items with identical normalized `DisplayMember` but different logical `ValueMember`. Resolver must:
+  - return an ambiguity/block-navigation outcome;
+  - preserve pending text and prior committed state;
+  - apply transient lookup `Invalid` state/message through Task 6;
+  - never choose the first row silently;
+  - never invoke `UnmatchedTextBehavior`;
+  - never invoke/create through `CommitAndAdd`.
+- [ ] **Step 4: Write duplicate-row/same-logical-value test.** Two exact rows that resolve to the same logical value count as one logical match; commit the first source occurrence deterministically.
+- [ ] **Step 5: Write `RestorePreviousSelection` tests.**
+- [ ] **Step 6: Write `KeepFocusWithValidationError` tests.** It applies only lookup transient validation. While the error is active, set inherited `ValidationState` from application code to another value; typing clears the lookup override and reveals that latest application value rather than erasing it.
+- [ ] **Step 7: Write string/object `CommitAndAdd` tests** including duplicate prevention, read-only fallback, null ValueMember, and source-add verification.
+- [ ] **Step 8: Write exception/event-order tests.** Successful order: commit state -> canonical text -> clear pending -> `SelectedValueChanged` if changed -> grid dirty callback later -> `SelectionCommitted`.
+- [ ] **Step 9: Run focused tests, implement, rerun both TFMs, and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupCommitTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupCommitTests"
-```
-
-- [ ] **Step 9: Commit.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Commit.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupCommitResult.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupCommitTests.cs
 git commit -m "feat: add BootstrapLookup commit resolver"
 ```
 
 ---
 
-## Task 7: Implement popup result content, multi-column ResultsGrid, and footer presentation
+## Task 9: Implement popup result content, multi-column ResultsGrid, and footer presentation
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupDropDownContent.cs`
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupFooter.cs`
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupResultBindingItem.cs`
+- Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupDropDownContentTests.cs`
 
-**Interfaces:** Builds the popup visual tree only. It receives a result projection and highlighted identity from the owner/controller; it does not own committed selection or search logic.
+**Interfaces:** Visual tree only; adds public read-only `ResultsGrid` escape hatch while keeping ownership/invariants internal.
 
-- [ ] **Step 1: Write failing visual-tree/invariant tests.** Content contains `BootstrapDataGridView` docked Fill and footer docked Bottom. Lock result-grid invariants:
+- [ ] **Step 1: Write visual-tree/invariant tests.**
 
 ```text
 ReadOnly = true
@@ -403,144 +434,105 @@ RowHeadersVisible = false
 TabStop = false
 ```
 
-Footer buttons also have `TabStop = false`.
+Footer controls also remain outside Tab order.
 
-- [ ] **Step 2: Write failing column-materialization tests.** Declarative `BootstrapLookupColumnDefinition` entries materialize as text-backed `DataGridViewTextBoxColumn` instances exactly once per column configuration change, not on every search. Test DataPropertyName, HeaderText, Width, MinimumWidth, Visible, AutoSizeMode, alignment, format, ValueType, and `ShowColumnHeaders`.
-
-- [ ] **Step 3: Write `ResultsGrid` escape-hatch tests.** The owner exposes the same grid instance for formatting/painting customization, but content/controller reapplies framework-owned invariants when opening/reconfiguring; caller must not replace its DataSource.
-
-- [ ] **Step 4: Write footer-state tests.** With 128 results and highlight index 2, status is `3 / 128`. With no results, `0 / 0`. Waiting-for-minimum state displays instruction text rather than pretending a normal empty result. Refresh/Add New visibility tracks independent booleans while footer remains visible when both are false.
-
-- [ ] **Step 5: Run focused tests and confirm failure.**
+- [ ] **Step 2: Write column-materialization tests.** Materialize text-backed columns only when column configuration changes, not each search.
+- [ ] **Step 3: Write `ResultsGrid` API/escape-hatch tests.** Same instance is exposed `[Browsable(false)]`/serialization hidden; callers may format/paint but framework reasserts invariants and owns `DataSource`.
+- [ ] **Step 4: Write footer-state tests.** Position/result count, `0 / 0`, minimum-length instruction, independent Refresh/Add New visibility; footer remains visible with no buttons.
+- [ ] **Step 5: Implement theme/DPI-safe content/footer and run both TFMs.**
+- [ ] **Step 6: Commit.**
 
 ```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupDropDownContentTests"
-```
-
-- [ ] **Step 6: Implement content/footer with theme/DPI-safe layout.** Reuse theme tokens/metrics; do not hard-code semantic colors. Keep footer outside the scrolling grid so constrained popup height scrolls only ResultsGrid.
-
-- [ ] **Step 7: Run both TFMs and commit.**
-
-```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupDropDownContentTests"
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupDropDownContentTests"
-git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupDropDownContent.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupFooter.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupResultBindingItem.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupDropDownContentTests.cs
+git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupDropDownContent.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupFooter.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupResultBindingItem.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupDropDownContentTests.cs
 git commit -m "feat: add BootstrapLookup popup content"
 ```
 
 ---
 
-## Task 8: Implement lookup popup controller on the shared overlay infrastructure
+## Task 10: Implement lookup popup controller on the shared overlay infrastructure
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupDropDownController.cs`
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Popup.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupPopupTests.cs`
 
-**Interfaces:** Reuses `BootstrapOverlaySurface`, `BootstrapOverlayDropDown`, `BootstrapOverlayAnchorTracker`, `BootstrapOverlayPlacementEngine`, and `BootstrapOverlayActivationDomain`. Owns popup lifetime/placement, content synchronization, mouse result activation, Refresh/Add New button dispatch, and activation-domain membership.
+**Interfaces:** Reuses `BootstrapOverlaySurface`, `BootstrapOverlayDropDown`, `BootstrapOverlayAnchorTracker`, `BootstrapOverlayPlacementEngine`, and `BootstrapOverlayActivationDomain`.
 
-- [ ] **Step 1: Write failing open/close tests.** `OpenDropDown()` creates/positions the popup and exposes `IsDropDownOpen`; `CloseDropDown()` is presentation-only and must not commit, validate, rollback, clear pending text, or move focus/cell.
-
-- [ ] **Step 2: Write placement/lifecycle tests.** Anchor moves/resizes/DPI changes cause reposition through existing overlay infrastructure; constrained working area clamps/flip-placement while footer stays visible. Do not create a second placement engine.
-
-- [ ] **Step 3: Write mouse result tests.** Clicking a result row commits that logical item with reason `Mouse`, synchronizes canonical display text, closes popup, and does not rely on ResultsGrid focus. A click on non-row/empty area does not commit.
-
-- [ ] **Step 4: Write Refresh tests.** Button and `RefreshResults()` invoke `RefreshRequested`, reconcile adapter/source, rerun current query, preserve committed selection, preserve highlight if still present, and do not move/commit. Re-entrancy/double-trigger protection must not leave the button disabled after exceptions.
-
-- [ ] **Step 5: Write explicit Add New tests.** `AddNewRequested` receives current QueryText. Cancellation preserves pending query and committed value. Success auto-selects/commits `NewItem`; source reconciliation is attempted but explicit Add New may commit the returned item by ValueMember even before source refresh sees it. Do not auto-move to the next cell in V1.
-
-- [ ] **Step 6: Write activation-domain tests.** Editor, popup surface, ResultsGrid, Refresh, and Add New count as one lookup activation domain. Clicking inside it must not trigger normal edit-end resolution.
-
-- [ ] **Step 7: Run focused tests, implement controller/owner bridge, rerun both TFMs.**
+- [ ] **Step 1: Write public popup API tests.** Lock `OpenDropDown()`, `CloseDropDown()`, `RefreshResults()`, `CancelPendingEdit()`, and `IsDropDownOpen`.
+- [ ] **Step 2: Write open/close tests.** `CloseDropDown()` is presentation-only.
+- [ ] **Step 3: Extend `CancelPendingEdit()` popup semantics.** The public method already restores committed text and clears lookup-transient validation/message from Task 7. Here, add/assert popup close while preserving committed value and without selection events. Pending-debounce cancellation is added/tested in Task 11 once debounce is integrated.
+- [ ] **Step 4: Write placement/lifecycle tests** using existing overlay primitives; no second placement engine.
+- [ ] **Step 5: Write mouse result tests.** Row click commits; empty-area click does not; focus remains editor-owned.
+- [ ] **Step 6: Write Refresh tests.** Raise `RefreshRequested`, reconcile source, rerun query, preserve committed/highlight where possible; exception-safe reentrancy.
+- [ ] **Step 7: Write explicit Add New tests.** Cancellation preserves pending; success commits returned valid item; no automatic next-cell move.
+- [ ] **Step 8: Write activation-domain tests.** Editor, popup, grid, Refresh, Add New, and dropdown affordance belong to one logical interaction domain.
+- [ ] **Step 9: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupPopupTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupPopupTests"
-```
-
-- [ ] **Step 8: Commit.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupDropDownController.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Popup.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupPopupTests.cs
 git commit -m "feat: add BootstrapLookup popup controller"
 ```
 
 ---
 
-## Task 9: Integrate debounce/search results, highlight preservation, and keyboard result navigation into BootstrapLookupBox
+## Task 11: Integrate debounce/search results, ResultsChanged semantics, highlight preservation, and keyboard navigation
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Search.cs`
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Keyboard.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupSearchIntegrationTests.cs`
 
-**Interfaces:** Connects the shared debouncer, pure search engine, popup controller, editor text changes, and highlighted logical identity. Does not yet implement DataGridView-specific editing contract.
+**Interfaces:** Connects shared debouncer, pure engine, popup/controller, editor text, `ResultsChanged`, and highlighted logical identity.
 
-- [ ] **Step 1: Write debounce tests.** `150 ms` schedules one search after rapid typing; `0` searches immediately; each new text change replaces pending work. Internal query generation/version must reject stale result application if future async work is introduced, even though V1 search is synchronous/local.
-
-- [ ] **Step 2: Write AutoOpen/KeepCurrentState tests.** `AutoOpen` opens only after non-empty query reaches `MinimumSearchLength`; `KeepCurrentState` updates an already-open popup but does not open a closed one. Clearing text while popup is closed must not auto-open.
-
-- [ ] **Step 3: Write minimum-length and manual-open tests.** When below minimum, manually opening via F4/Down displays `Type at least N characters` and no source rows; `MinimumSearchLength > 0` takes precedence over `EmptyQueryBehavior`.
-
-- [ ] **Step 4: Write highlight preservation tests.** Search refresh preserves prior highlighted logical item if still present. Initial popup population prefers the committed item if present, otherwise first ranked result. If prior highlight disappears, fall back to first ranked result.
-
-- [ ] **Step 5: Write logical navigation tests.** Up/Down/Home/End/PageUp/PageDown mutate only highlighted item/index, ResultsGrid current row/scroll position, and footer. They must not mutate `SelectedValue`, `Text`, or `HasPendingText`.
-
-- [ ] **Step 6: Write flush tests.** Down/PageDown/Enter/Tab/F4 must flush a pending debounce before using results. Escape cancels pending debounce without running a stale search.
-
-- [ ] **Step 7: Run focused tests, implement integration, rerun both TFMs.**
+- [ ] **Step 1: Write debounce tests.** 150 ms, zero delay, replacement, version/generation guard.
+- [ ] **Step 2: Write AutoOpen/KeepCurrentState tests.**
+- [ ] **Step 3: Write minimum-length/manual-open tests.**
+- [ ] **Step 4: Write `ResultsChanged` semantic tests.** Define logical projection identity as `(SearchState, ordered result logical values/source identities)`. Raise exactly once after applying a projection that differs from the previous projection. Do **not** raise merely for:
+  - popup open/close;
+  - highlight movement;
+  - executing the same query that yields the same ordered logical projection;
+  - Refresh when reconciliation yields the same projection.
+  Raise when query/source/minimum-state changes the ordered projection or transitions into/out of waiting-for-minimum state.
+- [ ] **Step 5: Write highlight event/preservation tests.** `HighlightedItemChanged` fires only when logical highlighted item changes; preserve prior logical item if still present; initial highlight prefers committed item then first result.
+- [ ] **Step 6: Write logical navigation tests.** Up/Down/Home/End/PageUp/PageDown alter only highlight/grid current row/scroll/footer, never committed value/text/pending flag.
+- [ ] **Step 7: Write flush/cancellation tests.** Down/PageDown/Enter/Tab/F4 flush pending debounce. `CancelPendingEdit()` and Escape cancel pending debounce without executing stale search work; after cancellation no delayed `ResultsChanged` may arrive from the discarded query.
+- [ ] **Step 8: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupSearchIntegrationTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupSearchIntegrationTests"
-```
-
-- [ ] **Step 8: Commit.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Search.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Keyboard.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupSearchIntegrationTests.cs
-git commit -m "feat: integrate BootstrapLookup search and highlight navigation"
+git commit -m "feat: integrate BootstrapLookup search and navigation"
 ```
 
 ---
 
-## Task 10: Harden standalone keyboard, focus, mouse, Escape, and application activation lifecycle with real message routing
+## Task 12: Harden standalone keyboard, focus, mouse, Escape, and application activation lifecycle with real message routing
 
 **Files:**
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Keyboard.cs`
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Popup.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupInteractionTests.cs`
 
-**Interfaces:** Locks user-visible interaction invariants before DataGridView integration. Tests must route real/native messages to the inherited editor where possible; do not merely call internal commit/open helpers.
+**Interfaces:** Locks Windows-message behavior before DataGridView integration. Use real Form/editor routing where possible.
 
-- [ ] **Step 1: Build an STA/nonparallel interaction fixture.** Follow the repository pattern in `BootstrapSelectInteractionTests`: host a real Form, show it, call `Application.DoEvents()`, and route key messages to the native `TextBox` editor. Any truly desktop-dependent SendInput test should be `[Explicit]` with an interactive-Windows explanation.
-
-- [ ] **Step 2: Write focus-invariant tests.** Open popup, send Down/PageDown/Home/End, and assert editor remains focused while ResultsGrid remains unfocused. Footer buttons must not appear in Tab order.
-
-- [ ] **Step 3: Write Enter tests.** Popup-open Enter commits highlighted item; popup-open with no highlight resolves pending text. Popup-closed behavior follows `ClosedEnterKeyBehavior`: ResolvePendingText vs owner/default behavior. `CommitSelection` stays; `CommitSelectionAndMoveNext` uses normal WinForms traversal for standalone control, not SendKeys.
-
-- [ ] **Step 4: Write Tab/Escape tests.** Tab resolves pending text before traversal; successful resolve moves normally. `KeepFocusWithValidationError` blocks traversal, opens/reopens popup, highlights best candidate, and keeps editor focus. Escape discards pending text, restores `CommittedDisplayText`, closes popup, and leaves committed value unchanged.
-
-- [ ] **Step 5: Write Down/F4/Alt+Down tests.** Closed popup opens and flushes current search. Mouse click on dropdown affordance opens without moving focus to popup children.
-
-- [ ] **Step 6: Write Alt+Tab/deactivation regression tests.** Simulate owner/application deactivation separately from same-app focus change. Deactivation must only close popup; preserve Text, `HasPendingText`, `SelectedItem`, `SelectedValue`; no validation/commit/rollback/navigation. Reactivation must not auto-open. A later Down/F4 reopens using the preserved query.
-
-- [ ] **Step 7: Write same-app focus-leave tests.** Clicking/focusing a different control in the same form attempts normal resolver/end-edit semantics rather than using app-deactivation behavior. Validation mode blocks the focus transition and restores editor focus.
-
-- [ ] **Step 8: Run focused interaction tests on net8 first, implement fixes, then net48.**
+- [ ] **Step 1: Build STA/nonparallel interaction fixture** following `BootstrapSelectInteractionTests`.
+- [ ] **Step 2: Write focus-invariant tests.** Popup navigation keeps editor focused; result/footer/affordance remain unfocused/non-Tab-stop.
+- [ ] **Step 3: Write Enter tests.** Popup-open commit/resolve; closed behavior matrix; standalone move-next uses normal traversal, never SendKeys.
+- [ ] **Step 4: Write Tab/Escape tests.** Tab resolves; validation/ambiguity blocks traversal; Escape delegates to the same behavior as `CancelPendingEdit()`.
+- [ ] **Step 5: Write Down/F4/Alt+Down and affordance mouse tests.**
+- [ ] **Step 6: Write Alt+Tab/deactivation regressions.** Close presentation only, preserve pending/committed state, no validation/commit/navigation; reactivation stays closed.
+- [ ] **Step 7: Write same-app focus-leave tests.** Normal resolver runs; validation/ambiguity can cancel focus transition.
+- [ ] **Step 8: Run both TFMs, then existing overlay/Select interaction regressions.**
 
 ```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupInteractionTests"
+dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupInteractionTests|FullyQualifiedName~BootstrapOverlay|FullyQualifiedName~BootstrapSelectInteractionTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupInteractionTests"
 ```
 
-- [ ] **Step 9: Run existing overlay and BootstrapSelect interaction regression tests.**
-
-```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapOverlay|FullyQualifiedName~BootstrapSelectInteractionTests"
-```
-
-- [ ] **Step 10: Commit.**
+- [ ] **Step 9: Commit.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Keyboard.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Popup.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupInteractionTests.cs
@@ -549,7 +541,7 @@ git commit -m "feat: harden BootstrapLookup interaction lifecycle"
 
 ---
 
-## Task 11: Add the real DataGridView editing control, internal cell, and public lookup column
+## Task 13: Add the real DataGridView editing control, internal cell, public lookup column, and reuse-safe reconfiguration
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupEditingControl.cs`
@@ -558,39 +550,43 @@ git commit -m "feat: harden BootstrapLookup interaction lifecycle"
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupColumn.Events.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupDataGridViewTests.cs`
 
-**Interfaces:** `BootstrapLookupEditingControl : BootstrapLookupBox, IDataGridViewEditingControl` becomes the actual editor created by the cell. `BootstrapLookupColumn` is public and owns reusable configuration; the cell/editor remain internal implementation details.
+**Interfaces:** `BootstrapLookupEditingControl : BootstrapLookupBox, IDataGridViewEditingControl` is the actual editor. The grid may reuse one editing control across cells/columns, so configuration must be transactional and detachable.
 
-- [ ] **Step 1: Write failing type-contract tests.** Assert public `BootstrapLookupColumn : DataGridViewColumn`; its CellTemplate is an internal lookup cell; cell `EditType` resolves to the lookup editing control; `BootstrapLookupEditingControl` implements `IDataGridViewEditingControl` and inherits `BootstrapLookupBox`.
+- [ ] **Step 1: Write type-contract tests.** Public `BootstrapLookupColumn : DataGridViewColumn`; internal cell/editing control remain non-exported.
+- [ ] **Step 2: Write configuration-copy tests.** Copy DataSource, members, cloned collections, search/commit/keyboard/popup defaults, normalizers/comparers, invalid message on every begin-edit.
+- [ ] **Step 3: Write raw/formatted value tests.** Raw ProductId stays raw; display comes from lookup mapping.
+- [ ] **Step 4: Implement complete `IDataGridViewEditingControl` contract.**
+- [ ] **Step 5: Lock key ownership.** Keep lookup keys when required; Tab/navigation coordinated with grid.
+- [ ] **Step 6: Write dirty-state tests.** Transient actions never dirty; logical committed value changes dirty exactly once.
+- [ ] **Step 7: Write column contextual-event tests.**
+- [ ] **Step 8: Add the missing editing-control reuse regression matrix.** In one real grid:
+  1. begin edit in LookupColumn A using DataSource A;
+  2. close/end edit;
+  3. begin edit in LookupColumn B using DataSource B and different members/collections/events;
+  4. mutate DataSource A;
+  5. trigger B search/Refresh/SelectionCommitted.
 
-- [ ] **Step 2: Write configuration-copy tests.** Column copies DataSource, DisplayMember, ValueMember, LookupColumns, SearchMembers, all search/unmatched/keyboard/popup defaults, dimensions, footer visibility, normalizers/comparers allowed by the spec, and invalid-text message into the reused editing control every time a cell begins edit. Clone/copy collections so editing one cell cannot mutate column configuration.
+Assert:
+  - B never refreshes from A mutations;
+  - no A `BindingSource.ListChanged` or adapter callback reaches the reused editor;
+  - A's forwarded SelectionCommitted/Refresh/AddNew/CreateFromText handlers are detached;
+  - B's handlers fire exactly once with B's row/column context;
+  - B has cloned configuration and no collection instance shared with A;
+  - a pending debounce/popup from A is cancelled/closed before B configuration becomes active.
 
-- [ ] **Step 3: Write raw/formatted value tests.** With `DataPropertyName = ProductId`, `ValueMember = Id`, `DisplayMember = Name`, raw cell value `125` displays the matching Product name while edit control committed value remains 125. `GetFormattedValue` must not store ProductName as raw cell value.
-
-- [ ] **Step 4: Implement the complete `IDataGridViewEditingControl` contract.** Cover `EditingControlDataGridView`, formatted value get/set, row index, `EditingControlValueChanged`, cursor, reposition flag, style application, `PrepareEditingControlForEdit`, and `EditingControlWantsInputKey`.
-
-- [ ] **Step 5: Lock key ownership.** `EditingControlWantsInputKey` keeps arrows/PageUp/PageDown/Home/End/F4/Enter/Escape when lookup semantics require them. Tab/navigation remains coordinated with DataGridView; do not simulate keys.
-
-- [ ] **Step 6: Write dirty-state tests.** Typing/search/highlight/popup/Refresh/Alt+Tab/restoring same value leave `EditingControlValueChanged == false`. Different committed value, clearing non-null, `CommitAndAdd`, and explicit Add New set it and call `DataGridView.NotifyCurrentCellDirty(true)` exactly when needed.
-
-- [ ] **Step 7: Write column contextual-event tests.** SelectionCommitted/AddNew/CreateItem/Refresh raised from the editing control are forwarded through the column with `DataGridView`, `RowIndex`, and `ColumnIndex`; event handlers can update dependent row model properties.
-
-- [ ] **Step 8: Run focused tests, implement minimum grid integration, rerun both TFMs.**
+- [ ] **Step 9: Implement an explicit reconfiguration boundary.** Before applying a new column/cell config, the editing control must cancel debounce, close popup presentation, detach old source adapter/subscriptions and old column event forwarding, clear lookup-transient validation, then copy the new configuration and initialize raw value. Do not depend on final `Dispose()` for this cleanup.
+- [ ] **Step 10: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupDataGridViewTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupDataGridViewTests"
-```
-
-- [ ] **Step 9: Commit.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupEditingControl.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupCell.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupColumn.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupColumn.Events.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupDataGridViewTests.cs
-git commit -m "feat: add BootstrapLookup DataGridView column and editor"
+git commit -m "feat: add reuse-safe BootstrapLookup DataGridView editor"
 ```
 
 ---
 
-## Task 12: Validate DataGridView Tab/Enter/Escape, validation blocking, BindingSource currency, and native new-row lifecycle with real interaction tests
+## Task 14: Validate DataGridView Tab/Enter/Escape, validation blocking, currency, and native new-row lifecycle with real interaction tests
 
 **Files:**
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupDataGridViewInteractionTests.cs`
@@ -598,79 +594,41 @@ git commit -m "feat: add BootstrapLookup DataGridView column and editor"
 - Modify as needed: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupCell.cs`
 - Modify as needed: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Keyboard.cs`
 
-**Interfaces:** Hardens the native DataGridView lifecycle. These are regression/acceptance tests for the architecture; do not bypass them by calling internal popup methods directly.
-
-- [ ] **Step 1: Build a bound-grid test host.** Use `BindingList<OrderLine>` + `BindingSource`, `BootstrapDataGridView`, `AutoGenerateColumns = false`, a `BootstrapLookupColumn` bound to `OrderLine.ProductId`, and neighboring editable/read-only/hidden columns. `[Apartment(ApartmentState.STA)]` + `[NonParallelizable]`.
-
-- [ ] **Step 2: Write valid Tab tests.** Start real editing in Product lookup, type/select, route Tab through the actual editing control, assert raw ProductId commits and DataGridView chooses the next editable visible cell. Include hidden/read-only intermediate columns to prove navigation is not `ColumnIndex + 1`.
-
-- [ ] **Step 3: Write invalid Tab tests.** Under `KeepFocusWithValidationError`, unmatched text must keep CurrentCell on Product, keep/reacquire editor focus, reopen popup, and avoid row-model mutation.
-
-- [ ] **Step 4: Write Enter behavior matrix.** `CommitSelection` commits but remains in the current cell; `CommitSelectionAndMoveNext` delegates to normal grid navigation. With popup closed + `DataGridViewDefault`, lookup does not steal default Enter semantics. With popup closed + ResolvePendingText, the normal lookup resolver runs first.
-
-- [ ] **Step 5: Write Escape tests.** Pending query restores committed text/value without dirtying the grid. A selection already committed earlier must not be rolled back by a later unrelated Escape owned by DataGridView.
-
-- [ ] **Step 6: Write BindingSource currency tests.** Search/highlight movement must not change `BindingSource.Position` or current row. Selecting a lookup result changes only the cell's bound property when committed.
-
-- [ ] **Step 7: Write native new-row acceptance test.** Setup:
-
-```csharp
-var lines = new BindingList<OrderLine>();
-using var source = new BindingSource { DataSource = lines };
-grid.DataSource = source;
-grid.AllowUserToAddRows = true;
-```
-
-Route interaction through the new-row placeholder: begin edit -> type/search -> select Product -> Tab. Assert `lines.Count == 1`, `lines[0].ProductId` is the selected raw value, new-row placeholder remains available, and no manual `Rows.Add`/DataTable path is involved.
-
-- [ ] **Step 8: Write DataGridView Alt+Tab/deactivation regression.** Popup closes and pending text survives without dirtying, committing, validating, or moving CurrentCell. Reactivation keeps popup closed. Reopen by Down/F4 and continue the same query.
-
-- [ ] **Step 9: Run focused tests on net8, fix only native lifecycle issues, then run net48.**
+- [ ] **Step 1: Build bound-grid host** with `BindingList<OrderLine>` + `BindingSource`, neighboring editable/read-only/hidden cells, STA/nonparallel.
+- [ ] **Step 2: Write valid Tab tests.** Grid finds next editable visible cell; never hard-code `ColumnIndex + 1`.
+- [ ] **Step 3: Write invalid and ambiguous Tab tests.** `KeepFocusWithValidationError` and ambiguous exact text keep CurrentCell/editor and avoid row-model mutation.
+- [ ] **Step 4: Write Enter matrix.**
+- [ ] **Step 5: Write Escape tests.** Pending edit cancels without rolling back a value already committed earlier.
+- [ ] **Step 6: Write BindingSource currency tests.** Search/highlight do not change Position/current row.
+- [ ] **Step 7: Write native new-row acceptance test.** Begin edit on placeholder -> lookup selection -> Tab -> one typed `OrderLine` created through native AddNew and placeholder remains.
+- [ ] **Step 8: Write DataGridView Alt+Tab regression.**
+- [ ] **Step 9: Add cross-column reuse interaction test** that begins editing A then B with real message routing and repeats the Task 13 stale-subscription assertions after actual grid end-edit/start-edit transitions.
+- [ ] **Step 10: Run net8 then net48 and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupDataGridViewInteractionTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupDataGridViewInteractionTests"
-```
-
-- [ ] **Step 10: Commit.**
-
-```powershell
 git add tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupDataGridViewInteractionTests.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupEditingControl.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupCell.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Keyboard.cs
 git commit -m "test: harden BootstrapLookup DataGridView lifecycle"
 ```
 
 ---
 
-## Task 13: Replace the old DataGridView + BootstrapSelect overlay demo with the native BootstrapLookupColumn workflow
+## Task 15: Replace the old DataGridView + BootstrapSelect overlay demo with the native BootstrapLookupColumn workflow
 
 **Files:**
 - Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DataGridSelectEditingDemoForm.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/DataGridSelectEditingDemoFormTests.cs`
-- Modify only if the demo title/navigation text requires it: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs`
+- Modify only if needed: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs`
 
-**Interfaces:** Demonstrates the production integration rather than the rejected overlay workaround. Preserve the existing demo route/form name to avoid unnecessary navigation churn, but change its content/title/instructions to BootstrapLookup.
-
-- [ ] **Step 1: Rewrite demo tests first.** Assert the form no longer owns a `DataTable`, no longer contains a hidden `BootstrapSelect` editor, and no longer wires `EditingControlShowing` to overlay an editor. Assert grid uses `BootstrapLookupColumn`, `AllowUserToAddRows = true`, and DataSource is a `BindingSource` backed by `BindingList<OrderLine>`.
-
-- [ ] **Step 2: Define typed demo models.** In the demo file or small dedicated demo-model files, use `OrderLine : INotifyPropertyChanged` and a typed Product model. `OrderLine` includes ProductId, ProductName, Unit, Quantity, UnitPrice, and computed/updated LineTotal. Keep ProductName/Unit/UnitPrice as dependent row-model fields; raw lookup cell binds ProductId.
-
-- [ ] **Step 3: Configure the Product `BootstrapLookupColumn`.** Bind `DataPropertyName = ProductId`, `DisplayMember = Name`, `ValueMember = Id`; result columns show at least Code/Name/Unit/UnitPrice; SearchMembers include Code, Name, Barcode or equivalent sample member; enable Refresh and Add New in the demo.
-
-- [ ] **Step 4: Wire `SelectionCommitted` contextual event.** Resolve the selected Product and update ProductName, Unit, UnitPrice, and LineTotal on the current `OrderLine`. Do not rely on cell formatted text as persistence state.
-
-- [ ] **Step 5: Demonstrate dynamic suggest on Unit if it does not conflict with dependent Product updates.** Use a separate `BootstrapLookupColumn`/source backed by `BindingList<string>` with `UnmatchedTextBehavior = CommitAndAdd`; typing a new unit and Tab adds it to the suggestion source and commits it. If Product selection supplies Unit, the user may still edit it afterwards.
-
-- [ ] **Step 6: Wire Refresh/Add New demo events.** Refresh rebuilds/reconciles the in-memory product source while preserving query. Add New creates an in-memory Product from QueryText (or a tiny local create dialog if already justified by demo conventions), returns it through `NewItem`, and verifies auto-select/commit. Do not introduce external persistence dependencies.
-
+- [ ] **Step 1: Rewrite demo tests first.** No DataTable, hidden BootstrapSelect overlay, or `EditingControlShowing` editor workaround.
+- [ ] **Step 2: Define typed Product/OrderLine models; use `INotifyPropertyChanged` where required.**
+- [ ] **Step 3: Configure Product `BootstrapLookupColumn`** bound raw `ProductId`, multi-column results, SearchMembers, Refresh/Add New.
+- [ ] **Step 4: Wire contextual `SelectionCommitted`** to update dependent ProductName/Unit/UnitPrice/LineTotal.
+- [ ] **Step 5: Demonstrate string `CommitAndAdd` on Unit if it does not conflict with dependent updates.**
+- [ ] **Step 6: Wire Refresh/Add New in-memory workflows.**
 - [ ] **Step 7: Run demo tests on both TFMs.**
-
-```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~DataGridSelectEditingDemoFormTests"
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~DataGridSelectEditingDemoFormTests"
-```
-
-- [ ] **Step 8: Manual demo smoke check.** Run the demo, edit existing Product rows, use keyboard-only search, add a new row through the native placeholder, trigger Refresh/Add New, use dynamic Unit suggest, Tab across cells, and Alt+Tab with popup open.
-
+- [ ] **Step 8: Manual smoke:** keyboard-only search, native new row, Tab, ambiguous duplicate display names, Refresh/Add New, dynamic unit, Alt+Tab.
 - [ ] **Step 9: Commit.**
 
 ```powershell
@@ -680,7 +638,7 @@ git commit -m "demo: replace select editor overlay with BootstrapLookup"
 
 ---
 
-## Task 14: Harden theme/DPI/accessibility/disposal/performance behavior
+## Task 16: Harden theme/DPI/accessibility/disposal/performance behavior
 
 **Files:**
 - Modify as needed: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.cs`
@@ -692,35 +650,24 @@ git commit -m "demo: replace select editor overlay with BootstrapLookup"
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupLifecycleTests.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupPerformanceTests.cs`
 
-**Interfaces:** Hardening only; do not add new feature scope or public abstractions.
-
-- [ ] **Step 1: Write disposal tests.** Open popup, attach a BindingSource, schedule debounce, then dispose owner/control. Assert popup is closed/disposed, timer stops, source/theme/form events are unsubscribed, and later source changes do not touch disposed controls.
-
-- [ ] **Step 2: Write theme tests.** Light/Dark theme changes repaint owner/content/footer/result grid using existing theme tokens; no hard-coded semantic colors or leaked GDI objects.
-
-- [ ] **Step 3: Write DPI/layout tests.** Popup/result/footer sizes scale through existing DPI helpers and placement engine. Footer remains visible when vertical space is constrained. DropDownWidth 0 uses the approved automatic behavior; explicit width is scaled/clamped appropriately.
-
-- [ ] **Step 4: Write accessibility/basic metadata tests.** Lookup owner has appropriate role/name/description inherited/overridden from BootstrapTextBox conventions; result grid/footer controls have sensible accessible names; noninteractive status does not steal focus.
-
-- [ ] **Step 5: Add performance regression tests for 1k/5k/10k local items.** Do not assert brittle hard millisecond SLAs. Instead assert search completes, result order is correct, repeated searches reuse member metadata/column structure, source position remains unchanged, and allocations/reflection are not pathologically multiplied by rebuilding structural objects each keystroke.
-
-- [ ] **Step 6: Run lifecycle/performance tests on both TFMs.**
+- [ ] **Step 1: Disposal tests.** Popup/timer/source/theme/form events all detach.
+- [ ] **Step 2: Theme tests.** No hard-coded semantic colors/GDI leaks.
+- [ ] **Step 3: DPI/layout tests.** Include the new inherited trailing accessory at 96/120/144/192 DPI, footer visibility, placement clamp/flip, DropDownWidth automatic/explicit behavior.
+- [ ] **Step 4: Accessibility tests.** Owner/result/footer/affordance sensible roles/names; status and affordance do not steal keyboard focus.
+- [ ] **Step 5: Performance regressions for 1k/5k/10k.** No brittle ms SLA; assert correct order, metadata/column reuse, stable currency, no structural rebuild per key.
+- [ ] **Step 6: Reconfiguration leak stress.** Alternate editing between two lookup columns/sources at least 50 times, then mutate both sources; assert one active subscription path only and no multiplying event/refresh count.
+- [ ] **Step 7: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapLookupLifecycleTests|FullyQualifiedName~BootstrapLookupPerformanceTests"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapLookupLifecycleTests|FullyQualifiedName~BootstrapLookupPerformanceTests"
-```
-
-- [ ] **Step 7: Commit.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapLookupBox.Popup.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupDropDownContent.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupFooter.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupDataAdapter.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapLookupSearchEngine.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupLifecycleTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapLookupPerformanceTests.cs
 git commit -m "test: harden BootstrapLookup lifecycle and performance"
 ```
 
 ---
 
-## Task 15: Document the component, review the exported API, update the fingerprint, and run the full dual-target verification gate
+## Task 17: Document the component, review the exported API, update fingerprint, and run the full dual-target verification gate
 
 **Files:**
 - Modify: `docs/COMPONENTS.md`
@@ -729,19 +676,28 @@ git commit -m "test: harden BootstrapLookup lifecycle and performance"
 - Modify: `docs/PACKAGE_README.md`
 - Modify: `CHANGELOG.md`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Release/Phase16PublicApiBaselineTests.cs`
-- Optional if repository docs convention prefers a dedicated guide: Create `docs/BOOTSTRAP_LOOKUP_BOX.md`
+- Optional: Create `docs/BOOTSTRAP_LOOKUP_BOX.md`
 
-**Interfaces:** Final public API and documentation review. No new implementation features in this task.
-
-- [ ] **Step 1: Update component documentation from the approved spec.** Document responsibility, public surface, local datasource support, result columns, SearchMembers, ranking/defaults, unmatched-text modes, Refresh/Add New, dynamic suggest, keyboard behavior, Alt+Tab semantics, and DataGridView raw-value binding. Explicitly state V1 non-goals.
-
-- [ ] **Step 2: Add usage examples.** Include a standalone lookup example and a `BootstrapLookupColumn` example using `BindingList<OrderLine>` + `BindingSource`, ProductId raw binding, multi-column results, and optional `CommitAndAdd` string suggestions. Do not use DataTable in the recommended example.
-
-- [ ] **Step 3: Add/extend a focused public API review test before changing the fingerprint.** In `Phase16PublicApiBaselineTests`, assert exported lookup-related type names and key public/protected member names match the reviewed spec. Explicitly assert implementation types remain non-exported:
+- [ ] **Step 1: Update docs** for datasource/result columns/SearchMembers/ranking tuple/ambiguous exact behavior/unmatched modes/Refresh/Add New/keyboard/Alt+Tab/DataGridView raw binding/V1 non-goals.
+- [ ] **Step 2: Add standalone and `BootstrapLookupColumn` examples** using BindingList/BindingSource, not DataTable.
+- [ ] **Step 3: Add focused API review assertions.** Require every reviewed public member, explicitly including:
 
 ```text
-BootstrapLookupEditingControl
+BootstrapLookupBox.ResultsChanged
+BootstrapLookupBox.CancelPendingEdit()
+BootstrapLookupBox.ResultsGrid
+BootstrapLookupBox.SearchTextNormalizer
+BootstrapLookupBox.TextNormalizer
+BootstrapLookupBox.TextComparer
+BootstrapLookupBox.ValidationMessage
+```
+
+Also assert these remain non-exported:
+
+```text
 BootstrapLookupCell
+BootstrapLookupEditingControl
+BootstrapLookupDropDownAffordance
 BootstrapLookupDropDownController
 BootstrapLookupDropDownContent
 BootstrapLookupFooter
@@ -750,76 +706,58 @@ BootstrapLookupSearchEngine
 BootstrapLookupMemberAccessor
 ```
 
-If DataGridView mechanics unexpectedly require exporting `BootstrapLookupCell`, stop and request a design update instead of silently expanding API.
+Also assert Task 5/6 did **not** accidentally add new public/protected `BootstrapTextBox` accessory/validation members; those hooks must remain internal.
 
-- [ ] **Step 4: Run the public API baseline intentionally and capture the expected fingerprint failure.**
-
-```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~Phase16PublicApiBaselineTests"
-```
-
-Expected: `ExportedApiMatchesApprovedV1Baseline` fails and prints the full API plus new SHA-256 fingerprint; all focused lookup API-shape assertions pass.
-
-- [ ] **Step 5: Review the printed API line-by-line against `docs/superpowers/specs/2026-09-02-bootstrap-lookup-box-design.md`.** Remove accidental aliases, extra setters, public internals, or missing XML docs before accepting the fingerprint. Do not update the fingerprint until this review is clean.
-
-- [ ] **Step 6: Update `ApprovedV1Fingerprint` to the reviewed value, then rerun the release test on both TFMs.**
-
-```powershell
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~Phase16PublicApiBaselineTests"
-dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~Phase16PublicApiBaselineTests"
-```
-
-Expected: pass.
-
-- [ ] **Step 7: Run the complete build gate.**
+- [ ] **Step 4: Run baseline and intentionally capture expected fingerprint failure.**
+- [ ] **Step 5: Review printed API line-by-line before accepting fingerprint.**
+- [ ] **Step 6: Update `ApprovedV1Fingerprint`, rerun release test on both TFMs.**
+- [ ] **Step 7: Run complete build gate.**
 
 ```powershell
 ./build.ps1 -Configuration Release
 ```
 
-Expected: src, tests, and demo build for both `net48` and `net8.0-windows` with zero warnings/errors.
-
-- [ ] **Step 8: Run the complete automated test gate.**
+- [ ] **Step 8: Run complete automated test gate.**
 
 ```powershell
 ./test.ps1 -Configuration Release -SkipBuild
 ```
 
-Expected: all non-explicit tests pass on both target frameworks.
-
-- [ ] **Step 9: Run final interactive/manual regression checklist on Windows.** Verify:
+- [ ] **Step 9: Final interactive/manual checklist on Windows.**
 
 ```text
-Standalone lookup:
+Standalone:
 - typing/debounce/AutoOpen
-- accent-insensitive multi-token search
-- ranking and highlight preservation
+- Vietnamese multi-token search and locked aggregate ranking
+- duplicate display text with distinct ValueMember blocks commit
+- duplicate rows with same logical ValueMember resolve deterministically
 - mouse result commit
-- keyboard Up/Down/Home/End/PageUp/PageDown
+- Up/Down/Home/End/PageUp/PageDown
 - Enter modes
-- Tab resolve
-- Escape restore
-- Refresh
-- Add New
-- CommitAndAdd
+- Tab resolve/block
+- Escape and public CancelPendingEdit have identical cancellation semantics
+- ResultsChanged fires only for actual projection/search-state changes
+- Refresh / Add New / CommitAndAdd
+- clear/trailing icon + dropdown affordance do not overlap
+- application ValidationState survives lookup transient validation
 - Alt+Tab closes only and reactivation stays closed
 
 DataGridView:
-- edit existing ProductId cell
-- raw value vs formatted display
+- existing raw ProductId edit and formatted display
 - Tab across hidden/read-only cells
-- Enter policy matrix
-- validation blocks cell change
-- native new-row AddNew with BindingSource/BindingList
-- dynamic Unit suggestion
-- BindingSource Position does not move from search/highlight
-- no duplicated active editor/focus visuals
+- Enter matrix
+- validation/ambiguity blocks cell change
+- native new-row AddNew
+- BindingSource Position stable
+- A -> B lookup-column editor reuse has no stale datasource/events/debounce/popup
+- no duplicate active editor/focus visuals
 
-Themes/lifecycle:
+Theme/lifecycle:
 - Light/Dark
 - resize/form move
 - supported DPI matrix
 - close/dispose while popup open
+- repeated A/B editor reuse does not multiply subscriptions/events
 ```
 
 - [ ] **Step 10: Commit documentation/API baseline.**
@@ -842,48 +780,58 @@ Task 2  shared debouncer extraction
   |
 Task 3  datasource adapter/member access
   |
-Task 4  pure search engine
+Task 4  pure search engine + fully specified aggregate rank
   |
-Task 5  BootstrapLookupBox core state
+Task 5  BootstrapTextBox internal trailing-accessory layout prerequisite
   |
-Task 6  commit resolver + CommitAndAdd
+Task 6  BootstrapTextBox transient validation-layer prerequisite
   |
-Task 7  popup content/footer
+Task 7  BootstrapLookupBox core state + dropdown affordance
   |
-Task 8  popup controller/overlay
+Task 8  commit resolver + ambiguity + CommitAndAdd
   |
-Task 9  search/debounce/highlight integration
+Task 9  popup content/footer + ResultsGrid
   |
-Task 10 standalone real keyboard/focus/activation hardening
+Task 10 popup controller + public CancelPendingEdit
   |
-Task 11 DataGridView column/cell/editing-control integration
+Task 11 search/debounce/ResultsChanged/highlight navigation
   |
-Task 12 real DataGridView lifecycle/new-row interaction hardening
+Task 12 standalone real keyboard/focus/activation hardening
   |
-Task 13 replacement integrated demo
+Task 13 DataGridView column/cell/editor + reuse-safe reconfiguration
   |
-Task 14 theme/DPI/disposal/performance hardening
+Task 14 real DataGridView lifecycle/new-row/reuse interaction hardening
   |
-Task 15 docs + public API review + full verification
+Task 15 replacement integrated demo
+  |
+Task 16 theme/DPI/disposal/performance/reuse hardening
+  |
+Task 17 docs + public API review + full verification
 ```
 
-Do not start Task 11 before standalone lookup state/commit/popup/keyboard semantics are stable; otherwise DataGridView-specific behavior will hide core-state defects and recreate the lifecycle coupling the design is intended to avoid.
+Do not start Task 7 before Tasks 5 and 6 pass their existing `BootstrapTextBox` regressions. Do not start Task 13 before standalone lookup state/commit/popup/keyboard semantics are stable. Do not treat final disposal as a substitute for Task 13's per-cell reconfiguration cleanup.
 
 ## Definition of Done
 
 Implementation is complete only when all of the following are true:
 
-- `BootstrapLookupBox` works as a standalone single-selection lookup and keeps committed state independent from pending query/highlight state.
-- Local search supports approved Vietnamese normalization, multi-token AND matching, SearchMembers, ranking, debounce, minimum length, and empty-query policies without mutating source currency/order.
+- `BootstrapLookupBox` works standalone and keeps committed state independent from pending query/highlight state.
+- The dropdown affordance is hosted through the base TextBox layout slot, never overlays the editor, never overlaps clear/trailing visuals, and does not steal focus.
+- Lookup-generated invalid state is transient and clearing it reveals the latest application-owned `ValidationState`.
+- Local search supports approved Vietnamese normalization, multi-token AND matching, SearchMembers, the exact aggregate ranking tuple in Task 4, debounce, minimum length, and empty-query policies without mutating source currency/order.
+- Exact text auto-resolves only one distinct logical value. Ambiguous exact display text never silently commits the first row and never triggers `CommitAndAdd`.
 - `RestorePreviousSelection`, `KeepFocusWithValidationError`, and atomic `CommitAndAdd` behave exactly as specified.
-- Results popup uses `BootstrapDataGridView` with multi-column definitions and footer status/Refresh/Add New; keyboard focus stays in the main editor.
+- Public `CancelPendingEdit()` is implemented/tested and Escape uses equivalent semantics.
+- Public `ResultsChanged` is implemented/tested and fires only when the logical projection/search state actually changes.
+- Results popup uses `BootstrapDataGridView` with multi-column definitions and footer; keyboard focus stays in the main editor.
 - Alt+Tab/app deactivation only closes presentation and never commits/rolls back/validates/moves; activation does not auto-open.
 - `BootstrapLookupEditingControl` is the real DataGridView editor. There is no native textbox + overlay-editor workaround and no `SendKeys` navigation.
 - `BootstrapLookupColumn` commits raw `ValueMember` values, exposes row/cell-context events, and preserves native DataGridView navigation/validation semantics.
+- Reusing one editing control from lookup column/source A to B detaches A completely: no stale source callbacks, event forwarding, pending debounce, popup, or shared mutable column/search collections.
 - Native `BindingSource` / `BindingList<T>` new-row editing works with `AllowUserToAddRows = true`.
 - Search/highlight does not change `BindingSource.Position` and transient activity does not dirty the grid.
-- The old DataGrid + BootstrapSelect overlay demo is replaced by the new typed BindingList/BindingSource lookup workflow.
-- Lifecycle, theme, DPI, performance-regression, keyboard/focus/window interaction, and disposal tests pass.
-- Public API exports only the reviewed contract and the baseline fingerprint is updated only after explicit API inspection.
+- The old DataGrid + BootstrapSelect overlay demo is replaced by the typed BindingList/BindingSource lookup workflow.
+- Lifecycle, theme, DPI, performance, keyboard/focus/window interaction, validation-layer, accessory-layout, reuse, and disposal tests pass.
+- Public API exports only the reviewed contract; new BootstrapTextBox framework hooks remain internal; fingerprint is updated only after explicit API inspection.
 - `./build.ps1 -Configuration Release` passes for both TFMs.
 - `./test.ps1 -Configuration Release -SkipBuild` passes for both TFMs.
