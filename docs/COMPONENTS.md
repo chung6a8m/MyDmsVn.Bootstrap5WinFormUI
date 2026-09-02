@@ -356,6 +356,18 @@ Manual verification: choose **Select** in the integrated demo. Exercise local si
 
 See `docs/BOOTSTRAP_SELECT.md` for complete usage examples and extension guidance.
 
+## BootstrapInputGroup
+
+Responsibility: compose supported addon, input, button, and split-button primitives into one horizontal connected row without replacing their native interaction or public state.
+
+Public concepts are `BootstrapInputGroupSize` (`Small`, `Default`, `Large`), `BootstrapInputGroup.InputGroupSize`, and the addon properties `BootstrapInputGroupText.Text`, `Icon`, `IconRenderer`, `TextAlign`, and `BorderRadius`. Composition and reorder use the inherited `Controls` collection and `Controls.SetChildIndex(...)`; there is no second public collection.
+
+Supported direct children are `BootstrapInputGroupText`, `BootstrapTextBox` (including `BootstrapFormattedTextBox`), `BootstrapNumericBox`, Single-mode `BootstrapSelect`, `BootstrapButton`, and `BootstrapSplitButton`. Multiple-mode Select, ComboBox, DatePicker, ButtonGroup, native/arbitrary controls, file input, checkbox, and radio addons are deferred and rejected before reparenting.
+
+The group applies internal explicit connected corner/size overrides and never mutates child `BorderRadius`, `ButtonSize`, validation, value, text, selection, enabled, read-only, or Tab state. Visible children are measured first for a safe common row height; final bounds are assigned only after the maximum native/theme floor is known. Fixed children keep preferred width, stretch inputs share surplus, and constrained layouts use deterministic fixed then emergency compression without negative/out-of-client rectangles.
+
+The container and addon are non-focusable. Interactive children keep normal Tab/Shift+Tab, editing, Enter/Space, popup, validation, and accessibility behavior. Visible children determine outer corners; hide/remove/reparent clears overrides. Caller reorder is canonical. RTL mirrors visual placement/corners without changing Controls or Tab order. See `docs/BOOTSTRAP_INPUT_GROUP.md`.
+
 ## BootstrapCard
 
 Responsibility: reusable themed surface/container with lightweight composition regions.

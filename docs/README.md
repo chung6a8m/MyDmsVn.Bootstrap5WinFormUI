@@ -18,6 +18,7 @@ This directory contains the authoritative development documentation for `MyDmsVn
 12. [RELEASING.md](RELEASING.md) — RC creation, package validation, CI artifacts, manual matrix, and stable-promotion process.
 13. [PACKAGE_README.md](PACKAGE_README.md) — self-contained README embedded in the NuGet package.
 14. [BOOTSTRAP_SELECT.md](BOOTSTRAP_SELECT.md) — Select2-style `BootstrapSelect` local/async usage, identity, grouping/custom values, matcher/renderer extension points, retry, keyboard/accessibility, ownership, and desktop verification matrix.
+15. [BOOTSTRAP_INPUT_GROUP.md](BOOTSTRAP_INPUT_GROUP.md) — connected input composition, supported child matrix, sizing/measurement, compression, reorder, RTL, and verification.
 15. [PHASE8_HARDENING.md](PHASE8_HARDENING.md) — post-review hardening notes for TextBox keyboard event forwarding and Card decoration-safe layout.
 16. [PHASE9_BOOTSTRAP_COLLAPSE.md](PHASE9_BOOTSTRAP_COLLAPSE.md) — finalized Collapse contract, height measurement/reversal behavior, tests, and manual verification matrix.
 17. [PHASE11_BOOTSTRAP_PROGRESS_BAR.md](PHASE11_BOOTSTRAP_PROGRESS_BAR.md) — finalized ProgressBar range, formatting, animation, indeterminate, lifecycle, tests, and manual verification contract.
