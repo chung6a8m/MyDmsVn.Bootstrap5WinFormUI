@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -13,6 +14,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     private readonly BootstrapLookupColumnDefinitionCollection _columns = new BootstrapLookupColumnDefinitionCollection();
     private readonly BootstrapLookupSearchMemberCollection _searchMembers = new BootstrapLookupSearchMemberCollection();
     private readonly BootstrapLookupDropDownAffordance _dropDownAffordance;
+    private readonly BootstrapLookupDropDownContent _dropDownContent;
     private bool _synchronizingText;
     private object? _selectedItem;
     private object? _selectedValue;
@@ -32,6 +34,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     /// <summary>Initializes a designer-safe lookup editor.</summary>
     public BootstrapLookupBox()
     {
+        _dropDownContent = new BootstrapLookupDropDownContent();
         _dropDownAffordance = new BootstrapLookupDropDownAffordance();
         _dropDownAffordance.Activated += OnDropDownAffordanceActivated;
         SetFrameworkTrailingAccessory(_dropDownAffordance);
@@ -63,6 +66,11 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     [Category("Data")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Content)]
     public BootstrapLookupSearchMemberCollection SearchMembers => _searchMembers;
+
+    /// <summary>Gets the framework-owned result grid for advanced presentation customization.</summary>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public BootstrapDataGridView ResultsGrid => _dropDownContent.ResultsGrid;
 
     /// <summary>Gets the committed source item.</summary>
     [Browsable(false)]
@@ -200,6 +208,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         {
             _dropDownAffordance.Activated -= OnDropDownAffordanceActivated;
             DisposeDataAdapter();
+            _dropDownContent.Dispose();
         }
         base.Dispose(disposing);
     }
