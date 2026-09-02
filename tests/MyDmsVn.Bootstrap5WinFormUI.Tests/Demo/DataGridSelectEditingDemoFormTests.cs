@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -17,9 +16,7 @@ public sealed class DataGridSelectEditingDemoFormTests
     [Test]
     public void DemoUsesFiveNativeTextColumnsAndSampleRows()
     {
-        using var form = CreateDemoForm();
-        form.CreateControl();
-        form.PerformLayout();
+        using var form = CreateAndShowDemoForm();
 
         var grid = FindControls<BootstrapDataGridView>(form).Single();
         var headers = grid.Columns.Cast<DataGridViewColumn>().Select(column => column.HeaderText).ToArray();
@@ -37,12 +34,9 @@ public sealed class DataGridSelectEditingDemoFormTests
     [Test]
     public void ProductCellEditingShowsBootstrapSelectAndCommitsProductMetadata()
     {
-        using var form = CreateDemoForm();
-        form.CreateControl();
-        form.PerformLayout();
+        using var form = CreateAndShowDemoForm();
 
         var grid = FindControls<BootstrapDataGridView>(form).Single();
-        grid.CreateControl();
         grid.CurrentCell = grid.Rows[0].Cells["ProductNameColumn"];
 
         Assert.That(grid.BeginEdit(true), Is.True);
@@ -68,9 +62,7 @@ public sealed class DataGridSelectEditingDemoFormTests
     [Test]
     public void EditingQuantityRecalculatesLineTotal()
     {
-        using var form = CreateDemoForm();
-        form.CreateControl();
-        form.PerformLayout();
+        using var form = CreateAndShowDemoForm();
 
         var grid = FindControls<BootstrapDataGridView>(form).Single();
         var row = grid.Rows[0];
@@ -82,11 +74,17 @@ public sealed class DataGridSelectEditingDemoFormTests
         Assert.That(Convert.ToDecimal(row.Cells["LineTotalColumn"].Value), Is.EqualTo(555000m));
     }
 
-    private static Form CreateDemoForm()
+    private static Form CreateAndShowDemoForm()
     {
         var demoType = typeof(MainForm).Assembly.GetType("MyDmsVn.Bootstrap5WinFormUI.Demo.DataGridSelectEditingDemoForm");
         Assert.That(demoType, Is.Not.Null, "The integrated demo should include DataGridSelectEditingDemoForm.");
-        return (Form)Activator.CreateInstance(demoType!)!;
+
+        var form = (Form)Activator.CreateInstance(demoType!)!;
+        form.Show();
+        Application.DoEvents();
+        form.PerformLayout();
+        Application.DoEvents();
+        return form;
     }
 
     private static IEnumerable<T> FindControls<T>(Control root)
