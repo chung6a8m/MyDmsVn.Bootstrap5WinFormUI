@@ -209,6 +209,16 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     }
 
     /// <inheritdoc />
+    protected override void OnLeave(EventArgs e)
+    {
+        base.OnLeave(e);
+        if (IsDisposed || Disposing || Form.ActiveForm != FindForm()) return;
+        var resolution = ResolvePendingText(BootstrapLookupCommitReason.ExactMatch);
+        if (!resolution.NavigationAllowed) OpenDropDown();
+        else CloseDropDown();
+    }
+
+    /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
         if (disposing)

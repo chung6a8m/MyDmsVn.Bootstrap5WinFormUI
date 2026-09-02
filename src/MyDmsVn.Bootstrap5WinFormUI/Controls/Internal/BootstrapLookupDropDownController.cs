@@ -15,6 +15,8 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
     private BootstrapOverlayAnchorTracker? _tracker;
     private bool _isOpen;
     private bool _disposed;
+    private int _activationGeneration;
+    private int _queuedWindowDeactivationGeneration = -1;
 
     internal BootstrapLookupDropDownController(BootstrapLookupBox owner, BootstrapLookupDropDownContent content)
     {
@@ -41,6 +43,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
             return;
         }
         _isOpen = true;
+        _activationGeneration++;
         _dropDown!.ShowAt(ComputeBounds());
         _tracker = new BootstrapOverlayAnchorTracker(_owner, Reposition, () => Close(false));
         _owner.FocusLookupEditor();
@@ -73,6 +76,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
         if (_dropDown is not null)
         {
             _dropDown.ApplicationDeactivated -= OnApplicationDeactivated;
+            _dropDown.WindowDeactivated -= OnWindowDeactivated;
             _dropDown.Closed -= OnDropDownClosed;
         }
         _surface?.DetachContent();
@@ -88,6 +92,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
         _surface.AttachContent(_content);
         _dropDown = new BootstrapOverlayDropDown(_surface) { AutoClose = true, CloseOnEscape = true, EscapeRequested = _owner.CancelPendingEdit };
         _dropDown.ApplicationDeactivated += OnApplicationDeactivated;
+        _dropDown.WindowDeactivated += OnWindowDeactivated;
         _dropDown.Closed += OnDropDownClosed;
         ApplyPresentation();
     }
@@ -131,11 +136,44 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
     private void OnRefreshRequested(object? sender, EventArgs e) => _owner.RefreshResults();
     private void OnAddNewRequested(object? sender, EventArgs e) => _owner.RequestExplicitAddNew();
     private void OnApplicationDeactivated(object? sender, EventArgs e) => Close(false);
+    private void OnWindowDeactivated(IntPtr activatedWindow)
+    {
+        if (_disposed || !_isOpen) return;
+        var ownerForm = _owner.FindForm();
+        if (BootstrapOverlayActivationDomain.IsOwnerWindow(activatedWindow, ownerForm) ||
+            BootstrapOverlayActivationDomain.IsPopupWindow(activatedWindow, _dropDown, _surface)) return;
+        if (activatedWindow != IntPtr.Zero) { Close(false); return; }
+        QueueWindowDeactivationCheck();
+    }
+
+    private void QueueWindowDeactivationCheck()
+    {
+        if (_dropDown?.IsHandleCreated != true || _dropDown.IsDisposed) return;
+        var generation = _activationGeneration;
+        if (_queuedWindowDeactivationGeneration == generation) return;
+        _queuedWindowDeactivationGeneration = generation;
+        try
+        {
+            _dropDown.BeginInvoke((Action)(() =>
+            {
+                if (_queuedWindowDeactivationGeneration == generation) _queuedWindowDeactivationGeneration = -1;
+                if (_disposed || !_isOpen || generation != _activationGeneration) return;
+                var popupActive = _dropDown?.ContainsFocus == true || _surface?.ContainsFocus == true || _content.ContainsFocus;
+                var ownerForm = _owner.FindForm();
+                var ownerActive = ownerForm?.IsHandleCreated == true && (ownerForm.ContainsFocus || Form.ActiveForm == ownerForm);
+                if (!popupActive && !ownerActive) Close(false);
+            }));
+        }
+        catch (ObjectDisposedException) { _queuedWindowDeactivationGeneration = -1; }
+        catch (InvalidOperationException) { _queuedWindowDeactivationGeneration = -1; }
+    }
     private void OnDropDownClosed(object? sender, ToolStripDropDownClosedEventArgs e) => CompleteClose();
 
     private void CompleteClose()
     {
         if (!_isOpen) return;
+        _activationGeneration++;
+        _queuedWindowDeactivationGeneration = -1;
         _isOpen = false;
         _tracker?.Dispose();
         _tracker = null;

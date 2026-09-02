@@ -1,10 +1,72 @@
 using System;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 public partial class BootstrapLookupBox
 {
+    /// <inheritdoc />
+    protected override void OnEditorKeyDown(KeyEventArgs e)
+    {
+        if (e.Handled || !Enabled)
+        {
+            base.OnEditorKeyDown(e);
+            return;
+        }
+
+        var key = e.KeyCode;
+        if (key == Keys.Escape)
+        {
+            CancelPendingEdit();
+            Consume(e);
+            return;
+        }
+
+        if (key == Keys.F4 || (e.Alt && key == Keys.Down) || (!IsDropDownOpen && key == Keys.Down))
+        {
+            FlushPendingSearch();
+            OpenDropDown();
+            Consume(e);
+            return;
+        }
+
+        if (IsDropDownOpen && IsNavigationKey(key))
+        {
+            FlushPendingSearch();
+            NavigateResults(key);
+            Consume(e);
+            return;
+        }
+
+        if (key == Keys.Enter && HandleEnterKey())
+        {
+            Consume(e);
+            return;
+        }
+
+        base.OnEditorKeyDown(e);
+    }
+
+    /// <inheritdoc />
+    protected override bool ProcessDialogKey(Keys keyData)
+    {
+        var key = keyData & Keys.KeyCode;
+        var modifiers = keyData & Keys.Modifiers;
+        if (key == Keys.Tab && (modifiers & (Keys.Alt | Keys.Control)) == Keys.None)
+        {
+            FlushPendingSearch();
+            var resolution = ResolvePendingText(BootstrapLookupCommitReason.Keyboard);
+            if (!resolution.NavigationAllowed)
+            {
+                OpenDropDown();
+                return true;
+            }
+            CloseDropDown();
+        }
+        return base.ProcessDialogKey(keyData);
+    }
+
     internal void NavigateResults(Keys key)
     {
         var grid = ResultsGrid;
@@ -45,5 +107,56 @@ public partial class BootstrapLookupBox
                 return index;
         }
         return -1;
+    }
+
+    private bool HandleEnterKey()
+    {
+        FlushPendingSearch();
+        if (!IsDropDownOpen && ClosedEnterKeyBehavior == BootstrapLookupClosedEnterKeyBehavior.DataGridViewDefault)
+            return false;
+
+        BootstrapLookupCommitResult resolution;
+        if (IsDropDownOpen && HighlightedItem is not null && _dataAdapter is not null && _dataAdapter.TryFindByItem(HighlightedItem, out var highlighted))
+        {
+            CommitSelection(highlighted!.Item, highlighted.Value, highlighted.DisplayText, BootstrapLookupCommitReason.Keyboard);
+            resolution = BootstrapLookupCommitResult.Success();
+        }
+        else
+        {
+            resolution = ResolvePendingText(BootstrapLookupCommitReason.Keyboard);
+        }
+
+        if (!resolution.NavigationAllowed)
+        {
+            OpenDropDown();
+            return true;
+        }
+
+        CloseDropDown();
+        if (EnterKeyBehavior == BootstrapLookupEnterKeyBehavior.CommitSelectionAndMoveNext)
+            ContinueDialogNavigation(false);
+        return true;
+    }
+
+    private bool ContinueDialogNavigation(bool reverse)
+    {
+        Control current = this;
+        var container = Parent;
+        while (container is not null)
+        {
+            if (container.SelectNextControl(current, !reverse, true, true, false)) return true;
+            current = container;
+            container = container.Parent;
+        }
+        return false;
+    }
+
+    private static bool IsNavigationKey(Keys key) => key == Keys.Up || key == Keys.Down || key == Keys.Home ||
+        key == Keys.End || key == Keys.PageUp || key == Keys.PageDown;
+
+    private static void Consume(KeyEventArgs e)
+    {
+        e.Handled = true;
+        e.SuppressKeyPress = true;
     }
 }
