@@ -75,6 +75,54 @@ public sealed class BootstrapLookupDataGridViewTests
     }
 
     [Test]
+    public void ClearingNullableLookupCommitsNullToBoundProperty()
+    {
+        var row = new NullableRow { ProductId = 1 };
+        var host = CreateGridHost(CreateColumn(new BindingList<Product> { new Product(1, "Alpha") }), row);
+        using var form = host.Form;
+        using var grid = host.Grid;
+        BeginEdit(grid, 0);
+        var editor = (BootstrapLookupBox)grid.EditingControl!;
+
+        editor.ClearSelection();
+
+        Assert.That(((IDataGridViewEditingControl)editor).EditingControlFormattedValue, Is.Null);
+        Assert.That(grid.EndEdit(), Is.True);
+        Assert.That(row.ProductId, Is.Null);
+    }
+
+    [Test]
+    public void ClearingNonNullableLookupRaisesDataErrorAndRetainsBoundValue()
+    {
+        var row = new Row { ProductId = 1 };
+        var host = CreateGridHost(CreateColumn(new BindingList<Product> { new Product(1, "Alpha") }), row);
+        using var form = host.Form;
+        using var grid = host.Grid;
+        var dataErrors = 0;
+        grid.DataError += (_, e) => { dataErrors++; e.ThrowException = false; };
+        BeginEdit(grid, 0);
+        var editor = (BootstrapLookupBox)grid.EditingControl!;
+
+        editor.ClearSelection();
+        var ended = grid.EndEdit();
+        try
+        {
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(ended, Is.False);
+                Assert.That(dataErrors, Is.GreaterThan(0));
+                Assert.That(row.ProductId, Is.EqualTo(1));
+            }));
+        }
+        finally
+        {
+            grid.CancelEdit();
+            form.Close();
+            Application.DoEvents();
+        }
+    }
+
+    [Test]
     public void ReusedEditorDetachesOldSourceAndForwardsOnlyCurrentColumn()
     {
         var sourceA = new BindingList<Product> { new Product(1, "Alpha") };
@@ -110,10 +158,10 @@ public sealed class BootstrapLookupDataGridViewTests
         DataSource = source, DisplayMember = "Name", ValueMember = "Id", DataPropertyName = "ProductId"
     };
 
-    private static (Form Form, DataGridView Grid) CreateGridHost(BootstrapLookupColumn column, Row row)
+    private static (Form Form, DataGridView Grid) CreateGridHost<T>(BootstrapLookupColumn column, T row) where T : class
     {
         var form = new Form { ShowInTaskbar = false };
-        var grid = new DataGridView { Dock = DockStyle.Fill, AutoGenerateColumns = false, DataSource = new BindingList<Row> { row } };
+        var grid = new DataGridView { Dock = DockStyle.Fill, AutoGenerateColumns = false, DataSource = new BindingList<T> { row } };
         grid.Columns.Add(column); form.Controls.Add(grid); form.Show(); Application.DoEvents();
         return (form, grid);
     }
@@ -139,5 +187,10 @@ public sealed class BootstrapLookupDataGridViewTests
         public int ProductId { get; set; }
         public int ProductA { get; set; }
         public int ProductB { get; set; }
+    }
+
+    private sealed class NullableRow
+    {
+        public int? ProductId { get; set; }
     }
 }

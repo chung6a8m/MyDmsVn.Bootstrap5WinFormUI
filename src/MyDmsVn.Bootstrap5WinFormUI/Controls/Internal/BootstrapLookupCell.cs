@@ -7,7 +7,6 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 internal sealed class BootstrapLookupCell : DataGridViewTextBoxCell
 {
     public override Type EditType => typeof(BootstrapLookupEditingControl);
-    public override Type ValueType => typeof(object);
     public override object? DefaultNewRowValue => null;
 
     public override void InitializeEditingControl(int rowIndex, object initialFormattedValue, DataGridViewCellStyle dataGridViewCellStyle)
@@ -24,5 +23,20 @@ internal sealed class BootstrapLookupCell : DataGridViewTextBoxCell
     }
 
     public override object ParseFormattedValue(object formattedValue, DataGridViewCellStyle cellStyle,
-        TypeConverter formattedValueTypeConverter, TypeConverter valueTypeConverter) => formattedValue;
+        TypeConverter formattedValueTypeConverter, TypeConverter valueTypeConverter)
+    {
+        if (formattedValue is null && !TargetAllowsNull())
+            throw new FormatException("A null lookup value cannot be assigned to the non-nullable bound property.");
+        return formattedValue!;
+    }
+
+    private bool TargetAllowsNull()
+    {
+        var targetType = OwningColumn?.ValueType;
+        var boundItem = OwningRow?.DataBoundItem;
+        var propertyName = OwningColumn?.DataPropertyName;
+        if (boundItem is not null && !string.IsNullOrEmpty(propertyName))
+            targetType = TypeDescriptor.GetProperties(boundItem)[propertyName!]?.PropertyType ?? targetType;
+        return targetType is null || !targetType.IsValueType || Nullable.GetUnderlyingType(targetType) is not null;
+    }
 }

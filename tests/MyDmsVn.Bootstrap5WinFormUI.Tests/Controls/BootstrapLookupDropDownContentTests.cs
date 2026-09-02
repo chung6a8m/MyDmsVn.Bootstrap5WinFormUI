@@ -99,6 +99,15 @@ public sealed class BootstrapLookupDropDownContentTests
         }));
     }
 
+    [Test]
+    public void PreferredHeightDoesNotReserveHorizontalScrollWhenColumnsFit()
+    {
+        using var content = CreateSizedContent(1);
+        content.ResultsGrid.Columns[0].Width = 290;
+
+        Assert.That(content.GetPreferredSize(new Size(300, 320)).Height, Is.EqualTo(86));
+    }
+
     private static BootstrapLookupDropDownContent CreateSizedContent(int rowCount)
     {
         var content = new BootstrapLookupDropDownContent();

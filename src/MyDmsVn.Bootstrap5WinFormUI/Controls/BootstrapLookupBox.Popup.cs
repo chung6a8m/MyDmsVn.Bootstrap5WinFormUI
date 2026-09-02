@@ -49,8 +49,37 @@ public partial class BootstrapLookupBox
         {
             if (ReferenceEquals(items[i].Item, HighlightedItem) || Equals(items[i].Item, HighlightedItem)) { position = i + 1; break; }
         }
+        SynchronizeHighlightedResult();
         _dropDownContent.ConfigureFooter(ShowRefreshButton, ShowAddNewButton);
         _dropDownContent.UpdateStatus(position, items.Count, _currentSearchResult.State == BootstrapLookupSearchState.WaitingForMinimumLength, MinimumSearchLength);
+    }
+
+    internal void SynchronizeHighlightedResult()
+    {
+        var rowIndex = -1;
+        for (var index = 0; index < ResultsGrid.Rows.Count; index++)
+        {
+            var sourceItem = _dropDownContent.GetSourceItem(index);
+            if (sourceItem is not null && (ReferenceEquals(sourceItem.Item, HighlightedItem) || Equals(sourceItem.Item, HighlightedItem)))
+            {
+                rowIndex = index;
+                break;
+            }
+        }
+        if (rowIndex < 0) return;
+        ResultsGrid.ClearSelection();
+        var row = ResultsGrid.Rows[rowIndex];
+        row.Selected = true;
+        System.Windows.Forms.DataGridViewCell? firstVisibleCell = null;
+        foreach (System.Windows.Forms.DataGridViewCell cell in row.Cells)
+        {
+            if (!cell.Visible) continue;
+            firstVisibleCell = cell;
+            break;
+        }
+        if (firstVisibleCell is not null) ResultsGrid.CurrentCell = firstVisibleCell;
+        if (ResultsGrid.DisplayedRowCount(false) > 0)
+            ResultsGrid.FirstDisplayedScrollingRowIndex = rowIndex;
     }
 
     internal void RequestExplicitAddNew()

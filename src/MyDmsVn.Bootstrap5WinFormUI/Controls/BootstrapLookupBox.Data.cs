@@ -116,6 +116,7 @@ public partial class BootstrapLookupBox
         var changed = !EqualityComparer<object?>.Default.Equals(_selectedValue, value);
         _selectedItem = item;
         _selectedValue = value;
+        SetHighlightedItem(item);
         _committedDisplayText = displayText ?? string.Empty;
         SynchronizeText(_committedDisplayText);
         _hasPendingText = false;

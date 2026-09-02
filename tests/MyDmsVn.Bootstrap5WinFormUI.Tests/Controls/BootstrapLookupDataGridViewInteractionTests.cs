@@ -15,6 +15,19 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 public sealed class BootstrapLookupDataGridViewInteractionTests
 {
     [Test]
+    public void InitializingEditorDoesNotScrollResultsBeforePopupHasDisplayRoom()
+    {
+        using var host = new GridHost();
+        var dataErrors = 0;
+        host.Grid.DataError += (_, _) => dataErrors++;
+
+        host.BeginLookupEdit();
+
+        Assert.That(dataErrors, Is.Zero);
+        host.Grid.CancelEdit();
+    }
+
+    [Test]
     public void ValidTabCommitsRawValueAndUsesNativeNextEditableCell()
     {
         using var host = new GridHost();

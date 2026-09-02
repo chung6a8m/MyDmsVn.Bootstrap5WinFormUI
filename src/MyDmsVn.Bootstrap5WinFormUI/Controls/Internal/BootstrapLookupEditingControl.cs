@@ -20,7 +20,7 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
     }
 
     public DataGridView? EditingControlDataGridView { get; set; }
-    public object EditingControlFormattedValue { get => SelectedValue ?? string.Empty; set => SelectedValue = value; }
+    public object EditingControlFormattedValue { get => SelectedValue!; set => SelectedValue = value; }
     public int EditingControlRowIndex { get; set; }
     public bool EditingControlValueChanged { get; set; }
     public Cursor EditingPanelCursor => Cursors.IBeam;
@@ -54,7 +54,7 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
         finally { _configuring = false; }
     }
 
-    public object GetEditingControlFormattedValue(DataGridViewDataErrorContexts context) => SelectedValue ?? string.Empty;
+    public object GetEditingControlFormattedValue(DataGridViewDataErrorContexts context) => SelectedValue!;
     public void ApplyCellStyleToEditingControl(DataGridViewCellStyle dataGridViewCellStyle)
     {
         Font = dataGridViewCellStyle.Font;

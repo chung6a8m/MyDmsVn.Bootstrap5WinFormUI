@@ -21,7 +21,6 @@ public partial class BootstrapLookupBox
         }
         if (key == Keys.F4 || ((modifiers & Keys.Alt) == Keys.Alt && key == Keys.Down) || (!IsDropDownOpen && key == Keys.Down))
         {
-            FlushPendingSearch();
             OpenDropDown();
             return true;
         }
@@ -54,7 +53,6 @@ public partial class BootstrapLookupBox
 
         if (key == Keys.F4 || (e.Alt && key == Keys.Down) || (!IsDropDownOpen && key == Keys.Down))
         {
-            FlushPendingSearch();
             OpenDropDown();
             Consume(e);
             return;

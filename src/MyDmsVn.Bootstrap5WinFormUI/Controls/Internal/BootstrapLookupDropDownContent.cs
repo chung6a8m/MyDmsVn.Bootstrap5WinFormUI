@@ -16,7 +16,7 @@ internal sealed class BootstrapLookupDropDownContent : UserControl
         TabStop = false;
         ResultsGrid = new BootstrapDataGridView
         {
-            Dock = DockStyle.Fill,
+            Dock = DockStyle.None,
             ReadOnly = true,
             MultiSelect = false,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
@@ -26,8 +26,9 @@ internal sealed class BootstrapLookupDropDownContent : UserControl
             TabStop = false,
             AutoGenerateColumns = false
         };
-        Controls.Add(ResultsGrid);
+        _footer.Dock = DockStyle.None;
         Controls.Add(_footer);
+        Controls.Add(ResultsGrid);
         _footer.BringToFront();
     }
 
@@ -110,12 +111,37 @@ internal sealed class BootstrapLookupDropDownContent : UserControl
             : ResultsGrid.BorderStyle == BorderStyle.FixedSingle
                 ? SystemInformation.BorderSize.Height * 2
                 : SystemInformation.Border3DSize.Height * 2;
+        var borderWidth = ResultsGrid.BorderStyle == BorderStyle.None
+            ? 0
+            : ResultsGrid.BorderStyle == BorderStyle.FixedSingle
+                ? SystemInformation.BorderSize.Width * 2
+                : SystemInformation.Border3DSize.Width * 2;
         var headerHeight = ResultsGrid.ColumnHeadersVisible ? ResultsGrid.ColumnHeadersHeight : 0;
         var rowsHeight = 0;
         foreach (DataGridViewRow row in ResultsGrid.Rows) rowsHeight += row.Height;
-        var desiredHeight = _footer.Height + borderHeight + headerHeight + rowsHeight;
+        var contentWidth = proposedSize.Width > 0 ? proposedSize.Width : Width;
+        var columnsWidth = 0;
+        foreach (DataGridViewColumn column in ResultsGrid.Columns)
+            if (column.Visible) columnsWidth += column.Width;
+        var baseHeight = _footer.Height + borderHeight + headerHeight + rowsHeight;
+        var verticalScrollAllowed = ResultsGrid.ScrollBars == ScrollBars.Both || ResultsGrid.ScrollBars == ScrollBars.Vertical;
+        var verticalScrollNeeded = verticalScrollAllowed && proposedSize.Height > 0 && baseHeight > proposedSize.Height;
+        var horizontalScrollAllowed = ResultsGrid.ScrollBars == ScrollBars.Both || ResultsGrid.ScrollBars == ScrollBars.Horizontal;
+        var availableColumnsWidth = contentWidth - borderWidth - (verticalScrollNeeded ? SystemInformation.VerticalScrollBarWidth : 0);
+        var horizontalScrollHeight = horizontalScrollAllowed && columnsWidth > Math.Max(0, availableColumnsWidth)
+            ? SystemInformation.HorizontalScrollBarHeight
+            : 0;
+        var desiredHeight = baseHeight + horizontalScrollHeight;
         var height = proposedSize.Height > 0 ? Math.Min(proposedSize.Height, desiredHeight) : desiredHeight;
         return new System.Drawing.Size(width, height);
+    }
+
+    protected override void OnLayout(LayoutEventArgs e)
+    {
+        base.OnLayout(e);
+        var footerHeight = Math.Min(ClientSize.Height, _footer.Height);
+        _footer.Bounds = new System.Drawing.Rectangle(0, ClientSize.Height - footerHeight, ClientSize.Width, footerHeight);
+        ResultsGrid.Bounds = new System.Drawing.Rectangle(0, 0, ClientSize.Width, Math.Max(0, _footer.Top));
     }
 
     private static string BuildSignature(IEnumerable<BootstrapLookupColumnDefinition> definitions)

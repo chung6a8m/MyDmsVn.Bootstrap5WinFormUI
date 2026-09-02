@@ -27,7 +27,11 @@ public partial class BootstrapLookupBox
         _currentSearchResult = next;
         PreserveOrChooseHighlight(next.Items);
         ApplyCurrentResultsToContent();
-        if (changed) RaiseResultsChanged();
+        if (changed)
+        {
+            if (IsDropDownOpen) _dropDownController.Reposition();
+            RaiseResultsChanged();
+        }
     }
 
     internal void FlushPendingSearch()

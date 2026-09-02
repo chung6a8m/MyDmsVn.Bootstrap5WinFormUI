@@ -6,7 +6,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 
-internal sealed class BootstrapLookupDropDownController : IDisposable
+internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageFilter
 {
     private readonly BootstrapLookupBox _owner;
     private readonly BootstrapLookupDropDownContent _content;
@@ -17,6 +17,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
     private bool _disposed;
     private int _activationGeneration;
     private int _queuedWindowDeactivationGeneration = -1;
+    private bool _messageFilterInstalled;
 
     internal BootstrapLookupDropDownController(BootstrapLookupBox owner, BootstrapLookupDropDownContent content)
     {
@@ -34,7 +35,6 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
         ThrowIfDisposed();
         if (_owner.IsDisposed || !_owner.Enabled || !_owner.Visible || !_owner.IsHandleCreated) return;
         EnsureCreated();
-        _owner.ApplyCurrentResultsToContent();
         ApplyPresentation();
         if (_isOpen)
         {
@@ -45,6 +45,12 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
         _isOpen = true;
         _activationGeneration++;
         _dropDown!.ShowAt(ComputeBounds());
+        _owner.SynchronizeHighlightedResult();
+        if (!_messageFilterInstalled)
+        {
+            Application.AddMessageFilter(this);
+            _messageFilterInstalled = true;
+        }
         _tracker = new BootstrapOverlayAnchorTracker(_owner, Reposition, () => Close(false));
         _owner.FocusLookupEditor();
     }
@@ -68,6 +74,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
         if (_disposed) return;
         _disposed = true;
         _isOpen = false;
+        RemoveMessageFilter();
         _tracker?.Dispose();
         _tracker = null;
         _content.ResultsGrid.CellMouseClick -= OnResultCellMouseClick;
@@ -83,6 +90,15 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
         _dropDown?.Dispose();
         _dropDown = null;
         _surface = null;
+    }
+
+    public bool PreFilterMessage(ref Message m)
+    {
+        if (!_isOpen || !IsPointerDownMessage(m.Msg)) return false;
+        var target = Control.FromChildHandle(m.HWnd);
+        if (IsWithin(target, _owner) || IsWithin(target, _dropDown) || IsWithin(target, _surface) || IsWithin(target, _content)) return false;
+        Close(false);
+        return false;
     }
 
     private void EnsureCreated()
@@ -112,9 +128,8 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
         var requestedWidth = _owner.DropDownWidth == 0 ? _owner.Width : DpiScaler.Scale(_owner.DropDownWidth, dpi);
         var width = Math.Max(_owner.Width, requestedWidth);
         var maxHeight = DpiScaler.Scale(_owner.MaxDropDownHeight, dpi);
-        var preferred = _content.GetPreferredSize(new Size(width, maxHeight));
+        var preferred = _surface!.GetPreferredSize(new Size(width, maxHeight));
         var desiredHeight = Math.Min(maxHeight, Math.Max(DpiScaler.Scale(64, dpi), preferred.Height));
-        _content.Size = new Size(width, desiredHeight);
         var anchor = _owner.RectangleToScreen(_owner.ClientRectangle);
         var request = new BootstrapOverlayPlacementRequest(anchor, new Size(width, desiredHeight), Screen.FromControl(_owner).WorkingArea,
             BootstrapOverlayPlacement.BottomStart, BootstrapOverlayCollisionBehavior.FlipAndShift,
@@ -175,6 +190,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
         _activationGeneration++;
         _queuedWindowDeactivationGeneration = -1;
         _isOpen = false;
+        RemoveMessageFilter();
         _tracker?.Dispose();
         _tracker = null;
     }
@@ -183,4 +199,25 @@ internal sealed class BootstrapLookupDropDownController : IDisposable
     {
         if (_disposed) throw new ObjectDisposedException(nameof(BootstrapLookupDropDownController));
     }
+
+    private void RemoveMessageFilter()
+    {
+        if (!_messageFilterInstalled) return;
+        Application.RemoveMessageFilter(this);
+        _messageFilterInstalled = false;
+    }
+
+    private static bool IsWithin(Control? candidate, Control? ancestor)
+    {
+        while (candidate is not null)
+        {
+            if (ReferenceEquals(candidate, ancestor)) return true;
+            candidate = candidate.Parent;
+        }
+        return false;
+    }
+
+    private static bool IsPointerDownMessage(int message) => message == 0x0201 || message == 0x0204 ||
+        message == 0x0207 || message == 0x020B || message == 0x00A1 || message == 0x00A4 ||
+        message == 0x00A7 || message == 0x00AB || message == 0x0246;
 }
