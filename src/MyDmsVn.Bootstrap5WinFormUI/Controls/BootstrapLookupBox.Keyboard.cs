@@ -7,6 +7,35 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 public partial class BootstrapLookupBox
 {
     /// <inheritdoc />
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (!Enabled) return base.ProcessCmdKey(ref msg, keyData);
+        var key = keyData & Keys.KeyCode;
+        var modifiers = keyData & Keys.Modifiers;
+        if (key == Keys.Tab && (modifiers & (Keys.Alt | Keys.Control)) == Keys.None)
+            return ProcessDialogKey(keyData);
+        if (key == Keys.Escape)
+        {
+            CancelPendingEdit();
+            return true;
+        }
+        if (key == Keys.F4 || ((modifiers & Keys.Alt) == Keys.Alt && key == Keys.Down) || (!IsDropDownOpen && key == Keys.Down))
+        {
+            FlushPendingSearch();
+            OpenDropDown();
+            return true;
+        }
+        if (IsDropDownOpen && IsNavigationKey(key))
+        {
+            FlushPendingSearch();
+            NavigateResults(key);
+            return true;
+        }
+        if (key == Keys.Enter && HandleEnterKey()) return true;
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    /// <inheritdoc />
     protected override void OnEditorKeyDown(KeyEventArgs e)
     {
         if (e.Handled || !Enabled)
