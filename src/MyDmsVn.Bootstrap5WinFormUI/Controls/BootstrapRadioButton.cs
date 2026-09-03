@@ -74,8 +74,8 @@ public class BootstrapRadioButton : RadioButton
         if (UsesNativeFallback()) return base.GetPreferredSize(proposedSize);
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
         var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.RadioButton, BootstrapThemeManager.CurrentTheme.Metrics, dpi);
-        var textSize = string.IsNullOrEmpty(Text) ? Size.Empty : TextRenderer.MeasureText(Text, Font, Size.Empty, GetTextFlags() | TextFormatFlags.NoPadding);
-        return BootstrapCheckableRenderLogic.GetPreferredSize(textSize, Padding, metrics);
+        var textSize = string.IsNullOrEmpty(Text) ? Size.Empty : TextRenderer.MeasureText(Text, Font, Size.Empty, GetTextFlags());
+        return BootstrapCheckableRenderLogic.GetPreferredSize(textSize, Padding, metrics, CheckAlign);
     }
 
     /// <inheritdoc />
@@ -104,10 +104,12 @@ public class BootstrapRadioButton : RadioButton
                 e.Graphics.DrawEllipse(pen, rect);
                 if (Checked)
                 {
-                    var inset = Math.Max(3, indicator.Width / 4);
-                    var dot = Rectangle.Inflate(indicator, -inset, -inset);
-                    using var dotBrush = new SolidBrush(palette.Glyph);
-                    e.Graphics.FillEllipse(dotBrush, dot);
+                    var dot = BootstrapCheckableRenderLogic.GetRadioDotBounds(indicator);
+                    if (dot.Width > 0 && dot.Height > 0)
+                    {
+                        using var dotBrush = new SolidBrush(palette.Glyph);
+                        e.Graphics.FillEllipse(dotBrush, dot);
+                    }
                 }
                 if (Focused && ShowFocusCues)
                 {
@@ -174,7 +176,7 @@ public class BootstrapRadioButton : RadioButton
         return BootstrapCheckableRenderLogic.GetTextFormatFlags(TextAlign, UseMnemonic, ShowKeyboardCues, AutoEllipsis, RightToLeft == RightToLeft.Yes);
     }
 
-    private bool UsesNativeFallback() => BootstrapCheckableRenderLogic.ShouldUseNativeFallback(Appearance, Image is not null, ImageList is not null, ImageIndex, ImageKey);
+    private bool UsesNativeFallback() => BootstrapCheckableRenderLogic.ShouldUseNativeFallback(Appearance, FlatStyle, Image is not null, ImageList is not null, ImageIndex, ImageKey);
     private void ApplyPreferredSize() { if (AutoSize && !IsDisposed) { var size = GetPreferredSize(Size.Empty); if (Size != size) Size = size; } }
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e) { if (!IsDisposed) { if (_useThemeFont) ApplyThemeFont(); ApplyPreferredSize(); Invalidate(); } }
     private void ApplyThemeFont()
