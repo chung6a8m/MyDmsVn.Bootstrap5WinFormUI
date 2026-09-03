@@ -74,8 +74,8 @@ public class BootstrapSwitch : CheckBox
         if (UsesNativeFallback()) return base.GetPreferredSize(proposedSize);
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
         var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.Switch, BootstrapThemeManager.CurrentTheme.Metrics, dpi);
-        var textSize = string.IsNullOrEmpty(Text) ? Size.Empty : TextRenderer.MeasureText(Text, Font, Size.Empty, GetTextFlags() | TextFormatFlags.NoPadding);
-        return BootstrapCheckableRenderLogic.GetPreferredSize(textSize, Padding, metrics);
+        var textSize = string.IsNullOrEmpty(Text) ? Size.Empty : TextRenderer.MeasureText(Text, Font, Size.Empty, GetTextFlags());
+        return BootstrapCheckableRenderLogic.GetPreferredSize(textSize, Padding, metrics, CheckAlign);
     }
 
     /// <inheritdoc />
@@ -185,7 +185,7 @@ public class BootstrapSwitch : CheckBox
         return BootstrapCheckableRenderLogic.GetTextFormatFlags(TextAlign, UseMnemonic, ShowKeyboardCues, AutoEllipsis, RightToLeft == RightToLeft.Yes);
     }
 
-    private bool UsesNativeFallback() => BootstrapCheckableRenderLogic.ShouldUseNativeFallback(Appearance, Image is not null, ImageList is not null, ImageIndex, ImageKey);
+    private bool UsesNativeFallback() => BootstrapCheckableRenderLogic.ShouldUseNativeFallback(Appearance, FlatStyle, Image is not null, ImageList is not null, ImageIndex, ImageKey);
     private void ApplyPreferredSize() { if (AutoSize && !IsDisposed) { var size = GetPreferredSize(Size.Empty); if (Size != size) Size = size; } }
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e) { if (!IsDisposed) { if (_useThemeFont) ApplyThemeFont(); ApplyPreferredSize(); Invalidate(); } }
     private void ApplyThemeFont()
