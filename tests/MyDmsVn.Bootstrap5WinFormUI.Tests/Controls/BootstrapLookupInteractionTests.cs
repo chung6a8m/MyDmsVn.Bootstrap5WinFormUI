@@ -856,6 +856,85 @@ public sealed class BootstrapLookupInteractionTests
     }
 
     [Test]
+    public void CommitAndAddModalWorkflowCreatesAndMutatesSourceOnlyOnce()
+    {
+        var source = new BindingList<Product> { new Product(1, "Alpha") };
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = new TestLookup
+        {
+            DisplayMember = "Name", ValueMember = "Id", DataSource = source,
+            UnmatchedTextBehavior = BootstrapLookupUnmatchedTextBehavior.CommitAndAdd,
+            SearchDebounceMilliseconds = 0
+        };
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.Text = "Gamma";
+        var creates = 0;
+        lookup.CreateItemFromText += (_, e) =>
+        {
+            creates++;
+            if (creates == 1)
+            {
+                lookup.SendLeave();
+                using var dialog = new Form { ShowInTaskbar = false };
+                dialog.Shown += (_, _) => dialog.BeginInvoke((Action)dialog.Close);
+                dialog.ShowDialog(form);
+            }
+            e.Item = new Product(3, "Gamma");
+        };
+
+        var resolution = lookup.ResolvePendingText(BootstrapLookupCommitReason.Keyboard);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(resolution.NavigationAllowed, Is.True);
+            Assert.That(creates, Is.EqualTo(1));
+            Assert.That(source, Has.Count.EqualTo(2));
+            Assert.That(lookup.SelectedValue, Is.EqualTo(3));
+        }));
+    }
+
+    [Test]
+    public void RefreshModalWorkflowPreservesPendingStateDuringCallback()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.SelectValue(1);
+        lookup.Text = "Gamma";
+        string? observedText = null;
+        bool? observedPending = null;
+        object? observedValue = null;
+        lookup.RefreshRequested += (_, _) =>
+        {
+            lookup.SendLeave();
+            using var dialog = new Form { ShowInTaskbar = false };
+            dialog.Shown += (_, _) => dialog.BeginInvoke((Action)dialog.Close);
+            dialog.ShowDialog(form);
+            observedText = lookup.Text;
+            observedPending = lookup.HasPendingText;
+            observedValue = lookup.SelectedValue;
+        };
+
+        lookup.RefreshResults();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(observedText, Is.EqualTo("Gamma"));
+            Assert.That(observedPending, Is.True);
+            Assert.That(observedValue, Is.EqualTo(1));
+            Assert.That(lookup.Text, Is.EqualTo("Gamma"));
+            Assert.That(lookup.HasPendingText, Is.True);
+            Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
     public void ExplicitAddNewRecomputesActiveQueryAfterPlainListMutation()
     {
         var source = new System.Collections.Generic.List<Product> { new Product(1, "Alpha") };

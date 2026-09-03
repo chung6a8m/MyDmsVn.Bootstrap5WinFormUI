@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -171,6 +172,46 @@ public sealed class BootstrapLookupPopupTests
             Assert.That(refreshes, Is.EqualTo(1));
             Assert.That(lookup.Text, Is.EqualTo("cof"));
             Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void SameValuePresentationChangeRepositionsOpenAutosizedPopup()
+    {
+        var source = new BindingList<Product> { new(1, "A") };
+        using var host = new Form { Size = new Size(600, 400) };
+        using var lookup = new BootstrapLookupBox
+        {
+            Width = 180,
+            DropDownWidth = 180,
+            MaxDropDownHeight = 300,
+            DisplayMember = "Name",
+            ValueMember = "Id",
+            DataSource = source,
+            SearchDebounceMilliseconds = 0
+        };
+        lookup.Columns.Add(new BootstrapLookupColumnDefinition
+        {
+            DataPropertyName = "Name",
+            HeaderText = "Product",
+            AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+        });
+        host.Controls.Add(lookup);
+        host.Show();
+        lookup.OpenDropDown();
+        Application.DoEvents();
+        var content = (BootstrapLookupDropDownContent)lookup.ResultsGrid.Parent!;
+        var initialHeight = GetSurface(content).Height;
+
+        source[0] = new Product(1, new string('W', 80));
+        Application.DoEvents();
+
+        var horizontalScrollBar = lookup.ResultsGrid.Controls.OfType<HScrollBar>().Single();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(horizontalScrollBar.Visible, Is.True);
+            Assert.That(GetSurface(content).Height, Is.GreaterThan(initialHeight));
+            Assert.That(lookup.ResultsGrid.GetRowDisplayRectangle(0, false).Bottom, Is.LessThanOrEqualTo(horizontalScrollBar.Top));
         }));
     }
 

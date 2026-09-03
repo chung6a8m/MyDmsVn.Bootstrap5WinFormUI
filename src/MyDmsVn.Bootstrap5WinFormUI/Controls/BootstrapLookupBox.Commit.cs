@@ -67,53 +67,71 @@ public partial class BootstrapLookupBox
     private BootstrapLookupCommitResult CommitNewItem(string originalText, string normalizedText)
     {
         if (_dataAdapter is null || !_dataAdapter.CanAdd) return ApplyLookupValidation();
-        object? item = null;
-        if (CreateItemFromText is null && IsStringSource())
+        var workflowGeneration = BeginApplicationWorkflow();
+        if (_activeCreateWorkflowGeneration == workflowGeneration)
         {
-            item = originalText.Trim();
-        }
-        else
-        {
-            var args = new BootstrapLookupCreateItemFromTextEventArgs(originalText, normalizedText);
-            RaiseCreateItemFromText(args);
-            if (args.Cancel) return ApplyLookupValidation();
-            item = args.Item;
+            EndApplicationWorkflow();
+            return BootstrapLookupCommitResult.Success(false);
         }
 
-        if (item is null) return ApplyLookupValidation();
-        if (!HasRequiredMembers(item)) return ApplyLookupValidation();
-        object? value;
+        _activeCreateWorkflowGeneration = workflowGeneration;
         try
         {
-            value = BootstrapLookupMemberAccessor.GetValue(item, ValueMember);
-        }
-        catch (ArgumentException)
-        {
-            return ApplyLookupValidation();
-        }
-        if (value is null && ValueMember.Length > 0) return ApplyLookupValidation();
+            object? item = null;
+            if (CreateItemFromText is null && IsStringSource())
+            {
+                item = originalText.Trim();
+            }
+            else
+            {
+                var args = new BootstrapLookupCreateItemFromTextEventArgs(originalText, normalizedText);
+                RaiseCreateItemFromText(args);
+                if (!IsApplicationWorkflowCurrent(workflowGeneration)) return BootstrapLookupCommitResult.Success(false);
+                if (args.Cancel) return ApplyLookupValidation();
+                item = args.Item;
+            }
 
-        var sourceChangeGeneration = _sourceChangeGeneration;
-        _dataAdapter.Add(item);
-        if (!_dataAdapter.TryFindByItem(item, out var accepted) || accepted is null)
-            return ApplyLookupValidation();
-        if (accepted.Value is null && ValueMember.Length > 0) return ApplyLookupValidation();
-        CommitSelection(accepted.Item, accepted.Value, accepted.DisplayText, BootstrapLookupCommitReason.CommitAndAdd);
-        if (sourceChangeGeneration == _sourceChangeGeneration) ExecuteSearchNow();
-        return BootstrapLookupCommitResult.Success();
+            if (item is null) return ApplyLookupValidation();
+            if (!HasRequiredMembers(item)) return ApplyLookupValidation();
+            object? value;
+            try
+            {
+                value = BootstrapLookupMemberAccessor.GetValue(item, ValueMember);
+            }
+            catch (ArgumentException)
+            {
+                return ApplyLookupValidation();
+            }
+            if (value is null && ValueMember.Length > 0) return ApplyLookupValidation();
+
+            var sourceChangeGeneration = _sourceChangeGeneration;
+            _dataAdapter.Add(item);
+            if (!IsApplicationWorkflowCurrent(workflowGeneration)) return BootstrapLookupCommitResult.Success(false);
+            if (!_dataAdapter.TryFindByItem(item, out var accepted) || accepted is null)
+                return ApplyLookupValidation();
+            if (accepted.Value is null && ValueMember.Length > 0) return ApplyLookupValidation();
+            CommitSelection(accepted.Item, accepted.Value, accepted.DisplayText, BootstrapLookupCommitReason.CommitAndAdd);
+            if (!IsApplicationWorkflowCurrent(workflowGeneration)) return BootstrapLookupCommitResult.Success(false);
+            if (sourceChangeGeneration == _sourceChangeGeneration) ExecuteSearchNow();
+            return BootstrapLookupCommitResult.Success();
+        }
+        finally
+        {
+            if (_activeCreateWorkflowGeneration == workflowGeneration) _activeCreateWorkflowGeneration = -1;
+            EndApplicationWorkflow();
+        }
     }
 
     private bool HasRequiredMembers(object item)
     {
         try
         {
-            var itemType = item.GetType();
-            BootstrapLookupMemberAccessor.Validate(itemType, DisplayMember);
-            BootstrapLookupMemberAccessor.Validate(itemType, ValueMember);
+            BootstrapLookupMemberAccessor.Validate(item, DisplayMember);
+            BootstrapLookupMemberAccessor.Validate(item, ValueMember);
             foreach (var member in SearchMembers)
-                BootstrapLookupMemberAccessor.Validate(itemType, member);
+                BootstrapLookupMemberAccessor.Validate(item, member);
             foreach (var column in Columns)
-                BootstrapLookupMemberAccessor.Validate(itemType, column.DataPropertyName);
+                BootstrapLookupMemberAccessor.Validate(item, column.DataPropertyName);
             return true;
         }
         catch (ArgumentException)

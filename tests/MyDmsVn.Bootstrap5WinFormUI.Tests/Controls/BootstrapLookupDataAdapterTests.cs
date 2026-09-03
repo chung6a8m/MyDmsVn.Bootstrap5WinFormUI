@@ -2,8 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data;
 using System.Linq;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using NUnit.Framework;
 
@@ -128,6 +130,41 @@ public sealed class BootstrapLookupDataAdapterTests
         source.DataSource = new BindingList<string>();
 
         Assert.That(adapter.IsStringItemSource, Is.True);
+    }
+
+    [Test]
+    public void DataTableDynamicDescriptorsSupportSearchSelectionAndColumnFormatting()
+    {
+        var table = new DataTable();
+        table.Columns.Add("Id", typeof(int));
+        table.Columns.Add("Name", typeof(string));
+        table.Rows.Add(1, "Alpha");
+        table.Rows.Add(2, "Beta");
+        BootstrapLookupBox? lookup = null;
+        Assert.DoesNotThrow((Action)(() => lookup = new BootstrapLookupBox
+        {
+            DisplayMember = "Name",
+            ValueMember = "Id",
+            DataSource = table,
+            SearchDebounceMilliseconds = 0
+        }));
+        using (lookup!)
+        {
+            lookup!.Text = "Bet";
+            lookup.ExecuteSearchNow();
+            Assert.That(lookup.ResultsGrid.Rows, Has.Count.EqualTo(1));
+            Assert.That(lookup.ResultsGrid.Rows[0].Cells[0].Value, Is.EqualTo("Beta"));
+            Assert.That(lookup.SelectValue(2), Is.True);
+            Assert.That(lookup.Text, Is.EqualTo("Beta"));
+        }
+
+        using var column = new BootstrapLookupColumn
+        {
+            DisplayMember = "Name",
+            ValueMember = "Id",
+            DataSource = table
+        };
+        Assert.That(column.ResolveDisplayText(2), Is.EqualTo("Beta"));
     }
 
     private sealed class Product

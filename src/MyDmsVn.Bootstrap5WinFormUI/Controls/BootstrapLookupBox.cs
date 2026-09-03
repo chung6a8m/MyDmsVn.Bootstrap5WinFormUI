@@ -18,6 +18,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     private readonly BootstrapLookupDropDownController _dropDownController;
     private readonly BootstrapUiDebouncer _searchDebouncer;
     private bool _synchronizingText;
+    private string _synchronizingTextTarget = string.Empty;
     private object? _selectedItem;
     private object? _selectedValue;
     private string _committedDisplayText = string.Empty;
@@ -41,6 +42,8 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     private BootstrapLookupClosedEnterKeyBehavior _closedEnterKeyBehavior;
     private int _leaveResolutionGeneration;
     private int _suspendedLeaveResolutionCount;
+    private int _applicationWorkflowGeneration;
+    private int _activeCreateWorkflowGeneration = -1;
     private int _highlightGeneration;
     private int _resultSynchronizationGeneration;
 
@@ -216,11 +219,20 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     /// <inheritdoc />
     protected override void OnEditorTextChanged(EventArgs e)
     {
+        var publishedText = Text;
+        var isFrameworkSynchronization = _synchronizingText &&
+            string.Equals(publishedText, _synchronizingTextTarget, StringComparison.Ordinal);
+        UpdateTextDerivedState(!isFrameworkSynchronization);
         base.OnEditorTextChanged(e);
-        if (_synchronizingText) return;
+        if (!string.Equals(Text, publishedText, StringComparison.Ordinal))
+            UpdateTextDerivedState(true);
+    }
+
+    private void UpdateTextDerivedState(bool scheduleSearch)
+    {
         _hasPendingText = !string.Equals(Text, _committedDisplayText, StringComparison.Ordinal);
         ClearLookupValidation();
-        ScheduleSearchForEditorText();
+        if (scheduleSearch) ScheduleSearchForEditorText();
     }
 
     /// <inheritdoc />
@@ -315,8 +327,13 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         if (string.Equals(Text, normalizedValue, StringComparison.Ordinal)) return;
 
         _synchronizingText = true;
+        _synchronizingTextTarget = normalizedValue;
         try { Text = normalizedValue; }
-        finally { _synchronizingText = false; }
+        finally
+        {
+            _synchronizingText = false;
+            _synchronizingTextTarget = string.Empty;
+        }
         _projectionDirty = true;
     }
 
@@ -366,6 +383,28 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         if (!resolution.NavigationAllowed) OpenDropDown();
         else CloseDropDown();
     }
+
+    internal void InvalidateApplicationWorkflows()
+    {
+        _applicationWorkflowGeneration++;
+        _leaveResolutionGeneration++;
+    }
+
+    private int BeginApplicationWorkflow()
+    {
+        _suspendedLeaveResolutionCount++;
+        _leaveResolutionGeneration++;
+        return _applicationWorkflowGeneration;
+    }
+
+    private void EndApplicationWorkflow()
+    {
+        _suspendedLeaveResolutionCount--;
+        _leaveResolutionGeneration++;
+    }
+
+    private bool IsApplicationWorkflowCurrent(int generation) =>
+        generation == _applicationWorkflowGeneration && !IsDisposed && !Disposing;
 
     private static bool ApplicationHasFocus()
     {

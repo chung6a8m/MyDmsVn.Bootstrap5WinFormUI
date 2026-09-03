@@ -36,9 +36,9 @@ public partial class BootstrapLookupBox
         CaptureSearchConfiguration();
         PreserveOrChooseHighlight(next.Items);
         ApplyCurrentResultsToContent();
+        if (IsDropDownOpen) _dropDownController.Reposition();
         if (changed)
         {
-            if (IsDropDownOpen) _dropDownController.Reposition();
             RaiseResultsChanged();
         }
     }

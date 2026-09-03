@@ -12,6 +12,7 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
     private object? _editingValue;
     private int _originatingRowIndex;
     private int _originatingColumnIndex;
+    private int _configurationGeneration;
 
     public BootstrapLookupEditingControl()
     {
@@ -30,6 +31,8 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
 
     internal void Configure(BootstrapLookupColumn column, int rowIndex, int columnIndex, object? rawValue, object? initialFormattedValue)
     {
+        _configurationGeneration++;
+        InvalidateApplicationWorkflows();
         CancelPendingEdit();
         DataSource = null;
         _column = null;
@@ -176,27 +179,38 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
     private void OnLookupRefreshRequested(object? sender, BootstrapLookupRefreshRequestedEventArgs e)
     {
         if (_configuring || _column is null) return;
+        var generation = _configurationGeneration;
+        var column = _column;
         var args = Context(); args.QueryText = e.QueryText;
-        _column.RaiseRefreshRequested(args);
-        SynchronizeColumnDataSource();
-        _column.RefreshDisplayIndex();
+        column.RaiseRefreshRequested(args);
+        if (generation != _configurationGeneration) return;
+        SynchronizeColumnDataSource(column);
+        if (generation != _configurationGeneration) return;
+        column.RefreshDisplayIndex();
     }
 
     private void OnLookupAddNewRequested(object? sender, BootstrapLookupAddNewRequestedEventArgs e)
     {
         if (_configuring || _column is null) return;
+        var generation = _configurationGeneration;
+        var column = _column;
         var args = Context(); args.QueryText = e.QueryText;
-        _column.RaiseAddNewRequested(args);
-        SynchronizeColumnDataSource();
-        _column.RefreshDisplayIndex();
+        column.RaiseAddNewRequested(args);
+        if (generation != _configurationGeneration) return;
+        SynchronizeColumnDataSource(column);
+        if (generation != _configurationGeneration) return;
+        column.RefreshDisplayIndex();
         e.NewItem = args.NewItem; e.Cancel = args.Cancel;
     }
 
     private void OnLookupCreateItemFromText(object? sender, BootstrapLookupCreateItemFromTextEventArgs e)
     {
         if (_configuring || _column is null) return;
+        var generation = _configurationGeneration;
+        var column = _column;
         var args = Context(); args.OriginalText = e.OriginalText; args.NormalizedText = e.NormalizedText;
-        _column.RaiseCreateItemFromText(args);
+        column.RaiseCreateItemFromText(args);
+        if (generation != _configurationGeneration) return;
         e.Item = args.Item; e.Cancel = args.Cancel;
     }
 
@@ -206,9 +220,8 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
         return new BootstrapLookupCellEventArgs(grid, _originatingRowIndex, _originatingColumnIndex);
     }
 
-    private void SynchronizeColumnDataSource()
+    private void SynchronizeColumnDataSource(BootstrapLookupColumn column)
     {
-        if (_column is not null && !ReferenceEquals(DataSource, _column.DataSource))
-            DataSource = _column.DataSource;
+        if (!ReferenceEquals(DataSource, column.DataSource)) DataSource = column.DataSource;
     }
 }

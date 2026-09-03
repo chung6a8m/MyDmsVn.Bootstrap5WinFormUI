@@ -385,6 +385,53 @@ public sealed class BootstrapLookupDataGridViewTests
         Application.DoEvents();
     }
 
+    [Test]
+    public void ReconfiguredEditorAbortsStaleCommitAndAddContinuationFromPreviousColumn()
+    {
+        var sourceA = new BindingList<Product> { new Product(1, "Alpha") };
+        var sourceB = new BindingList<Product> { new Product(2, "Beta") };
+        var columnA = CreateColumn(sourceA); columnA.DataPropertyName = nameof(Row.ProductA);
+        var columnB = CreateColumn(sourceB); columnB.DataPropertyName = nameof(Row.ProductB);
+        var row = new Row { ProductA = 1, ProductB = 2 };
+        using var form = new Form { ShowInTaskbar = false };
+        using var grid = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            AutoGenerateColumns = false,
+            DataSource = new BindingList<Row> { row }
+        };
+        grid.Columns.Add(columnA);
+        grid.Columns.Add(columnB);
+        form.Controls.Add(grid);
+        form.Show();
+        Application.DoEvents();
+        BeginEdit(grid, 0);
+        var editorA = (BootstrapLookupBox)grid.EditingControl!;
+        editorA.UnmatchedTextBehavior = BootstrapLookupUnmatchedTextBehavior.CommitAndAdd;
+        editorA.Text = "Gamma";
+        columnA.CreateItemFromText += (_, e) =>
+        {
+            Assert.That(grid.EndEdit(), Is.True);
+            BeginEdit(grid, 1);
+            e.Item = new Product(3, "Gamma");
+        };
+
+        editorA.ResolvePendingText(BootstrapLookupCommitReason.Keyboard);
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(grid.EditingControl, Is.SameAs(editorA));
+            Assert.That(sourceA, Has.Count.EqualTo(1));
+            Assert.That(sourceB, Has.Count.EqualTo(1));
+            Assert.That(row.ProductB, Is.EqualTo(2));
+            Assert.That(((BootstrapLookupBox)grid.EditingControl!).SelectedValue, Is.EqualTo(2));
+        }));
+        grid.CancelEdit();
+        form.Close();
+        Application.DoEvents();
+    }
+
     private static BootstrapLookupColumn CreateColumn(object source) => new BootstrapLookupColumn
     {
         DataSource = source, DisplayMember = "Name", ValueMember = "Id", DataPropertyName = "ProductId"

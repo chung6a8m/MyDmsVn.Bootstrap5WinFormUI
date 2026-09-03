@@ -12,6 +12,7 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
     private readonly string _displayMember;
     private readonly string _valueMember;
     private Type? _itemType;
+    private PropertyDescriptorCollection? _itemProperties;
     private readonly BindingSource? _bindingSource;
     private readonly IBindingList? _bindingList;
     private List<BootstrapLookupSourceItem> _snapshot = new List<BootstrapLookupSourceItem>();
@@ -23,7 +24,8 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
         _displayMember = displayMember ?? string.Empty;
         _valueMember = valueMember ?? string.Empty;
         _itemType = GetKnownItemType(dataSource);
-        ValidateKnownItemType(_itemType, _displayMember, _valueMember);
+        _itemProperties = GetKnownItemProperties(dataSource);
+        ValidateKnownMetadata(_itemProperties, _itemType, _displayMember, _valueMember);
         _bindingSource = dataSource as BindingSource;
         if (_bindingSource != null)
         {
@@ -54,6 +56,12 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
     internal void ValidateMember(string member)
     {
         ThrowIfDisposed();
+        if (_itemProperties != null && _itemProperties.Count > 0)
+        {
+            BootstrapLookupMemberAccessor.Validate(_itemProperties, member);
+            return;
+        }
+
         if (_itemType is not null)
         {
             BootstrapLookupMemberAccessor.Validate(_itemType, member);
@@ -64,7 +72,14 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
         foreach (var sourceItem in _snapshot)
         {
             var itemType = sourceItem.Item.GetType();
-            if (validatedTypes.Add(itemType)) BootstrapLookupMemberAccessor.Validate(itemType, member);
+            if (sourceItem.Item is ICustomTypeDescriptor)
+            {
+                BootstrapLookupMemberAccessor.Validate(sourceItem.Item, member);
+            }
+            else if (validatedTypes.Add(itemType))
+            {
+                BootstrapLookupMemberAccessor.Validate(itemType, member);
+            }
         }
     }
 
@@ -81,7 +96,8 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
     {
         ThrowIfDisposed();
         var itemType = GetKnownItemType(_dataSource);
-        ValidateKnownItemType(itemType, _displayMember, _valueMember);
+        var itemProperties = GetKnownItemProperties(_dataSource);
+        ValidateKnownMetadata(itemProperties, itemType, _displayMember, _valueMember);
         var result = new List<BootstrapLookupSourceItem>();
         var enumerable = ResolveEnumerable(_dataSource);
         if (enumerable != null)
@@ -90,8 +106,8 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
             foreach (var item in enumerable)
             {
                 if (item is null) continue;
-                BootstrapLookupMemberAccessor.Validate(item.GetType(), _displayMember);
-                BootstrapLookupMemberAccessor.Validate(item.GetType(), _valueMember);
+                BootstrapLookupMemberAccessor.Validate(item, _displayMember);
+                BootstrapLookupMemberAccessor.Validate(item, _valueMember);
                 var display = BootstrapLookupMemberAccessor.GetValue(item, _displayMember)?.ToString() ?? string.Empty;
                 var value = BootstrapLookupMemberAccessor.GetValue(item, _valueMember);
                 result.Add(new BootstrapLookupSourceItem(item, value, display, index++));
@@ -100,6 +116,7 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
 
         _snapshot = result;
         _itemType = itemType;
+        _itemProperties = itemProperties;
     }
 
     internal bool TryFindByValue(object? value, out BootstrapLookupSourceItem? sourceItem)
@@ -194,8 +211,21 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
         return itemType == typeof(object) ? null : itemType;
     }
 
-    private static void ValidateKnownItemType(Type? itemType, string displayMember, string valueMember)
+    private static PropertyDescriptorCollection? GetKnownItemProperties(object? source)
     {
+        if (source is null) return null;
+        return ListBindingHelper.GetListItemProperties(ResolveList(source) ?? source);
+    }
+
+    private static void ValidateKnownMetadata(PropertyDescriptorCollection? properties, Type? itemType, string displayMember, string valueMember)
+    {
+        if (properties != null && properties.Count > 0)
+        {
+            BootstrapLookupMemberAccessor.Validate(properties, displayMember);
+            BootstrapLookupMemberAccessor.Validate(properties, valueMember);
+            return;
+        }
+
         if (itemType is null) return;
         BootstrapLookupMemberAccessor.Validate(itemType, displayMember);
         BootstrapLookupMemberAccessor.Validate(itemType, valueMember);

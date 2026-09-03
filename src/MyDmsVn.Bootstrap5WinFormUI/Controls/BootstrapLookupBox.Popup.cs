@@ -26,7 +26,16 @@ public partial class BootstrapLookupBox
     /// <summary>Raises RefreshRequested, reconciles the source, and reapplies the active query.</summary>
     public void RefreshResults()
     {
-        RaiseRefreshRequested(new BootstrapLookupRefreshRequestedEventArgs(Text));
+        var workflowGeneration = BeginApplicationWorkflow();
+        try
+        {
+            RaiseRefreshRequested(new BootstrapLookupRefreshRequestedEventArgs(Text));
+        }
+        finally
+        {
+            EndApplicationWorkflow();
+        }
+        if (!IsApplicationWorkflowCurrent(workflowGeneration)) return;
         _dataAdapter?.Refresh();
         ReconcileCommittedSelection();
         ExecuteSearchNow();
@@ -126,8 +135,7 @@ public partial class BootstrapLookupBox
     {
         if (!Enabled || ReadOnly) return;
         var args = new BootstrapLookupAddNewRequestedEventArgs(Text);
-        _suspendedLeaveResolutionCount++;
-        _leaveResolutionGeneration++;
+        var workflowGeneration = BeginApplicationWorkflow();
         try
         {
             CloseDropDown();
@@ -135,9 +143,9 @@ public partial class BootstrapLookupBox
         }
         finally
         {
-            _suspendedLeaveResolutionCount--;
-            _leaveResolutionGeneration++;
+            EndApplicationWorkflow();
         }
+        if (!IsApplicationWorkflowCurrent(workflowGeneration)) return;
         if (args.Cancel || args.NewItem is null) return;
         object? value;
         string display;
@@ -152,6 +160,7 @@ public partial class BootstrapLookupBox
         }
         if (value is null && ValueMember.Length > 0) return;
         CommitSelection(args.NewItem, value, display, BootstrapLookupCommitReason.Programmatic);
+        if (!IsApplicationWorkflowCurrent(workflowGeneration)) return;
         _dataAdapter?.Refresh();
         ExecuteSearchNow();
     }

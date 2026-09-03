@@ -13,12 +13,39 @@ internal static class BootstrapLookupMemberAccessor
     {
         if (item is null) throw new ArgumentNullException(nameof(item));
         if (string.IsNullOrEmpty(memberName)) return item;
-        return GetDescriptor(item.GetType(), memberName).GetValue(item);
+        return GetDescriptor(item, memberName).GetValue(item);
     }
 
     internal static void Validate(Type itemType, string memberName)
     {
         if (!string.IsNullOrEmpty(memberName)) GetDescriptor(itemType, memberName);
+    }
+
+    internal static void Validate(object item, string memberName)
+    {
+        if (item is null) throw new ArgumentNullException(nameof(item));
+        if (!string.IsNullOrEmpty(memberName)) GetDescriptor(item, memberName);
+    }
+
+    internal static void Validate(PropertyDescriptorCollection properties, string memberName)
+    {
+        if (properties is null) throw new ArgumentNullException(nameof(properties));
+        if (string.IsNullOrEmpty(memberName)) return;
+        if (properties.Find(memberName, false) is null)
+        {
+            throw new ArgumentException($"Member '{memberName}' was not found in the list metadata.", nameof(memberName));
+        }
+    }
+
+    private static PropertyDescriptor GetDescriptor(object item, string memberName)
+    {
+        if (item is ICustomTypeDescriptor)
+        {
+            return TypeDescriptor.GetProperties(item).Find(memberName, false)
+                ?? throw new ArgumentException($"Member '{memberName}' was not found on '{item.GetType().FullName}'.", nameof(memberName));
+        }
+
+        return GetDescriptor(item.GetType(), memberName);
     }
 
     private static PropertyDescriptor GetDescriptor(Type itemType, string memberName)

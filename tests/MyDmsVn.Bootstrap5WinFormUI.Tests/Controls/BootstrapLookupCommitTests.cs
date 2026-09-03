@@ -316,6 +316,47 @@ public sealed class BootstrapLookupCommitTests
     }
 
     [Test]
+    public void UserTextChangedObservesPendingStateBeforeNotification()
+    {
+        using var lookup = Create(new BindingList<Product> { new(1, "Alpha") });
+        lookup.SelectValue(1);
+        var observedPending = false;
+        lookup.TextChanged += (_, _) => observedPending = lookup.HasPendingText;
+
+        lookup.Text = "manual";
+
+        Assert.That(observedPending, Is.True);
+    }
+
+    [Test]
+    public void TextChangedRewriteDuringCommitRemainsPendingAndUsesUnmatchedResolver()
+    {
+        using var lookup = Create(new BindingList<Product> { new(1, "Alpha"), new(2, "Beta") });
+        lookup.SelectValue(1);
+        lookup.Text = "be";
+        lookup.UnmatchedTextBehavior = BootstrapLookupUnmatchedTextBehavior.KeepFocusWithValidationError;
+        var rewritten = false;
+        lookup.TextChanged += (_, _) =>
+        {
+            if (rewritten || lookup.Text != "Beta") return;
+            rewritten = true;
+            lookup.Text = "manual";
+        };
+
+        lookup.SelectValue(2);
+        var resolution = lookup.ResolvePendingText(BootstrapLookupCommitReason.Keyboard);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.SelectedValue, Is.EqualTo(2));
+            Assert.That(lookup.Text, Is.EqualTo("manual"));
+            Assert.That(lookup.HasPendingText, Is.True);
+            Assert.That(resolution.NavigationAllowed, Is.False);
+            Assert.That(lookup.ValidationMessage, Is.Not.Empty);
+        }));
+    }
+
+    [Test]
     public void CommitAndAddRejectsIncompatibleItemBeforeMutatingHeterogeneousSource()
     {
         var source = new ArrayList { new SearchableProduct(1, "Alpha", "A") };
