@@ -136,7 +136,21 @@ public sealed class BootstrapRadioButtonTests
     }
 
     [Test]
-    public void CheckedTinyBoundsNeverProduceInvalidDotGeometry()
+    public void TinyRadioDotGeometryIsClampedBeforePainting()
+    {
+        var method = typeof(BootstrapCheckableRenderLogic).GetMethod("GetRadioDotBounds", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null, "Radio dot geometry should be resolved by shared render logic so tiny bounds can be clamped before Graphics receives them.");
+
+        var dot = (Rectangle)method!.Invoke(null, new object[] { new Rectangle(0, 0, 1, 1) })!;
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(dot.Width, Is.GreaterThanOrEqualTo(0));
+            Assert.That(dot.Height, Is.GreaterThanOrEqualTo(0));
+        }));
+    }
+
+    [Test]
+    public void CheckedTinyBoundsNeverThrow()
     {
         using var control = new BootstrapRadioButton { AutoSize = false, Checked = true, Size = new Size(1, 1) };
         Assert.DoesNotThrow((Action)(() => Draw(control)));
