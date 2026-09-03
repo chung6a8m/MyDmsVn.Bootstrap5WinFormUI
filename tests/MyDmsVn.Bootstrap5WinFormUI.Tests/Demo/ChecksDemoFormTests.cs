@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -45,6 +46,19 @@ public sealed class ChecksDemoFormTests
             Assert.That(Find<Control>(form).Any(control => control.RightToLeft == RightToLeft.Yes), Is.True);
             Assert.That(Find<Label>(form).Any(label => label.AccessibleName == "Checkable event counters"), Is.True);
         }));
+    }
+
+    [Test]
+    public void DemoReleasesItsOwnedSectionFontOnDispose()
+    {
+        var form = new ChecksDemoForm();
+        var sectionFont = Find<Label>(form).First(label => label.Text == "CheckBox states").Font;
+
+        form.Dispose();
+
+        using var bitmap = new Bitmap(24, 24);
+        using var graphics = Graphics.FromImage(bitmap);
+        Assert.Catch((Action)(() => graphics.MeasureString("x", sectionFont)));
     }
 
     private static IEnumerable<T> Find<T>(Control root) where T : Control

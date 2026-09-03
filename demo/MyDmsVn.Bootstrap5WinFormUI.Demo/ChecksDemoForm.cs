@@ -11,6 +11,7 @@ public sealed class ChecksDemoForm : Form
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
     private readonly Label _eventStatus = new Label();
     private readonly Bitmap _fallbackImage = new Bitmap(12, 12);
+    private readonly Font _sectionFont = new Font(FontFamily.GenericSansSerif, 9f, FontStyle.Bold);
     private int _checkedEvents;
     private int _stateEvents;
 
@@ -35,6 +36,7 @@ public sealed class ChecksDemoForm : Form
         {
             BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
             _fallbackImage.Dispose();
+            _sectionFont.Dispose();
         }
         base.Dispose(disposing);
     }
@@ -124,7 +126,7 @@ public sealed class ChecksDemoForm : Form
         parent.Controls.Add(control);
     }
 
-    private static FlowLayoutPanel CreateRow(string title)
+    private FlowLayoutPanel CreateRow(string title)
     {
         var panel = new FlowLayoutPanel
         {
@@ -136,7 +138,7 @@ public sealed class ChecksDemoForm : Form
             Padding = new Padding(8),
             Margin = new Padding(0, 0, 0, 12)
         };
-        panel.Controls.Add(new Label { Text = title, AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 9f, FontStyle.Bold), Margin = new Padding(0, 4, 16, 6) });
+        panel.Controls.Add(new Label { Text = title, AutoSize = true, Font = _sectionFont, Margin = new Padding(0, 4, 16, 6) });
         return panel;
     }
 
