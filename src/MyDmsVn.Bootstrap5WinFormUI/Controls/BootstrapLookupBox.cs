@@ -22,6 +22,8 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     private object? _selectedValue;
     private string _committedDisplayText = string.Empty;
     private object? _highlightedItem;
+    private object? _highlightedValue;
+    private bool _hasHighlightedItem;
     private bool _hasPendingText;
     private string _validationMessage = string.Empty;
     private Func<string, string> _searchTextNormalizer = BootstrapLookupTextNormalization.NormalizeSearchText;
@@ -262,13 +264,25 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         base.Dispose(disposing);
     }
 
-    internal void SetHighlightedItem(object? item)
+    internal void SetHighlightedSourceItem(BootstrapLookupSourceItem? sourceItem)
     {
-        if (ReferenceEquals(_highlightedItem, item) || Equals(_highlightedItem, item)) return;
+        SetHighlightedItem(sourceItem?.Item, sourceItem?.Value, sourceItem is not null);
+    }
+
+    internal void SetHighlightedItem(object? item, object? value, bool hasItem)
+    {
+        var logicalIdentityChanged = _hasHighlightedItem != hasItem ||
+            (hasItem && !EqualityComparer<object?>.Default.Equals(_highlightedValue, value));
         var previous = _highlightedItem;
         _highlightedItem = item;
-        HighlightedItemChanged?.Invoke(this, new BootstrapLookupHighlightedItemChangedEventArgs(previous, item));
+        _highlightedValue = value;
+        _hasHighlightedItem = hasItem;
+        if (logicalIdentityChanged)
+            HighlightedItemChanged?.Invoke(this, new BootstrapLookupHighlightedItemChangedEventArgs(previous, item));
     }
+
+    internal bool IsHighlightedSourceItem(BootstrapLookupSourceItem sourceItem) => _hasHighlightedItem &&
+        EqualityComparer<object?>.Default.Equals(_highlightedValue, sourceItem.Value);
 
     internal void SetLookupValidation(string message)
     {
@@ -291,7 +305,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         _synchronizingText = true;
         try { Text = normalizedValue; }
         finally { _synchronizingText = false; }
-        _searchPending = true;
+        _projectionDirty = true;
     }
 
     internal void RaiseResultsChanged() => ResultsChanged?.Invoke(this, EventArgs.Empty);
@@ -333,7 +347,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
 
     private void ResolveDeferredLeave(int generation)
     {
-        if (generation != _leaveResolutionGeneration || IsDisposed || Disposing || ContainsFocus) return;
+        if (generation != _leaveResolutionGeneration || IsDisposed || Disposing || ContainsFocus || !Enabled || ReadOnly) return;
         if (_dropDownController.ContainsFocus || !ApplicationHasFocus()) return;
         var resolution = ResolvePendingText(BootstrapLookupCommitReason.ExactMatch);
         if (!resolution.NavigationAllowed) OpenDropDown();

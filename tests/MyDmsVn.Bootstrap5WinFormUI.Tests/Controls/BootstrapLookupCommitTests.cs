@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using NUnit.Framework;
@@ -117,6 +118,91 @@ public sealed class BootstrapLookupCommitTests
         objectLookup.Text = "Tea";
         Assert.That(objectLookup.ResolvePendingText(BootstrapLookupCommitReason.Keyboard).NavigationAllowed, Is.False);
         Assert.That(objectLookup.SelectedValue, Is.Null);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void CommitAndAddInfersEmptyStringItemSource(bool useBindingSource)
+    {
+        var strings = useBindingSource ? null : new List<string>();
+        var bindingList = useBindingSource ? new BindingList<string>() : null;
+        using var bindingSource = useBindingSource ? new BindingSource { DataSource = bindingList } : null;
+        using var lookup = new BootstrapLookupBox
+        {
+            DataSource = (object?)bindingSource ?? strings!,
+            UnmatchedTextBehavior = BootstrapLookupUnmatchedTextBehavior.CommitAndAdd,
+            Text = "Tea"
+        };
+
+        var result = lookup.ResolvePendingText(BootstrapLookupCommitReason.Keyboard);
+        IEnumerable<string> actualSource = useBindingSource ? bindingList! : strings!;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(result.NavigationAllowed, Is.True);
+            Assert.That(lookup.SelectedValue, Is.EqualTo("Tea"));
+            Assert.That(actualSource, Does.Contain("Tea"));
+        }));
+    }
+
+    [Test]
+    public void NestedSelectionChangeSuppressesStaleOuterCommitNotification()
+    {
+        using var lookup = Create(new BindingList<Product>
+        {
+            new(1, "Coffee"), new(2, "Tea")
+        });
+        var redirected = false;
+        var observedValues = new List<object?>();
+        lookup.SelectedValueChanged += (_, _) =>
+        {
+            if (redirected) return;
+            redirected = true;
+            lookup.SelectedValue = 2;
+        };
+        lookup.SelectionCommitted += (_, e) =>
+        {
+            Assert.That(e.Value, Is.EqualTo(lookup.SelectedValue));
+            Assert.That(e.Item, Is.SameAs(lookup.SelectedItem));
+            Assert.That(e.DisplayText, Is.EqualTo(lookup.CommittedDisplayText));
+            observedValues.Add(e.Value);
+        };
+
+        lookup.SelectedValue = 1;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.SelectedValue, Is.EqualTo(2));
+            Assert.That(observedValues, Is.EqualTo(new object?[] { 2 }));
+        }));
+    }
+
+    [Test]
+    public void HighlightNotificationDuringCommitObservesConsistentCommittedState()
+    {
+        using var lookup = Create(new BindingList<Product>
+        {
+            new(1, "Coffee"), new(2, "Tea")
+        });
+        lookup.SelectValue(1);
+        lookup.UnmatchedTextBehavior = BootstrapLookupUnmatchedTextBehavior.KeepFocusWithValidationError;
+        lookup.Text = "invalid";
+        lookup.ResolvePendingText(BootstrapLookupCommitReason.Keyboard);
+        var observations = 0;
+        lookup.HighlightedItemChanged += (_, e) =>
+        {
+            observations++;
+            Assert.That(e.NewItem, Is.SameAs(lookup.SelectedItem));
+            Assert.That(lookup.SelectedValue, Is.EqualTo(2));
+            Assert.That(lookup.CommittedDisplayText, Is.EqualTo("Tea"));
+            Assert.That(lookup.Text, Is.EqualTo("Tea"));
+            Assert.That(lookup.HasPendingText, Is.False);
+            Assert.That(lookup.ValidationMessage, Is.Empty);
+        };
+
+        lookup.SelectValue(2);
+
+        Assert.That(observations, Is.EqualTo(1));
     }
 
     private static BootstrapLookupBox Create(object source) => new BootstrapLookupBox { DisplayMember = "Name", ValueMember = "Id", DataSource = source };

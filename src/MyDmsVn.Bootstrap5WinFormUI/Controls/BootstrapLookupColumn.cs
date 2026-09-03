@@ -100,6 +100,18 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
         return value is not null && _displayByValue.TryGetValue(value, out var display) ? display : string.Empty;
     }
 
+    internal void RefreshDisplayIndex()
+    {
+        if (_formatAdapter is null)
+        {
+            ReplaceFormatAdapter(_dataSource, _displayMember, _valueMember);
+            return;
+        }
+        _formatAdapter.Refresh();
+        _displayByValue = BuildDisplayIndex(_formatAdapter);
+        InvalidateOwningColumn();
+    }
+
     private void CopyConfigurationFrom(BootstrapLookupColumn source)
     {
         _lookupColumns.Clear();

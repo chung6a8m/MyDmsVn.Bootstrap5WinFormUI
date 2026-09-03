@@ -96,6 +96,37 @@ public sealed class BootstrapLookupPopupTests
     }
 
     [Test]
+    public void OpenPopupScalesLogicalFixedColumnDimensionsWhenDpiChanges()
+    {
+        using var host = new Form { Size = new Size(700, 600) };
+        using var lookup = CreateLookup();
+        lookup.Columns.Add(new BootstrapLookupColumnDefinition
+        {
+            DataPropertyName = "Name",
+            HeaderText = "Product",
+            Width = 120,
+            MinimumWidth = 40
+        });
+        host.Controls.Add(lookup);
+        host.Show();
+        lookup.OpenDropDown();
+        var controller = GetController(lookup);
+
+        controller.ApplyOwnerDpiChange(96);
+        var widthAt96 = lookup.ResultsGrid.Columns[0].Width;
+        var minimumAt96 = lookup.ResultsGrid.Columns[0].MinimumWidth;
+        controller.ApplyOwnerDpiChange(192);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(widthAt96, Is.EqualTo(120));
+            Assert.That(minimumAt96, Is.EqualTo(40));
+            Assert.That(lookup.ResultsGrid.Columns[0].Width, Is.EqualTo(240));
+            Assert.That(lookup.ResultsGrid.Columns[0].MinimumWidth, Is.EqualTo(80));
+        }));
+    }
+
+    [Test]
     public void PublicOpenCloseAndCancelHaveDistinctStateSemantics()
     {
         using var host = new Form();

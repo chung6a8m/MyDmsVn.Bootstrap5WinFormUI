@@ -102,7 +102,7 @@ public partial class BootstrapLookupBox
         var count = grid.Rows.Count;
         if (count == 0)
         {
-            SetHighlightedItem(null);
+            SetHighlightedSourceItem(null);
             return;
         }
 
@@ -123,7 +123,7 @@ public partial class BootstrapLookupBox
         grid.Rows[current].Selected = true;
         grid.CurrentCell = FindFirstVisibleCell(grid.Rows[current]);
         var sourceItem = _dropDownContent.GetSourceItem(current);
-        SetHighlightedItem(sourceItem?.Item);
+        SetHighlightedSourceItem(sourceItem);
         _dropDownContent.UpdateStatus(current + 1, count, false, MinimumSearchLength);
     }
 
@@ -132,7 +132,7 @@ public partial class BootstrapLookupBox
         for (var index = 0; index < ResultsGrid.Rows.Count; index++)
         {
             var sourceItem = _dropDownContent.GetSourceItem(index);
-            if (sourceItem is not null && (ReferenceEquals(sourceItem.Item, HighlightedItem) || Equals(sourceItem.Item, HighlightedItem)))
+            if (sourceItem is not null && IsHighlightedSourceItem(sourceItem))
                 return index;
         }
         return -1;

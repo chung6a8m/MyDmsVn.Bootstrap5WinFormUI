@@ -154,6 +154,46 @@ public sealed class BootstrapLookupDataGridViewTests
     }
 
     [Test]
+    public void SelectionEventKeepsOriginCoordinatesWhenDirtyHandlerMovesCurrentCell()
+    {
+        var products = new BindingList<Product> { new Product(1, "Alpha"), new Product(2, "Beta") };
+        var lookupColumn = CreateColumn(products);
+        using var form = new Form { ShowInTaskbar = false };
+        using var grid = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            AutoGenerateColumns = false,
+            DataSource = new BindingList<Row> { new Row { ProductId = 1, Other = "next" } }
+        };
+        grid.Columns.Add(lookupColumn);
+        grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(Row.Other) });
+        form.Controls.Add(grid);
+        form.Show();
+        Application.DoEvents();
+        BootstrapLookupCellEventArgs? observed = null;
+        lookupColumn.SelectionCommitted += (_, e) => observed = e;
+        grid.CurrentCellDirtyStateChanged += (_, _) =>
+        {
+            if (!grid.IsCurrentCellDirty) return;
+            grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            grid.EndEdit();
+            grid.CurrentCell = grid.Rows[0].Cells[1];
+        };
+        BeginEdit(grid, 0);
+        var editor = (BootstrapLookupBox)grid.EditingControl!;
+
+        editor.SelectValue(2);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(grid.CurrentCell?.ColumnIndex, Is.EqualTo(1));
+            Assert.That(observed, Is.Not.Null);
+            Assert.That(observed!.RowIndex, Is.EqualTo(0));
+            Assert.That(observed.ColumnIndex, Is.EqualTo(0));
+        }));
+    }
+
+    [Test]
     public void RefreshCanReplaceColumnSourceDuringActiveEdit()
     {
         var original = new[] { new Product(1, "Alpha") };
@@ -185,6 +225,34 @@ public sealed class BootstrapLookupDataGridViewTests
             editor.CloseDropDown();
             grid.CancelEdit();
         }
+    }
+
+    [Test]
+    public void CommitAndAddRefreshesPlainListColumnDisplayIndexBeforeEditEnds()
+    {
+        var products = new System.Collections.Generic.List<Product> { new Product(1, "Alpha") };
+        var column = CreateColumn(products);
+        column.UnmatchedTextBehavior = BootstrapLookupUnmatchedTextBehavior.CommitAndAdd;
+        column.CreateItemFromText += (_, e) => e.Item = new Product(2, e.OriginalText);
+        var row = new NullableRow { ProductId = 1 };
+        var host = CreateGridHost(column, row);
+        using var form = host.Form;
+        using var grid = host.Grid;
+        BeginEdit(grid, 0);
+        var editor = (BootstrapLookupBox)grid.EditingControl!;
+        editor.Text = "Gamma";
+
+        var resolution = editor.ResolvePendingText(BootstrapLookupCommitReason.Keyboard);
+        var ended = grid.EndEdit();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(resolution.NavigationAllowed, Is.True);
+            Assert.That(ended, Is.True);
+            Assert.That(products, Has.Count.EqualTo(2));
+            Assert.That(row.ProductId, Is.EqualTo(2));
+            Assert.That(grid.Rows[0].Cells[0].FormattedValue, Is.EqualTo("Gamma"));
+        }));
     }
 
     private static BootstrapLookupColumn CreateColumn(object source) => new BootstrapLookupColumn
@@ -221,6 +289,7 @@ public sealed class BootstrapLookupDataGridViewTests
         public int ProductId { get; set; }
         public int ProductA { get; set; }
         public int ProductB { get; set; }
+        public string Other { get; set; } = string.Empty;
     }
 
     private sealed class NullableRow

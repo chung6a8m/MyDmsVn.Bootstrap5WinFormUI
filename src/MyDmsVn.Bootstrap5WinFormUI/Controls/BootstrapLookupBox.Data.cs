@@ -10,6 +10,7 @@ public partial class BootstrapLookupBox
     private string _displayMember = string.Empty;
     private string _valueMember = string.Empty;
     private BootstrapLookupDataAdapter? _dataAdapter;
+    private int _commitGeneration;
 
     private void SetDataSource(object? value)
     {
@@ -113,16 +114,19 @@ public partial class BootstrapLookupBox
 
     internal void CommitSelection(object? item, object? value, string displayText, BootstrapLookupCommitReason reason)
     {
+        var generation = ++_commitGeneration;
         var changed = !EqualityComparer<object?>.Default.Equals(_selectedValue, value);
         _selectedItem = item;
         _selectedValue = value;
-        SetHighlightedItem(item);
-        if (IsDropDownOpen) SynchronizeHighlightedResult();
         _committedDisplayText = displayText ?? string.Empty;
         SynchronizeText(_committedDisplayText);
         _hasPendingText = false;
         ClearLookupValidation();
+        SetHighlightedItem(item, value, item is not null);
+        if (generation != _commitGeneration) return;
+        if (IsDropDownOpen) SynchronizeHighlightedResult();
         if (changed) SelectedValueChanged?.Invoke(this, EventArgs.Empty);
+        if (generation != _commitGeneration) return;
         SelectionCommitted?.Invoke(this, new BootstrapLookupSelectionCommittedEventArgs(item, value, _committedDisplayText, reason));
     }
 

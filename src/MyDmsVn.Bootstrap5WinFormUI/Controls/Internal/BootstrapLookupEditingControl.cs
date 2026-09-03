@@ -10,6 +10,8 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
     private BootstrapLookupColumn? _column;
     private bool _configuring;
     private object? _editingValue;
+    private int _originatingRowIndex;
+    private int _originatingColumnIndex;
 
     public BootstrapLookupEditingControl()
     {
@@ -46,6 +48,8 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
             SearchTextNormalizer = column.SearchTextNormalizer; TextNormalizer = column.TextNormalizer; TextComparer = column.TextComparer;
             InvalidTextMessage = column.InvalidTextMessage;
             SelectedValue = rawValue;
+            _originatingRowIndex = rowIndex;
+            _originatingColumnIndex = columnIndex;
             EditingControlRowIndex = rowIndex;
             EditingControlValueChanged = false;
             _editingValue = rawValue;
@@ -117,15 +121,17 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
     private void OnLookupSelectionCommitted(object? sender, BootstrapLookupSelectionCommittedEventArgs e)
     {
         if (_configuring || _column is null) return;
+        var column = _column;
+        var args = Context();
+        column.RefreshDisplayIndex();
         if (!EqualityComparer<object?>.Default.Equals(_editingValue, e.Value))
         {
             _editingValue = e.Value;
             EditingControlValueChanged = true;
             EditingControlDataGridView?.NotifyCurrentCellDirty(true);
         }
-        var args = Context();
         args.Item = e.Item; args.Value = e.Value; args.DisplayText = e.DisplayText; args.Reason = e.Reason;
-        _column.RaiseSelectionCommitted(args);
+        column.RaiseSelectionCommitted(args);
     }
 
     private void OnLookupRefreshRequested(object? sender, BootstrapLookupRefreshRequestedEventArgs e)
@@ -134,6 +140,7 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
         var args = Context(); args.QueryText = e.QueryText;
         _column.RaiseRefreshRequested(args);
         SynchronizeColumnDataSource();
+        _column.RefreshDisplayIndex();
     }
 
     private void OnLookupAddNewRequested(object? sender, BootstrapLookupAddNewRequestedEventArgs e)
@@ -142,6 +149,7 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
         var args = Context(); args.QueryText = e.QueryText;
         _column.RaiseAddNewRequested(args);
         SynchronizeColumnDataSource();
+        _column.RefreshDisplayIndex();
         e.NewItem = args.NewItem; e.Cancel = args.Cancel;
     }
 
@@ -156,7 +164,7 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
     private BootstrapLookupCellEventArgs Context()
     {
         var grid = EditingControlDataGridView ?? throw new InvalidOperationException("The lookup editor is not attached to a DataGridView.");
-        return new BootstrapLookupCellEventArgs(grid, EditingControlRowIndex, grid.CurrentCell?.ColumnIndex ?? -1);
+        return new BootstrapLookupCellEventArgs(grid, _originatingRowIndex, _originatingColumnIndex);
     }
 
     private void SynchronizeColumnDataSource()

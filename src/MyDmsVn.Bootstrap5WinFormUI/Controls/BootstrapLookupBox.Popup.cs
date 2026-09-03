@@ -16,6 +16,7 @@ public partial class BootstrapLookupBox
     {
         if (!Enabled || ReadOnly) return;
         FlushPendingSearch();
+        ApplyCurrentPresentationToContent(_dropDownController.EffectiveDpi);
         _dropDownController.Open();
     }
 
@@ -34,6 +35,16 @@ public partial class BootstrapLookupBox
 
     internal void ApplyCurrentResultsToContent()
     {
+        ApplyCurrentContent(includeResults: true, _dropDownController.EffectiveDpi);
+    }
+
+    internal void ApplyCurrentPresentationToContent(int dpi)
+    {
+        ApplyCurrentContent(includeResults: false, dpi);
+    }
+
+    private void ApplyCurrentContent(bool includeResults, int dpi)
+    {
         var definitions = Columns;
         if (definitions.Count == 0)
         {
@@ -42,13 +53,13 @@ public partial class BootstrapLookupBox
                 new BootstrapLookupColumnDefinition { DataPropertyName = DisplayMember, HeaderText = DisplayMember }
             };
         }
-        _dropDownContent.ApplyColumns(definitions, ShowColumnHeaders);
+        var columnsChanged = _dropDownContent.ApplyColumns(definitions, ShowColumnHeaders, dpi);
         IReadOnlyList<BootstrapLookupSourceItem> items = _currentSearchResult.Items;
-        _dropDownContent.ApplyResults(items);
+        if (includeResults || columnsChanged) _dropDownContent.ApplyResults(items);
         var position = 0;
         for (var i = 0; i < items.Count; i++)
         {
-            if (ReferenceEquals(items[i].Item, HighlightedItem) || Equals(items[i].Item, HighlightedItem)) { position = i + 1; break; }
+            if (IsHighlightedSourceItem(items[i])) { position = i + 1; break; }
         }
         SynchronizeHighlightedResult();
         _dropDownContent.ConfigureFooter(ShowRefreshButton, ShowAddNewButton);
@@ -61,7 +72,7 @@ public partial class BootstrapLookupBox
         for (var index = 0; index < ResultsGrid.Rows.Count; index++)
         {
             var sourceItem = _dropDownContent.GetSourceItem(index);
-            if (sourceItem is not null && (ReferenceEquals(sourceItem.Item, HighlightedItem) || Equals(sourceItem.Item, HighlightedItem)))
+            if (sourceItem is not null && IsHighlightedSourceItem(sourceItem))
             {
                 rowIndex = index;
                 break;

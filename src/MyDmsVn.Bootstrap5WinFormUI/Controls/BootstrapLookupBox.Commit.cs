@@ -104,7 +104,7 @@ public partial class BootstrapLookupBox
     {
         if (_dataAdapter is null) return false;
         foreach (var item in _dataAdapter.Snapshot) return item.Item is string;
-        return DataSource is System.ComponentModel.BindingList<string> || DataSource is string[];
+        return _dataAdapter.IsStringItemSource;
     }
 
     private BootstrapLookupCommitResult ApplyLookupValidation()

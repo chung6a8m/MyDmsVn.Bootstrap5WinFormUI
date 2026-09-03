@@ -11,6 +11,7 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
     private readonly object? _dataSource;
     private readonly string _displayMember;
     private readonly string _valueMember;
+    private readonly Type? _itemType;
     private readonly BindingSource? _bindingSource;
     private readonly IBindingList? _bindingList;
     private List<BootstrapLookupSourceItem> _snapshot = new List<BootstrapLookupSourceItem>();
@@ -21,7 +22,8 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
         _dataSource = dataSource;
         _displayMember = displayMember ?? string.Empty;
         _valueMember = valueMember ?? string.Empty;
-        ValidateKnownItemType(dataSource, _displayMember, _valueMember);
+        _itemType = GetKnownItemType(dataSource);
+        ValidateKnownItemType(_itemType, _displayMember, _valueMember);
         _bindingSource = dataSource as BindingSource;
         if (_bindingSource != null)
         {
@@ -47,6 +49,7 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
     internal event EventHandler? SourceChanged;
 
     internal IReadOnlyList<BootstrapLookupSourceItem> Snapshot => _snapshot;
+    internal bool IsStringItemSource => _itemType == typeof(string);
 
     internal bool CanAdd
     {
@@ -101,11 +104,18 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
         ThrowIfDisposed();
         foreach (var candidate in _snapshot)
         {
-            if (ReferenceEquals(candidate.Item, item) || Equals(candidate.Item, item))
+            if (ReferenceEquals(candidate.Item, item))
             {
                 sourceItem = candidate;
                 return true;
             }
+        }
+
+        foreach (var candidate in _snapshot)
+        {
+            if (!Equals(candidate.Item, item)) continue;
+            sourceItem = candidate;
+            return true;
         }
 
         sourceItem = null;
@@ -157,11 +167,16 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
         return source;
     }
 
-    private static void ValidateKnownItemType(object? source, string displayMember, string valueMember)
+    private static Type? GetKnownItemType(object? source)
     {
-        if (source is null) return;
-        var itemType = ListBindingHelper.GetListItemType(source);
-        if (itemType is null || itemType == typeof(object)) return;
+        if (source is null) return null;
+        var itemType = ListBindingHelper.GetListItemType(ResolveList(source) ?? source);
+        return itemType == typeof(object) ? null : itemType;
+    }
+
+    private static void ValidateKnownItemType(Type? itemType, string displayMember, string valueMember)
+    {
+        if (itemType is null) return;
         BootstrapLookupMemberAccessor.Validate(itemType, displayMember);
         BootstrapLookupMemberAccessor.Validate(itemType, valueMember);
     }

@@ -7,7 +7,13 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 public partial class BootstrapLookupBox
 {
-    private bool _searchPending;
+    private bool _projectionDirty;
+    private bool _hasAppliedSearchConfiguration;
+    private int _appliedMinimumSearchLength;
+    private BootstrapLookupEmptyQueryBehavior _appliedEmptyQueryBehavior;
+    private Func<string, string>? _appliedSearchTextNormalizer;
+    private string _appliedDisplayMember = string.Empty;
+    private string[] _appliedSearchMembers = Array.Empty<string>();
     private BootstrapLookupSearchResult _currentSearchResult = new BootstrapLookupSearchResult(
         BootstrapLookupSearchState.Results,
         Array.Empty<BootstrapLookupSourceItem>());
@@ -26,6 +32,8 @@ public partial class BootstrapLookupBox
             SearchTextNormalizer);
         var changed = !HasSameProjection(_currentSearchResult, next);
         _currentSearchResult = next;
+        _projectionDirty = false;
+        CaptureSearchConfiguration();
         PreserveOrChooseHighlight(next.Items);
         ApplyCurrentResultsToContent();
         if (changed)
@@ -37,20 +45,46 @@ public partial class BootstrapLookupBox
 
     internal void FlushPendingSearch()
     {
-        if (!_searchPending) return;
+        if (!_projectionDirty && !HasSearchConfigurationChanged()) return;
         ExecuteSearchNow();
     }
 
     private void ScheduleSearchForEditorText()
     {
-        _searchPending = true;
+        _projectionDirty = true;
         _searchDebouncer.Schedule(TimeSpan.FromMilliseconds(SearchDebounceMilliseconds), ExecuteScheduledSearch);
     }
 
     private void CancelPendingSearch()
     {
-        _searchPending = false;
         _searchDebouncer.Cancel();
+    }
+
+    private bool HasSearchConfigurationChanged()
+    {
+        if (!_hasAppliedSearchConfiguration ||
+            _appliedMinimumSearchLength != MinimumSearchLength ||
+            _appliedEmptyQueryBehavior != EmptyQueryBehavior ||
+            !ReferenceEquals(_appliedSearchTextNormalizer, SearchTextNormalizer) ||
+            !string.Equals(_appliedDisplayMember, DisplayMember, StringComparison.Ordinal) ||
+            _appliedSearchMembers.Length != SearchMembers.Count)
+            return true;
+
+        for (var index = 0; index < _appliedSearchMembers.Length; index++)
+        {
+            if (!string.Equals(_appliedSearchMembers[index], SearchMembers[index], StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
+    private void CaptureSearchConfiguration()
+    {
+        _hasAppliedSearchConfiguration = true;
+        _appliedMinimumSearchLength = MinimumSearchLength;
+        _appliedEmptyQueryBehavior = EmptyQueryBehavior;
+        _appliedSearchTextNormalizer = SearchTextNormalizer;
+        _appliedDisplayMember = DisplayMember;
+        _appliedSearchMembers = SearchMembers.ToArray();
     }
 
     private void ExecuteScheduledSearch()
@@ -70,19 +104,12 @@ public partial class BootstrapLookupBox
     private void PreserveOrChooseHighlight(IReadOnlyList<BootstrapLookupSourceItem> items)
     {
         BootstrapLookupSourceItem? chosen = null;
-        if (_highlightedItem is not null)
-            chosen = items.FirstOrDefault(item => SameLogicalItem(item, _highlightedItem));
+        if (_hasHighlightedItem)
+            chosen = items.FirstOrDefault(IsHighlightedSourceItem);
         if (chosen is null && _selectedValue is not null)
             chosen = items.FirstOrDefault(item => EqualityComparer<object?>.Default.Equals(item.Value, _selectedValue));
         if (chosen is null && items.Count > 0) chosen = items[0];
-        SetHighlightedItem(chosen?.Item);
-    }
-
-    private bool SameLogicalItem(BootstrapLookupSourceItem candidate, object item)
-    {
-        if (ReferenceEquals(candidate.Item, item)) return true;
-        if (_dataAdapter is null || !_dataAdapter.TryFindByItem(item, out var previous)) return Equals(candidate.Item, item);
-        return EqualityComparer<object?>.Default.Equals(candidate.Value, previous!.Value);
+        SetHighlightedSourceItem(chosen);
     }
 
     private static bool HasSameProjection(BootstrapLookupSearchResult left, BootstrapLookupSearchResult right)

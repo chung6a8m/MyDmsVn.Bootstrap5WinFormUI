@@ -33,6 +33,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
     }
 
     internal bool IsOpen => _isOpen;
+    internal int EffectiveDpi => _effectiveDpi;
     internal bool ContainsFocus => _dropDown?.ContainsFocus == true || _surface?.ContainsFocus == true || _content.ContainsFocus;
 
     internal void Open()
@@ -133,6 +134,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
         _surface.LogicalBorderRadius = _owner.BorderRadius;
         _surface.ApplyTheme(BootstrapThemeManager.CurrentTheme, dpi);
         _content.Font = _owner.Font;
+        _owner.ApplyCurrentPresentationToContent(dpi);
     }
 
     internal void ApplyOwnerDpiChange(int dpi)
@@ -172,16 +174,27 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
 
     private void OnResultCellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
     {
-        if (e.Button != MouseButtons.Left || e.RowIndex < 0 || !_owner.Enabled || _owner.ReadOnly) return;
+        if (e.Button != MouseButtons.Left) return;
+        if (e.RowIndex < 0 || !_owner.Enabled || _owner.ReadOnly)
+        {
+            _owner.FocusLookupEditor();
+            return;
+        }
         var sourceItem = _content.GetSourceItem(e.RowIndex);
-        if (sourceItem is null) return;
+        if (sourceItem is null)
+        {
+            _owner.FocusLookupEditor();
+            return;
+        }
         if (!_owner.TryCommitResult(sourceItem, BootstrapLookupCommitReason.Mouse).NavigationAllowed) return;
         Close(true);
     }
 
     private void OnRefreshRequested(object? sender, EventArgs e)
     {
-        if (_owner.Enabled && !_owner.ReadOnly) _owner.RefreshResults();
+        if (!_owner.Enabled || _owner.ReadOnly) return;
+        _owner.RefreshResults();
+        if (_isOpen) _owner.FocusLookupEditor();
     }
 
     private void OnAddNewRequested(object? sender, EventArgs e)

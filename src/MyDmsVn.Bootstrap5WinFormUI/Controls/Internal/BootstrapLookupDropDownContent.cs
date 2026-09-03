@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 
@@ -36,31 +37,34 @@ internal sealed class BootstrapLookupDropDownContent : UserControl
     internal event EventHandler? RefreshRequested { add => _footer.RefreshRequested += value; remove => _footer.RefreshRequested -= value; }
     internal event EventHandler? AddNewRequested { add => _footer.AddNewRequested += value; remove => _footer.AddNewRequested -= value; }
 
-    internal void ApplyColumns(BootstrapLookupColumnDefinitionCollection definitions, bool showHeaders)
+    internal bool ApplyColumns(BootstrapLookupColumnDefinitionCollection definitions, bool showHeaders, int dpi = DpiScaler.DefaultDpi)
     {
         if (definitions is null) throw new ArgumentNullException(nameof(definitions));
         ReassertInvariants();
         ResultsGrid.ColumnHeadersVisible = showHeaders;
-        var signature = BuildSignature(definitions);
-        if (string.Equals(signature, _columnSignature, StringComparison.Ordinal)) return;
+        var signature = BuildSignature(definitions, dpi);
+        if (string.Equals(signature, _columnSignature, StringComparison.Ordinal)) return false;
         _columnSignature = signature;
         ResultsGrid.Columns.Clear();
         foreach (var definition in definitions)
         {
-            ResultsGrid.Columns.Add(new DataGridViewTextBoxColumn
+            var column = new DataGridViewTextBoxColumn
             {
                 Name = definition.DataPropertyName,
                 HeaderText = definition.HeaderText,
-                Width = definition.Width,
-                MinimumWidth = definition.MinimumWidth,
+                MinimumWidth = DpiScaler.Scale(definition.MinimumWidth, dpi),
                 Visible = definition.Visible,
                 AutoSizeMode = definition.AutoSizeMode,
                 ValueType = definition.ValueType,
                 DefaultCellStyle = { Alignment = definition.Alignment, Format = definition.Format },
                 SortMode = DataGridViewColumnSortMode.NotSortable,
                 ReadOnly = true
-            });
+            };
+            if (definition.AutoSizeMode == DataGridViewAutoSizeColumnMode.None)
+                column.Width = DpiScaler.Scale(definition.Width, dpi);
+            ResultsGrid.Columns.Add(column);
         }
+        return true;
     }
 
     internal void ApplyResults(IReadOnlyList<BootstrapLookupSourceItem> items)
@@ -144,9 +148,10 @@ internal sealed class BootstrapLookupDropDownContent : UserControl
         ResultsGrid.Bounds = new System.Drawing.Rectangle(0, 0, ClientSize.Width, Math.Max(0, _footer.Top));
     }
 
-    private static string BuildSignature(IEnumerable<BootstrapLookupColumnDefinition> definitions)
+    private static string BuildSignature(IEnumerable<BootstrapLookupColumnDefinition> definitions, int dpi)
     {
         var builder = new StringBuilder();
+        builder.Append(dpi).Append('\u0002');
         foreach (var definition in definitions)
         {
             builder.Append(definition.DataPropertyName).Append('\0').Append(definition.HeaderText).Append('\0')
