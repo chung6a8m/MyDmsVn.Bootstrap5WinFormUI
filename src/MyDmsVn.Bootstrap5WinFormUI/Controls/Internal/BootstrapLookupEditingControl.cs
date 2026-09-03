@@ -1,0 +1,227 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
+
+internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataGridViewEditingControl
+{
+    private BootstrapLookupColumn? _column;
+    private bool _configuring;
+    private object? _editingValue;
+    private int _originatingRowIndex;
+    private int _originatingColumnIndex;
+    private int _configurationGeneration;
+
+    public BootstrapLookupEditingControl()
+    {
+        SelectionCommitted += OnLookupSelectionCommitted;
+        RefreshRequested += OnLookupRefreshRequested;
+        AddNewRequested += OnLookupAddNewRequested;
+        CreateItemFromText += OnLookupCreateItemFromText;
+    }
+
+    public DataGridView? EditingControlDataGridView { get; set; }
+    public object EditingControlFormattedValue { get => SelectedValue!; set => SelectedValue = value; }
+    public int EditingControlRowIndex { get; set; }
+    public bool EditingControlValueChanged { get; set; }
+    public Cursor EditingPanelCursor => Cursors.IBeam;
+    public bool RepositionEditingControlOnValueChange => false;
+
+    internal void Configure(BootstrapLookupColumn column, int rowIndex, int columnIndex, object? rawValue, object? initialFormattedValue)
+    {
+        _configurationGeneration++;
+        InvalidateApplicationWorkflows();
+        CancelPendingEdit();
+        DataSource = null;
+        _column = null;
+        _configuring = true;
+        try
+        {
+            Columns.Clear(); SearchMembers.Clear();
+            DisplayMember = column.DisplayMember; ValueMember = column.ValueMember; DataSource = column.DataSource;
+            foreach (var definition in column.LookupColumns) Columns.Add(BootstrapLookupColumn.CloneDefinition(definition));
+            foreach (var member in column.SearchMembers) SearchMembers.Add(member);
+            UnmatchedTextBehavior = column.UnmatchedTextBehavior; EmptyQueryBehavior = column.EmptyQueryBehavior;
+            TypingPopupBehavior = column.TypingPopupBehavior; EnterKeyBehavior = column.EnterKeyBehavior;
+            ClosedEnterKeyBehavior = column.ClosedEnterKeyBehavior; SearchDebounceMilliseconds = column.SearchDebounceMilliseconds;
+            MinimumSearchLength = column.MinimumSearchLength; DropDownWidth = column.DropDownWidth; MaxDropDownHeight = column.MaxDropDownHeight;
+            ShowColumnHeaders = column.ShowColumnHeaders; ShowRefreshButton = column.ShowRefreshButton; ShowAddNewButton = column.ShowAddNewButton;
+            SearchTextNormalizer = column.SearchTextNormalizer; TextNormalizer = column.TextNormalizer; TextComparer = column.TextComparer;
+            InvalidTextMessage = column.InvalidTextMessage;
+            SelectedValue = rawValue;
+            if (rawValue is not null && SelectedItem is null)
+                RestoreUnresolvedConfiguredValue(rawValue, initialFormattedValue?.ToString() ?? string.Empty);
+            _originatingRowIndex = rowIndex;
+            _originatingColumnIndex = columnIndex;
+            EditingControlRowIndex = rowIndex;
+            EditingControlValueChanged = false;
+            _editingValue = rawValue;
+            _column = column;
+        }
+        finally { _configuring = false; }
+    }
+
+    public object GetEditingControlFormattedValue(DataGridViewDataErrorContexts context) => SelectedValue!;
+    public void ApplyCellStyleToEditingControl(DataGridViewCellStyle dataGridViewCellStyle)
+    {
+        Font = dataGridViewCellStyle.Font;
+        ForeColor = dataGridViewCellStyle.ForeColor;
+        BackColor = dataGridViewCellStyle.BackColor;
+    }
+    public void PrepareEditingControlForEdit(bool selectAll)
+    {
+        if (selectAll)
+        {
+            SelectAll();
+            return;
+        }
+
+        Editor.SelectionStart = Editor.TextLength;
+        Editor.SelectionLength = 0;
+    }
+    public bool EditingControlWantsInputKey(Keys keyData, bool dataGridViewWantsInputKey)
+    {
+        var key = keyData & Keys.KeyCode;
+        var modifiers = keyData & Keys.Modifiers;
+        if (key == Keys.Down && modifiers == Keys.Alt) return true;
+        if (modifiers == Keys.None)
+        {
+            if (key == Keys.Down || key == Keys.F4 || key == Keys.Escape) return true;
+            if (IsDropDownOpen && (key == Keys.Up || key == Keys.Home || key == Keys.End ||
+                key == Keys.PageUp || key == Keys.PageDown)) return true;
+            if (key == Keys.Enter)
+                return IsDropDownOpen || ClosedEnterKeyBehavior != BootstrapLookupClosedEnterKeyBehavior.DataGridViewDefault;
+        }
+
+        switch (key)
+        {
+            case Keys.Left:
+                return RightToLeft == RightToLeft.No
+                    ? Editor.SelectionLength > 0 || Editor.SelectionStart > 0
+                    : Editor.SelectionLength > 0 || Editor.SelectionStart < Editor.TextLength;
+            case Keys.Right:
+                return RightToLeft == RightToLeft.No
+                    ? Editor.SelectionLength > 0 || Editor.SelectionStart < Editor.TextLength
+                    : Editor.SelectionLength > 0 || Editor.SelectionStart > 0;
+            case Keys.Home:
+            case Keys.End:
+                return Editor.SelectionLength != Editor.TextLength;
+            case Keys.Delete:
+                return Editor.SelectionLength > 0 || Editor.SelectionStart < Editor.TextLength;
+            default:
+                return !dataGridViewWantsInputKey;
+        }
+    }
+
+    private protected override bool ContinueOwnerNavigation(bool reverse)
+    {
+        var grid = EditingControlDataGridView;
+        if (grid?.CurrentCell is not DataGridViewCell currentCell)
+            return base.ContinueOwnerNavigation(reverse);
+        if (!grid.EndEdit()) return true;
+
+        var nextCell = FindNextEditableCell(grid, currentCell, reverse);
+        if (nextCell is null) return false;
+        grid.CurrentCell = nextCell;
+        return true;
+    }
+
+    private static DataGridViewCell? FindNextEditableCell(DataGridView grid, DataGridViewCell currentCell, bool reverse)
+    {
+        var rowIndex = currentCell.RowIndex;
+        var column = currentCell.OwningColumn;
+        while (rowIndex >= 0 && column is not null)
+        {
+            column = reverse
+                ? grid.Columns.GetPreviousColumn(column, DataGridViewElementStates.Visible, DataGridViewElementStates.None)
+                : grid.Columns.GetNextColumn(column, DataGridViewElementStates.Visible, DataGridViewElementStates.None);
+            while (column is not null)
+            {
+                var candidate = grid.Rows[rowIndex].Cells[column.Index];
+                if (!candidate.ReadOnly) return candidate;
+                column = reverse
+                    ? grid.Columns.GetPreviousColumn(column, DataGridViewElementStates.Visible, DataGridViewElementStates.None)
+                    : grid.Columns.GetNextColumn(column, DataGridViewElementStates.Visible, DataGridViewElementStates.None);
+            }
+
+            rowIndex = reverse
+                ? grid.Rows.GetPreviousRow(rowIndex, DataGridViewElementStates.Visible)
+                : grid.Rows.GetNextRow(rowIndex, DataGridViewElementStates.Visible);
+            if (rowIndex < 0) return null;
+            column = reverse
+                ? grid.Columns.GetLastColumn(DataGridViewElementStates.Visible, DataGridViewElementStates.None)
+                : grid.Columns.GetFirstColumn(DataGridViewElementStates.Visible);
+            if (column is not null && !grid.Rows[rowIndex].Cells[column.Index].ReadOnly)
+                return grid.Rows[rowIndex].Cells[column.Index];
+        }
+        return null;
+    }
+
+    private void OnLookupSelectionCommitted(object? sender, BootstrapLookupSelectionCommittedEventArgs e)
+    {
+        if (_configuring || _column is null) return;
+        var column = _column;
+        var args = Context();
+        if (e.Reason == BootstrapLookupCommitReason.CommitAndAdd) column.RefreshDisplayIndex();
+        column.RememberDisplayText(e.Value, e.DisplayText);
+        if (!EqualityComparer<object?>.Default.Equals(_editingValue, e.Value))
+        {
+            _editingValue = e.Value;
+            EditingControlValueChanged = true;
+            EditingControlDataGridView?.NotifyCurrentCellDirty(true);
+        }
+        args.Item = e.Item; args.Value = e.Value; args.DisplayText = e.DisplayText; args.Reason = e.Reason;
+        column.RaiseSelectionCommitted(args);
+    }
+
+    private void OnLookupRefreshRequested(object? sender, BootstrapLookupRefreshRequestedEventArgs e)
+    {
+        if (_configuring || _column is null) return;
+        var generation = _configurationGeneration;
+        var column = _column;
+        var args = Context(); args.QueryText = e.QueryText;
+        column.RaiseRefreshRequested(args);
+        if (generation != _configurationGeneration) return;
+        SynchronizeColumnDataSource(column);
+        if (generation != _configurationGeneration) return;
+        column.RefreshDisplayIndex();
+    }
+
+    private void OnLookupAddNewRequested(object? sender, BootstrapLookupAddNewRequestedEventArgs e)
+    {
+        if (_configuring || _column is null) return;
+        var generation = _configurationGeneration;
+        var column = _column;
+        var args = Context(); args.QueryText = e.QueryText;
+        column.RaiseAddNewRequested(args);
+        if (generation != _configurationGeneration) return;
+        SynchronizeColumnDataSource(column);
+        if (generation != _configurationGeneration) return;
+        column.RefreshDisplayIndex();
+        e.NewItem = args.NewItem; e.Cancel = args.Cancel;
+    }
+
+    private void OnLookupCreateItemFromText(object? sender, BootstrapLookupCreateItemFromTextEventArgs e)
+    {
+        if (_configuring || _column is null) return;
+        var generation = _configurationGeneration;
+        var column = _column;
+        var args = Context(); args.OriginalText = e.OriginalText; args.NormalizedText = e.NormalizedText;
+        column.RaiseCreateItemFromText(args);
+        if (generation != _configurationGeneration) return;
+        e.Item = args.Item; e.Cancel = args.Cancel;
+    }
+
+    private BootstrapLookupCellEventArgs Context()
+    {
+        var grid = EditingControlDataGridView ?? throw new InvalidOperationException("The lookup editor is not attached to a DataGridView.");
+        return new BootstrapLookupCellEventArgs(grid, _originatingRowIndex, _originatingColumnIndex);
+    }
+
+    private void SynchronizeColumnDataSource(BootstrapLookupColumn column)
+    {
+        if (!ReferenceEquals(DataSource, column.DataSource)) DataSource = column.DataSource;
+    }
+}

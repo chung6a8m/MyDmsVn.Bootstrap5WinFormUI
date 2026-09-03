@@ -515,6 +515,22 @@ Rules:
 - Reuse Animation for width/state transitions.
 - Do not create a separate icon model.
 
+## BootstrapLookupBox and BootstrapLookupColumn
+
+Responsibility: provide a local, single-selection lookup that separates committed value, pending editor text, and transient result highlight, plus a native DataGridView column that stores raw lookup identity.
+
+`BootstrapLookupBox` accepts `BindingSource`, `BindingList<T>`, `IList`, `IListSource`, and arrays. `Columns` defines text-backed popup columns and `SearchMembers` defines member priority. The default Vietnamese-insensitive multi-token search ranks by worst token quality, total quality, DisplayMember match count, member priority, then source order without filtering or moving caller currency.
+
+Exact text commits only one distinct logical value. Ambiguous labels with distinct values validate instead of silently choosing; duplicate rows with the same value choose the first source row. Empty text clears, while unmatched input follows RestorePreviousSelection, KeepFocusWithValidationError, or CommitAndAdd. Lookup validation is transient and does not erase application validation.
+
+The popup composes shared overlay infrastructure and `BootstrapDataGridView`. Result navigation never takes editor focus or commits. Tab resolves before native traversal; Escape equals `CancelPendingEdit()`; application deactivation closes presentation only. Refresh and Add New are explicit application workflows.
+
+`BootstrapLookupColumn` binds `DataPropertyName` to the row's raw value, maps `ValueMember` to `DisplayMember`, and exposes contextual SelectionCommitted/Refresh/AddNew/CreateItemFromText events. Its internal reusable editor detaches old datasource/events/debounce/popup state before applying cloned configuration for another cell. Native DataGridView navigation, validation, BindingSource currency, and new-row creation remain authoritative. See `docs/BOOTSTRAP_LOOKUP_BOX.md`.
+
+V1 excludes remote paging, multiple selection, source filtering, and public cell/editor implementation types.
+
+Manual verification: exercise Vietnamese search, ambiguity, keyboard/mouse commit, Tab blocking, Escape, Alt+Tab, Refresh/Add New, Light/Dark and 100–200% DPI. In the DataGrid demo verify raw ProductId binding, hidden/read-only traversal, native new row, and repeated cross-column editor reuse.
+
 ## BootstrapDataGridView
 
 Responsibility: retain native WinForms `DataGridView` behavior while applying the framework visual language and lightweight presentation states.

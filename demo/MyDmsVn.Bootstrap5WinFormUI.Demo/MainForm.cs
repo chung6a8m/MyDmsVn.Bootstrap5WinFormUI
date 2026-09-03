@@ -246,7 +246,7 @@ public sealed class MainForm : Form
             "Bound data, states, large-row performance, and editable product cells using BootstrapSelect through the native editing lifecycle.",
             () => new DemoPageHostForm(
                 new DemoPageSection("Basic / states", () => new DataGridDemoForm()),
-                new DemoPageSection("Editable + BootstrapSelect", () => new DataGridSelectEditingDemoForm())));
+                new DemoPageSection("Editable + BootstrapLookup", () => new DataGridSelectEditingDemoForm())));
 
         AddPage(
             "Pagination",

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -14,58 +15,38 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Demo;
 public sealed class DataGridSelectEditingDemoFormTests
 {
     [Test]
-    public void DemoUsesFiveNativeTextColumnsAndSampleRows()
+    public void DemoUsesNativeLookupColumnsAndTypedBinding()
     {
-        using var form = CreateAndShowDemoForm();
-
-        var grid = FindControls<BootstrapDataGridView>(form).Single();
-        var headers = grid.Columns.Cast<DataGridViewColumn>().Select(column => column.HeaderText).ToArray();
-
+        using var form = CreateAndShow();
+        var grid = Find<BootstrapDataGridView>(form).Single();
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(grid.AutoGenerateColumns, Is.False);
-            Assert.That(grid.Columns.Cast<DataGridViewColumn>().All(column => column is DataGridViewTextBoxColumn), Is.True,
-                "The demo must not introduce a custom DataGridView column/cell type.");
-            Assert.That(headers, Is.EqualTo(new[] { "Tên hàng", "Đơn vị tính", "Số lượng", "Đơn giá", "Thành tiền" }));
-            Assert.That(grid.Rows.Count, Is.GreaterThan(0));
+            Assert.That(grid.Columns[0], Is.InstanceOf<BootstrapLookupColumn>());
+            Assert.That(grid.Columns[1], Is.InstanceOf<BootstrapLookupColumn>());
+            Assert.That(Find<BootstrapSelect>(form), Is.Empty);
+            Assert.That(grid.DataSource, Is.Not.InstanceOf<DataTable>());
+            Assert.That(grid.AllowUserToAddRows, Is.True);
+            var product = (BootstrapLookupColumn)grid.Columns["ProductColumn"];
+            Assert.That(product.LookupColumns[1].AutoSizeMode, Is.EqualTo(DataGridViewAutoSizeColumnMode.Fill));
+            Assert.That(product.LookupColumns[1].MinimumWidth, Is.GreaterThanOrEqualTo(200));
         }));
     }
 
     [Test]
-    public void ProductCellEditingUsesBootstrapSelectPopupAndCommitsProductMetadata()
+    public void ProductLookupCommitsRawIdAndDependentMetadata()
     {
-        using var form = CreateAndShowDemoForm();
-
-        var grid = FindControls<BootstrapDataGridView>(form).Single();
-        grid.CurrentCell = grid.Rows[0].Cells["ProductNameColumn"];
-
-        Assert.That(grid.BeginEdit(true), Is.True);
-        Application.DoEvents();
-
-        var select = FindControls<BootstrapSelect>(grid).SingleOrDefault(control => control.Visible);
-        Assert.That(select, Is.Not.Null, "EditingControlShowing should replace the visible product editor with BootstrapSelect.");
-
-        select!.OpenDropDownInternal();
-        Application.DoEvents();
-
-        Assert.Multiple((Action)(() =>
-        {
-            Assert.That(select.IsDropDownOpenForTest, Is.True, "The Select popup must stay open while the grid cell is being edited.");
-            Assert.That(grid.IsCurrentCellInEditMode, Is.True);
-        }));
-
-        select.SetSearchTextForTest("Trà ô long");
-        Application.DoEvents();
-        Assert.That(select.ActivateHighlightedResultForTest(), Is.True);
-        Application.DoEvents();
-
+        using var form = CreateAndShow();
+        var grid = Find<BootstrapDataGridView>(form).Single();
+        grid.CurrentCell = grid.Rows[0].Cells["ProductColumn"];
+        Assert.That(grid.BeginEdit(true), Is.True); Application.DoEvents();
+        ((BootstrapLookupBox)grid.EditingControl!).SelectValue(2);
+        grid.EndEdit(); Application.DoEvents();
         var row = grid.Rows[0];
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(row.Cells["ProductNameColumn"].Value, Is.EqualTo("Trà ô long cao sơn"));
+            Assert.That(row.Cells["ProductColumn"].Value, Is.EqualTo(2));
             Assert.That(row.Cells["UnitColumn"].Value, Is.EqualTo("Hộp 20 túi"));
             Assert.That(Convert.ToDecimal(row.Cells["UnitPriceColumn"].Value), Is.EqualTo(128000m));
-            Assert.That(Convert.ToDecimal(row.Cells["QuantityColumn"].Value), Is.EqualTo(2m));
             Assert.That(Convert.ToDecimal(row.Cells["LineTotalColumn"].Value), Is.EqualTo(256000m));
         }));
     }
@@ -73,45 +54,24 @@ public sealed class DataGridSelectEditingDemoFormTests
     [Test]
     public void EditingQuantityRecalculatesLineTotal()
     {
-        using var form = CreateAndShowDemoForm();
-
-        var grid = FindControls<BootstrapDataGridView>(form).Single();
-        var row = grid.Rows[0];
-
-        row.Cells["QuantityColumn"].Value = 3m;
-        grid.EndEdit();
-        Application.DoEvents();
-
+        using var form = CreateAndShow();
+        var row = Find<BootstrapDataGridView>(form).Single().Rows[0];
+        row.Cells["QuantityColumn"].Value = 3m; Application.DoEvents();
         Assert.That(Convert.ToDecimal(row.Cells["LineTotalColumn"].Value), Is.EqualTo(555000m));
     }
 
-    private static Form CreateAndShowDemoForm()
+    private static Form CreateAndShow()
     {
-        var demoType = typeof(MainForm).Assembly.GetType("MyDmsVn.Bootstrap5WinFormUI.Demo.DataGridSelectEditingDemoForm");
-        Assert.That(demoType, Is.Not.Null, "The integrated demo should include DataGridSelectEditingDemoForm.");
-
-        var form = (Form)Activator.CreateInstance(demoType!)!;
-        form.Show();
-        Application.DoEvents();
-        form.PerformLayout();
-        Application.DoEvents();
-        return form;
+        var type = typeof(MainForm).Assembly.GetType("MyDmsVn.Bootstrap5WinFormUI.Demo.DataGridSelectEditingDemoForm");
+        var form = (Form)Activator.CreateInstance(type!)!; form.Show(); Application.DoEvents(); return form;
     }
 
-    private static IEnumerable<T> FindControls<T>(Control root)
-        where T : Control
+    private static IEnumerable<T> Find<T>(Control root) where T : Control
     {
         foreach (Control child in root.Controls)
         {
-            if (child is T match)
-            {
-                yield return match;
-            }
-
-            foreach (var nested in FindControls<T>(child))
-            {
-                yield return nested;
-            }
+            if (child is T match) yield return match;
+            foreach (var nested in Find<T>(child)) yield return nested;
         }
     }
 }

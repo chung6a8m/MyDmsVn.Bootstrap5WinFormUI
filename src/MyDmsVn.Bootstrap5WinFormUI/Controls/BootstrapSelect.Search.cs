@@ -9,7 +9,7 @@ public partial class BootstrapSelect
 {
     private IBootstrapSelectDataProvider? _dataProvider;
     private BootstrapSelectSearchController? _searchController;
-    private BootstrapSelectDebouncer? _searchDebouncer;
+    private BootstrapUiDebouncer? _searchDebouncer;
 
     /// <summary>Occurs when an asynchronous provider query starts.</summary>
     public event EventHandler<BootstrapSelectSearchEventArgs>? SearchStarted;
@@ -66,7 +66,7 @@ public partial class BootstrapSelect
             _dropDownController?.RefreshResults();
             return;
         }
-        _searchDebouncer ??= new BootstrapSelectDebouncer();
+        _searchDebouncer ??= new BootstrapUiDebouncer();
         _searchDebouncer.Schedule(SearchDebounce, () => _ = StartRemoteSearchAsync(effectiveText, _dataProvider));
     }
 

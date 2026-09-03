@@ -1,0 +1,190 @@
+using System;
+using System.Collections.Generic;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
+
+namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
+
+public partial class BootstrapLookupBox
+{
+    private object? _dataSource;
+    private string _displayMember = string.Empty;
+    private string _valueMember = string.Empty;
+    private BootstrapLookupDataAdapter? _dataAdapter;
+    private int _commitGeneration;
+    private int _sourceChangeGeneration;
+
+    private void SetDataSource(object? value)
+    {
+        if (ReferenceEquals(_dataSource, value)) return;
+        ReplaceDataAdapter(value, _displayMember, _valueMember);
+    }
+
+    private void SetDisplayMember(string? value)
+    {
+        var normalized = value ?? string.Empty;
+        if (string.Equals(_displayMember, normalized, StringComparison.Ordinal)) return;
+        ReplaceDataAdapter(_dataSource, normalized, _valueMember);
+    }
+
+    private void SetValueMember(string? value)
+    {
+        var normalized = value ?? string.Empty;
+        if (string.Equals(_valueMember, normalized, StringComparison.Ordinal)) return;
+        ReplaceDataAdapter(_dataSource, _displayMember, normalized);
+    }
+
+    private void ReplaceDataAdapter(object? dataSource, string displayMember, string valueMember)
+    {
+        var replacement = new BootstrapLookupDataAdapter(dataSource, displayMember, valueMember);
+        try
+        {
+            ValidateSearchMembers(replacement);
+        }
+        catch
+        {
+            replacement.Dispose();
+            throw;
+        }
+        DisposeDataAdapter();
+        _dataSource = dataSource;
+        _displayMember = displayMember;
+        _valueMember = valueMember;
+        _dataAdapter = replacement;
+        _dataAdapter.SourceChanged += OnLookupSourceChanged;
+        ReconcileCommittedSelection();
+        ExecuteSearchNow();
+    }
+
+    private void DisposeDataAdapter()
+    {
+        if (_dataAdapter is null) return;
+        _dataAdapter.SourceChanged -= OnLookupSourceChanged;
+        _dataAdapter.Dispose();
+        _dataAdapter = null;
+    }
+
+    private void OnLookupSourceChanged(object? sender, EventArgs e)
+    {
+        if (_dataAdapter is not null) ValidateSearchMembers(_dataAdapter);
+        _sourceChangeGeneration++;
+        ReconcileCommittedSelection();
+        ExecuteSearchNow();
+    }
+
+    private void ReconcileCommittedSelection()
+    {
+        if (_dataAdapter is null || _selectedValue is null) return;
+        if (_dataAdapter.TryFindByValue(_selectedValue, out var found))
+        {
+            _selectedItem = found!.Item;
+            _committedDisplayText = found.DisplayText;
+            if (!_hasPendingText) SynchronizeText(_committedDisplayText);
+        }
+        else
+        {
+            _selectedItem = null;
+        }
+    }
+
+    private void SetSelectedValue(object? value)
+    {
+        if (value is null)
+        {
+            ClearSelection();
+            return;
+        }
+
+        if (!SelectValueCore(value, BootstrapLookupCommitReason.Programmatic))
+            CommitSelection(null, value, string.Empty, BootstrapLookupCommitReason.Programmatic);
+    }
+
+    private bool SelectValueCore(object? value, BootstrapLookupCommitReason reason)
+    {
+        if (value is null)
+        {
+            CommitSelection(null, null, string.Empty, reason == BootstrapLookupCommitReason.Programmatic ? BootstrapLookupCommitReason.Clear : reason);
+            return true;
+        }
+        if (_dataAdapter is null || !_dataAdapter.TryFindByValue(value, out var found)) return false;
+        if (found!.Value is null && _valueMember.Length > 0) return false;
+        CommitSelection(found.Item, found.Value, found.DisplayText, reason);
+        return true;
+    }
+
+    private bool SelectItemCore(object? item, BootstrapLookupCommitReason reason)
+    {
+        if (item is null)
+        {
+            ClearSelection();
+            return true;
+        }
+        if (_dataAdapter is null || !_dataAdapter.TryFindByItem(item, out var found)) return false;
+        if (found!.Value is null && _valueMember.Length > 0) return false;
+        CommitSelection(found.Item, found.Value, found.DisplayText, reason);
+        return true;
+    }
+
+    internal void CommitSelection(object? item, object? value, string displayText, BootstrapLookupCommitReason reason)
+    {
+        var generation = ++_commitGeneration;
+        var changed = !EqualityComparer<object?>.Default.Equals(_selectedValue, value);
+        _selectedItem = item;
+        _selectedValue = value;
+        _committedDisplayText = displayText ?? string.Empty;
+        _hasPendingText = false;
+        ClearLookupValidation();
+        SynchronizeText(_committedDisplayText);
+        if (generation != _commitGeneration) return;
+        SetHighlightedItem(item, value, item is not null);
+        if (generation != _commitGeneration) return;
+        if (IsDropDownOpen) SynchronizeHighlightedResult();
+        if (changed) RaiseSelectedValueChanged(generation);
+        if (generation != _commitGeneration) return;
+        RaiseSelectionCommitted(new BootstrapLookupSelectionCommittedEventArgs(item, value, _committedDisplayText, reason), generation);
+    }
+
+    private void RaiseSelectedValueChanged(int generation)
+    {
+        var handlers = SelectedValueChanged;
+        if (handlers is null) return;
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            if (generation != _commitGeneration) return;
+            handler(this, EventArgs.Empty);
+        }
+    }
+
+    private void RaiseSelectionCommitted(BootstrapLookupSelectionCommittedEventArgs args, int generation)
+    {
+        var handlers = SelectionCommitted;
+        if (handlers is null) return;
+        foreach (EventHandler<BootstrapLookupSelectionCommittedEventArgs> handler in handlers.GetInvocationList())
+        {
+            if (generation != _commitGeneration) return;
+            handler(this, args);
+        }
+    }
+
+    internal BootstrapLookupCommitResult TryCommitResult(BootstrapLookupSourceItem sourceItem, BootstrapLookupCommitReason reason)
+    {
+        if (sourceItem.Value is null && _valueMember.Length > 0) return ApplyLookupValidation();
+        CommitSelection(sourceItem.Item, sourceItem.Value, sourceItem.DisplayText, reason);
+        return BootstrapLookupCommitResult.Success();
+    }
+
+    internal void RestoreUnresolvedConfiguredValue(object value, string displayText)
+    {
+        if (_selectedItem is not null || !EqualityComparer<object?>.Default.Equals(_selectedValue, value)) return;
+        _committedDisplayText = displayText ?? string.Empty;
+        _hasPendingText = false;
+        ClearLookupValidation();
+        SynchronizeText(_committedDisplayText);
+    }
+
+    private void ValidateSearchMember(string member) => _dataAdapter?.ValidateMember(member);
+
+    private void ValidateSearchMembers(BootstrapLookupDataAdapter adapter)
+    {
+        foreach (var member in _searchMembers) adapter.ValidateMember(member);
+    }
+}

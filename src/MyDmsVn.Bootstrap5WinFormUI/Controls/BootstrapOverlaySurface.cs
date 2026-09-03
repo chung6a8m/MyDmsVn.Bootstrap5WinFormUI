@@ -150,11 +150,16 @@ internal sealed class BootstrapOverlaySurface : Panel
 
     public override Size GetPreferredSize(Size proposedSize)
     {
-        var contentSize = HostedContent?.GetPreferredSize(Size.Empty) ?? Size.Empty;
         var padding = DpiScaler.Scale(_logicalContentPadding, _dpi);
+        var chromeWidth = padding.Horizontal + (2 * _borderWidth);
+        var chromeHeight = padding.Vertical + (2 * _borderWidth);
+        var contentProposal = new Size(
+            proposedSize.Width > 0 ? Math.Max(0, proposedSize.Width - chromeWidth) : 0,
+            proposedSize.Height > 0 ? Math.Max(0, proposedSize.Height - chromeHeight) : 0);
+        var contentSize = HostedContent?.GetPreferredSize(contentProposal) ?? Size.Empty;
         return new Size(
-            SaturateSize((long)Math.Max(0, contentSize.Width) + padding.Horizontal + (2L * _borderWidth)),
-            SaturateSize((long)Math.Max(0, contentSize.Height) + padding.Vertical + (2L * _borderWidth)));
+            SaturateSize((long)Math.Max(0, contentSize.Width) + chromeWidth),
+            SaturateSize((long)Math.Max(0, contentSize.Height) + chromeHeight));
     }
 
     protected override void OnLayout(LayoutEventArgs levent)

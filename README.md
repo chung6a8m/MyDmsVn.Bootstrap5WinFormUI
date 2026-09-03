@@ -57,6 +57,7 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapNumericBox`
 - `BootstrapComboBox`
 - `BootstrapSelect`
+- `BootstrapLookupBox` and `BootstrapLookupColumn`
 - `BootstrapInputGroup`
 - `BootstrapInputGroupText`
 - `BootstrapDatePicker`
@@ -99,7 +100,7 @@ The Navigation / Tabs page demonstrates native-backed Tabs plus Dropdown basic/i
 
 Earlier Rendering / DPI, Icons, and Animation diagnostics remain available below the Theme navigation item.
 
-See [Phase 14 — Integrated Demo Application](docs/PHASE14_INTEGRATED_DEMO.md) for the original navigation contract, [BootstrapSelect guide](docs/BOOTSTRAP_SELECT.md) for the Select2-style selector contract, and [Component contracts](docs/COMPONENTS.md) for current component behavior.
+See [Phase 14 — Integrated Demo Application](docs/PHASE14_INTEGRATED_DEMO.md) for the original navigation contract, [BootstrapSelect guide](docs/BOOTSTRAP_SELECT.md), [BootstrapLookup guide](docs/BOOTSTRAP_LOOKUP_BOX.md), and [Component contracts](docs/COMPONENTS.md).
 
 See [BootstrapInputGroup guide](docs/BOOTSTRAP_INPUT_GROUP.md) for connected addon/input/button composition, supported child types, sizing, compression, reorder, RTL, and verification.
 

@@ -13,7 +13,7 @@ The library is native WinForms. It does not require a browser, WebView, Bootstra
 
 Input composition includes `BootstrapInputGroup`, `BootstrapInputGroupText`, and `BootstrapInputGroupSize`; grouped `BootstrapSelect` is Single-only in v1.
 
-`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapSplitButton`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapComboBox`, `BootstrapSelect`, `BootstrapDatePicker`, `BootstrapCalendar`, `BootstrapCalendarPicker`, `BootstrapDropdown`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabControl`, `BootstrapToast`, `BootstrapToastContainer`, and `BootstrapToastService`, plus shared Theme, Rendering, DPI, Animation, Icon, and Overlay infrastructure.
+`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapSplitButton`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapComboBox`, `BootstrapSelect`, `BootstrapLookupBox`, `BootstrapLookupColumn`, `BootstrapDatePicker`, `BootstrapCalendar`, `BootstrapCalendarPicker`, `BootstrapDropdown`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabControl`, `BootstrapToast`, `BootstrapToastContainer`, and `BootstrapToastService`, plus shared Theme, Rendering, DPI, Animation, Icon, and Overlay infrastructure.
 
 `BootstrapNumericBox` is a native-backed numeric input. It owns one borderless WinForms `NumericUpDown` and forwards `Value`, `Minimum`, `Maximum`, `Increment`, `DecimalPlaces`, `ThousandsSeparator`, and `ReadOnly` directly, while the framework owns the themed shell, validation/focus rendering, DPI layout, single public tab stop, and `BorderRadius`. Native range exceptions, spin buttons, Up/Down keys, mouse wheel, parsing, and formatting semantics remain native.
 
@@ -264,3 +264,7 @@ The package is a release candidate, not an automatic NuGet.org publication.
 Project source and full documentation: https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI
 
 BootstrapSelect guide: https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI/blob/main/docs/BOOTSTRAP_SELECT.md
+
+BootstrapLookup guide: https://github.com/chung6a8m/MyDmsVn.Bootstrap5WinFormUI/blob/main/docs/BOOTSTRAP_LOOKUP_BOX.md
+
+`BootstrapLookupBox` provides local single-selection search with Vietnamese-insensitive multi-token ranking, exact-match ambiguity protection, Refresh/Add New workflows, and separate committed, pending, and highlighted state. `BootstrapLookupColumn` stores raw `ValueMember` values while preserving native DataGridView traversal, currency, and new-row behavior.

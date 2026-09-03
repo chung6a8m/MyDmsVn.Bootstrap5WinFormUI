@@ -760,6 +760,12 @@ Run this manual sequence on the integrated **Feedback** page:
 
 Repeat the sequence in Light and Dark themes and at a non-100% Windows DPI setting. Focus cues must remain visible, and theme/DPI changes must not alter keyboard behavior or overlay placement.
 
+### BootstrapLookup regression matrix
+
+Automated tests cover standalone state separation, Vietnamese normalization and aggregate ranking, exact-match ambiguity, every unmatched policy, debounce cancellation, logical `ResultsChanged`, highlight-only navigation, popup mouse/keyboard behavior, transient validation layering, theme/source disposal, and 1k/5k/10k deterministic search. DataGridView tests use the real internal editing control and verify raw-value formatting, dirty notification, contextual events, native Tab skipping, validation blocking, BindingSource currency, native new rows, and A-to-B editor reconfiguration without stale source or event paths.
+
+Manual Windows verification adds Light/Dark switching, 96/120/144/168/192 DPI, real IME input, F4/Alt+Down, application Alt+Tab presentation-only close, monitor-edge placement, footer workflows, repeated popup disposal, and repeated cross-column edit cycles while observing USER/GDI resources. See `docs/BOOTSTRAP_LOOKUP_BOX.md`.
+
 ### Anchored overlay activation and BootstrapSelect navigation regression matrix
 
 Run the following BootstrapSelect checks on the integrated **Select** page:

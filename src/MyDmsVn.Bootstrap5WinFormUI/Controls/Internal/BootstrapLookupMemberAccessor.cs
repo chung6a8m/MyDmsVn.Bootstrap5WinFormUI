@@ -1,0 +1,63 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+
+namespace MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
+
+internal static class BootstrapLookupMemberAccessor
+{
+    private static readonly object Sync = new object();
+    private static readonly Dictionary<string, PropertyDescriptor> Cache = new Dictionary<string, PropertyDescriptor>(StringComparer.Ordinal);
+
+    internal static object? GetValue(object item, string memberName)
+    {
+        if (item is null) throw new ArgumentNullException(nameof(item));
+        if (string.IsNullOrEmpty(memberName)) return item;
+        return GetDescriptor(item, memberName).GetValue(item);
+    }
+
+    internal static void Validate(Type itemType, string memberName)
+    {
+        if (!string.IsNullOrEmpty(memberName)) GetDescriptor(itemType, memberName);
+    }
+
+    internal static void Validate(object item, string memberName)
+    {
+        if (item is null) throw new ArgumentNullException(nameof(item));
+        if (!string.IsNullOrEmpty(memberName)) GetDescriptor(item, memberName);
+    }
+
+    internal static void Validate(PropertyDescriptorCollection properties, string memberName)
+    {
+        if (properties is null) throw new ArgumentNullException(nameof(properties));
+        if (string.IsNullOrEmpty(memberName)) return;
+        if (properties.Find(memberName, false) is null)
+        {
+            throw new ArgumentException($"Member '{memberName}' was not found in the list metadata.", nameof(memberName));
+        }
+    }
+
+    private static PropertyDescriptor GetDescriptor(object item, string memberName)
+    {
+        if (item is ICustomTypeDescriptor)
+        {
+            return TypeDescriptor.GetProperties(item).Find(memberName, false)
+                ?? throw new ArgumentException($"Member '{memberName}' was not found on '{item.GetType().FullName}'.", nameof(memberName));
+        }
+
+        return GetDescriptor(item.GetType(), memberName);
+    }
+
+    private static PropertyDescriptor GetDescriptor(Type itemType, string memberName)
+    {
+        var key = itemType.AssemblyQualifiedName + "\0" + memberName;
+        lock (Sync)
+        {
+            if (Cache.TryGetValue(key, out var descriptor)) return descriptor;
+            descriptor = TypeDescriptor.GetProperties(itemType).Find(memberName, false)
+                ?? throw new ArgumentException($"Member '{memberName}' was not found on '{itemType.FullName}'.", nameof(memberName));
+            Cache.Add(key, descriptor);
+            return descriptor;
+        }
+    }
+}
