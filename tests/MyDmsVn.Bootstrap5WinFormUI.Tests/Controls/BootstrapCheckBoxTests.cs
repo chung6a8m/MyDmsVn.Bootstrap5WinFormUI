@@ -145,16 +145,16 @@ public sealed class BootstrapCheckBoxTests
     }
 
     [Test]
-    public void AutoSizeTextBoundsAreWideEnoughForPaintMetrics()
+    public void AutoSizePreferredSizeUsesTheSameTextPaddingAsPainting()
     {
         using var control = new BootstrapCheckBox { Text = "Wide italic-like WWW label", AutoSize = true };
         var dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
         var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.CheckBox, BootstrapThemeManager.CurrentTheme.Metrics, dpi);
         var flags = BootstrapCheckableRenderLogic.GetTextFormatFlags(control.TextAlign, control.UseMnemonic, false, control.AutoEllipsis, false);
         var paintTextSize = TextRenderer.MeasureText(control.Text, control.Font, Size.Empty, flags);
-        var layout = BootstrapCheckableRenderLogic.GetLayout(control.ClientRectangle, control.Padding, metrics, control.CheckAlign, false);
+        var expected = BootstrapCheckableRenderLogic.GetPreferredSize(paintTextSize, control.Padding, metrics);
 
-        Assert.That(layout.TextBounds.Width, Is.GreaterThanOrEqualTo(paintTextSize.Width));
+        Assert.That(control.GetPreferredSize(Size.Empty), Is.EqualTo(expected));
     }
 
     [Test]
