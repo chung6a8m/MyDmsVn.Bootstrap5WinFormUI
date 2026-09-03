@@ -11,7 +11,7 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
     private readonly object? _dataSource;
     private readonly string _displayMember;
     private readonly string _valueMember;
-    private readonly Type? _itemType;
+    private Type? _itemType;
     private readonly BindingSource? _bindingSource;
     private readonly IBindingList? _bindingList;
     private List<BootstrapLookupSourceItem> _snapshot = new List<BootstrapLookupSourceItem>();
@@ -63,6 +63,8 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
     internal void Refresh()
     {
         ThrowIfDisposed();
+        var itemType = GetKnownItemType(_dataSource);
+        ValidateKnownItemType(itemType, _displayMember, _valueMember);
         var result = new List<BootstrapLookupSourceItem>();
         var enumerable = ResolveEnumerable(_dataSource);
         if (enumerable != null)
@@ -80,6 +82,7 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
         }
 
         _snapshot = result;
+        _itemType = itemType;
     }
 
     internal bool TryFindByValue(object? value, out BootstrapLookupSourceItem? sourceItem)

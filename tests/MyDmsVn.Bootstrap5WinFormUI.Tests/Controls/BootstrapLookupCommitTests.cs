@@ -205,6 +205,115 @@ public sealed class BootstrapLookupCommitTests
         Assert.That(observations, Is.EqualTo(1));
     }
 
+    [Test]
+    public void CommitAndAddRefreshesPlainListProjectionForReopen()
+    {
+        var source = new List<string>();
+        using var lookup = new BootstrapLookupBox
+        {
+            DataSource = source,
+            UnmatchedTextBehavior = BootstrapLookupUnmatchedTextBehavior.CommitAndAdd,
+            SearchDebounceMilliseconds = 0,
+            Text = "Gamma"
+        };
+        lookup.ExecuteSearchNow();
+
+        Assert.That(lookup.ResolvePendingText(BootstrapLookupCommitReason.Keyboard).NavigationAllowed, Is.True);
+        lookup.OpenDropDown();
+
+        Assert.That(lookup.ResultsGrid.Rows, Has.Count.EqualTo(1));
+        Assert.That(lookup.ResultsGrid.Rows[0].Cells[0].Value, Is.EqualTo("Gamma"));
+    }
+
+    [Test]
+    public void CommitAndAddUsesMetadataFromReconfiguredBindingSource()
+    {
+        using var source = new BindingSource();
+        using var lookup = new BootstrapLookupBox
+        {
+            DataSource = source,
+            UnmatchedTextBehavior = BootstrapLookupUnmatchedTextBehavior.CommitAndAdd
+        };
+        var strings = new BindingList<string>();
+        source.DataSource = strings;
+        lookup.Text = "Tea";
+
+        var result = lookup.ResolvePendingText(BootstrapLookupCommitReason.Keyboard);
+
+        Assert.That(result.NavigationAllowed, Is.True);
+        Assert.That(strings, Is.EqualTo(new[] { "Tea" }));
+        Assert.That(lookup.SelectedValue, Is.EqualTo("Tea"));
+    }
+
+    [Test]
+    public void SelectionCommittedStopsStaleOuterDeliveryBetweenSubscribers()
+    {
+        using var lookup = Create(new BindingList<Product> { new(1, "Alpha"), new(2, "Beta") });
+        var secondSubscriberValues = new List<object?>();
+        var redirected = false;
+        lookup.SelectionCommitted += (_, e) =>
+        {
+            if (!redirected && Equals(e.Value, 1))
+            {
+                redirected = true;
+                lookup.SelectedValue = 2;
+            }
+        };
+        lookup.SelectionCommitted += (_, e) =>
+        {
+            Assert.That(e.Value, Is.EqualTo(lookup.SelectedValue));
+            secondSubscriberValues.Add(e.Value);
+        };
+
+        lookup.SelectedValue = 1;
+
+        Assert.That(secondSubscriberValues, Is.EqualTo(new object?[] { 2 }));
+    }
+
+    [Test]
+    public void TextChangedDuringCommitObservesConsistentCommittedState()
+    {
+        using var lookup = Create(new BindingList<Product> { new(1, "Alpha"), new(2, "Beta") });
+        lookup.SelectValue(1);
+        lookup.Text = "be";
+        lookup.SetLookupValidation("old error");
+        lookup.TextChanged += (_, _) =>
+        {
+            Assert.That(lookup.SelectedValue, Is.EqualTo(2));
+            Assert.That(lookup.CommittedDisplayText, Is.EqualTo("Beta"));
+            Assert.That(lookup.HasPendingText, Is.False);
+            Assert.That(lookup.ValidationMessage, Is.Empty);
+        };
+
+        lookup.SelectValue(2);
+    }
+
+    [Test]
+    public void TextChangedReentrantSelectionLeavesNestedHighlightAndCommitStateIntact()
+    {
+        var first = new Product(1, "Alpha");
+        var second = new Product(2, "Beta");
+        using var lookup = Create(new BindingList<Product> { first, second });
+        var redirected = false;
+        lookup.TextChanged += (_, _) =>
+        {
+            if (redirected || lookup.Text != "Alpha") return;
+            redirected = true;
+            lookup.SelectedValue = 2;
+        };
+
+        lookup.SelectedValue = 1;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.SelectedValue, Is.EqualTo(2));
+            Assert.That(lookup.SelectedItem, Is.SameAs(second));
+            Assert.That(lookup.Text, Is.EqualTo("Beta"));
+            Assert.That(lookup.CommittedDisplayText, Is.EqualTo("Beta"));
+            Assert.That(lookup.HighlightedItem, Is.SameAs(second));
+        }));
+    }
+
     private static BootstrapLookupBox Create(object source) => new BootstrapLookupBox { DisplayMember = "Name", ValueMember = "Id", DataSource = source };
 
     private sealed class Product

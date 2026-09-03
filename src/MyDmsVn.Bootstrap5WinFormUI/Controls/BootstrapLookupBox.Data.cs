@@ -11,6 +11,7 @@ public partial class BootstrapLookupBox
     private string _valueMember = string.Empty;
     private BootstrapLookupDataAdapter? _dataAdapter;
     private int _commitGeneration;
+    private int _sourceChangeGeneration;
 
     private void SetDataSource(object? value)
     {
@@ -55,6 +56,7 @@ public partial class BootstrapLookupBox
 
     private void OnLookupSourceChanged(object? sender, EventArgs e)
     {
+        _sourceChangeGeneration++;
         ReconcileCommittedSelection();
         ExecuteSearchNow();
     }
@@ -119,15 +121,38 @@ public partial class BootstrapLookupBox
         _selectedItem = item;
         _selectedValue = value;
         _committedDisplayText = displayText ?? string.Empty;
-        SynchronizeText(_committedDisplayText);
         _hasPendingText = false;
         ClearLookupValidation();
+        SynchronizeText(_committedDisplayText);
+        if (generation != _commitGeneration) return;
         SetHighlightedItem(item, value, item is not null);
         if (generation != _commitGeneration) return;
         if (IsDropDownOpen) SynchronizeHighlightedResult();
-        if (changed) SelectedValueChanged?.Invoke(this, EventArgs.Empty);
+        if (changed) RaiseSelectedValueChanged(generation);
         if (generation != _commitGeneration) return;
-        SelectionCommitted?.Invoke(this, new BootstrapLookupSelectionCommittedEventArgs(item, value, _committedDisplayText, reason));
+        RaiseSelectionCommitted(new BootstrapLookupSelectionCommittedEventArgs(item, value, _committedDisplayText, reason), generation);
+    }
+
+    private void RaiseSelectedValueChanged(int generation)
+    {
+        var handlers = SelectedValueChanged;
+        if (handlers is null) return;
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            if (generation != _commitGeneration) return;
+            handler(this, EventArgs.Empty);
+        }
+    }
+
+    private void RaiseSelectionCommitted(BootstrapLookupSelectionCommittedEventArgs args, int generation)
+    {
+        var handlers = SelectionCommitted;
+        if (handlers is null) return;
+        foreach (EventHandler<BootstrapLookupSelectionCommittedEventArgs> handler in handlers.GetInvocationList())
+        {
+            if (generation != _commitGeneration) return;
+            handler(this, args);
+        }
     }
 
     internal BootstrapLookupCommitResult TryCommitResult(BootstrapLookupSourceItem sourceItem, BootstrapLookupCommitReason reason)

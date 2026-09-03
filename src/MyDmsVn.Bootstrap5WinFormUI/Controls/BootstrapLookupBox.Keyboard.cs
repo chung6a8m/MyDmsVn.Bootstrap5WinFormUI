@@ -19,12 +19,13 @@ public partial class BootstrapLookupBox
             CancelPendingEdit();
             return true;
         }
-        if (key == Keys.F4 || ((modifiers & Keys.Alt) == Keys.Alt && key == Keys.Down) || (!IsDropDownOpen && key == Keys.Down))
+        if ((key == Keys.F4 && modifiers == Keys.None) || (modifiers == Keys.Alt && key == Keys.Down) ||
+            (!IsDropDownOpen && key == Keys.Down && modifiers == Keys.None))
         {
             OpenDropDown();
             return true;
         }
-        if (IsDropDownOpen && IsNavigationKey(key))
+        if (IsDropDownOpen && modifiers == Keys.None && IsNavigationKey(key))
         {
             FlushPendingSearch();
             NavigateResults(key);
@@ -51,14 +52,15 @@ public partial class BootstrapLookupBox
             return;
         }
 
-        if (key == Keys.F4 || (e.Alt && key == Keys.Down) || (!IsDropDownOpen && key == Keys.Down))
+        if ((key == Keys.F4 && e.Modifiers == Keys.None) || (e.Modifiers == Keys.Alt && key == Keys.Down) ||
+            (!IsDropDownOpen && key == Keys.Down && e.Modifiers == Keys.None))
         {
             OpenDropDown();
             Consume(e);
             return;
         }
 
-        if (IsDropDownOpen && IsNavigationKey(key))
+        if (IsDropDownOpen && e.Modifiers == Keys.None && IsNavigationKey(key))
         {
             FlushPendingSearch();
             NavigateResults(key);
@@ -129,6 +131,17 @@ public partial class BootstrapLookupBox
 
     private int FindHighlightedRowIndex()
     {
+        var currentRow = ResultsGrid.CurrentCell?.RowIndex ?? -1;
+        if (currentRow >= 0 && currentRow < ResultsGrid.Rows.Count)
+        {
+            var currentItem = _dropDownContent.GetSourceItem(currentRow);
+            if (currentItem is not null && ReferenceEquals(currentItem.Item, _highlightedItem)) return currentRow;
+        }
+        for (var index = 0; index < ResultsGrid.Rows.Count; index++)
+        {
+            var sourceItem = _dropDownContent.GetSourceItem(index);
+            if (sourceItem is not null && ReferenceEquals(sourceItem.Item, _highlightedItem)) return index;
+        }
         for (var index = 0; index < ResultsGrid.Rows.Count; index++)
         {
             var sourceItem = _dropDownContent.GetSourceItem(index);

@@ -92,11 +92,13 @@ public partial class BootstrapLookupBox
         }
         if (value is null && ValueMember.Length > 0) return ApplyLookupValidation();
 
+        var sourceChangeGeneration = _sourceChangeGeneration;
         _dataAdapter.Add(item);
         if (!_dataAdapter.TryFindByItem(item, out var accepted) || accepted is null)
             return ApplyLookupValidation();
         if (accepted.Value is null && ValueMember.Length > 0) return ApplyLookupValidation();
         CommitSelection(accepted.Item, accepted.Value, accepted.DisplayText, BootstrapLookupCommitReason.CommitAndAdd);
+        if (sourceChangeGeneration == _sourceChangeGeneration) ExecuteSearchNow();
         return BootstrapLookupCommitResult.Success();
     }
 

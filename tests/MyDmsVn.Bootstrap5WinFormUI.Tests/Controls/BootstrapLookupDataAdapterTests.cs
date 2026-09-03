@@ -108,6 +108,28 @@ public sealed class BootstrapLookupDataAdapterTests
         Assert.That(changes, Is.EqualTo(1));
     }
 
+    [Test]
+    public void BindingSourceReplacementRefreshesAndValidatesItemMetadata()
+    {
+        using var source = new BindingSource();
+        using var adapter = new BootstrapLookupDataAdapter(source, "Missing", "Id");
+
+        Assert.That(
+            (Action)(() => source.DataSource = new BindingList<Product>()),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public void BindingSourceReplacementCanBecomeAStringItemSource()
+    {
+        using var source = new BindingSource();
+        using var adapter = new BootstrapLookupDataAdapter(source, string.Empty, string.Empty);
+
+        source.DataSource = new BindingList<string>();
+
+        Assert.That(adapter.IsStringItemSource, Is.True);
+    }
+
     private sealed class Product
     {
         internal Product(object? id, string? name) { Id = id; Name = name; }

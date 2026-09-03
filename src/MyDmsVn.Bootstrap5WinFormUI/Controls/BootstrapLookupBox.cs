@@ -40,6 +40,8 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     private BootstrapLookupEnterKeyBehavior _enterKeyBehavior;
     private BootstrapLookupClosedEnterKeyBehavior _closedEnterKeyBehavior;
     private int _leaveResolutionGeneration;
+    private int _suspendedLeaveResolutionCount;
+    private int _highlightGeneration;
 
     /// <summary>Initializes a designer-safe lookup editor.</summary>
     public BootstrapLookupBox()
@@ -277,8 +279,16 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         _highlightedItem = item;
         _highlightedValue = value;
         _hasHighlightedItem = hasItem;
-        if (logicalIdentityChanged)
-            HighlightedItemChanged?.Invoke(this, new BootstrapLookupHighlightedItemChangedEventArgs(previous, item));
+        var generation = ++_highlightGeneration;
+        if (!logicalIdentityChanged) return;
+        var handlers = HighlightedItemChanged;
+        if (handlers is null) return;
+        var args = new BootstrapLookupHighlightedItemChangedEventArgs(previous, item);
+        foreach (EventHandler<BootstrapLookupHighlightedItemChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            if (generation != _highlightGeneration) return;
+            handler(this, args);
+        }
     }
 
     internal bool IsHighlightedSourceItem(BootstrapLookupSourceItem sourceItem) => _hasHighlightedItem &&
@@ -347,7 +357,8 @@ public partial class BootstrapLookupBox : BootstrapTextBox
 
     private void ResolveDeferredLeave(int generation)
     {
-        if (generation != _leaveResolutionGeneration || IsDisposed || Disposing || ContainsFocus || !Enabled || ReadOnly) return;
+        if (generation != _leaveResolutionGeneration || _suspendedLeaveResolutionCount > 0 ||
+            IsDisposed || Disposing || ContainsFocus || !Enabled || ReadOnly) return;
         if (_dropDownController.ContainsFocus || !ApplicationHasFocus()) return;
         var resolution = ResolvePendingText(BootstrapLookupCommitReason.ExactMatch);
         if (!resolution.NavigationAllowed) OpenDropDown();

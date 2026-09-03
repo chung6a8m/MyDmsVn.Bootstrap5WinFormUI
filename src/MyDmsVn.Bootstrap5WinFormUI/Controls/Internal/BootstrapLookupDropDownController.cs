@@ -26,6 +26,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
         _content = content ?? throw new ArgumentNullException(nameof(content));
         _effectiveDpi = ResolveOwnerDpi();
         _content.ResultsGrid.CellMouseClick += OnResultCellMouseClick;
+        _content.ResultsGrid.Enter += OnResultsGridEnter;
         _content.RefreshRequested += OnRefreshRequested;
         _content.AddNewRequested += OnAddNewRequested;
         _owner.DpiChangedAfterParent += OnOwnerDpiChangedAfterParent;
@@ -84,6 +85,7 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
         _tracker?.Dispose();
         _tracker = null;
         _content.ResultsGrid.CellMouseClick -= OnResultCellMouseClick;
+        _content.ResultsGrid.Enter -= OnResultsGridEnter;
         _content.RefreshRequested -= OnRefreshRequested;
         _content.AddNewRequested -= OnAddNewRequested;
         _owner.DpiChangedAfterParent -= OnOwnerDpiChangedAfterParent;
@@ -195,6 +197,20 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
         if (!_owner.Enabled || _owner.ReadOnly) return;
         _owner.RefreshResults();
         if (_isOpen) _owner.FocusLookupEditor();
+    }
+
+    private void OnResultsGridEnter(object? sender, EventArgs e)
+    {
+        if (!_isOpen || _disposed || _owner.IsDisposed) return;
+        try
+        {
+            _owner.BeginInvoke((Action)(() =>
+            {
+                if (!_isOpen || _disposed || _owner.IsDisposed || !_owner.Enabled || _owner.ReadOnly) return;
+                _owner.FocusLookupEditor();
+            }));
+        }
+        catch (InvalidOperationException) { }
     }
 
     private void OnAddNewRequested(object? sender, EventArgs e)

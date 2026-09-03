@@ -68,16 +68,8 @@ public partial class BootstrapLookupBox
 
     internal void SynchronizeHighlightedResult()
     {
-        var rowIndex = -1;
-        for (var index = 0; index < ResultsGrid.Rows.Count; index++)
-        {
-            var sourceItem = _dropDownContent.GetSourceItem(index);
-            if (sourceItem is not null && IsHighlightedSourceItem(sourceItem))
-            {
-                rowIndex = index;
-                break;
-            }
-        }
+        var rowIndex = FindPhysicalHighlightedRowIndex();
+        if (rowIndex < 0) rowIndex = FindLogicalHighlightedRowIndex();
         ResultsGrid.ClearSelection();
         if (rowIndex < 0)
         {
@@ -89,6 +81,26 @@ public partial class BootstrapLookupBox
         ResultsGrid.CurrentCell = FindFirstVisibleCell(row);
         if (ResultsGrid.DisplayedRowCount(false) > 0)
             ResultsGrid.FirstDisplayedScrollingRowIndex = rowIndex;
+    }
+
+    private int FindPhysicalHighlightedRowIndex()
+    {
+        for (var index = 0; index < ResultsGrid.Rows.Count; index++)
+        {
+            var sourceItem = _dropDownContent.GetSourceItem(index);
+            if (sourceItem is not null && ReferenceEquals(sourceItem.Item, _highlightedItem)) return index;
+        }
+        return -1;
+    }
+
+    private int FindLogicalHighlightedRowIndex()
+    {
+        for (var index = 0; index < ResultsGrid.Rows.Count; index++)
+        {
+            var sourceItem = _dropDownContent.GetSourceItem(index);
+            if (sourceItem is not null && IsHighlightedSourceItem(sourceItem)) return index;
+        }
+        return -1;
     }
 
     private static System.Windows.Forms.DataGridViewCell? FindFirstVisibleCell(System.Windows.Forms.DataGridViewRow row)
@@ -104,8 +116,18 @@ public partial class BootstrapLookupBox
     {
         if (!Enabled || ReadOnly) return;
         var args = new BootstrapLookupAddNewRequestedEventArgs(Text);
-        CloseDropDown();
-        RaiseAddNewRequested(args);
+        _suspendedLeaveResolutionCount++;
+        _leaveResolutionGeneration++;
+        try
+        {
+            CloseDropDown();
+            RaiseAddNewRequested(args);
+        }
+        finally
+        {
+            _suspendedLeaveResolutionCount--;
+            _leaveResolutionGeneration++;
+        }
         if (args.Cancel || args.NewItem is null) return;
         object? value;
         string display;
@@ -121,7 +143,7 @@ public partial class BootstrapLookupBox
         if (value is null && ValueMember.Length > 0) return;
         CommitSelection(args.NewItem, value, display, BootstrapLookupCommitReason.Programmatic);
         _dataAdapter?.Refresh();
-        ApplyCurrentResultsToContent();
+        ExecuteSearchNow();
     }
 
     internal void FocusLookupEditor()

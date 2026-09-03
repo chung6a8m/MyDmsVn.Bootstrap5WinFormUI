@@ -255,6 +255,31 @@ public sealed class BootstrapLookupDataGridViewTests
         }));
     }
 
+    [Test]
+    public void ExplicitAddNewFormatsReturnedItemBeforeSourceReconciliation()
+    {
+        var products = new System.Collections.Generic.List<Product> { new Product(1, "Alpha") };
+        var column = CreateColumn(products);
+        column.AddNewRequested += (_, e) => e.NewItem = new Product(3, "Gamma");
+        var row = new NullableRow { ProductId = 1 };
+        var host = CreateGridHost(column, row);
+        using var form = host.Form;
+        using var grid = host.Grid;
+        BeginEdit(grid, 0);
+        var editor = (BootstrapLookupBox)grid.EditingControl!;
+        editor.Text = "Gamma";
+
+        editor.RequestExplicitAddNew();
+        var ended = grid.EndEdit();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(ended, Is.True);
+            Assert.That(row.ProductId, Is.EqualTo(3));
+            Assert.That(grid.Rows[0].Cells[0].FormattedValue, Is.EqualTo("Gamma"));
+        }));
+    }
+
     private static BootstrapLookupColumn CreateColumn(object source) => new BootstrapLookupColumn
     {
         DataSource = source, DisplayMember = "Name", ValueMember = "Id", DataPropertyName = "ProductId"

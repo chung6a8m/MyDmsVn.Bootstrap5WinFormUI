@@ -103,6 +103,34 @@ public sealed class BootstrapLookupInteractionTests
         }));
     }
 
+    [Test]
+    public void NavigationTraversesPhysicalRowsThatShareOneLogicalValue()
+    {
+        var first = new Product(1, "First");
+        var second = new Product(1, "Second");
+        var third = new Product(1, "Third");
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = new TestLookup
+        {
+            DisplayMember = "Name", ValueMember = "Id",
+            DataSource = new BindingList<Product> { first, second, third },
+            SearchDebounceMilliseconds = 0
+        };
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.OpenDropDown();
+
+        lookup.SendKey(Keys.Down);
+        lookup.SendKey(Keys.Down);
+
+        Assert.That(lookup.ResultsGrid.SelectedRows.Cast<DataGridViewRow>().Single().Index, Is.EqualTo(2));
+        Assert.That(lookup.HighlightedItem, Is.SameAs(third));
+        lookup.SendKey(Keys.Enter);
+        Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+        Assert.That(lookup.SelectedItem, Is.SameAs(third));
+    }
+
     [TestCase(Keys.Down)]
     [TestCase(Keys.PageDown)]
     public void NavigationUsesFirstVisibleResultCellWhenLeadingColumnIsHidden(Keys key)
@@ -613,6 +641,121 @@ public sealed class BootstrapLookupInteractionTests
     }
 
     [Test]
+    public void BlankResultsViewportReturnsKeyboardFocusToEditor()
+    {
+        using var form = new Form { ShowInTaskbar = false, Height = 300 };
+        using var lookup = Create();
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.OpenDropDown();
+        Application.DoEvents();
+
+        lookup.ResultsGrid.Focus();
+        Application.DoEvents();
+        SendCharacterToFocusedControl('b');
+
+        Assert.That(lookup.EditorFocused, Is.True);
+        Assert.That(lookup.Text, Is.EqualTo("b"));
+    }
+
+    [Test]
+    public void ResultsScrollbarReturnsKeyboardFocusToEditor()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        lookup.DropDownWidth = 180;
+        lookup.Columns.Add(new BootstrapLookupColumnDefinition
+        {
+            DataPropertyName = "Name", HeaderText = "Name", Width = 400
+        });
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.OpenDropDown();
+        Application.DoEvents();
+        var scrollbar = lookup.ResultsGrid.Controls.OfType<HScrollBar>().Single();
+        Assert.That(scrollbar.Visible, Is.True);
+
+        scrollbar.Focus();
+        Application.DoEvents();
+        SendCharacterToFocusedControl('b');
+
+        Assert.That(lookup.EditorFocused, Is.True);
+        Assert.That(lookup.Text, Is.EqualTo("b"));
+    }
+
+    [Test]
+    public void ModifiedF4AndDownAreNotConsumedAsLookupCommands()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            lookup.SendCommandKey(Keys.Alt | Keys.F4);
+            Assert.That(lookup.SendEditorKey(Keys.Control | Keys.F4), Is.False);
+            Assert.That(lookup.SendEditorKey(Keys.Control | Keys.Down), Is.False);
+            Assert.That(lookup.IsDropDownOpen, Is.False);
+        }));
+    }
+
+    [Test]
+    public void ExplicitAddNewCancellationAcrossNestedMessageLoopPreservesPendingQuery()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.SelectValue(1);
+        lookup.Text = "Gamma";
+        lookup.AddNewRequested += (_, e) =>
+        {
+            lookup.SendLeave();
+            using var dialog = new Form { ShowInTaskbar = false };
+            dialog.Shown += (_, _) => dialog.BeginInvoke((Action)dialog.Close);
+            dialog.ShowDialog(form);
+            e.Cancel = true;
+        };
+
+        lookup.RequestExplicitAddNew();
+        Application.DoEvents();
+
+        Assert.That(lookup.Text, Is.EqualTo("Gamma"));
+        Assert.That(lookup.HasPendingText, Is.True);
+        Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void ExplicitAddNewRecomputesActiveQueryAfterPlainListMutation()
+    {
+        var source = new System.Collections.Generic.List<Product> { new Product(1, "Alpha") };
+        using var lookup = new TestLookup
+        {
+            DisplayMember = "Name", ValueMember = "Id", DataSource = source,
+            SearchDebounceMilliseconds = 0, Text = "Gamma"
+        };
+        lookup.ExecuteSearchNow();
+        lookup.AddNewRequested += (_, e) =>
+        {
+            var added = new Product(3, "Gamma");
+            source.Add(added);
+            e.NewItem = added;
+        };
+
+        lookup.RequestExplicitAddNew();
+        lookup.OpenDropDown();
+
+        Assert.That(lookup.ResultsGrid.Rows, Has.Count.EqualTo(1));
+        Assert.That(lookup.ResultsGrid.Rows[0].Cells[0].Value, Is.EqualTo("Gamma"));
+    }
+
+    [Test]
     public void ReadOnlyBlocksKeyboardCommitAndMouseOpen()
     {
         using var form = new Form { ShowInTaskbar = false };
@@ -921,6 +1064,17 @@ public sealed class BootstrapLookupInteractionTests
             OnEditorKeyDown(args);
         }
         internal bool SendDialogKey(Keys key) => ProcessDialogKey(key);
+        internal bool SendEditorKey(Keys key)
+        {
+            var args = new KeyEventArgs(key);
+            OnEditorKeyDown(args);
+            return args.Handled;
+        }
+        internal bool SendCommandKey(Keys key)
+        {
+            var message = Message.Create(Editor.Handle, 0x0104, (IntPtr)(int)(key & Keys.KeyCode), IntPtr.Zero);
+            return ProcessCmdKey(ref message, key);
+        }
         internal void SendLeave() => OnLeave(EventArgs.Empty);
     }
 

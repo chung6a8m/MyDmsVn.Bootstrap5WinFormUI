@@ -105,7 +105,8 @@ public partial class BootstrapLookupBox
     {
         BootstrapLookupSourceItem? chosen = null;
         if (_hasHighlightedItem)
-            chosen = items.FirstOrDefault(IsHighlightedSourceItem);
+            chosen = items.FirstOrDefault(item => ReferenceEquals(item.Item, _highlightedItem)) ??
+                items.FirstOrDefault(IsHighlightedSourceItem);
         if (chosen is null && _selectedValue is not null)
             chosen = items.FirstOrDefault(item => EqualityComparer<object?>.Default.Equals(item.Value, _selectedValue));
         if (chosen is null && items.Count > 0) chosen = items[0];

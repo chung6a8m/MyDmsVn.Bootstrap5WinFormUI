@@ -28,6 +28,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     private string _valueMember = string.Empty;
     private BootstrapLookupDataAdapter? _formatAdapter;
     private Dictionary<object, string> _displayByValue = new Dictionary<object, string>();
+    private Dictionary<object, string> _displayFallbackByValue = new Dictionary<object, string>();
 
     /// <summary>Initializes a lookup column.</summary>
     public BootstrapLookupColumn() : base(new BootstrapLookupCell())
@@ -86,6 +87,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
         clone._searchMembers = new BootstrapLookupSearchMemberCollection();
         clone._formatAdapter = null;
         clone._displayByValue = new Dictionary<object, string>();
+        clone._displayFallbackByValue = new Dictionary<object, string>();
         clone._dataSource = null;
         clone._displayMember = string.Empty;
         clone._valueMember = string.Empty;
@@ -97,7 +99,16 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     internal string ResolveDisplayText(object? value)
     {
         if (_formatAdapter is null) ReplaceFormatAdapter(_dataSource, _displayMember, _valueMember);
-        return value is not null && _displayByValue.TryGetValue(value, out var display) ? display : string.Empty;
+        if (value is null) return string.Empty;
+        if (_displayByValue.TryGetValue(value, out var display)) return display;
+        return _displayFallbackByValue.TryGetValue(value, out display) ? display : string.Empty;
+    }
+
+    internal void RememberDisplayText(object? value, string displayText)
+    {
+        if (value is null) return;
+        _displayFallbackByValue[value] = displayText ?? string.Empty;
+        InvalidateOwningColumn();
     }
 
     internal void RefreshDisplayIndex()
@@ -109,6 +120,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
         }
         _formatAdapter.Refresh();
         _displayByValue = BuildDisplayIndex(_formatAdapter);
+        RemoveReconciledFallbacks();
         InvalidateOwningColumn();
     }
 
@@ -149,6 +161,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
         _valueMember = valueMember;
         _formatAdapter = replacement;
         _displayByValue = replacementIndex;
+        RemoveReconciledFallbacks();
         _formatAdapter.SourceChanged += OnFormatSourceChanged;
         InvalidateOwningColumn();
     }
@@ -157,6 +170,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     {
         if (_formatAdapter is null) return;
         _displayByValue = BuildDisplayIndex(_formatAdapter);
+        RemoveReconciledFallbacks();
         InvalidateOwningColumn();
     }
 
@@ -188,5 +202,10 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     private void InvalidateOwningColumn()
     {
         if (DataGridView is not null && !DataGridView.IsDisposed && Index >= 0) DataGridView.InvalidateColumn(Index);
+    }
+
+    private void RemoveReconciledFallbacks()
+    {
+        foreach (var value in _displayByValue.Keys) _displayFallbackByValue.Remove(value);
     }
 }
