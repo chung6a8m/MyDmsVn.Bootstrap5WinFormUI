@@ -76,7 +76,7 @@ public class BootstrapCheckBox : CheckBox
         if (UsesNativeFallback()) return base.GetPreferredSize(proposedSize);
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
         var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.CheckBox, BootstrapThemeManager.CurrentTheme.Metrics, dpi);
-        var textSize = string.IsNullOrEmpty(Text) ? Size.Empty : TextRenderer.MeasureText(Text, Font, Size.Empty, GetTextFlags());
+        var textSize = string.IsNullOrEmpty(Text) ? Size.Empty : TextRenderer.MeasureText(Text, Font, Size.Empty, GetTextFlags() & ~TextFormatFlags.WordBreak);
         return BootstrapCheckableRenderLogic.GetPreferredSize(textSize, Padding, metrics, CheckAlign);
     }
 
