@@ -121,6 +121,28 @@ public sealed class BootstrapRadioButtonTests
     }
 
     [Test]
+    public void FlatStyleSystemUsesNativePreferredSizeFallback()
+    {
+        using var font = new Font("Segoe UI", 9f);
+        using var native = new RadioButton { Text = "System radio", Font = font, FlatStyle = FlatStyle.System, AutoSize = true };
+        using var control = new BootstrapRadioButton { Text = "System radio", Font = font, FlatStyle = FlatStyle.System, AutoSize = true, Checked = true };
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(control.GetPreferredSize(Size.Empty), Is.EqualTo(native.GetPreferredSize(Size.Empty)));
+            Assert.DoesNotThrow((Action)(() => Draw(control)));
+            Assert.That(control.Checked, Is.True);
+        }));
+    }
+
+    [Test]
+    public void CheckedTinyBoundsNeverProduceInvalidDotGeometry()
+    {
+        using var control = new BootstrapRadioButton { AutoSize = false, Checked = true, Size = new Size(1, 1) };
+        Assert.DoesNotThrow((Action)(() => Draw(control)));
+    }
+
+    [Test]
     public void DisposalDetachesThemeSubscription()
     {
         var baseline = GetThemeSubscriptionCount();
