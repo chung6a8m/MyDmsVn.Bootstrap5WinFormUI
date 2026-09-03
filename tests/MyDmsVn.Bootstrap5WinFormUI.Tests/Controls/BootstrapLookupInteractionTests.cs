@@ -131,6 +131,84 @@ public sealed class BootstrapLookupInteractionTests
         Assert.That(lookup.SelectedItem, Is.SameAs(third));
     }
 
+    [Test]
+    public void DuplicateValueReopenKeepsFooterAlignedWithPhysicalHighlightedRow()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = new TestLookup
+        {
+            DisplayMember = "Name", ValueMember = "Id",
+            DataSource = new BindingList<Product>
+            {
+                new Product(1, "First"), new Product(1, "Second"), new Product(1, "Third")
+            },
+            SearchDebounceMilliseconds = 0
+        };
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.OpenDropDown();
+        lookup.SendKey(Keys.End);
+        lookup.CloseDropDown();
+
+        lookup.OpenDropDown();
+
+        var status = Descendants(lookup.ResultsGrid.Parent!).OfType<Label>()
+            .Single(label => label.Text.IndexOf("/", StringComparison.Ordinal) >= 0).Text;
+        Assert.That(lookup.ResultsGrid.SelectedRows.Cast<DataGridViewRow>().Single().Index, Is.EqualTo(2));
+        Assert.That(status, Is.EqualTo("3 / 3"));
+    }
+
+    [Test]
+    public void DuplicateValuePhysicalNavigationRaisesHighlightedItemChanged()
+    {
+        var first = new Product(1, "First");
+        var second = new Product(1, "Second");
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = new TestLookup
+        {
+            DisplayMember = "Name", ValueMember = "Id",
+            DataSource = new BindingList<Product> { first, second },
+            SearchDebounceMilliseconds = 0
+        };
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.OpenDropDown();
+        BootstrapLookupHighlightedItemChangedEventArgs? observed = null;
+        lookup.HighlightedItemChanged += (_, e) => observed = e;
+
+        lookup.SendKey(Keys.Down);
+
+        Assert.That(observed, Is.Not.Null);
+        Assert.That(observed!.OldItem, Is.SameAs(first));
+        Assert.That(observed.NewItem, Is.SameAs(second));
+    }
+
+    [Test]
+    public void OpenPopupVisualSynchronizationAbortsAfterReentrantSelectionChange()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.OpenDropDown();
+        var redirected = false;
+        lookup.ResultsGrid.SelectionChanged += (_, _) =>
+        {
+            if (redirected) return;
+            redirected = true;
+            lookup.SelectedValue = 1;
+        };
+
+        lookup.SelectedValue = 2;
+
+        Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+        Assert.That(lookup.ResultsGrid.SelectedRows.Cast<DataGridViewRow>().Single().Index, Is.EqualTo(0));
+        Assert.That(lookup.ResultsGrid.CurrentCell?.RowIndex, Is.EqualTo(0));
+    }
+
     [TestCase(Keys.Down)]
     [TestCase(Keys.PageDown)]
     public void NavigationUsesFirstVisibleResultCellWhenLeadingColumnIsHidden(Keys key)
@@ -701,6 +779,32 @@ public sealed class BootstrapLookupInteractionTests
             Assert.That(lookup.SendEditorKey(Keys.Control | Keys.F4), Is.False);
             Assert.That(lookup.SendEditorKey(Keys.Control | Keys.Down), Is.False);
             Assert.That(lookup.IsDropDownOpen, Is.False);
+        }));
+    }
+
+    [Test]
+    public void ModifiedEnterAndEscapeDoNotCommitOrCancelLookupState()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.SelectValue(1);
+        lookup.Text = "Beta";
+
+        lookup.SendCommandKey(Keys.Control | Keys.Enter);
+        lookup.SendCommandKey(Keys.Alt | Keys.Escape);
+        var editorEnterHandled = lookup.SendEditorKey(Keys.Control | Keys.Enter);
+        var editorEscapeHandled = lookup.SendEditorKey(Keys.Alt | Keys.Escape);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(editorEnterHandled, Is.False);
+            Assert.That(editorEscapeHandled, Is.False);
+            Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+            Assert.That(lookup.Text, Is.EqualTo("Beta"));
+            Assert.That(lookup.HasPendingText, Is.True);
         }));
     }
 

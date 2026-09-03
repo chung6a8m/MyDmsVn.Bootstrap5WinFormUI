@@ -14,7 +14,7 @@ public partial class BootstrapLookupBox
         var modifiers = keyData & Keys.Modifiers;
         if (key == Keys.Tab && (modifiers & (Keys.Alt | Keys.Control)) == Keys.None)
             return ProcessDialogKey(keyData);
-        if (key == Keys.Escape)
+        if (key == Keys.Escape && modifiers == Keys.None)
         {
             CancelPendingEdit();
             return true;
@@ -31,7 +31,7 @@ public partial class BootstrapLookupBox
             NavigateResults(key);
             return true;
         }
-        if (key == Keys.Enter && HandleEnterKey()) return true;
+        if (key == Keys.Enter && modifiers == Keys.None && HandleEnterKey()) return true;
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
@@ -45,7 +45,7 @@ public partial class BootstrapLookupBox
         }
 
         var key = e.KeyCode;
-        if (key == Keys.Escape)
+        if (key == Keys.Escape && e.Modifiers == Keys.None)
         {
             CancelPendingEdit();
             Consume(e);
@@ -68,7 +68,7 @@ public partial class BootstrapLookupBox
             return;
         }
 
-        if (key == Keys.Enter && HandleEnterKey())
+        if (key == Keys.Enter && e.Modifiers == Keys.None && HandleEnterKey())
         {
             Consume(e);
             return;

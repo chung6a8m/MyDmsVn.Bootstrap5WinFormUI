@@ -123,6 +123,23 @@ public sealed class BootstrapLookupDataGridViewInteractionTests
     }
 
     [Test]
+    public void ClosedPopupLeavesNonOpeningNavigationKeysToDataGridView()
+    {
+        using var host = new GridHost(twoRows: true);
+        var editor = (IDataGridViewEditingControl)host.BeginLookupEdit(rowIndex: 1);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(editor.EditingControlWantsInputKey(Keys.Up, true), Is.False);
+            Assert.That(editor.EditingControlWantsInputKey(Keys.PageUp, true), Is.False);
+            Assert.That(editor.EditingControlWantsInputKey(Keys.PageDown, true), Is.False);
+            Assert.That(editor.EditingControlWantsInputKey(Keys.Down, true), Is.True);
+            Assert.That(editor.EditingControlWantsInputKey(Keys.F4, true), Is.True);
+        }));
+        host.Grid.CancelEdit();
+    }
+
+    [Test]
     public void CommitAndMoveNextEnterUsesNativeGridTraversal()
     {
         using var host = new GridHost();

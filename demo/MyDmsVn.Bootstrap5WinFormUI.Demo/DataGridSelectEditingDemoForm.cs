@@ -61,7 +61,11 @@ public sealed class DataGridSelectEditingDemoForm : Form
         };
         product.SearchMembers.Add("Name"); product.SearchMembers.Add("Code");
         product.LookupColumns.Add(new BootstrapLookupColumnDefinition { DataPropertyName = "Code", HeaderText = "Mã", Width = 90 });
-        product.LookupColumns.Add(new BootstrapLookupColumnDefinition { DataPropertyName = "Name", HeaderText = "Tên hàng", Width = 250 });
+        product.LookupColumns.Add(new BootstrapLookupColumnDefinition
+        {
+            DataPropertyName = "Name", HeaderText = "Tên hàng",
+            Width = 250, MinimumWidth = 220, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+        });
         product.LookupColumns.Add(new BootstrapLookupColumnDefinition { DataPropertyName = "Unit", HeaderText = "Đơn vị", Width = 110 });
         product.SelectionCommitted += OnProductCommitted;
         product.RefreshRequested += (_, _) => _status.Text = "Product list refreshed in memory.";

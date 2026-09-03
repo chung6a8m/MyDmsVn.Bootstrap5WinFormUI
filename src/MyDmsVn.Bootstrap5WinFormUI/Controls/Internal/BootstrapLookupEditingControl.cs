@@ -72,8 +72,9 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
         var modifiers = keyData & Keys.Modifiers;
         if (key == Keys.Down && modifiers == Keys.Alt) return true;
         if (modifiers != Keys.None) return false;
-        return key == Keys.Up || key == Keys.Down || key == Keys.Home || key == Keys.End || key == Keys.PageUp ||
-            key == Keys.PageDown || key == Keys.F4 || key == Keys.Escape ||
+        return key == Keys.Down || key == Keys.F4 || key == Keys.Escape ||
+            (IsDropDownOpen && (key == Keys.Up || key == Keys.Home || key == Keys.End ||
+                key == Keys.PageUp || key == Keys.PageDown)) ||
             (key == Keys.Enter && (IsDropDownOpen || ClosedEnterKeyBehavior != BootstrapLookupClosedEnterKeyBehavior.DataGridViewDefault));
     }
 
@@ -126,7 +127,7 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
         if (_configuring || _column is null) return;
         var column = _column;
         var args = Context();
-        column.RefreshDisplayIndex();
+        if (e.Reason == BootstrapLookupCommitReason.CommitAndAdd) column.RefreshDisplayIndex();
         column.RememberDisplayText(e.Value, e.DisplayText);
         if (!EqualityComparer<object?>.Default.Equals(_editingValue, e.Value))
         {

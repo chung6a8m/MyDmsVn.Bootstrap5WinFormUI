@@ -273,14 +273,14 @@ public partial class BootstrapLookupBox : BootstrapTextBox
 
     internal void SetHighlightedItem(object? item, object? value, bool hasItem)
     {
-        var logicalIdentityChanged = _hasHighlightedItem != hasItem ||
-            (hasItem && !EqualityComparer<object?>.Default.Equals(_highlightedValue, value));
+        var physicalItemChanged = _hasHighlightedItem != hasItem ||
+            (hasItem && !ReferenceEquals(_highlightedItem, item));
         var previous = _highlightedItem;
         _highlightedItem = item;
         _highlightedValue = value;
         _hasHighlightedItem = hasItem;
         var generation = ++_highlightGeneration;
-        if (!logicalIdentityChanged) return;
+        if (!physicalItemChanged) return;
         var handlers = HighlightedItemChanged;
         if (handlers is null) return;
         var args = new BootstrapLookupHighlightedItemChangedEventArgs(previous, item);

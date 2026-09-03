@@ -127,7 +127,7 @@ public partial class BootstrapLookupBox
         if (generation != _commitGeneration) return;
         SetHighlightedItem(item, value, item is not null);
         if (generation != _commitGeneration) return;
-        if (IsDropDownOpen) SynchronizeHighlightedResult();
+        if (IsDropDownOpen) SynchronizeHighlightedResult(generation);
         if (changed) RaiseSelectedValueChanged(generation);
         if (generation != _commitGeneration) return;
         RaiseSelectionCommitted(new BootstrapLookupSelectionCommittedEventArgs(item, value, _committedDisplayText, reason), generation);

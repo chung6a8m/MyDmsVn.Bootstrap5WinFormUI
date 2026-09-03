@@ -56,21 +56,20 @@ public partial class BootstrapLookupBox
         var columnsChanged = _dropDownContent.ApplyColumns(definitions, ShowColumnHeaders, dpi);
         IReadOnlyList<BootstrapLookupSourceItem> items = _currentSearchResult.Items;
         if (includeResults || columnsChanged) _dropDownContent.ApplyResults(items);
-        var position = 0;
-        for (var i = 0; i < items.Count; i++)
-        {
-            if (IsHighlightedSourceItem(items[i])) { position = i + 1; break; }
-        }
+        var positionIndex = FindPhysicalHighlightedRowIndex();
+        if (positionIndex < 0) positionIndex = FindLogicalHighlightedRowIndex();
+        var position = positionIndex + 1;
         SynchronizeHighlightedResult();
         _dropDownContent.ConfigureFooter(ShowRefreshButton, ShowAddNewButton);
         _dropDownContent.UpdateStatus(position, items.Count, _currentSearchResult.State == BootstrapLookupSearchState.WaitingForMinimumLength, MinimumSearchLength);
     }
 
-    internal void SynchronizeHighlightedResult()
+    internal void SynchronizeHighlightedResult(int expectedCommitGeneration = 0)
     {
         var rowIndex = FindPhysicalHighlightedRowIndex();
         if (rowIndex < 0) rowIndex = FindLogicalHighlightedRowIndex();
         ResultsGrid.ClearSelection();
+        if (IsStaleCommit(expectedCommitGeneration)) return;
         if (rowIndex < 0)
         {
             ResultsGrid.CurrentCell = null;
@@ -78,10 +77,15 @@ public partial class BootstrapLookupBox
         }
         var row = ResultsGrid.Rows[rowIndex];
         row.Selected = true;
+        if (IsStaleCommit(expectedCommitGeneration)) return;
         ResultsGrid.CurrentCell = FindFirstVisibleCell(row);
+        if (IsStaleCommit(expectedCommitGeneration)) return;
         if (ResultsGrid.DisplayedRowCount(false) > 0)
             ResultsGrid.FirstDisplayedScrollingRowIndex = rowIndex;
     }
+
+    private bool IsStaleCommit(int expectedCommitGeneration) =>
+        expectedCommitGeneration != 0 && expectedCommitGeneration != _commitGeneration;
 
     private int FindPhysicalHighlightedRowIndex()
     {

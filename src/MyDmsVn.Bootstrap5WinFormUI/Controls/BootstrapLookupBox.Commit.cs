@@ -81,6 +81,7 @@ public partial class BootstrapLookupBox
         }
 
         if (item is null) return ApplyLookupValidation();
+        if (!HasRequiredMembers(item)) return ApplyLookupValidation();
         object? value;
         try
         {
@@ -100,6 +101,25 @@ public partial class BootstrapLookupBox
         CommitSelection(accepted.Item, accepted.Value, accepted.DisplayText, BootstrapLookupCommitReason.CommitAndAdd);
         if (sourceChangeGeneration == _sourceChangeGeneration) ExecuteSearchNow();
         return BootstrapLookupCommitResult.Success();
+    }
+
+    private bool HasRequiredMembers(object item)
+    {
+        try
+        {
+            var itemType = item.GetType();
+            BootstrapLookupMemberAccessor.Validate(itemType, DisplayMember);
+            BootstrapLookupMemberAccessor.Validate(itemType, ValueMember);
+            foreach (var member in SearchMembers)
+                BootstrapLookupMemberAccessor.Validate(itemType, member);
+            foreach (var column in Columns)
+                BootstrapLookupMemberAccessor.Validate(itemType, column.DataPropertyName);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     private bool IsStringSource()

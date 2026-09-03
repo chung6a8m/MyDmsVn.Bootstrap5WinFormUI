@@ -29,6 +29,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     private BootstrapLookupDataAdapter? _formatAdapter;
     private Dictionary<object, string> _displayByValue = new Dictionary<object, string>();
     private Dictionary<object, string> _displayFallbackByValue = new Dictionary<object, string>();
+    private int _selectionCommitGeneration;
 
     /// <summary>Initializes a lookup column.</summary>
     public BootstrapLookupColumn() : base(new BootstrapLookupCell())
@@ -88,6 +89,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
         clone._formatAdapter = null;
         clone._displayByValue = new Dictionary<object, string>();
         clone._displayFallbackByValue = new Dictionary<object, string>();
+        clone._selectionCommitGeneration = 0;
         clone._dataSource = null;
         clone._displayMember = string.Empty;
         clone._valueMember = string.Empty;
@@ -106,7 +108,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
 
     internal void RememberDisplayText(object? value, string displayText)
     {
-        if (value is null) return;
+        if (value is null || _displayByValue.ContainsKey(value)) return;
         _displayFallbackByValue[value] = displayText ?? string.Empty;
         InvalidateOwningColumn();
     }
@@ -161,7 +163,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
         _valueMember = valueMember;
         _formatAdapter = replacement;
         _displayByValue = replacementIndex;
-        RemoveReconciledFallbacks();
+        _displayFallbackByValue.Clear();
         _formatAdapter.SourceChanged += OnFormatSourceChanged;
         InvalidateOwningColumn();
     }
@@ -197,6 +199,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     {
         Disposed -= OnColumnDisposed;
         DisposeFormatAdapter();
+        _displayFallbackByValue.Clear();
     }
 
     private void InvalidateOwningColumn()

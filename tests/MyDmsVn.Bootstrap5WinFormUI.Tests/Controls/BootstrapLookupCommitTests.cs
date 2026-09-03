@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Windows.Forms;
@@ -314,6 +315,29 @@ public sealed class BootstrapLookupCommitTests
         }));
     }
 
+    [Test]
+    public void CommitAndAddRejectsIncompatibleItemBeforeMutatingHeterogeneousSource()
+    {
+        var source = new ArrayList { new SearchableProduct(1, "Alpha", "A") };
+        using var lookup = new BootstrapLookupBox
+        {
+            DataSource = source,
+            DisplayMember = "Name",
+            ValueMember = "Id",
+            UnmatchedTextBehavior = BootstrapLookupUnmatchedTextBehavior.CommitAndAdd,
+            Text = "Gamma"
+        };
+        lookup.SearchMembers.Add("Code");
+        lookup.CreateItemFromText += (_, e) => e.Item = new ValueOnlyProduct(3);
+
+        BootstrapLookupCommitResult? result = null;
+        Assert.DoesNotThrow((Action)(() => result = lookup.ResolvePendingText(BootstrapLookupCommitReason.Keyboard)));
+
+        Assert.That(result!.NavigationAllowed, Is.False);
+        Assert.That(source, Has.Count.EqualTo(1));
+        Assert.That(lookup.SelectedValue, Is.Null);
+    }
+
     private static BootstrapLookupBox Create(object source) => new BootstrapLookupBox { DisplayMember = "Name", ValueMember = "Id", DataSource = source };
 
     private sealed class Product
@@ -321,5 +345,19 @@ public sealed class BootstrapLookupCommitTests
         internal Product(int id, string name) { Id = id; Name = name; }
         public int Id { get; }
         public string Name { get; }
+    }
+
+    private sealed class SearchableProduct
+    {
+        internal SearchableProduct(int id, string name, string code) { Id = id; Name = name; Code = code; }
+        public int Id { get; }
+        public string Name { get; }
+        public string Code { get; }
+    }
+
+    private sealed class ValueOnlyProduct
+    {
+        internal ValueOnlyProduct(int id) { Id = id; }
+        public int Id { get; }
     }
 }

@@ -26,6 +26,9 @@ public sealed class DataGridSelectEditingDemoFormTests
             Assert.That(Find<BootstrapSelect>(form), Is.Empty);
             Assert.That(grid.DataSource, Is.Not.InstanceOf<DataTable>());
             Assert.That(grid.AllowUserToAddRows, Is.True);
+            var product = (BootstrapLookupColumn)grid.Columns["ProductColumn"];
+            Assert.That(product.LookupColumns[1].AutoSizeMode, Is.EqualTo(DataGridViewAutoSizeColumnMode.Fill));
+            Assert.That(product.LookupColumns[1].MinimumWidth, Is.GreaterThanOrEqualTo(200));
         }));
     }
 

@@ -280,6 +280,80 @@ public sealed class BootstrapLookupDataGridViewTests
         }));
     }
 
+    [Test]
+    public void RemovingNormallyCommittedSourceValueDoesNotUseAStaleFallback()
+    {
+        var products = new BindingList<Product> { new Product(1, "Alpha"), new Product(2, "Beta") };
+        var host = CreateGridHost(CreateColumn(products), new NullableRow { ProductId = 1 });
+        using var form = host.Form;
+        using var grid = host.Grid;
+        BeginEdit(grid, 0);
+        ((BootstrapLookupBox)grid.EditingControl!).SelectValue(2);
+        Assert.That(grid.EndEdit(), Is.True);
+
+        products.RemoveAt(1);
+        Application.DoEvents();
+
+        Assert.That(grid.Rows[0].Cells[0].Value, Is.EqualTo(2));
+        Assert.That(grid.Rows[0].Cells[0].FormattedValue, Is.EqualTo(string.Empty));
+    }
+
+    [Test]
+    public void ColumnSelectionCommittedStopsStaleOuterDeliveryBetweenSubscribers()
+    {
+        var column = CreateColumn(new BindingList<Product> { new Product(1, "Alpha"), new Product(2, "Beta") });
+        var host = CreateGridHost(column, new NullableRow { ProductId = 1 });
+        using var form = host.Form;
+        using var grid = host.Grid;
+        BeginEdit(grid, 0);
+        var editor = (BootstrapLookupBox)grid.EditingControl!;
+        var redirected = false;
+        var observed = new System.Collections.Generic.List<object?>();
+        column.SelectionCommitted += (_, e) =>
+        {
+            if (redirected || !Equals(e.Value, 2)) return;
+            redirected = true;
+            editor.SelectValue(1);
+        };
+        column.SelectionCommitted += (_, e) =>
+        {
+            Assert.That(e.Value, Is.EqualTo(editor.SelectedValue));
+            observed.Add(e.Value);
+        };
+
+        editor.SelectValue(2);
+
+        Assert.That(observed, Is.EqualTo(new object?[] { 1 }));
+        Assert.That(grid.EndEdit(), Is.True);
+        form.Close();
+        Application.DoEvents();
+    }
+
+    [Test]
+    public void OrdinarySelectionCommitDoesNotRescanSettledColumnSource()
+    {
+        var source = new System.Collections.Generic.List<CountingProduct>
+        {
+            new CountingProduct(1, "Alpha"), new CountingProduct(2, "Beta")
+        };
+        var column = new BootstrapLookupColumn
+        {
+            DataSource = source, DisplayMember = "Name", ValueMember = "Id", DataPropertyName = "ProductId"
+        };
+        var host = CreateGridHost(column, new NullableRow { ProductId = 1 });
+        using var form = host.Form;
+        using var grid = host.Grid;
+        BeginEdit(grid, 0);
+        CountingProduct.GetterReads = 0;
+
+        ((BootstrapLookupBox)grid.EditingControl!).SelectValue(2);
+
+        Assert.That(CountingProduct.GetterReads, Is.Zero);
+        Assert.That(grid.EndEdit(), Is.True);
+        form.Close();
+        Application.DoEvents();
+    }
+
     private static BootstrapLookupColumn CreateColumn(object source) => new BootstrapLookupColumn
     {
         DataSource = source, DisplayMember = "Name", ValueMember = "Id", DataPropertyName = "ProductId"
@@ -315,6 +389,16 @@ public sealed class BootstrapLookupDataGridViewTests
         public int ProductA { get; set; }
         public int ProductB { get; set; }
         public string Other { get; set; } = string.Empty;
+    }
+
+    private sealed class CountingProduct
+    {
+        private readonly int _id;
+        private readonly string _name;
+        internal CountingProduct(int id, string name) { _id = id; _name = name; }
+        internal static int GetterReads { get; set; }
+        public int Id { get { GetterReads++; return _id; } }
+        public string Name { get { GetterReads++; return _name; } }
     }
 
     private sealed class NullableRow
