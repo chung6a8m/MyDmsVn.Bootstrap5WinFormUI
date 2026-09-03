@@ -64,28 +64,34 @@ public partial class BootstrapLookupBox
         _dropDownContent.UpdateStatus(position, items.Count, _currentSearchResult.State == BootstrapLookupSearchState.WaitingForMinimumLength, MinimumSearchLength);
     }
 
-    internal void SynchronizeHighlightedResult(int expectedCommitGeneration = 0)
+    internal void SynchronizeHighlightedResult()
     {
-        var rowIndex = FindPhysicalHighlightedRowIndex();
-        if (rowIndex < 0) rowIndex = FindLogicalHighlightedRowIndex();
-        ResultsGrid.ClearSelection();
-        if (IsStaleCommit(expectedCommitGeneration)) return;
-        if (rowIndex < 0)
+        var synchronizationGeneration = ++_resultSynchronizationGeneration;
+        while (synchronizationGeneration == _resultSynchronizationGeneration)
         {
-            ResultsGrid.CurrentCell = null;
+            var commitGeneration = _commitGeneration;
+            var rowIndex = FindPhysicalHighlightedRowIndex();
+            if (rowIndex < 0) rowIndex = FindLogicalHighlightedRowIndex();
+            ResultsGrid.ClearSelection();
+            if (synchronizationGeneration != _resultSynchronizationGeneration) return;
+            if (commitGeneration != _commitGeneration) continue;
+            if (rowIndex < 0)
+            {
+                ResultsGrid.CurrentCell = null;
+                return;
+            }
+            var row = ResultsGrid.Rows[rowIndex];
+            row.Selected = true;
+            if (synchronizationGeneration != _resultSynchronizationGeneration) return;
+            if (commitGeneration != _commitGeneration) continue;
+            ResultsGrid.CurrentCell = FindFirstVisibleCell(row);
+            if (synchronizationGeneration != _resultSynchronizationGeneration) return;
+            if (commitGeneration != _commitGeneration) continue;
+            if (ResultsGrid.DisplayedRowCount(false) > 0)
+                ResultsGrid.FirstDisplayedScrollingRowIndex = rowIndex;
             return;
         }
-        var row = ResultsGrid.Rows[rowIndex];
-        row.Selected = true;
-        if (IsStaleCommit(expectedCommitGeneration)) return;
-        ResultsGrid.CurrentCell = FindFirstVisibleCell(row);
-        if (IsStaleCommit(expectedCommitGeneration)) return;
-        if (ResultsGrid.DisplayedRowCount(false) > 0)
-            ResultsGrid.FirstDisplayedScrollingRowIndex = rowIndex;
     }
-
-    private bool IsStaleCommit(int expectedCommitGeneration) =>
-        expectedCommitGeneration != 0 && expectedCommitGeneration != _commitGeneration;
 
     private int FindPhysicalHighlightedRowIndex()
     {

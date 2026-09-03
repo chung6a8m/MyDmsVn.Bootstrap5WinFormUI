@@ -51,6 +51,23 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
     internal IReadOnlyList<BootstrapLookupSourceItem> Snapshot => _snapshot;
     internal bool IsStringItemSource => _itemType == typeof(string);
 
+    internal void ValidateMember(string member)
+    {
+        ThrowIfDisposed();
+        if (_itemType is not null)
+        {
+            BootstrapLookupMemberAccessor.Validate(_itemType, member);
+            return;
+        }
+
+        var validatedTypes = new HashSet<Type>();
+        foreach (var sourceItem in _snapshot)
+        {
+            var itemType = sourceItem.Item.GetType();
+            if (validatedTypes.Add(itemType)) BootstrapLookupMemberAccessor.Validate(itemType, member);
+        }
+    }
+
     internal bool CanAdd
     {
         get

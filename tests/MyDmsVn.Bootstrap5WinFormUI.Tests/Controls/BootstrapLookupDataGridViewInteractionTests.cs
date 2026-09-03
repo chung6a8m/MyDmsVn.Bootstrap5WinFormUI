@@ -140,6 +140,61 @@ public sealed class BootstrapLookupDataGridViewInteractionTests
     }
 
     [Test]
+    public void BoundGridEditorClaimsNativeTextEditingKeysAtNonEdgeCaretPositions()
+    {
+        using var host = new GridHost();
+        var editor = host.BeginLookupEdit();
+        var native = Descendants(editor).OfType<TextBox>().Single();
+        var editingControl = (IDataGridViewEditingControl)editor;
+        var originalCell = host.Grid.CurrentCell;
+
+        native.Select(2, 0);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(editingControl.EditingControlWantsInputKey(Keys.Left, true), Is.True);
+            Assert.That(editingControl.EditingControlWantsInputKey(Keys.Right, true), Is.True);
+            Assert.That(editingControl.EditingControlWantsInputKey(Keys.Home, true), Is.True);
+            Assert.That(editingControl.EditingControlWantsInputKey(Keys.End, true), Is.True);
+            Assert.That(editingControl.EditingControlWantsInputKey(Keys.Delete, true), Is.True);
+            Assert.That(host.Grid.CurrentCell, Is.SameAs(originalCell));
+            Assert.That(host.Grid.IsCurrentCellInEditMode, Is.True);
+        }));
+
+        native.Select(0, 0);
+        Assert.That(editingControl.EditingControlWantsInputKey(Keys.Left, true), Is.False);
+        Assert.That(editingControl.EditingControlWantsInputKey(Keys.Home, true), Is.True);
+        native.Select(native.TextLength, 0);
+        Assert.That(editingControl.EditingControlWantsInputKey(Keys.Right, true), Is.False);
+        Assert.That(editingControl.EditingControlWantsInputKey(Keys.End, true), Is.True);
+        Assert.That(editingControl.EditingControlWantsInputKey(Keys.Delete, true), Is.False);
+        native.SelectAll();
+        Assert.That(editingControl.EditingControlWantsInputKey(Keys.Home, true), Is.False);
+        Assert.That(editingControl.EditingControlWantsInputKey(Keys.End, true), Is.False);
+        host.Grid.CancelEdit();
+    }
+
+    [Test]
+    public void ReusedEditorPlacesCaretAtEndWhenEditDoesNotRequestSelectAll()
+    {
+        using var host = new GridHost(twoRows: true);
+        var firstEditor = host.BeginLookupEdit();
+        var native = Descendants(firstEditor).OfType<TextBox>().Single();
+        native.Select(0, 2);
+        Assert.That(host.Grid.EndEdit(), Is.True);
+
+        var reusedEditor = host.BeginLookupEdit(rowIndex: 1, selectAll: false);
+        var reusedNative = Descendants(reusedEditor).OfType<TextBox>().Single();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(reusedEditor, Is.SameAs(firstEditor));
+            Assert.That(reusedNative.SelectionStart, Is.EqualTo(reusedNative.TextLength));
+            Assert.That(reusedNative.SelectionLength, Is.Zero);
+        }));
+        host.Grid.CancelEdit();
+    }
+
+    [Test]
     public void CommitAndMoveNextEnterUsesNativeGridTraversal()
     {
         using var host = new GridHost();
@@ -220,10 +275,10 @@ public sealed class BootstrapLookupDataGridViewInteractionTests
         internal BindingList<OrderLine> Rows { get; }
         internal BindingSource Binding { get; }
 
-        internal BootstrapLookupBox BeginLookupEdit(int rowIndex = 0)
+        internal BootstrapLookupBox BeginLookupEdit(int rowIndex = 0, bool selectAll = true)
         {
             Grid.CurrentCell = Grid.Rows[rowIndex].Cells[0];
-            Assert.That(Grid.BeginEdit(true), Is.True);
+            Assert.That(Grid.BeginEdit(selectAll), Is.True);
             Application.DoEvents();
             return (BootstrapLookupBox)Grid.EditingControl!;
         }

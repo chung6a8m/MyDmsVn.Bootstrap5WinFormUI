@@ -281,6 +281,37 @@ public sealed class BootstrapLookupDataGridViewTests
     }
 
     [Test]
+    public void ReeditingUnreconciledExplicitAddNewValueRestoresItsFormattedText()
+    {
+        var products = new System.Collections.Generic.List<Product> { new Product(1, "Alpha") };
+        var column = CreateColumn(products);
+        column.AddNewRequested += (_, e) => e.NewItem = new Product(3, "Gamma");
+        var row = new NullableRow { ProductId = 1 };
+        var host = CreateGridHost(column, row);
+        using var form = host.Form;
+        using var grid = host.Grid;
+        BeginEdit(grid, 0);
+        var editor = (BootstrapLookupBox)grid.EditingControl!;
+        editor.Text = "Gamma";
+        editor.RequestExplicitAddNew();
+        Assert.That(grid.EndEdit(), Is.True);
+
+        BeginEdit(grid, 0);
+        var reopenedEditor = (BootstrapLookupBox)grid.EditingControl!;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(row.ProductId, Is.EqualTo(3));
+            Assert.That(reopenedEditor.SelectedValue, Is.EqualTo(3));
+            Assert.That(reopenedEditor.Text, Is.EqualTo("Gamma"));
+            Assert.That(((IDataGridViewEditingControl)reopenedEditor).EditingControlValueChanged, Is.False);
+        }));
+        grid.CancelEdit();
+        form.Close();
+        Application.DoEvents();
+    }
+
+    [Test]
     public void RemovingNormallyCommittedSourceValueDoesNotUseAStaleFallback()
     {
         var products = new BindingList<Product> { new Product(1, "Alpha"), new Product(2, "Beta") };

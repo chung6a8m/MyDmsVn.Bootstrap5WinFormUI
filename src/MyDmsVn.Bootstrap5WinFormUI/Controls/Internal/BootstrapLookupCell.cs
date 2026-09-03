@@ -13,7 +13,7 @@ internal sealed class BootstrapLookupCell : DataGridViewTextBoxCell
     {
         base.InitializeEditingControl(rowIndex, initialFormattedValue, dataGridViewCellStyle);
         if (DataGridView?.EditingControl is BootstrapLookupEditingControl editor && OwningColumn is BootstrapLookupColumn column)
-            editor.Configure(column, rowIndex, ColumnIndex, Value);
+            editor.Configure(column, rowIndex, ColumnIndex, Value, initialFormattedValue);
     }
 
     protected override object GetFormattedValue(object value, int rowIndex, ref DataGridViewCellStyle cellStyle,

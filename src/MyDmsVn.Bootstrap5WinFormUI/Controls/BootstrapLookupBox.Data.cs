@@ -36,6 +36,15 @@ public partial class BootstrapLookupBox
     private void ReplaceDataAdapter(object? dataSource, string displayMember, string valueMember)
     {
         var replacement = new BootstrapLookupDataAdapter(dataSource, displayMember, valueMember);
+        try
+        {
+            ValidateSearchMembers(replacement);
+        }
+        catch
+        {
+            replacement.Dispose();
+            throw;
+        }
         DisposeDataAdapter();
         _dataSource = dataSource;
         _displayMember = displayMember;
@@ -56,6 +65,7 @@ public partial class BootstrapLookupBox
 
     private void OnLookupSourceChanged(object? sender, EventArgs e)
     {
+        if (_dataAdapter is not null) ValidateSearchMembers(_dataAdapter);
         _sourceChangeGeneration++;
         ReconcileCommittedSelection();
         ExecuteSearchNow();
@@ -127,7 +137,7 @@ public partial class BootstrapLookupBox
         if (generation != _commitGeneration) return;
         SetHighlightedItem(item, value, item is not null);
         if (generation != _commitGeneration) return;
-        if (IsDropDownOpen) SynchronizeHighlightedResult(generation);
+        if (IsDropDownOpen) SynchronizeHighlightedResult();
         if (changed) RaiseSelectedValueChanged(generation);
         if (generation != _commitGeneration) return;
         RaiseSelectionCommitted(new BootstrapLookupSelectionCommittedEventArgs(item, value, _committedDisplayText, reason), generation);
@@ -160,5 +170,21 @@ public partial class BootstrapLookupBox
         if (sourceItem.Value is null && _valueMember.Length > 0) return ApplyLookupValidation();
         CommitSelection(sourceItem.Item, sourceItem.Value, sourceItem.DisplayText, reason);
         return BootstrapLookupCommitResult.Success();
+    }
+
+    internal void RestoreUnresolvedConfiguredValue(object value, string displayText)
+    {
+        if (_selectedItem is not null || !EqualityComparer<object?>.Default.Equals(_selectedValue, value)) return;
+        _committedDisplayText = displayText ?? string.Empty;
+        _hasPendingText = false;
+        ClearLookupValidation();
+        SynchronizeText(_committedDisplayText);
+    }
+
+    private void ValidateSearchMember(string member) => _dataAdapter?.ValidateMember(member);
+
+    private void ValidateSearchMembers(BootstrapLookupDataAdapter adapter)
+    {
+        foreach (var member in _searchMembers) adapter.ValidateMember(member);
     }
 }

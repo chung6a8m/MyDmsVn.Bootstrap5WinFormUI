@@ -28,7 +28,7 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
     public Cursor EditingPanelCursor => Cursors.IBeam;
     public bool RepositionEditingControlOnValueChange => false;
 
-    internal void Configure(BootstrapLookupColumn column, int rowIndex, int columnIndex, object? rawValue)
+    internal void Configure(BootstrapLookupColumn column, int rowIndex, int columnIndex, object? rawValue, object? initialFormattedValue)
     {
         CancelPendingEdit();
         DataSource = null;
@@ -48,6 +48,8 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
             SearchTextNormalizer = column.SearchTextNormalizer; TextNormalizer = column.TextNormalizer; TextComparer = column.TextComparer;
             InvalidTextMessage = column.InvalidTextMessage;
             SelectedValue = rawValue;
+            if (rawValue is not null && SelectedItem is null)
+                RestoreUnresolvedConfiguredValue(rawValue, initialFormattedValue?.ToString() ?? string.Empty);
             _originatingRowIndex = rowIndex;
             _originatingColumnIndex = columnIndex;
             EditingControlRowIndex = rowIndex;
@@ -65,17 +67,49 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
         ForeColor = dataGridViewCellStyle.ForeColor;
         BackColor = dataGridViewCellStyle.BackColor;
     }
-    public void PrepareEditingControlForEdit(bool selectAll) { if (selectAll) SelectAll(); }
+    public void PrepareEditingControlForEdit(bool selectAll)
+    {
+        if (selectAll)
+        {
+            SelectAll();
+            return;
+        }
+
+        Editor.SelectionStart = Editor.TextLength;
+        Editor.SelectionLength = 0;
+    }
     public bool EditingControlWantsInputKey(Keys keyData, bool dataGridViewWantsInputKey)
     {
         var key = keyData & Keys.KeyCode;
         var modifiers = keyData & Keys.Modifiers;
         if (key == Keys.Down && modifiers == Keys.Alt) return true;
-        if (modifiers != Keys.None) return false;
-        return key == Keys.Down || key == Keys.F4 || key == Keys.Escape ||
-            (IsDropDownOpen && (key == Keys.Up || key == Keys.Home || key == Keys.End ||
-                key == Keys.PageUp || key == Keys.PageDown)) ||
-            (key == Keys.Enter && (IsDropDownOpen || ClosedEnterKeyBehavior != BootstrapLookupClosedEnterKeyBehavior.DataGridViewDefault));
+        if (modifiers == Keys.None)
+        {
+            if (key == Keys.Down || key == Keys.F4 || key == Keys.Escape) return true;
+            if (IsDropDownOpen && (key == Keys.Up || key == Keys.Home || key == Keys.End ||
+                key == Keys.PageUp || key == Keys.PageDown)) return true;
+            if (key == Keys.Enter)
+                return IsDropDownOpen || ClosedEnterKeyBehavior != BootstrapLookupClosedEnterKeyBehavior.DataGridViewDefault;
+        }
+
+        switch (key)
+        {
+            case Keys.Left:
+                return RightToLeft == RightToLeft.No
+                    ? Editor.SelectionLength > 0 || Editor.SelectionStart > 0
+                    : Editor.SelectionLength > 0 || Editor.SelectionStart < Editor.TextLength;
+            case Keys.Right:
+                return RightToLeft == RightToLeft.No
+                    ? Editor.SelectionLength > 0 || Editor.SelectionStart < Editor.TextLength
+                    : Editor.SelectionLength > 0 || Editor.SelectionStart > 0;
+            case Keys.Home:
+            case Keys.End:
+                return Editor.SelectionLength != Editor.TextLength;
+            case Keys.Delete:
+                return Editor.SelectionLength > 0 || Editor.SelectionStart < Editor.TextLength;
+            default:
+                return !dataGridViewWantsInputKey;
+        }
     }
 
     private protected override bool ContinueOwnerNavigation(bool reverse)

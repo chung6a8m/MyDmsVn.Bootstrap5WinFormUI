@@ -37,6 +37,44 @@ public sealed class BootstrapLookupContractsTests
         }));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LookupBoxRejectsUnknownSearchMembersRegardlessOfAssignmentOrder(bool searchMemberFirst)
+    {
+        using var lookup = new BootstrapLookupBox { DisplayMember = "Name", ValueMember = "Id" };
+        var source = new BindingList<SearchProduct> { new SearchProduct(1, "Alpha") };
+
+        if (searchMemberFirst)
+        {
+            lookup.SearchMembers.Add("Missing");
+            Assert.That((Action)(() => lookup.DataSource = source), Throws.ArgumentException);
+        }
+        else
+        {
+            lookup.DataSource = source;
+            Assert.That((Action)(() => lookup.SearchMembers.Add("Missing")), Throws.ArgumentException);
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LookupColumnRejectsUnknownSearchMembersRegardlessOfAssignmentOrder(bool searchMemberFirst)
+    {
+        using var column = new BootstrapLookupColumn { DisplayMember = "Name", ValueMember = "Id" };
+        var source = new BindingList<SearchProduct> { new SearchProduct(1, "Alpha") };
+
+        if (searchMemberFirst)
+        {
+            column.SearchMembers.Add("Missing");
+            Assert.That((Action)(() => column.DataSource = source), Throws.ArgumentException);
+        }
+        else
+        {
+            column.DataSource = source;
+            Assert.That((Action)(() => column.SearchMembers.Add("Missing")), Throws.ArgumentException);
+        }
+    }
+
     [Test]
     public void ColumnDefinitionsRejectNullAndExposeDesignerContentSerialization()
     {
@@ -114,5 +152,12 @@ public sealed class BootstrapLookupContractsTests
             Assert.That(context.RowIndex, Is.EqualTo(2));
             Assert.That(context.ColumnIndex, Is.EqualTo(3));
         }));
+    }
+
+    private sealed class SearchProduct
+    {
+        internal SearchProduct(int id, string name) { Id = id; Name = name; }
+        public int Id { get; }
+        public string Name { get; }
     }
 }

@@ -100,6 +100,18 @@ public sealed class BootstrapLookupDropDownContentTests
     }
 
     [Test]
+    public void CappedRowMeasurementStopsBeforeVisitingEveryMaterializedRow()
+    {
+        var visits = 0;
+        var heights = CountedHeights(10000, 30, () => visits++);
+
+        for (var index = 0; index < 100; index++)
+            Assert.That(BootstrapLookupDropDownContent.AccumulateCappedHeight(heights, 150), Is.EqualTo(180));
+
+        Assert.That(visits, Is.EqualTo(600));
+    }
+
+    [Test]
     public void PreferredHeightDoesNotReserveHorizontalScrollWhenColumnsFit()
     {
         using var content = CreateSizedContent(1);
@@ -123,6 +135,15 @@ public sealed class BootstrapLookupDropDownContentTests
             .Select(index => new BootstrapLookupSourceItem(new SizedItem(index), index, $"Item {index}", index - 1))
             .ToArray());
         return content;
+    }
+
+    private static System.Collections.Generic.IEnumerable<int> CountedHeights(int count, int height, Action visited)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            visited();
+            yield return height;
+        }
     }
 
     private sealed class SizedItem

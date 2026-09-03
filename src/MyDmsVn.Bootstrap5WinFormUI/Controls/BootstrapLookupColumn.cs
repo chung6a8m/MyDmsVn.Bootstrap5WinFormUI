@@ -34,6 +34,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     /// <summary>Initializes a lookup column.</summary>
     public BootstrapLookupColumn() : base(new BootstrapLookupCell())
     {
+        _searchMembers.MemberValidator = ValidateSearchMember;
         Disposed += OnColumnDisposed;
     }
 
@@ -86,6 +87,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
         var clone = (BootstrapLookupColumn)base.Clone();
         clone._lookupColumns = new BootstrapLookupColumnDefinitionCollection();
         clone._searchMembers = new BootstrapLookupSearchMemberCollection();
+        clone._searchMembers.MemberValidator = clone.ValidateSearchMember;
         clone._formatAdapter = null;
         clone._displayByValue = new Dictionary<object, string>();
         clone._displayFallbackByValue = new Dictionary<object, string>();
@@ -156,7 +158,17 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     private void ReplaceFormatAdapter(object? dataSource, string displayMember, string valueMember)
     {
         var replacement = new BootstrapLookupDataAdapter(dataSource, displayMember, valueMember);
-        var replacementIndex = BuildDisplayIndex(replacement);
+        Dictionary<object, string> replacementIndex;
+        try
+        {
+            ValidateSearchMembers(replacement);
+            replacementIndex = BuildDisplayIndex(replacement);
+        }
+        catch
+        {
+            replacement.Dispose();
+            throw;
+        }
         DisposeFormatAdapter();
         _dataSource = dataSource;
         _displayMember = displayMember;
@@ -171,6 +183,7 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     private void OnFormatSourceChanged(object? sender, EventArgs e)
     {
         if (_formatAdapter is null) return;
+        ValidateSearchMembers(_formatAdapter);
         _displayByValue = BuildDisplayIndex(_formatAdapter);
         RemoveReconciledFallbacks();
         InvalidateOwningColumn();
@@ -210,5 +223,12 @@ public partial class BootstrapLookupColumn : DataGridViewColumn
     private void RemoveReconciledFallbacks()
     {
         foreach (var value in _displayByValue.Keys) _displayFallbackByValue.Remove(value);
+    }
+
+    private void ValidateSearchMember(string member) => _formatAdapter?.ValidateMember(member);
+
+    private void ValidateSearchMembers(BootstrapLookupDataAdapter adapter)
+    {
+        foreach (var member in _searchMembers) adapter.ValidateMember(member);
     }
 }

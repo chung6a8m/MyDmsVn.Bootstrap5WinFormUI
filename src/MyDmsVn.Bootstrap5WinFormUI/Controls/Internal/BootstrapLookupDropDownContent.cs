@@ -121,13 +121,18 @@ internal sealed class BootstrapLookupDropDownContent : UserControl
                 ? SystemInformation.BorderSize.Width * 2
                 : SystemInformation.Border3DSize.Width * 2;
         var headerHeight = ResultsGrid.ColumnHeadersVisible ? ResultsGrid.ColumnHeadersHeight : 0;
-        var rowsHeight = 0;
-        foreach (DataGridViewRow row in ResultsGrid.Rows) rowsHeight += row.Height;
+        var fixedHeight = _footer.Height + borderHeight + headerHeight;
+        var maximumRowsHeight = proposedSize.Height > 0
+            ? Math.Max(0, proposedSize.Height - fixedHeight)
+            : int.MaxValue;
+        var rowsHeight = AccumulateCappedHeight(
+            ResultsGrid.Rows.Cast<DataGridViewRow>().Select(row => row.Height),
+            maximumRowsHeight);
         var contentWidth = proposedSize.Width > 0 ? proposedSize.Width : Width;
         var columnsWidth = 0;
         foreach (DataGridViewColumn column in ResultsGrid.Columns)
             if (column.Visible) columnsWidth += column.Width;
-        var baseHeight = _footer.Height + borderHeight + headerHeight + rowsHeight;
+        var baseHeight = fixedHeight + rowsHeight;
         var verticalScrollAllowed = ResultsGrid.ScrollBars == ScrollBars.Both || ResultsGrid.ScrollBars == ScrollBars.Vertical;
         var verticalScrollNeeded = verticalScrollAllowed && proposedSize.Height > 0 && baseHeight > proposedSize.Height;
         var horizontalScrollAllowed = ResultsGrid.ScrollBars == ScrollBars.Both || ResultsGrid.ScrollBars == ScrollBars.Horizontal;
@@ -138,6 +143,17 @@ internal sealed class BootstrapLookupDropDownContent : UserControl
         var desiredHeight = baseHeight + horizontalScrollHeight;
         var height = proposedSize.Height > 0 ? Math.Min(proposedSize.Height, desiredHeight) : desiredHeight;
         return new System.Drawing.Size(width, height);
+    }
+
+    internal static int AccumulateCappedHeight(IEnumerable<int> heights, int maximumHeight)
+    {
+        var total = 0;
+        foreach (var height in heights)
+        {
+            total += height;
+            if (total > maximumHeight) break;
+        }
+        return total;
     }
 
     protected override void OnLayout(LayoutEventArgs e)

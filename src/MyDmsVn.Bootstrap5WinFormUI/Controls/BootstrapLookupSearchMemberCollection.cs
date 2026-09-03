@@ -6,6 +6,8 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// <summary>Represents ordered source-member names used for lookup searching.</summary>
 public sealed class BootstrapLookupSearchMemberCollection : Collection<string>
 {
+    internal Action<string>? MemberValidator { get; set; }
+
     /// <inheritdoc />
     protected override void InsertItem(int index, string item)
     {
@@ -29,5 +31,6 @@ public sealed class BootstrapLookupSearchMemberCollection : Collection<string>
             if (i != replacedIndex && string.Equals(this[i], item, StringComparison.Ordinal))
                 throw new ArgumentException("Duplicate search member names are not allowed.", nameof(item));
         }
+        MemberValidator?.Invoke(item);
     }
 }

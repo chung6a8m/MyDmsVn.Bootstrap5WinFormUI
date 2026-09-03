@@ -42,10 +42,12 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     private int _leaveResolutionGeneration;
     private int _suspendedLeaveResolutionCount;
     private int _highlightGeneration;
+    private int _resultSynchronizationGeneration;
 
     /// <summary>Initializes a designer-safe lookup editor.</summary>
     public BootstrapLookupBox()
     {
+        _searchMembers.MemberValidator = ValidateSearchMember;
         _dropDownContent = new BootstrapLookupDropDownContent();
         _dropDownController = new BootstrapLookupDropDownController(this, _dropDownContent);
         _searchDebouncer = new BootstrapUiDebouncer();

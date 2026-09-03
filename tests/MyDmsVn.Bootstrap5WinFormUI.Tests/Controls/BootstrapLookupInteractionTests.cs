@@ -209,6 +209,26 @@ public sealed class BootstrapLookupInteractionTests
         Assert.That(lookup.ResultsGrid.CurrentCell?.RowIndex, Is.EqualTo(0));
     }
 
+    [Test]
+    public void PresentationSynchronizationAbortsAfterReentrantSelectionChange()
+    {
+        using var lookup = Create();
+        lookup.SelectedValue = 2;
+        var redirected = false;
+        lookup.ResultsGrid.SelectionChanged += (_, _) =>
+        {
+            if (redirected) return;
+            redirected = true;
+            lookup.SelectedValue = 1;
+        };
+
+        lookup.ApplyCurrentPresentationToContent(96);
+
+        Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+        Assert.That(lookup.ResultsGrid.SelectedRows.Cast<DataGridViewRow>().Single().Index, Is.EqualTo(0));
+        Assert.That(lookup.ResultsGrid.CurrentCell?.RowIndex, Is.EqualTo(0));
+    }
+
     [TestCase(Keys.Down)]
     [TestCase(Keys.PageDown)]
     public void NavigationUsesFirstVisibleResultCellWhenLeadingColumnIsHidden(Keys key)
