@@ -88,11 +88,44 @@ internal readonly struct BootstrapTreeViewLayoutInput
     }
 }
 
+internal readonly struct BootstrapTreeViewLineSegment
+{
+    internal BootstrapTreeViewLineSegment(Point start, Point end)
+    {
+        Start = start;
+        End = end;
+    }
+
+    internal Point Start { get; }
+
+    internal Point End { get; }
+
+    internal bool IsEmpty => Start == End;
+}
+
+internal readonly struct BootstrapTreeViewExpanderGlyph
+{
+    internal BootstrapTreeViewExpanderGlyph(Point first, Point tip, Point second)
+    {
+        First = first;
+        Tip = tip;
+        Second = second;
+    }
+
+    internal Point First { get; }
+
+    internal Point Tip { get; }
+
+    internal Point Second { get; }
+}
+
 internal readonly struct BootstrapTreeViewNodeLayout
 {
     internal BootstrapTreeViewNodeLayout(
         Rectangle rowBounds,
         Rectangle selectionBounds,
+        Rectangle expanderSlotBounds,
+        int expanderAnchorX,
         Rectangle expanderBounds,
         Rectangle stateImageBounds,
         Rectangle nodeImageBounds,
@@ -101,6 +134,8 @@ internal readonly struct BootstrapTreeViewNodeLayout
     {
         RowBounds = rowBounds;
         SelectionBounds = selectionBounds;
+        ExpanderSlotBounds = expanderSlotBounds;
+        ExpanderAnchorX = expanderAnchorX;
         ExpanderBounds = expanderBounds;
         StateImageBounds = stateImageBounds;
         NodeImageBounds = nodeImageBounds;
@@ -111,6 +146,10 @@ internal readonly struct BootstrapTreeViewNodeLayout
     internal Rectangle RowBounds { get; }
 
     internal Rectangle SelectionBounds { get; }
+
+    internal Rectangle ExpanderSlotBounds { get; }
+
+    internal int ExpanderAnchorX { get; }
 
     internal Rectangle ExpanderBounds { get; }
 
@@ -144,6 +183,8 @@ internal static class BootstrapTreeViewLayout
                 Rectangle.Empty,
                 Rectangle.Empty,
                 Rectangle.Empty,
+                0,
+                Rectangle.Empty,
                 Rectangle.Empty,
                 Rectangle.Empty,
                 Rectangle.Empty,
@@ -166,19 +207,142 @@ internal static class BootstrapTreeViewLayout
         var stateImageBounds = input.HasStateImage
             ? PlaceBackwardInSlot(ref cursor, input.NativeStateImageSlotWidth, stateImageSize, rowBounds)
             : Rectangle.Empty;
+
+        // Keep the un-clipped native-anchored slot long enough to center both the glyph and the
+        // connector anchor. Clip only the drawable rectangles; horizontal scrolling must not
+        // recenter framework geometry away from the native HitTest column.
+        var rawExpanderSlot = TakeBackwardSlot(ref cursor, expanderSlotWidth, rowBounds);
+        var expanderAnchorX = rawExpanderSlot.Left + (rawExpanderSlot.Width / 2);
+        var expanderSlotBounds = Intersect(rawExpanderSlot, rowBounds);
         var expanderBounds = input.HasExpander
-            ? PlaceBackwardInSlot(ref cursor, expanderSlotWidth, expanderSize, rowBounds)
+            ? Intersect(CenterInSlot(rawExpanderSlot, expanderSize), rowBounds)
             : Rectangle.Empty;
 
         var selectionBounds = input.EffectiveFullRowSelection ? rowBounds : textBounds;
         return new BootstrapTreeViewNodeLayout(
             rowBounds,
             selectionBounds,
+            expanderSlotBounds,
+            expanderAnchorX,
             expanderBounds,
             stateImageBounds,
             nodeImageBounds,
             textBounds,
             selectionBounds);
+    }
+
+    internal static BootstrapTreeViewExpanderGlyph CalculateExpanderGlyph(
+        Rectangle bounds,
+        bool expanded,
+        bool rightToLeft)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return new BootstrapTreeViewExpanderGlyph(Point.Empty, Point.Empty, Point.Empty);
+        }
+
+        var horizontalInset = Math.Max(1, bounds.Width / 4);
+        var verticalInset = Math.Max(1, bounds.Height / 4);
+        var left = bounds.Left + horizontalInset;
+        var right = Math.Max(left, bounds.Right - horizontalInset - 1);
+        var top = bounds.Top + verticalInset;
+        var bottom = Math.Max(top, bounds.Bottom - verticalInset - 1);
+        var centerX = bounds.Left + (bounds.Width / 2);
+        var centerY = bounds.Top + (bounds.Height / 2);
+
+        if (expanded)
+        {
+            return new BootstrapTreeViewExpanderGlyph(
+                new Point(left, top),
+                new Point(centerX, bottom),
+                new Point(right, top));
+        }
+
+        if (rightToLeft)
+        {
+            return new BootstrapTreeViewExpanderGlyph(
+                new Point(right, top),
+                new Point(left, centerY),
+                new Point(right, bottom));
+        }
+
+        return new BootstrapTreeViewExpanderGlyph(
+            new Point(left, top),
+            new Point(right, centerY),
+            new Point(left, bottom));
+    }
+
+    internal static BootstrapTreeViewLineSegment CalculateVerticalConnectorLine(
+        Rectangle rowBounds,
+        int x,
+        bool continueAbove,
+        bool continueBelow)
+    {
+        if (rowBounds.Width <= 0 || rowBounds.Height <= 0 || (!continueAbove && !continueBelow))
+        {
+            return new BootstrapTreeViewLineSegment(Point.Empty, Point.Empty);
+        }
+
+        var safeX = Clamp(x, rowBounds.Left, rowBounds.Right - 1);
+        var centerY = rowBounds.Top + (rowBounds.Height / 2);
+        var startY = continueAbove ? rowBounds.Top : centerY;
+        var endY = continueBelow ? rowBounds.Bottom - 1 : centerY;
+        return new BootstrapTreeViewLineSegment(new Point(safeX, startY), new Point(safeX, endY));
+    }
+
+    internal static BootstrapTreeViewLineSegment CalculateHorizontalConnectorLine(
+        Rectangle rowBounds,
+        int fromX,
+        int toX)
+    {
+        if (rowBounds.Width <= 0 || rowBounds.Height <= 0)
+        {
+            return new BootstrapTreeViewLineSegment(Point.Empty, Point.Empty);
+        }
+
+        var safeFromX = Clamp(fromX, rowBounds.Left, rowBounds.Right - 1);
+        var safeToX = Clamp(toX, rowBounds.Left, rowBounds.Right - 1);
+        var centerY = rowBounds.Top + (rowBounds.Height / 2);
+        return new BootstrapTreeViewLineSegment(
+            new Point(safeFromX, centerY),
+            new Point(safeToX, centerY));
+    }
+
+    internal static int CalculateAncestorConnectorX(
+        int currentAnchorX,
+        int currentLevel,
+        int ancestorLevel,
+        int indent,
+        bool rightToLeft)
+    {
+        if (currentLevel < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(currentLevel));
+        }
+
+        if (ancestorLevel < 0 || ancestorLevel >= currentLevel)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ancestorLevel));
+        }
+
+        if (indent < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(indent));
+        }
+
+        var delta = (long)(currentLevel - ancestorLevel) * indent;
+        var value = rightToLeft ? currentAnchorX + delta : currentAnchorX - delta;
+        if (value > int.MaxValue)
+        {
+            return int.MaxValue;
+        }
+
+        if (value < int.MinValue)
+        {
+            return int.MinValue;
+        }
+
+        return (int)value;
     }
 
     private static Rectangle PlaceBackward(ref int cursor, Size size, int gap, Rectangle rowBounds)
@@ -193,12 +357,31 @@ internal static class BootstrapTreeViewLayout
 
     private static Rectangle PlaceBackwardInSlot(ref int cursor, int slotWidth, int desiredSize, Rectangle rowBounds)
     {
+        var rawSlot = TakeBackwardSlot(ref cursor, slotWidth, rowBounds);
+        return Intersect(CenterInSlot(rawSlot, desiredSize), rowBounds);
+    }
+
+    private static Rectangle TakeBackwardSlot(ref int cursor, int slotWidth, Rectangle rowBounds)
+    {
         var width = Math.Max(0, slotWidth);
         var slotLeft = cursor - width;
-        var size = Math.Min(width, Math.Max(0, desiredSize));
-        var rectangle = CenterVertically(slotLeft + ((width - size) / 2), size, size, rowBounds);
         cursor = slotLeft;
-        return Intersect(rectangle, rowBounds);
+        return new Rectangle(slotLeft, rowBounds.Top, width, rowBounds.Height);
+    }
+
+    private static Rectangle CenterInSlot(Rectangle slotBounds, int desiredSize)
+    {
+        if (slotBounds.Width <= 0 || slotBounds.Height <= 0)
+        {
+            return Rectangle.Empty;
+        }
+
+        var size = Math.Min(
+            Math.Min(slotBounds.Width, slotBounds.Height),
+            Math.Max(0, desiredSize));
+        var x = slotBounds.Left + ((slotBounds.Width - size) / 2);
+        var y = slotBounds.Top + ((slotBounds.Height - size) / 2);
+        return new Rectangle(x, y, size, size);
     }
 
     private static Rectangle CenterVertically(int x, int width, int height, Rectangle rowBounds)
@@ -226,5 +409,15 @@ internal static class BootstrapTreeViewLayout
         }
 
         return Rectangle.FromLTRB(left, top, right, bottom);
+    }
+
+    private static int Clamp(int value, int minimum, int maximum)
+    {
+        if (value < minimum)
+        {
+            return minimum;
+        }
+
+        return value > maximum ? maximum : value;
     }
 }

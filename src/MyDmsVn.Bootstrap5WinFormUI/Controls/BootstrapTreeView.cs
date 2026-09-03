@@ -113,6 +113,17 @@ public class BootstrapTreeView : TreeView
         return visibleSelected && focused && showFocusCues;
     }
 
+    internal static bool ShouldDrawExpander(
+        int nodeLevel,
+        int childCount,
+        bool showPlusMinus,
+        bool showRootLines)
+    {
+        return childCount > 0 &&
+               showPlusMinus &&
+               (nodeLevel > 0 || showRootLines);
+    }
+
     private void RaiseObservableDrawNodeEvent(DrawTreeNodeEventArgs e)
     {
         base.OnDrawNode(e);
@@ -144,6 +155,11 @@ public class BootstrapTreeView : TreeView
             hot: false,
             enabled: Enabled);
         var palette = BootstrapTreeViewRenderLogic.ResolvePalette(theme.Colors, _variant, visualState);
+        var hasExpander = ShouldDrawExpander(
+            node.Level,
+            node.Nodes.Count,
+            ShowPlusMinus,
+            ShowRootLines);
         var layout = BootstrapTreeViewLayout.Calculate(new BootstrapTreeViewLayoutInput(
             ClientRectangle,
             rowBounds,
@@ -152,7 +168,7 @@ public class BootstrapTreeView : TreeView
             dpi,
             RightToLeft == RightToLeft.Yes,
             FullRowSelect && !ShowLines,
-            hasExpander: false,
+            hasExpander,
             hasStateImage: false,
             nativeStateImageSlotWidth: 0,
             hasNodeImage: false,
@@ -181,6 +197,28 @@ public class BootstrapTreeView : TreeView
             graphics.FillRectangle(backgroundBrush, backgroundBounds);
         }
 
+        if (ShowLines)
+        {
+            DrawConnectorLines(graphics, node, layout, theme.Colors.Border, dpi);
+        }
+
+        if (hasExpander && !layout.ExpanderBounds.IsEmpty)
+        {
+            var expanderColor = theme.Colors.MutedText;
+            if (visibleSelected && layout.SelectionBounds.Contains(layout.ExpanderBounds))
+            {
+                expanderColor = foreground;
+            }
+
+            DrawExpander(
+                graphics,
+                layout.ExpanderBounds,
+                node.IsExpanded,
+                RightToLeft == RightToLeft.Yes,
+                expanderColor,
+                dpi);
+        }
+
         if (layout.TextBounds.Width > 0 && layout.TextBounds.Height > 0 && !string.IsNullOrEmpty(node.Text))
         {
             var font = node.NodeFont ?? Font;
@@ -206,6 +244,127 @@ public class BootstrapTreeView : TreeView
         if (ShouldDrawFocusCueForTesting(visibleSelected, Focused, ShowFocusCues))
         {
             DrawFocusCue(graphics, layout.FocusBounds, theme.Colors.Focus, dpi);
+        }
+    }
+
+    private void DrawConnectorLines(
+        Graphics graphics,
+        TreeNode node,
+        BootstrapTreeViewNodeLayout layout,
+        Color color,
+        int dpi)
+    {
+        if (layout.RowBounds.IsEmpty || layout.ExpanderSlotBounds.IsEmpty)
+        {
+            return;
+        }
+
+        using var pen = new Pen(color, Math.Max(1, DpiScaler.Scale(1, dpi)))
+        {
+            DashStyle = DashStyle.Dot,
+        };
+
+        var currentAnchorX = layout.ExpanderAnchorX;
+        var drawCurrentBranch = node.Level > 0 || ShowRootLines;
+        if (drawCurrentBranch)
+        {
+            var currentVertical = BootstrapTreeViewLayout.CalculateVerticalConnectorLine(
+                layout.RowBounds,
+                currentAnchorX,
+                continueAbove: node.Parent is not null || node.PrevNode is not null,
+                continueBelow: node.NextNode is not null);
+            DrawConnectorSegment(graphics, pen, currentVertical);
+
+            var firstContentX = GetFirstContentX(layout);
+            var currentHorizontal = BootstrapTreeViewLayout.CalculateHorizontalConnectorLine(
+                layout.RowBounds,
+                currentAnchorX,
+                firstContentX);
+            DrawConnectorSegment(graphics, pen, currentHorizontal);
+        }
+
+        var ancestor = node.Parent;
+        var ancestorLevel = node.Level - 1;
+        while (ancestor is not null && ancestorLevel >= 0)
+        {
+            if (ancestor.NextNode is not null && (ancestorLevel > 0 || ShowRootLines))
+            {
+                var ancestorX = BootstrapTreeViewLayout.CalculateAncestorConnectorX(
+                    currentAnchorX,
+                    node.Level,
+                    ancestorLevel,
+                    Indent,
+                    RightToLeft == RightToLeft.Yes);
+                var continuation = BootstrapTreeViewLayout.CalculateVerticalConnectorLine(
+                    layout.RowBounds,
+                    ancestorX,
+                    continueAbove: true,
+                    continueBelow: true);
+                DrawConnectorSegment(graphics, pen, continuation);
+            }
+
+            ancestor = ancestor.Parent;
+            ancestorLevel--;
+        }
+    }
+
+    private static int GetFirstContentX(BootstrapTreeViewNodeLayout layout)
+    {
+        if (!layout.StateImageBounds.IsEmpty)
+        {
+            return layout.StateImageBounds.Left;
+        }
+
+        if (!layout.NodeImageBounds.IsEmpty)
+        {
+            return layout.NodeImageBounds.Left;
+        }
+
+        return layout.TextBounds.IsEmpty ? layout.ExpanderAnchorX : layout.TextBounds.Left;
+    }
+
+    private static void DrawConnectorSegment(
+        Graphics graphics,
+        Pen pen,
+        BootstrapTreeViewLineSegment segment)
+    {
+        if (!segment.IsEmpty)
+        {
+            graphics.DrawLine(pen, segment.Start, segment.End);
+        }
+    }
+
+    private static void DrawExpander(
+        Graphics graphics,
+        Rectangle bounds,
+        bool expanded,
+        bool rightToLeft,
+        Color color,
+        int dpi)
+    {
+        var glyph = BootstrapTreeViewLayout.CalculateExpanderGlyph(bounds, expanded, rightToLeft);
+        if (glyph.First == glyph.Tip || glyph.Tip == glyph.Second)
+        {
+            return;
+        }
+
+        using var pen = new Pen(color, Math.Max(1, DpiScaler.Scale(1, dpi)))
+        {
+            StartCap = LineCap.Round,
+            EndCap = LineCap.Round,
+            LineJoin = LineJoin.Round,
+        };
+
+        var previousSmoothingMode = graphics.SmoothingMode;
+        try
+        {
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            graphics.DrawLine(pen, glyph.First, glyph.Tip);
+            graphics.DrawLine(pen, glyph.Tip, glyph.Second);
+        }
+        finally
+        {
+            graphics.SmoothingMode = previousSmoothingMode;
         }
     }
 

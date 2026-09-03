@@ -26,6 +26,7 @@ public sealed class BootstrapTreeViewLayoutTests
             Assert.That(layout.ExpanderBounds.Right, Is.LessThanOrEqualTo(layout.StateImageBounds.Left));
             Assert.That(layout.StateImageBounds.Right, Is.LessThanOrEqualTo(layout.NodeImageBounds.Left));
             Assert.That(layout.NodeImageBounds.Right, Is.LessThanOrEqualTo(layout.TextBounds.Left));
+            AssertContained(layout.RowBounds, layout.ExpanderSlotBounds);
             AssertContained(layout.RowBounds, layout.ExpanderBounds);
             AssertContained(layout.RowBounds, layout.StateImageBounds);
             AssertContained(layout.RowBounds, layout.NodeImageBounds);
@@ -62,6 +63,7 @@ public sealed class BootstrapTreeViewLayoutTests
             Assert.That(layout.ExpanderBounds.Right, Is.LessThanOrEqualTo(layout.StateImageBounds.Left));
             Assert.That(layout.StateImageBounds.Right, Is.LessThanOrEqualTo(layout.NodeImageBounds.Left));
             Assert.That(layout.NodeImageBounds.Right, Is.LessThanOrEqualTo(layout.TextBounds.Left));
+            AssertContained(layout.RowBounds, layout.ExpanderSlotBounds);
             AssertContained(layout.RowBounds, layout.ExpanderBounds);
             AssertContained(layout.RowBounds, layout.StateImageBounds);
             AssertContained(layout.RowBounds, layout.NodeImageBounds);
@@ -137,6 +139,7 @@ public sealed class BootstrapTreeViewLayoutTests
         {
             Assert.That(layout.TextBounds.Left, Is.EqualTo(0));
             Assert.That(layout.TextBounds.Right, Is.EqualTo(80));
+            Assert.That(layout.ExpanderSlotBounds.IsEmpty, Is.True);
             Assert.That(layout.ExpanderBounds.IsEmpty, Is.True);
             Assert.That(layout.StateImageBounds.IsEmpty, Is.True);
             Assert.That(layout.NodeImageBounds.IsEmpty, Is.True);
@@ -160,6 +163,7 @@ public sealed class BootstrapTreeViewLayoutTests
             Assert.That(layout.ExpanderBounds.Right, Is.LessThanOrEqualTo(layout.StateImageBounds.Left));
             Assert.That(layout.StateImageBounds.Right, Is.LessThanOrEqualTo(layout.NodeImageBounds.Left));
             Assert.That(layout.NodeImageBounds.Right, Is.LessThanOrEqualTo(layout.TextBounds.Left));
+            AssertContained(layout.RowBounds, layout.ExpanderSlotBounds);
             AssertContained(layout.RowBounds, layout.ExpanderBounds);
             AssertContained(layout.RowBounds, layout.StateImageBounds);
             AssertContained(layout.RowBounds, layout.NodeImageBounds);
@@ -194,6 +198,7 @@ public sealed class BootstrapTreeViewLayoutTests
             Assert.That(normal.FocusBounds, Is.EqualTo(normal.TextBounds));
             Assert.That(fullRow.SelectionBounds, Is.EqualTo(fullRow.RowBounds));
             Assert.That(fullRow.FocusBounds, Is.EqualTo(fullRow.RowBounds));
+            Assert.That(fullRow.ExpanderSlotBounds, Is.EqualTo(normal.ExpanderSlotBounds));
             Assert.That(fullRow.ExpanderBounds, Is.EqualTo(normal.ExpanderBounds));
             Assert.That(fullRow.StateImageBounds, Is.EqualTo(normal.StateImageBounds));
             Assert.That(fullRow.NodeImageBounds, Is.EqualTo(normal.NodeImageBounds));
@@ -227,6 +232,7 @@ public sealed class BootstrapTreeViewLayoutTests
         Assert.Multiple((Action)(() =>
         {
             Assert.That(labelOnlyDraw.RowBounds, Is.EqualTo(fullRowDraw.RowBounds));
+            Assert.That(labelOnlyDraw.ExpanderSlotBounds, Is.EqualTo(fullRowDraw.ExpanderSlotBounds));
             Assert.That(labelOnlyDraw.ExpanderBounds, Is.EqualTo(fullRowDraw.ExpanderBounds));
             Assert.That(labelOnlyDraw.StateImageBounds, Is.EqualTo(fullRowDraw.StateImageBounds));
             Assert.That(labelOnlyDraw.NodeImageBounds, Is.EqualTo(fullRowDraw.NodeImageBounds));
@@ -255,6 +261,93 @@ public sealed class BootstrapTreeViewLayoutTests
             Assert.That(smallNodeImage.StateImageBounds.Width, Is.LessThanOrEqualTo(19));
             Assert.That(oversizedNormalImage.StateImageBounds.Width, Is.EqualTo(smallNodeImage.StateImageBounds.Width));
             Assert.That(oversizedNormalImage.StateImageBounds.Height, Is.EqualTo(smallNodeImage.StateImageBounds.Height));
+        }));
+    }
+
+    [Test]
+    public void ExpanderGlyph_ExpandedPointsDownAndCollapsedPointsTowardContent()
+    {
+        var bounds = new Rectangle(20, 4, 12, 12);
+
+        var expanded = BootstrapTreeViewLayout.CalculateExpanderGlyph(bounds, expanded: true, rightToLeft: false);
+        var collapsedLtr = BootstrapTreeViewLayout.CalculateExpanderGlyph(bounds, expanded: false, rightToLeft: false);
+        var collapsedRtl = BootstrapTreeViewLayout.CalculateExpanderGlyph(bounds, expanded: false, rightToLeft: true);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(expanded.Tip.Y, Is.GreaterThan(expanded.First.Y));
+            Assert.That(expanded.Tip.Y, Is.GreaterThan(expanded.Second.Y));
+            Assert.That(collapsedLtr.Tip.X, Is.GreaterThan(collapsedLtr.First.X));
+            Assert.That(collapsedLtr.Tip.X, Is.GreaterThan(collapsedLtr.Second.X));
+            Assert.That(collapsedRtl.Tip.X, Is.LessThan(collapsedRtl.First.X));
+            Assert.That(collapsedRtl.Tip.X, Is.LessThan(collapsedRtl.Second.X));
+            Assert.That(bounds.Contains(expanded.First), Is.True);
+            Assert.That(bounds.Contains(expanded.Tip), Is.True);
+            Assert.That(bounds.Contains(expanded.Second), Is.True);
+        }));
+    }
+
+    [Test]
+    public void ConnectorVerticalGeometry_AncestorContinuesAndLastChildTerminatesAtCenter()
+    {
+        var row = new Rectangle(0, 10, 160, 24);
+        var ancestorContinuation = BootstrapTreeViewLayout.CalculateVerticalConnectorLine(
+            row,
+            x: 40,
+            continueAbove: true,
+            continueBelow: true);
+        var lastChild = BootstrapTreeViewLayout.CalculateVerticalConnectorLine(
+            row,
+            x: 60,
+            continueAbove: true,
+            continueBelow: false);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(ancestorContinuation.Start, Is.EqualTo(new Point(40, row.Top)));
+            Assert.That(ancestorContinuation.End, Is.EqualTo(new Point(40, row.Bottom - 1)));
+            Assert.That(lastChild.Start, Is.EqualTo(new Point(60, row.Top)));
+            Assert.That(lastChild.End, Is.EqualTo(new Point(60, row.Top + (row.Height / 2))));
+        }));
+    }
+
+    [Test]
+    public void AncestorConnectorX_UsesNativeIndentDirectionForLtrAndRtl()
+    {
+        var ltr = BootstrapTreeViewLayout.CalculateAncestorConnectorX(
+            currentAnchorX: 100,
+            currentLevel: 3,
+            ancestorLevel: 1,
+            indent: 19,
+            rightToLeft: false);
+        var rtl = BootstrapTreeViewLayout.CalculateAncestorConnectorX(
+            currentAnchorX: 100,
+            currentLevel: 3,
+            ancestorLevel: 1,
+            indent: 19,
+            rightToLeft: true);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(ltr, Is.EqualTo(62));
+            Assert.That(rtl, Is.EqualTo(138));
+        }));
+    }
+
+    [Test]
+    public void LeafLayout_RetainsConnectorAnchorWithoutDrawingExpander()
+    {
+        var leaf = BootstrapTreeViewLayout.Calculate(CreateInput(
+            nativeLabelBounds: new Rectangle(96, 0, 120, 24),
+            nodeLevel: 2,
+            hasExpander: false));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(leaf.ExpanderBounds.IsEmpty, Is.True);
+            Assert.That(leaf.ExpanderSlotBounds.IsEmpty, Is.False);
+            Assert.That(leaf.ExpanderAnchorX, Is.GreaterThanOrEqualTo(leaf.RowBounds.Left));
+            Assert.That(leaf.ExpanderAnchorX, Is.LessThan(leaf.TextBounds.Left));
         }));
     }
 
@@ -293,6 +386,7 @@ public sealed class BootstrapTreeViewLayoutTests
         {
             layout.RowBounds,
             layout.SelectionBounds,
+            layout.ExpanderSlotBounds,
             layout.ExpanderBounds,
             layout.StateImageBounds,
             layout.NodeImageBounds,

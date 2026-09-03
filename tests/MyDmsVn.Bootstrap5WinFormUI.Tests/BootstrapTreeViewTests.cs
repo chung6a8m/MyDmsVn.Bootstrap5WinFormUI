@@ -1,5 +1,7 @@
+using System;
 using System.Drawing;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -13,6 +15,11 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests;
 [Apartment(ApartmentState.STA)]
 public sealed class BootstrapTreeViewTests
 {
+    private const int WmLButtonDown = 0x0201;
+    private const int WmLButtonUp = 0x0202;
+    private const int WmLButtonDoubleClick = 0x0203;
+    private const int MkLButton = 0x0001;
+
     [Test]
     public void Constructor_PreservesNativeTreeViewContractAndBootstrapDefaults()
     {
@@ -80,6 +87,103 @@ public sealed class BootstrapTreeViewTests
         Assert.That(treeView.ShowRootLines, Is.False);
         Assert.That(treeView.Indent, Is.EqualTo(28));
         Assert.That(treeView.ItemHeight, Is.EqualTo(24));
+    }
+
+    [Test]
+    public void ExpanderVisibility_UsesNativeShowPlusMinusShowRootLinesAndLeafContract()
+    {
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(BootstrapTreeView.ShouldDrawExpander(0, 1, showPlusMinus: true, showRootLines: true), Is.True);
+            Assert.That(BootstrapTreeView.ShouldDrawExpander(0, 1, showPlusMinus: true, showRootLines: false), Is.False);
+            Assert.That(BootstrapTreeView.ShouldDrawExpander(1, 1, showPlusMinus: true, showRootLines: false), Is.True);
+            Assert.That(BootstrapTreeView.ShouldDrawExpander(1, 1, showPlusMinus: false, showRootLines: true), Is.False);
+            Assert.That(BootstrapTreeView.ShouldDrawExpander(1, 0, showPlusMinus: true, showRootLines: true), Is.False);
+        }));
+    }
+
+    [Test]
+    public void RenderNodeForTesting_NodeWithChildrenPaintsFrameworkExpander()
+    {
+        using var treeView = new BootstrapTreeView
+        {
+            Size = new Size(220, 48),
+            ShowLines = false,
+            ShowPlusMinus = true,
+            ShowRootLines = true,
+            ItemHeight = 24,
+        };
+        var root = new TreeNode("Root");
+        root.Nodes.Add(new TreeNode("Child"));
+        treeView.Nodes.Add(root);
+        var rowBounds = new Rectangle(0, 0, 220, 24);
+        var labelBounds = new Rectangle(48, 0, 120, 24);
+        var layout = BootstrapTreeViewLayout.Calculate(new BootstrapTreeViewLayoutInput(
+            treeView.ClientRectangle,
+            rowBounds,
+            labelBounds,
+            root.Level,
+            96,
+            rightToLeft: false,
+            effectiveFullRowSelection: false,
+            hasExpander: true,
+            hasStateImage: false,
+            nativeStateImageSlotWidth: 0,
+            hasNodeImage: false,
+            nodeImageSize: Size.Empty));
+
+        using var bitmap = new Bitmap(220, 48);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.Magenta);
+
+        treeView.RenderNodeForTesting(graphics, root, rowBounds, labelBounds, (TreeNodeStates)0);
+
+        Assert.That(ContainsPaint(bitmap, layout.ExpanderBounds, Color.Magenta), Is.True);
+    }
+
+    [Test]
+    public void RenderNodeForTesting_LeafWithShowLinesPaintsNativeHierarchyConnector()
+    {
+        using var treeView = new BootstrapTreeView
+        {
+            Size = new Size(220, 72),
+            ShowLines = true,
+            ShowPlusMinus = true,
+            ShowRootLines = true,
+            ItemHeight = 24,
+            Indent = 19,
+        };
+        var root = new TreeNode("Root");
+        var leaf = new TreeNode("Leaf");
+        root.Nodes.Add(leaf);
+        treeView.Nodes.Add(root);
+        var rowBounds = new Rectangle(0, 24, 220, 24);
+        var labelBounds = new Rectangle(67, 24, 120, 24);
+        var layout = BootstrapTreeViewLayout.Calculate(new BootstrapTreeViewLayoutInput(
+            treeView.ClientRectangle,
+            rowBounds,
+            labelBounds,
+            leaf.Level,
+            96,
+            rightToLeft: false,
+            effectiveFullRowSelection: false,
+            hasExpander: false,
+            hasStateImage: false,
+            nativeStateImageSlotWidth: 0,
+            hasNodeImage: false,
+            nodeImageSize: Size.Empty));
+
+        using var bitmap = new Bitmap(220, 72);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.Magenta);
+
+        treeView.RenderNodeForTesting(graphics, leaf, rowBounds, labelBounds, (TreeNodeStates)0);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(layout.ExpanderBounds.IsEmpty, Is.True);
+            Assert.That(ContainsPaint(bitmap, layout.ExpanderSlotBounds, Color.Magenta), Is.True);
+        }));
     }
 
     [Test]
@@ -163,6 +267,37 @@ public sealed class BootstrapTreeViewTests
     }
 
     [Test]
+    public void NativeHitTestParity_NonRootExpanderRemainsInteractiveWhenRootLinesAreHidden()
+    {
+        using var treeView = new BootstrapTreeView
+        {
+            Size = new Size(260, 120),
+            ShowPlusMinus = true,
+            ShowRootLines = false,
+            Indent = 19,
+            ItemHeight = 24,
+        };
+        var root = new TreeNode("Root");
+        var branch = new TreeNode("Branch");
+        branch.Nodes.Add(new TreeNode("Leaf"));
+        root.Nodes.Add(branch);
+        treeView.Nodes.Add(root);
+        root.Expand();
+        _ = treeView.Handle;
+
+        var layout = CalculateNativeAnchoredLayout(
+            treeView,
+            branch,
+            dpi: 96,
+            rightToLeft: false,
+            nativeStateImageSlotWidth: 0,
+            hasStateImage: false,
+            nodeImageSize: Size.Empty);
+
+        AssertNativeHit(treeView, branch, layout.ExpanderBounds, TreeViewHitTestLocations.PlusMinus);
+    }
+
+    [Test]
     public void NativeHitTestParity_DeepScrolledNode_RemainsNativeAnchored()
     {
         using var imageList = CreateImageList(new Size(16, 16), 1);
@@ -207,6 +342,47 @@ public sealed class BootstrapTreeViewTests
         AssertNativeHit(treeView, current, layout.NodeImageBounds, TreeViewHitTestLocations.Image);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void NativePlusMinusMouseSequence_MatchesPlainTreeViewWithoutFrameworkSynthesis(bool doubleClick)
+    {
+        using var native = CreateInteractionTree(new TreeView());
+        using var bootstrap = CreateInteractionTree(new BootstrapTreeView());
+
+        var nativeResult = CapturePlusMinusMouseSequence(native, doubleClick);
+        var bootstrapResult = CapturePlusMinusMouseSequence(bootstrap, doubleClick);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(bootstrapResult.BeforeExpand, Is.EqualTo(nativeResult.BeforeExpand));
+            Assert.That(bootstrapResult.AfterExpand, Is.EqualTo(nativeResult.AfterExpand));
+            Assert.That(bootstrapResult.BeforeCollapse, Is.EqualTo(nativeResult.BeforeCollapse));
+            Assert.That(bootstrapResult.AfterCollapse, Is.EqualTo(nativeResult.AfterCollapse));
+            Assert.That(bootstrapResult.RootExpanded, Is.EqualTo(nativeResult.RootExpanded));
+            Assert.That(nativeResult.TotalTransitions, Is.GreaterThan(0));
+        }));
+    }
+
+    [Test]
+    public void ProgrammaticExpandCollapseSequence_MatchesPlainTreeViewEventSemantics()
+    {
+        using var native = CreateProgrammaticTree(new TreeView());
+        using var bootstrap = CreateProgrammaticTree(new BootstrapTreeView());
+
+        var nativeResult = CaptureProgrammaticTransitions(native);
+        var bootstrapResult = CaptureProgrammaticTransitions(bootstrap);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(bootstrapResult.BeforeExpand, Is.EqualTo(nativeResult.BeforeExpand));
+            Assert.That(bootstrapResult.AfterExpand, Is.EqualTo(nativeResult.AfterExpand));
+            Assert.That(bootstrapResult.BeforeCollapse, Is.EqualTo(nativeResult.BeforeCollapse));
+            Assert.That(bootstrapResult.AfterCollapse, Is.EqualTo(nativeResult.AfterCollapse));
+            Assert.That(bootstrapResult.RootExpanded, Is.EqualTo(nativeResult.RootExpanded));
+            Assert.That(bootstrapResult.ChildExpanded, Is.EqualTo(nativeResult.ChildExpanded));
+        }));
+    }
+
     private static BootstrapTreeViewNodeLayout CalculateNativeAnchoredLayout(
         BootstrapTreeView treeView,
         TreeNode node,
@@ -226,7 +402,11 @@ public sealed class BootstrapTreeViewTests
             dpi,
             rightToLeft,
             treeView.FullRowSelect && !treeView.ShowLines,
-            node.Nodes.Count > 0 && treeView.ShowPlusMinus && (node.Level > 0 || treeView.ShowRootLines),
+            BootstrapTreeView.ShouldDrawExpander(
+                node.Level,
+                node.Nodes.Count,
+                treeView.ShowPlusMinus,
+                treeView.ShowRootLines),
             hasStateImage,
             nativeStateImageSlotWidth,
             treeView.ImageList is not null && node.ImageIndex >= 0,
@@ -263,6 +443,36 @@ public sealed class BootstrapTreeViewTests
         return last - first + 1;
     }
 
+    private static Point GetNativeHitPoint(
+        TreeView treeView,
+        TreeNode expectedNode,
+        TreeViewHitTestLocations expectedLocation)
+    {
+        var nativeBounds = expectedNode.Bounds;
+        var y = nativeBounds.Top + (nativeBounds.Height / 2);
+        var first = -1;
+        var last = -1;
+
+        for (var x = treeView.ClientRectangle.Left; x < treeView.ClientRectangle.Right; x++)
+        {
+            var hit = treeView.HitTest(x, y);
+            if (hit.Node != expectedNode || (hit.Location & expectedLocation) != expectedLocation)
+            {
+                continue;
+            }
+
+            if (first < 0)
+            {
+                first = x;
+            }
+
+            last = x;
+        }
+
+        Assert.That(first, Is.GreaterThanOrEqualTo(0), $"Expected native {expectedLocation} hit geometry.");
+        return new Point(first + ((last - first) / 2), y);
+    }
+
     private static void AssertNativeHit(
         TreeView treeView,
         TreeNode expectedNode,
@@ -273,11 +483,107 @@ public sealed class BootstrapTreeViewTests
         var point = new Point(bounds.Left + (bounds.Width / 2), bounds.Top + (bounds.Height / 2));
         var hit = treeView.HitTest(point);
 
-        Assert.Multiple((System.Action)(() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(hit.Node, Is.SameAs(expectedNode), $"Native hit node at {point} for {expectedLocation}.");
             Assert.That(hit.Location & expectedLocation, Is.EqualTo(expectedLocation), $"Native hit location at {point}.");
         }));
+    }
+
+    private static T CreateInteractionTree<T>(T treeView)
+        where T : TreeView
+    {
+        treeView.Size = new Size(240, 100);
+        treeView.ShowPlusMinus = true;
+        treeView.ShowRootLines = true;
+        treeView.Indent = 19;
+        treeView.ItemHeight = 24;
+        var root = new TreeNode("Root");
+        root.Nodes.Add(new TreeNode("Child"));
+        treeView.Nodes.Add(root);
+        _ = treeView.Handle;
+        return treeView;
+    }
+
+    private static T CreateProgrammaticTree<T>(T treeView)
+        where T : TreeView
+    {
+        treeView.Size = new Size(240, 120);
+        var root = new TreeNode("Root");
+        var child = new TreeNode("Child");
+        child.Nodes.Add(new TreeNode("Grandchild"));
+        root.Nodes.Add(child);
+        treeView.Nodes.Add(root);
+        _ = treeView.Handle;
+        return treeView;
+    }
+
+    private static NativeTransitionSnapshot CapturePlusMinusMouseSequence(TreeView treeView, bool doubleClick)
+    {
+        var root = treeView.Nodes[0];
+        var snapshot = new NativeTransitionSnapshot();
+        treeView.BeforeExpand += (_, _) => snapshot.BeforeExpand++;
+        treeView.AfterExpand += (_, _) => snapshot.AfterExpand++;
+        treeView.BeforeCollapse += (_, _) => snapshot.BeforeCollapse++;
+        treeView.AfterCollapse += (_, _) => snapshot.AfterCollapse++;
+
+        var point = GetNativeHitPoint(treeView, root, TreeViewHitTestLocations.PlusMinus);
+        SendMouseMessage(treeView.Handle, WmLButtonDown, point, buttonDown: true);
+        SendMouseMessage(treeView.Handle, WmLButtonUp, point, buttonDown: false);
+        if (doubleClick)
+        {
+            SendMouseMessage(treeView.Handle, WmLButtonDoubleClick, point, buttonDown: true);
+            SendMouseMessage(treeView.Handle, WmLButtonUp, point, buttonDown: false);
+        }
+
+        snapshot.RootExpanded = root.IsExpanded;
+        return snapshot;
+    }
+
+    private static NativeTransitionSnapshot CaptureProgrammaticTransitions(TreeView treeView)
+    {
+        var root = treeView.Nodes[0];
+        var child = root.Nodes[0];
+        var snapshot = new NativeTransitionSnapshot();
+        treeView.BeforeExpand += (_, _) => snapshot.BeforeExpand++;
+        treeView.AfterExpand += (_, _) => snapshot.AfterExpand++;
+        treeView.BeforeCollapse += (_, _) => snapshot.BeforeCollapse++;
+        treeView.AfterCollapse += (_, _) => snapshot.AfterCollapse++;
+
+        root.Expand();
+        treeView.Refresh();
+        root.Collapse();
+        treeView.Refresh();
+        treeView.ExpandAll();
+        treeView.Refresh();
+        treeView.CollapseAll();
+        treeView.Refresh();
+
+        snapshot.RootExpanded = root.IsExpanded;
+        snapshot.ChildExpanded = child.IsExpanded;
+        return snapshot;
+    }
+
+    private static void SendMouseMessage(IntPtr handle, int message, Point point, bool buttonDown)
+    {
+        var lParam = new IntPtr((point.Y << 16) | (point.X & 0xFFFF));
+        SendMessage(handle, message, buttonDown ? new IntPtr(MkLButton) : IntPtr.Zero, lParam);
+    }
+
+    private static bool ContainsPaint(Bitmap bitmap, Rectangle bounds, Color background)
+    {
+        for (var y = bounds.Top; y < bounds.Bottom; y++)
+        {
+            for (var x = bounds.Left; x < bounds.Right; x++)
+            {
+                if (bitmap.GetPixel(x, y).ToArgb() != background.ToArgb())
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static ImageList CreateImageList(Size imageSize, int count)
@@ -289,5 +595,25 @@ public sealed class BootstrapTreeViewTests
         }
 
         return imageList;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    private sealed class NativeTransitionSnapshot
+    {
+        internal int BeforeExpand { get; set; }
+
+        internal int AfterExpand { get; set; }
+
+        internal int BeforeCollapse { get; set; }
+
+        internal int AfterCollapse { get; set; }
+
+        internal bool RootExpanded { get; set; }
+
+        internal bool ChildExpanded { get; set; }
+
+        internal int TotalTransitions => BeforeExpand + BeforeCollapse;
     }
 }
