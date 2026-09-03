@@ -1,9 +1,11 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -151,6 +153,60 @@ public sealed class BootstrapCheckableInteractionTests
             Assert.That(checkBox.Variant, Is.EqualTo(BootstrapVariant.Success));
             Assert.That(radio.ValidationState, Is.EqualTo(BootstrapValidationState.Invalid));
         }));
+    }
+
+    [TestCase(typeof(BootstrapCheckBox))]
+    [TestCase(typeof(BootstrapRadioButton))]
+    [TestCase(typeof(BootstrapSwitch))]
+    public void OwnerDrawnTextHonorsTopAndBottomTextAlign(Type controlType)
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+            var top = RenderTextInkRows(controlType, ContentAlignment.TopLeft);
+            var bottom = RenderTextInkRows(controlType, ContentAlignment.BottomLeft);
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(top.First(), Is.LessThan(10), $"{controlType.Name} must render top-aligned text at the top edge.");
+                Assert.That(bottom.Last(), Is.GreaterThan(50), $"{controlType.Name} must render bottom-aligned text at the bottom edge.");
+                Assert.That(top.Last(), Is.LessThan(bottom.First()), $"{controlType.Name} top and bottom text positions must be distinct.");
+            }));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
+    }
+
+    private static int[] RenderTextInkRows(Type controlType, ContentAlignment textAlign)
+    {
+        using var host = new Panel { Size = new Size(220, 64), BackColor = Color.White };
+        using var control = (ButtonBase)Activator.CreateInstance(controlType)!;
+        control.AutoSize = false;
+        control.Bounds = new Rectangle(0, 0, 220, 64);
+        control.Text = "Alignment";
+        control.TextAlign = textAlign;
+        if (control is RadioButton radio)
+        {
+            radio.CheckAlign = ContentAlignment.MiddleLeft;
+        }
+        else
+        {
+            ((CheckBox)control).CheckAlign = ContentAlignment.MiddleLeft;
+        }
+
+        host.Controls.Add(control);
+        host.CreateControl();
+        control.CreateControl();
+        using var bitmap = new Bitmap(host.Width, host.Height);
+        host.DrawToBitmap(bitmap, host.ClientRectangle);
+
+        return Enumerable.Range(0, bitmap.Height)
+            .Where(y => Enumerable.Range(48, bitmap.Width - 48)
+                .Any(x => bitmap.GetPixel(x, y).GetBrightness() < 0.65f))
+            .ToArray();
     }
 
     private sealed class TestCheckBox : BootstrapCheckBox

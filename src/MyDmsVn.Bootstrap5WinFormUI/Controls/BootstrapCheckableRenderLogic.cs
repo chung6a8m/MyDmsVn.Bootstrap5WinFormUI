@@ -13,6 +13,13 @@ internal enum BootstrapCheckableKind
     Switch
 }
 
+internal enum BootstrapCheckableHorizontalSlot
+{
+    Left,
+    Center,
+    Right
+}
+
 internal readonly struct BootstrapCheckableMetrics
 {
     public BootstrapCheckableMetrics(int indicatorSize, Size indicatorBoundsSize, int textGap, int borderWidth, int focusWidth, float radius)
@@ -136,17 +143,25 @@ internal static class BootstrapCheckableRenderLogic
         return new BootstrapCheckablePalette(colors.Surface, border, fill, glyph, text, colors.Focus);
     }
 
-    public static bool IsIndicatorOnLeft(ContentAlignment checkAlign, bool rightToLeft)
+    public static BootstrapCheckableHorizontalSlot ResolveIndicatorSlot(ContentAlignment checkAlign, bool rightToLeft)
     {
         ValidateAlignment(checkAlign);
         var alignedLeft = checkAlign == ContentAlignment.TopLeft || checkAlign == ContentAlignment.MiddleLeft || checkAlign == ContentAlignment.BottomLeft;
         var alignedRight = checkAlign == ContentAlignment.TopRight || checkAlign == ContentAlignment.MiddleRight || checkAlign == ContentAlignment.BottomRight;
         if (!alignedLeft && !alignedRight)
         {
-            alignedLeft = true;
+            return BootstrapCheckableHorizontalSlot.Center;
         }
 
-        return rightToLeft ? !alignedLeft : alignedLeft;
+        var slot = alignedLeft ? BootstrapCheckableHorizontalSlot.Left : BootstrapCheckableHorizontalSlot.Right;
+        if (!rightToLeft)
+        {
+            return slot;
+        }
+
+        return slot == BootstrapCheckableHorizontalSlot.Left
+            ? BootstrapCheckableHorizontalSlot.Right
+            : BootstrapCheckableHorizontalSlot.Left;
     }
 
     public static BootstrapCheckableLayout GetLayout(Rectangle clientBounds, Padding padding, BootstrapCheckableMetrics metrics, ContentAlignment checkAlign, bool rightToLeft)
@@ -164,13 +179,19 @@ internal static class BootstrapCheckableRenderLogic
         var indicatorWidth = Math.Min(Math.Max(0, metrics.IndicatorBoundsSize.Width), Math.Max(0, content.Width));
         var indicatorHeight = Math.Min(Math.Max(0, metrics.IndicatorBoundsSize.Height), Math.Max(0, content.Height));
         var y = AlignVertically(content, indicatorHeight, checkAlign);
-        var onLeft = IsIndicatorOnLeft(checkAlign, rightToLeft);
-        var x = onLeft ? content.Left : content.Right - indicatorWidth;
+        var slot = ResolveIndicatorSlot(checkAlign, rightToLeft);
+        var x = slot == BootstrapCheckableHorizontalSlot.Left
+            ? content.Left
+            : slot == BootstrapCheckableHorizontalSlot.Right
+                ? content.Right - indicatorWidth
+                : content.Left + (content.Width - indicatorWidth) / 2;
         var indicator = new Rectangle(x, y, indicatorWidth, indicatorHeight);
         var gap = Math.Min(metrics.TextGap, Math.Max(0, content.Width - indicatorWidth));
-        var text = onLeft
-            ? Rectangle.FromLTRB(Math.Min(content.Right, indicator.Right + gap), content.Top, content.Right, content.Bottom)
-            : Rectangle.FromLTRB(content.Left, content.Top, Math.Max(content.Left, indicator.Left - gap), content.Bottom);
+        var text = slot == BootstrapCheckableHorizontalSlot.Center
+            ? content
+            : slot == BootstrapCheckableHorizontalSlot.Left
+                ? Rectangle.FromLTRB(Math.Min(content.Right, indicator.Right + gap), content.Top, content.Right, content.Bottom)
+                : Rectangle.FromLTRB(content.Left, content.Top, Math.Max(content.Left, indicator.Left - gap), content.Bottom);
         return new BootstrapCheckableLayout(indicator, text);
     }
 
@@ -210,6 +231,53 @@ internal static class BootstrapCheckableRenderLogic
     public static bool ShouldUseNativeFallback(Appearance appearance, bool hasImage, bool hasImageList, int imageIndex, string? imageKey)
     {
         return appearance != Appearance.Normal || hasImage || (hasImageList && (imageIndex >= 0 || !string.IsNullOrEmpty(imageKey)));
+    }
+
+    public static TextFormatFlags GetTextFormatFlags(ContentAlignment textAlign, bool useMnemonic, bool showKeyboardCues, bool autoEllipsis, bool rightToLeft)
+    {
+        ValidateAlignment(textAlign);
+        var flags = TextFormatFlags.SingleLine | TextFormatFlags.PreserveGraphicsClipping;
+        if (!useMnemonic)
+        {
+            flags |= TextFormatFlags.NoPrefix;
+        }
+        else if (!showKeyboardCues)
+        {
+            flags |= TextFormatFlags.HidePrefix;
+        }
+
+        if (autoEllipsis) flags |= TextFormatFlags.EndEllipsis;
+        if (rightToLeft) flags |= TextFormatFlags.RightToLeft;
+
+        switch (textAlign)
+        {
+            case ContentAlignment.TopCenter:
+            case ContentAlignment.MiddleCenter:
+            case ContentAlignment.BottomCenter:
+                flags |= TextFormatFlags.HorizontalCenter;
+                break;
+            case ContentAlignment.TopRight:
+            case ContentAlignment.MiddleRight:
+            case ContentAlignment.BottomRight:
+                flags |= TextFormatFlags.Right;
+                break;
+        }
+
+        switch (textAlign)
+        {
+            case ContentAlignment.MiddleLeft:
+            case ContentAlignment.MiddleCenter:
+            case ContentAlignment.MiddleRight:
+                flags |= TextFormatFlags.VerticalCenter;
+                break;
+            case ContentAlignment.BottomLeft:
+            case ContentAlignment.BottomCenter:
+            case ContentAlignment.BottomRight:
+                flags |= TextFormatFlags.Bottom;
+                break;
+        }
+
+        return flags;
     }
 
     private static int AlignVertically(Rectangle bounds, int height, ContentAlignment alignment)

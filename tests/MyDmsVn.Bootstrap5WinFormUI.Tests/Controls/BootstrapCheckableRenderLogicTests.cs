@@ -102,7 +102,49 @@ public sealed class BootstrapCheckableRenderLogicTests
     [TestCase(ContentAlignment.MiddleRight, true, true)]
     public void NativeCompatibleSlotMirrorsCheckAlignExactlyOnce(ContentAlignment align, bool rtl, bool expectedLeft)
     {
-        Assert.That(BootstrapCheckableRenderLogic.IsIndicatorOnLeft(align, rtl), Is.EqualTo(expectedLeft));
+        var slot = BootstrapCheckableRenderLogic.ResolveIndicatorSlot(align, rtl);
+        Assert.That(slot == BootstrapCheckableHorizontalSlot.Left, Is.EqualTo(expectedLeft));
+    }
+
+    [TestCase(ContentAlignment.TopCenter, false, 0)]
+    [TestCase(ContentAlignment.TopCenter, true, 0)]
+    [TestCase(ContentAlignment.MiddleCenter, false, 16)]
+    [TestCase(ContentAlignment.MiddleCenter, true, 16)]
+    [TestCase(ContentAlignment.BottomCenter, false, 32)]
+    [TestCase(ContentAlignment.BottomCenter, true, 32)]
+    public void CenterCheckAlignKeepsTheNativeCenterSlotAndFullTextArea(ContentAlignment align, bool rtl, int expectedY)
+    {
+        var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.CheckBox, BootstrapThemeMetrics.Default, 96);
+
+        var layout = BootstrapCheckableRenderLogic.GetLayout(new Rectangle(0, 0, 120, 48), Padding.Empty, metrics, align, rtl);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(layout.IndicatorBounds, Is.EqualTo(new Rectangle(52, expectedY, 16, 16)));
+            Assert.That(layout.TextBounds, Is.EqualTo(new Rectangle(0, 0, 120, 48)));
+        }));
+    }
+
+    [TestCase(ContentAlignment.TopLeft, TextFormatFlags.Left, TextFormatFlags.Top)]
+    [TestCase(ContentAlignment.TopCenter, TextFormatFlags.HorizontalCenter, TextFormatFlags.Top)]
+    [TestCase(ContentAlignment.TopRight, TextFormatFlags.Right, TextFormatFlags.Top)]
+    [TestCase(ContentAlignment.MiddleLeft, TextFormatFlags.Left, TextFormatFlags.VerticalCenter)]
+    [TestCase(ContentAlignment.MiddleCenter, TextFormatFlags.HorizontalCenter, TextFormatFlags.VerticalCenter)]
+    [TestCase(ContentAlignment.MiddleRight, TextFormatFlags.Right, TextFormatFlags.VerticalCenter)]
+    [TestCase(ContentAlignment.BottomLeft, TextFormatFlags.Left, TextFormatFlags.Bottom)]
+    [TestCase(ContentAlignment.BottomCenter, TextFormatFlags.HorizontalCenter, TextFormatFlags.Bottom)]
+    [TestCase(ContentAlignment.BottomRight, TextFormatFlags.Right, TextFormatFlags.Bottom)]
+    public void TextFlagsPreserveBothComponentsOfTextAlign(ContentAlignment align, TextFormatFlags expectedHorizontal, TextFormatFlags expectedVertical)
+    {
+        var flags = BootstrapCheckableRenderLogic.GetTextFormatFlags(align, true, true, false, false);
+        var horizontalMask = TextFormatFlags.HorizontalCenter | TextFormatFlags.Right;
+        var verticalMask = TextFormatFlags.VerticalCenter | TextFormatFlags.Bottom;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(flags & horizontalMask, Is.EqualTo(expectedHorizontal));
+            Assert.That(flags & verticalMask, Is.EqualTo(expectedVertical));
+        }));
     }
 
     [Test]

@@ -171,22 +171,7 @@ public class BootstrapRadioButton : RadioButton
 
     private TextFormatFlags GetTextFlags()
     {
-        var flags = TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.PreserveGraphicsClipping;
-        if (!UseMnemonic) flags |= TextFormatFlags.NoPrefix;
-        else if (!ShowKeyboardCues) flags |= TextFormatFlags.HidePrefix;
-        if (AutoEllipsis) flags |= TextFormatFlags.EndEllipsis;
-        if (RightToLeft == RightToLeft.Yes) flags |= TextFormatFlags.RightToLeft;
-        switch (TextAlign)
-        {
-            case ContentAlignment.TopCenter:
-            case ContentAlignment.MiddleCenter:
-            case ContentAlignment.BottomCenter: flags |= TextFormatFlags.HorizontalCenter; break;
-            case ContentAlignment.TopRight:
-            case ContentAlignment.MiddleRight:
-            case ContentAlignment.BottomRight: flags |= TextFormatFlags.Right; break;
-            default: flags |= TextFormatFlags.Left; break;
-        }
-        return flags;
+        return BootstrapCheckableRenderLogic.GetTextFormatFlags(TextAlign, UseMnemonic, ShowKeyboardCues, AutoEllipsis, RightToLeft == RightToLeft.Yes);
     }
 
     private bool UsesNativeFallback() => BootstrapCheckableRenderLogic.ShouldUseNativeFallback(Appearance, Image is not null, ImageList is not null, ImageIndex, ImageKey);
