@@ -137,7 +137,7 @@ public sealed class BootstrapCheckBoxTests
         using var control = new BootstrapCheckBox { Text = "Stacked label", CheckAlign = ContentAlignment.TopCenter, AutoSize = true };
         var dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
         var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.CheckBox, BootstrapThemeManager.CurrentTheme.Metrics, dpi);
-        var flags = BootstrapCheckableRenderLogic.GetTextFormatFlags(control.TextAlign, control.UseMnemonic, false, control.AutoEllipsis, false);
+        var flags = BootstrapCheckableRenderLogic.GetTextFormatFlags(control.TextAlign, control.UseMnemonic, false, control.AutoEllipsis, false) & ~TextFormatFlags.WordBreak;
         var textSize = TextRenderer.MeasureText(control.Text, control.Font, Size.Empty, flags);
         var expectedHeight = control.Padding.Vertical + metrics.IndicatorBoundsSize.Height + metrics.TextGap + textSize.Height + metrics.FocusWidth;
 
@@ -145,15 +145,15 @@ public sealed class BootstrapCheckBoxTests
     }
 
     [Test]
-    public void AutoSizePreferredSizeUsesPaintTextMetrics()
+    public void AutoSizePreferredSizeUsesPaintTextMetricsWithoutConstraintWrapping()
     {
         using var font = new Font("Segoe UI", 24f, FontStyle.Italic);
         using var control = new BootstrapCheckBox { Text = "WWW italic overhang", Font = font, AutoSize = true };
         var dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
         var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.CheckBox, BootstrapThemeManager.CurrentTheme.Metrics, dpi);
-        var flags = BootstrapCheckableRenderLogic.GetTextFormatFlags(control.TextAlign, control.UseMnemonic, false, control.AutoEllipsis, false);
-        var paintTextSize = TextRenderer.MeasureText(control.Text, control.Font, Size.Empty, flags);
-        var expected = BootstrapCheckableRenderLogic.GetPreferredSize(paintTextSize, control.Padding, metrics, control.CheckAlign);
+        var flags = BootstrapCheckableRenderLogic.GetTextFormatFlags(control.TextAlign, control.UseMnemonic, false, control.AutoEllipsis, false) & ~TextFormatFlags.WordBreak;
+        var preferredTextSize = TextRenderer.MeasureText(control.Text, control.Font, Size.Empty, flags);
+        var expected = BootstrapCheckableRenderLogic.GetPreferredSize(preferredTextSize, control.Padding, metrics, control.CheckAlign);
 
         Assert.That(control.GetPreferredSize(Size.Empty), Is.EqualTo(expected));
     }
