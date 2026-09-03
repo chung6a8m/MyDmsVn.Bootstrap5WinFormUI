@@ -14,6 +14,7 @@ public partial class BootstrapLookupBox
     /// <summary>Opens the lookup result popup without committing pending text.</summary>
     public void OpenDropDown()
     {
+        if (!Enabled || ReadOnly) return;
         FlushPendingSearch();
         _dropDownController.Open();
     }
@@ -90,6 +91,7 @@ public partial class BootstrapLookupBox
 
     internal void RequestExplicitAddNew()
     {
+        if (!Enabled || ReadOnly) return;
         var args = new BootstrapLookupAddNewRequestedEventArgs(Text);
         CloseDropDown();
         RaiseAddNewRequested(args);

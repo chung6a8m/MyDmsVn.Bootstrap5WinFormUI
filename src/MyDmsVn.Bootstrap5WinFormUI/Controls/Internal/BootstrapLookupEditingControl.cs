@@ -133,6 +133,7 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
         if (_configuring || _column is null) return;
         var args = Context(); args.QueryText = e.QueryText;
         _column.RaiseRefreshRequested(args);
+        SynchronizeColumnDataSource();
     }
 
     private void OnLookupAddNewRequested(object? sender, BootstrapLookupAddNewRequestedEventArgs e)
@@ -140,6 +141,7 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
         if (_configuring || _column is null) return;
         var args = Context(); args.QueryText = e.QueryText;
         _column.RaiseAddNewRequested(args);
+        SynchronizeColumnDataSource();
         e.NewItem = args.NewItem; e.Cancel = args.Cancel;
     }
 
@@ -155,5 +157,11 @@ internal sealed class BootstrapLookupEditingControl : BootstrapLookupBox, IDataG
     {
         var grid = EditingControlDataGridView ?? throw new InvalidOperationException("The lookup editor is not attached to a DataGridView.");
         return new BootstrapLookupCellEventArgs(grid, EditingControlRowIndex, grid.CurrentCell?.ColumnIndex ?? -1);
+    }
+
+    private void SynchronizeColumnDataSource()
+    {
+        if (_column is not null && !ReferenceEquals(DataSource, _column.DataSource))
+            DataSource = _column.DataSource;
     }
 }

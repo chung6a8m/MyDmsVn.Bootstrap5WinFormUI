@@ -9,7 +9,7 @@ public partial class BootstrapLookupBox
     /// <inheritdoc />
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
-        if (!Enabled) return base.ProcessCmdKey(ref msg, keyData);
+        if (!Enabled || ReadOnly) return base.ProcessCmdKey(ref msg, keyData);
         var key = keyData & Keys.KeyCode;
         var modifiers = keyData & Keys.Modifiers;
         if (key == Keys.Tab && (modifiers & (Keys.Alt | Keys.Control)) == Keys.None)
@@ -37,7 +37,7 @@ public partial class BootstrapLookupBox
     /// <inheritdoc />
     protected override void OnEditorKeyDown(KeyEventArgs e)
     {
-        if (e.Handled || !Enabled)
+        if (e.Handled || !Enabled || ReadOnly)
         {
             base.OnEditorKeyDown(e);
             return;
@@ -78,6 +78,8 @@ public partial class BootstrapLookupBox
     /// <inheritdoc />
     protected override bool ProcessDialogKey(Keys keyData)
     {
+        if (!Enabled || ReadOnly) return base.ProcessDialogKey(keyData);
+
         var key = keyData & Keys.KeyCode;
         var modifiers = keyData & Keys.Modifiers;
         if (key == Keys.Tab && (modifiers & (Keys.Alt | Keys.Control)) == Keys.None)
@@ -145,8 +147,7 @@ public partial class BootstrapLookupBox
         BootstrapLookupCommitResult resolution;
         if (IsDropDownOpen && HighlightedItem is not null && _dataAdapter is not null && _dataAdapter.TryFindByItem(HighlightedItem, out var highlighted))
         {
-            CommitSelection(highlighted!.Item, highlighted.Value, highlighted.DisplayText, BootstrapLookupCommitReason.Keyboard);
-            resolution = BootstrapLookupCommitResult.Success();
+            resolution = TryCommitResult(highlighted!, BootstrapLookupCommitReason.Keyboard);
         }
         else
         {

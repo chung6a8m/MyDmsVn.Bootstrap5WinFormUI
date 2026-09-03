@@ -33,11 +33,12 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
     }
 
     internal bool IsOpen => _isOpen;
+    internal bool ContainsFocus => _dropDown?.ContainsFocus == true || _surface?.ContainsFocus == true || _content.ContainsFocus;
 
     internal void Open()
     {
         ThrowIfDisposed();
-        if (_owner.IsDisposed || !_owner.Enabled || !_owner.Visible || !_owner.IsHandleCreated) return;
+        if (_owner.IsDisposed || !_owner.Enabled || _owner.ReadOnly || !_owner.Visible || !_owner.IsHandleCreated) return;
         EnsureCreated();
         ApplyPresentation();
         if (_isOpen)
@@ -171,15 +172,22 @@ internal sealed class BootstrapLookupDropDownController : IDisposable, IMessageF
 
     private void OnResultCellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
     {
-        if (e.Button != MouseButtons.Left || e.RowIndex < 0) return;
+        if (e.Button != MouseButtons.Left || e.RowIndex < 0 || !_owner.Enabled || _owner.ReadOnly) return;
         var sourceItem = _content.GetSourceItem(e.RowIndex);
         if (sourceItem is null) return;
-        _owner.CommitSelection(sourceItem.Item, sourceItem.Value, sourceItem.DisplayText, BootstrapLookupCommitReason.Mouse);
+        if (!_owner.TryCommitResult(sourceItem, BootstrapLookupCommitReason.Mouse).NavigationAllowed) return;
         Close(true);
     }
 
-    private void OnRefreshRequested(object? sender, EventArgs e) => _owner.RefreshResults();
-    private void OnAddNewRequested(object? sender, EventArgs e) => _owner.RequestExplicitAddNew();
+    private void OnRefreshRequested(object? sender, EventArgs e)
+    {
+        if (_owner.Enabled && !_owner.ReadOnly) _owner.RefreshResults();
+    }
+
+    private void OnAddNewRequested(object? sender, EventArgs e)
+    {
+        if (_owner.Enabled && !_owner.ReadOnly) _owner.RequestExplicitAddNew();
+    }
     private void OnApplicationDeactivated(object? sender, EventArgs e) => Close(false);
     private void OnWindowDeactivated(IntPtr activatedWindow)
     {

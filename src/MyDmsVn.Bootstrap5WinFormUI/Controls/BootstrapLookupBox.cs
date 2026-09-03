@@ -37,6 +37,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     private BootstrapLookupUnmatchedTextBehavior _unmatchedTextBehavior;
     private BootstrapLookupEnterKeyBehavior _enterKeyBehavior;
     private BootstrapLookupClosedEnterKeyBehavior _closedEnterKeyBehavior;
+    private int _leaveResolutionGeneration;
 
     /// <summary>Initializes a designer-safe lookup editor.</summary>
     public BootstrapLookupBox()
@@ -46,7 +47,10 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         _searchDebouncer = new BootstrapUiDebouncer();
         _dropDownAffordance = new BootstrapLookupDropDownAffordance();
         _dropDownAffordance.Activated += OnDropDownAffordanceActivated;
+        Editor.ReadOnlyChanged += OnEditorReadOnlyChanged;
+        Enter += OnLookupEnter;
         SetFrameworkTrailingAccessory(_dropDownAffordance);
+        UpdateInteractionState();
         AccessibleRole = System.Windows.Forms.AccessibleRole.ComboBox;
         AccessibleDescription = "Searchable single-selection lookup.";
     }
@@ -196,7 +200,7 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     /// <summary>Discards pending editor text and restores committed display state.</summary>
     public void CancelPendingEdit()
     {
-        _searchDebouncer.Cancel();
+        CancelPendingSearch();
         CloseDropDown();
         SynchronizeText(_committedDisplayText);
         _hasPendingText = false;
@@ -217,31 +221,28 @@ public partial class BootstrapLookupBox : BootstrapTextBox
     protected override void OnLeave(EventArgs e)
     {
         base.OnLeave(e);
-        _searchDebouncer.Cancel();
-        if (IsDisposed || Disposing || Form.ActiveForm != FindForm()) return;
-        var resolution = ResolvePendingText(BootstrapLookupCommitReason.ExactMatch);
-        if (!resolution.NavigationAllowed) OpenDropDown();
-        else CloseDropDown();
+        CancelPendingSearch();
+        QueueLeaveResolution();
     }
 
     /// <inheritdoc />
     protected override void OnVisibleChanged(EventArgs e)
     {
         base.OnVisibleChanged(e);
-        if (!Visible) { _searchDebouncer.Cancel(); CloseDropDown(); }
+        if (!Visible) { CancelPendingSearch(); CloseDropDown(); }
     }
 
     /// <inheritdoc />
     protected override void OnEnabledChanged(EventArgs e)
     {
         base.OnEnabledChanged(e);
-        if (!Enabled) { _searchDebouncer.Cancel(); CloseDropDown(); }
+        UpdateInteractionState();
     }
 
     /// <inheritdoc />
     protected override void OnHandleDestroyed(EventArgs e)
     {
-        _searchDebouncer.Cancel(); CloseDropDown();
+        CancelPendingSearch(); CloseDropDown();
         base.OnHandleDestroyed(e);
     }
 
@@ -251,6 +252,8 @@ public partial class BootstrapLookupBox : BootstrapTextBox
         if (disposing)
         {
             _dropDownAffordance.Activated -= OnDropDownAffordanceActivated;
+            Editor.ReadOnlyChanged -= OnEditorReadOnlyChanged;
+            Enter -= OnLookupEnter;
             _searchDebouncer.Dispose();
             _dropDownController.Dispose();
             DisposeDataAdapter();
@@ -282,9 +285,13 @@ public partial class BootstrapLookupBox : BootstrapTextBox
 
     internal void SynchronizeText(string value)
     {
+        var normalizedValue = value ?? string.Empty;
+        if (string.Equals(Text, normalizedValue, StringComparison.Ordinal)) return;
+
         _synchronizingText = true;
-        try { Text = value ?? string.Empty; }
+        try { Text = normalizedValue; }
         finally { _synchronizingText = false; }
+        _searchPending = true;
     }
 
     internal void RaiseResultsChanged() => ResultsChanged?.Invoke(this, EventArgs.Empty);
@@ -294,9 +301,53 @@ public partial class BootstrapLookupBox : BootstrapTextBox
 
     private void OnDropDownAffordanceActivated(object? sender, EventArgs e)
     {
-        if (!Enabled) return;
+        if (!Enabled || ReadOnly) return;
         Editor.Focus();
         if (IsDropDownOpen) CloseDropDown(); else OpenDropDown();
+    }
+
+    private void OnEditorReadOnlyChanged(object? sender, EventArgs e) => UpdateInteractionState();
+
+    private void OnLookupEnter(object? sender, EventArgs e) => _leaveResolutionGeneration++;
+
+    private void UpdateInteractionState()
+    {
+        _dropDownAffordance.Enabled = Enabled && !ReadOnly;
+        if (!Enabled || ReadOnly)
+        {
+            CancelPendingSearch();
+            CloseDropDown();
+        }
+    }
+
+    private void QueueLeaveResolution()
+    {
+        if (IsDisposed || Disposing || !IsHandleCreated) return;
+        var generation = ++_leaveResolutionGeneration;
+        try
+        {
+            BeginInvoke((Action)(() => ResolveDeferredLeave(generation)));
+        }
+        catch (InvalidOperationException) { }
+    }
+
+    private void ResolveDeferredLeave(int generation)
+    {
+        if (generation != _leaveResolutionGeneration || IsDisposed || Disposing || ContainsFocus) return;
+        if (_dropDownController.ContainsFocus || !ApplicationHasFocus()) return;
+        var resolution = ResolvePendingText(BootstrapLookupCommitReason.ExactMatch);
+        if (!resolution.NavigationAllowed) OpenDropDown();
+        else CloseDropDown();
+    }
+
+    private static bool ApplicationHasFocus()
+    {
+        if (Form.ActiveForm is not null) return true;
+        foreach (Form form in Application.OpenForms)
+        {
+            if (form.ContainsFocus) return true;
+        }
+        return false;
     }
 
     private static void ValidateEnum<T>(T value, string parameterName) where T : struct

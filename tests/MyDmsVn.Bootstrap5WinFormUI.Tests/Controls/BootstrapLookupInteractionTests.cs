@@ -85,6 +85,7 @@ public sealed class BootstrapLookupInteractionTests
             DataPropertyName = "Name",
             HeaderText = "Name"
         });
+        lookup.ExecuteSearchNow();
         form.Controls.Add(lookup);
         form.Show();
         lookup.Focus();
@@ -117,6 +118,7 @@ public sealed class BootstrapLookupInteractionTests
             HeaderText = "Name",
             Visible = false
         });
+        lookup.ExecuteSearchNow();
         form.Controls.Add(lookup);
         form.Show();
         lookup.Focus();
@@ -254,7 +256,7 @@ public sealed class BootstrapLookupInteractionTests
     }
 
     [Test]
-    public void KeyboardOpenMaterializesEachResultOnce()
+    public void KeyboardOpenReusesSettledResultMaterialization()
     {
         using var form = new Form { ShowInTaskbar = false };
         using var lookup = new TestLookup
@@ -274,7 +276,239 @@ public sealed class BootstrapLookupInteractionTests
 
         lookup.SendKey(Keys.F4);
 
-        Assert.That(CountingProduct.NameReads, Is.EqualTo(2));
+        Assert.That(CountingProduct.NameReads, Is.Zero);
+    }
+
+    [Test]
+    public void SettledResultNavigationDoesNotRematerializeRows()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = new TestLookup
+        {
+            DisplayMember = "Name",
+            ValueMember = "Id",
+            DataSource = new BindingList<CountingProduct>
+            {
+                new CountingProduct(1, "Alpha"), new CountingProduct(2, "Beta")
+            },
+            SearchDebounceMilliseconds = 0
+        };
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.OpenDropDown();
+        CountingProduct.NameReads = 0;
+
+        lookup.SendKey(Keys.Down);
+        lookup.SendKey(Keys.PageDown);
+        lookup.SendKey(Keys.Home);
+
+        Assert.That(CountingProduct.NameReads, Is.Zero);
+    }
+
+    [Test]
+    public void ReopenAfterCommitRefreshesProjectionForCanonicalText()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.Text = "a";
+        lookup.OpenDropDown();
+        lookup.SendKey(Keys.End);
+        lookup.SendKey(Keys.Enter);
+
+        lookup.OpenDropDown();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.Text, Is.EqualTo("Beta"));
+            Assert.That(lookup.ResultsGrid.Rows, Has.Count.EqualTo(1));
+            Assert.That(lookup.ResultsGrid.Rows[0].Cells[0].Value, Is.EqualTo("Beta"));
+        }));
+    }
+
+    [Test]
+    public void EnterCannotCommitHighlightedItemWithNullLogicalValue()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = new TestLookup
+        {
+            DisplayMember = "Name",
+            ValueMember = "Id",
+            DataSource = new BindingList<NullableProduct>
+            {
+                new NullableProduct(1, "Valid"), new NullableProduct(null, "Missing")
+            },
+            SearchDebounceMilliseconds = 0
+        };
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.SelectValue(1);
+        lookup.Text = string.Empty;
+        lookup.OpenDropDown();
+        lookup.SendKey(Keys.Down);
+
+        lookup.SendKey(Keys.Enter);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+            Assert.That(lookup.ValidationMessage, Is.Not.Empty);
+            Assert.That(lookup.IsDropDownOpen, Is.True);
+        }));
+    }
+
+    [Test]
+    public void MouseCannotCommitHighlightedItemWithNullLogicalValue()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = new TestLookup
+        {
+            DisplayMember = "Name",
+            ValueMember = "Id",
+            DataSource = new BindingList<NullableProduct>
+            {
+                new NullableProduct(1, "Valid"), new NullableProduct(null, "Missing")
+            },
+            SearchDebounceMilliseconds = 0
+        };
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.SelectValue(1);
+        lookup.Text = string.Empty;
+        lookup.OpenDropDown();
+
+        ClickResultRow(lookup, 1);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+            Assert.That(lookup.ValidationMessage, Is.Not.Empty);
+            Assert.That(lookup.IsDropDownOpen, Is.True);
+        }));
+    }
+
+    [Test]
+    public void FilteredResultMouseClickCommitsBeforeExternalLeaveResolution()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = new TestLookup
+        {
+            DisplayMember = "Name",
+            ValueMember = "Id",
+            DataSource = new BindingList<Product>
+            {
+                new Product(1, "Brazil"), new Product(2, "Brandy")
+            },
+            SearchDebounceMilliseconds = 0
+        };
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.SelectValue(1);
+        lookup.Text = "bran";
+        Application.DoEvents();
+
+        ClickResultRow(lookup, 0);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.SelectedValue, Is.EqualTo(2));
+            Assert.That(lookup.Text, Is.EqualTo("Brandy"));
+        }));
+    }
+
+    [TestCase("Refresh")]
+    [TestCase("Add New")]
+    public void FooterMouseActionRunsBeforePendingLeaveResolution(string action)
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        lookup.ShowRefreshButton = action == "Refresh";
+        lookup.ShowAddNewButton = action == "Add New";
+        var requests = 0;
+        lookup.RefreshRequested += (_, _) => requests++;
+        lookup.AddNewRequested += (_, e) =>
+        {
+            requests++;
+            e.NewItem = new Product(3, "Gamma");
+        };
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.Focus();
+        lookup.SelectValue(1);
+        lookup.Text = "unmatched";
+        lookup.OpenDropDown();
+        Application.DoEvents();
+        var content = lookup.ResultsGrid.Parent!;
+        var button = Descendants(content).OfType<Button>().Single(candidate => candidate.Text == action);
+
+        ClickControl(button);
+
+        Assert.That(requests, Is.EqualTo(1));
+        if (action == "Refresh")
+            Assert.That(lookup.Text, Is.EqualTo("unmatched"));
+        else
+            Assert.That(lookup.SelectedValue, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void ReadOnlyBlocksKeyboardCommitAndMouseOpen()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var lookup = Create();
+        form.Controls.Add(lookup);
+        form.Show();
+        lookup.SelectValue(1);
+        lookup.ReadOnly = true;
+        lookup.Text = "Beta";
+
+        lookup.SendKey(Keys.Enter);
+        lookup.SendKey(Keys.Tab);
+        lookup.SendKey(Keys.F4);
+        var affordance = Descendants(lookup).Single(control => control.GetType().Name == "BootstrapLookupDropDownAffordance");
+        ClickControl(affordance);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+            Assert.That(lookup.Text, Is.EqualTo("Beta"));
+            Assert.That(lookup.IsDropDownOpen, Is.False);
+            Assert.That(affordance.Enabled, Is.False);
+        }));
+    }
+
+    [Test]
+    public void MovingFocusToAnotherApplicationFormResolvesPendingText()
+    {
+        using var firstForm = new Form { ShowInTaskbar = false };
+        using var secondForm = new Form { ShowInTaskbar = false, Left = 400 };
+        using var lookup = Create();
+        using var destination = new Button();
+        firstForm.Controls.Add(lookup);
+        secondForm.Controls.Add(destination);
+        firstForm.Show();
+        secondForm.Show();
+        firstForm.Activate();
+        lookup.Focus();
+        lookup.SelectValue(1);
+        lookup.Text = "unmatched";
+        lookup.CloseDropDown();
+        Application.DoEvents();
+
+        secondForm.Activate();
+        Assert.That(destination.Focus(), Is.True);
+        lookup.SendLeave();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(lookup.Text, Is.EqualTo("Alpha"));
+            Assert.That(lookup.HasPendingText, Is.False);
+            Assert.That(lookup.SelectedValue, Is.EqualTo(1));
+        }));
     }
 
     [Test]
@@ -296,6 +530,7 @@ public sealed class BootstrapLookupInteractionTests
             HeaderText = "Product",
             Width = 400
         });
+        lookup.ExecuteSearchNow();
         form.Controls.Add(lookup);
         form.Show();
         lookup.Focus();
@@ -418,6 +653,38 @@ public sealed class BootstrapLookupInteractionTests
         Application.DoEvents();
     }
 
+    private static void ClickResultRow(BootstrapLookupBox lookup, int rowIndex)
+    {
+        var grid = lookup.ResultsGrid;
+        Assert.That(grid.Focus(), Is.True);
+        var onCellMouseClick = typeof(DataGridView).GetMethod(
+            "OnCellMouseClick",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        onCellMouseClick.Invoke(grid, new object[]
+        {
+            new DataGridViewCellMouseEventArgs(0, rowIndex, 4, 4, new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0))
+        });
+        Application.DoEvents();
+    }
+
+    private static void ClickControl(Control control, int x = 4, int y = 4)
+    {
+        var coordinates = new IntPtr((x & 0xffff) | ((y & 0xffff) << 16));
+        control.Focus();
+        SendMessage(control.Handle, 0x0201, (IntPtr)1, coordinates);
+        SendMessage(control.Handle, 0x0202, IntPtr.Zero, coordinates);
+        Application.DoEvents();
+    }
+
+    private static System.Collections.Generic.IEnumerable<Control> Descendants(Control root)
+    {
+        foreach (Control child in root.Controls)
+        {
+            yield return child;
+            foreach (var descendant in Descendants(child)) yield return descendant;
+        }
+    }
+
     private static TestLookup Create() => new TestLookup
     {
         DisplayMember = "Name",
@@ -435,12 +702,20 @@ public sealed class BootstrapLookupInteractionTests
             OnEditorKeyDown(args);
         }
         internal bool SendDialogKey(Keys key) => ProcessDialogKey(key);
+        internal void SendLeave() => OnLeave(EventArgs.Empty);
     }
 
     private sealed class Product
     {
         internal Product(int id, string name) { Id = id; Name = name; }
         public int Id { get; }
+        public string Name { get; }
+    }
+
+    private sealed class NullableProduct
+    {
+        internal NullableProduct(int? id, string name) { Id = id; Name = name; }
+        public int? Id { get; }
         public string Name { get; }
     }
 
@@ -456,4 +731,7 @@ public sealed class BootstrapLookupInteractionTests
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool PostMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
 }

@@ -125,4 +125,11 @@ public partial class BootstrapLookupBox
         if (changed) SelectedValueChanged?.Invoke(this, EventArgs.Empty);
         SelectionCommitted?.Invoke(this, new BootstrapLookupSelectionCommittedEventArgs(item, value, _committedDisplayText, reason));
     }
+
+    internal BootstrapLookupCommitResult TryCommitResult(BootstrapLookupSourceItem sourceItem, BootstrapLookupCommitReason reason)
+    {
+        if (sourceItem.Value is null && _valueMember.Length > 0) return ApplyLookupValidation();
+        CommitSelection(sourceItem.Item, sourceItem.Value, sourceItem.DisplayText, reason);
+        return BootstrapLookupCommitResult.Success();
+    }
 }

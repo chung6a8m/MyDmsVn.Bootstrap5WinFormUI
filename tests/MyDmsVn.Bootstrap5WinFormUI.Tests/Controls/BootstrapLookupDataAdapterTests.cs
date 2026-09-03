@@ -44,6 +44,19 @@ public sealed class BootstrapLookupDataAdapterTests
     }
 
     [Test]
+    public void EmptyTypedSourceRejectsInvalidMemberBeforeSourceMutation()
+    {
+        var items = new BindingList<Product>();
+
+        Assert.That(
+            (Action)(() => new BootstrapLookupDataAdapter(items, "Missing", "Id")),
+            Throws.TypeOf<ArgumentException>());
+
+        Assert.DoesNotThrow((Action)(() => items.Add(new Product(1, "Coffee"))));
+        Assert.That(items, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public void FindByValueDistinguishesAFoundNullFromMissing()
     {
         var first = new Product(null, "No id");

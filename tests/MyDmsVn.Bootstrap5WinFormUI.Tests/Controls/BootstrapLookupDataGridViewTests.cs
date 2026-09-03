@@ -153,6 +153,40 @@ public sealed class BootstrapLookupDataGridViewTests
         grid.EndEdit();
     }
 
+    [Test]
+    public void RefreshCanReplaceColumnSourceDuringActiveEdit()
+    {
+        var original = new[] { new Product(1, "Alpha") };
+        var replacement = new[] { new Product(2, "Beta") };
+        var column = CreateColumn(original);
+        var host = CreateGridHost(column, new NullableRow { ProductId = 1 });
+        using var form = host.Form;
+        var grid = host.Grid;
+        BeginEdit(grid, 0);
+        var editor = (BootstrapLookupBox)grid.EditingControl!;
+        editor.Text = "Beta";
+        editor.OpenDropDown();
+        column.RefreshRequested += (_, _) => column.DataSource = replacement;
+
+        try
+        {
+            editor.RefreshResults();
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(editor.DataSource, Is.SameAs(replacement));
+                Assert.That(editor.Text, Is.EqualTo("Beta"));
+                Assert.That(editor.ResultsGrid.Rows, Has.Count.EqualTo(1));
+                Assert.That(editor.ResultsGrid.Rows[0].Cells[0].Value, Is.EqualTo("Beta"));
+            }));
+        }
+        finally
+        {
+            editor.CloseDropDown();
+            grid.CancelEdit();
+        }
+    }
+
     private static BootstrapLookupColumn CreateColumn(object source) => new BootstrapLookupColumn
     {
         DataSource = source, DisplayMember = "Name", ValueMember = "Id", DataPropertyName = "ProductId"

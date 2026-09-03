@@ -21,6 +21,7 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
         _dataSource = dataSource;
         _displayMember = displayMember ?? string.Empty;
         _valueMember = valueMember ?? string.Empty;
+        ValidateKnownItemType(dataSource, _displayMember, _valueMember);
         _bindingSource = dataSource as BindingSource;
         if (_bindingSource != null)
         {
@@ -154,6 +155,15 @@ internal sealed class BootstrapLookupDataAdapter : IDisposable
         if (source is BindingSource bindingSource) return bindingSource.List;
         if (source is IListSource listSource) return listSource.GetList();
         return source;
+    }
+
+    private static void ValidateKnownItemType(object? source, string displayMember, string valueMember)
+    {
+        if (source is null) return;
+        var itemType = ListBindingHelper.GetListItemType(source);
+        if (itemType is null || itemType == typeof(object)) return;
+        BootstrapLookupMemberAccessor.Validate(itemType, displayMember);
+        BootstrapLookupMemberAccessor.Validate(itemType, valueMember);
     }
 
     private void ThrowIfDisposed()

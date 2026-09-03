@@ -7,13 +7,14 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 public partial class BootstrapLookupBox
 {
+    private bool _searchPending;
     private BootstrapLookupSearchResult _currentSearchResult = new BootstrapLookupSearchResult(
         BootstrapLookupSearchState.Results,
         Array.Empty<BootstrapLookupSourceItem>());
 
     internal void ExecuteSearchNow()
     {
-        _searchDebouncer.Cancel();
+        CancelPendingSearch();
         var source = _dataAdapter?.Snapshot ?? Array.Empty<BootstrapLookupSourceItem>();
         var next = BootstrapLookupSearchEngine.Search(
             source,
@@ -36,13 +37,20 @@ public partial class BootstrapLookupBox
 
     internal void FlushPendingSearch()
     {
-        _searchDebouncer.Cancel();
+        if (!_searchPending) return;
         ExecuteSearchNow();
     }
 
     private void ScheduleSearchForEditorText()
     {
+        _searchPending = true;
         _searchDebouncer.Schedule(TimeSpan.FromMilliseconds(SearchDebounceMilliseconds), ExecuteScheduledSearch);
+    }
+
+    private void CancelPendingSearch()
+    {
+        _searchPending = false;
+        _searchDebouncer.Cancel();
     }
 
     private void ExecuteScheduledSearch()
