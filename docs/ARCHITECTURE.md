@@ -73,6 +73,9 @@ Control-specific child namespaces may be introduced if the namespace remains dis
                   Pagination
 
  TextBox -----+
+ CheckBox ----+---- native CheckBox + Theme / Rendering
+ RadioButton -+---- native RadioButton + Theme / Rendering
+ Switch ------+---- native CheckBox + Theme / Rendering
  NumericBox --+---- native NumericUpDown + Theme / Rendering
  ComboBox ----+---- native ComboBox + Theme / Rendering / Icons
  Dropdown ----+---- BootstrapButton target + native ToolStripDropDownMenu
@@ -224,6 +227,8 @@ This architecture intentionally avoids custom numeric parsing, a second value/ra
 
 `BootstrapComboBox` uses inheritance rather than composition because the native `ComboBox` already owns the complete public data/selection/edit/drop-down contract. Native `Items`, `DataSource`, `DisplayMember`, `ValueMember`, `SelectedIndex`, `SelectedItem`, `SelectedValue`, text editing, autocomplete, focus/keyboard behavior, `DropDown` / `DropDownClosed`, and selection events remain authoritative inherited behavior. The framework owns `OwnerDrawFixed` item/closed-selection presentation, validation/focus shell border, theme/DPI metrics, theme-owned font lifecycle, and optional `LeadingIcon` rendering through the existing `IIconRenderer`.
 
+`BootstrapCheckBox`, `BootstrapRadioButton`, and `BootstrapSwitch` also use direct native inheritance. Native checked state, event ordering, keyboard/mnemonic activation, `AutoCheck`, three-state cycling, and RadioButton same-parent grouping remain authoritative. The framework owns only normal text-label owner painting, theme/font lifecycle, DPI-aware geometry, `Variant`, and `ValidationState`. One internal pure `BootstrapCheckableRenderLogic` resolves palette, metrics, layout, actual-`CheckState` glyph/thumb geometry, and fallback decisions; it has no handle, concrete-control, timer, or static-theme dependency. Button/image appearance delegates to native base painting and preferred sizing.
+
 The ComboBox editable native child, arrow button, hit-testing, and popup chrome remain WinForms/OS-owned. The shell is a conservative post-native-paint border overlay; no child-window replacement, private-field reflection, global hook, window region, custom `Form`, `ToolStripDropDown`, or `ListBox` host is introduced. `BorderRadius` therefore describes best-effort framework-controlled shell geometry only and does not promise rounded native popup chrome.
 
 ### 6.2 Composite controls
@@ -282,6 +287,8 @@ NumericBox subscribes once to `BootstrapThemeManager.ThemeChanged` because the w
 
 ComboBox follows the same deterministic ownership rule: it subscribes once for shell/item palette and theme-created font updates, reapplies owner-draw metrics after DPI/font/handle changes, and never recreates or rebinds native item/selection state merely because the theme changed. Disposal removes the static subscription; caller-assigned fonts remain caller-owned.
 
+Each checkable control subscribes once for its normal owner-drawn presentation and theme-created Body font. Theme changes repaint the same native instance without changing checked state or grouping. Caller-assigned fonts remain caller-owned, and disposal removes the static subscription and releases only framework-created fonts.
+
 Dropdown subscribes once because an open native popup can outlive the target click that created its current snapshot. Theme changes while open regenerate only framework-owned menu images and invalidate/reapply token presentation. A closed Dropdown has no native rows to synchronize; its next opening resolves the current theme. Disposal removes the static subscription.
 
 Popover subscribes to the static theme event only while open. Closing/disposal removes that handler and the target/ancestor tracker. Tooltip continues resolving theme at popup/draw time without a static subscription.
@@ -315,6 +322,8 @@ Pagination owns its internal ButtonGroup and dynamically-created Button children
 NumericBox owns its native `NumericUpDown` through normal WinForms containment and owns only framework-created theme fonts. It detaches editor/theme event handlers on disposal and never disposes a caller-assigned font.
 
 ComboBox owns no application items, `DataSource`, binding manager, popup window, native child window, or caller font. Paint-time `Brush`, `Pen`, `GraphicsPath`, and `Graphics` instances are scoped and disposed immediately; the only cross-lifetime resource is its framework-created theme font plus the deterministic theme subscription.
+
+CheckBox/RadioButton/Switch own no child controls, timer, animation, checked-state mirror, radio registry, or image cache. Their paint-time paths, pens, and brushes are scoped; their only cross-lifetime resources are one deterministic theme subscription and an optional framework-created Body font.
 
 Dropdown owns its one `ToolStripDropDownMenu`, transient native snapshot items, generated icon bitmaps, native event subscriptions, and theme subscription. It never owns the caller's `BootstrapButton`, `BootstrapDropdownItem` instances, icon descriptors, or icon renderer. Rebuild/theme refresh clears native image references before disposing bitmaps so ToolStrip cannot retain disposed image objects.
 

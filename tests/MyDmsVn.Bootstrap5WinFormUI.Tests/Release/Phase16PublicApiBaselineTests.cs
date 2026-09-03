@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "710217615c5f348340c04d2a4927c3ef601a375bddb1cb02f8cd51057b5b8db5";
+    private const string ApprovedV1Fingerprint = "9b2649aaca94076783e74ed92a721e3787c8edef36175b9ed441c9f9d33b4d2f";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -34,6 +34,46 @@ public sealed class Phase16PublicApiBaselineTests
     public void V1CompatibilityAssemblyVersionIsStable()
     {
         Assert.That(typeof(BootstrapButton).Assembly.GetName().Version, Is.EqualTo(new Version(1, 0, 0, 0)));
+    }
+
+    [Test]
+    public void BootstrapCheckableApiExportsOnlyTheReviewedContract()
+    {
+        var assembly = typeof(BootstrapCheckBox).Assembly;
+        var types = new[] { typeof(BootstrapCheckBox), typeof(BootstrapRadioButton), typeof(BootstrapSwitch) };
+        var expectedCheckBoxProtected = new[]
+        {
+            "Dispose", "OnAutoSizeChanged", "OnCheckStateChanged", "OnDpiChangedAfterParent", "OnEnabledChanged",
+            "OnFontChanged", "OnGotFocus", "OnLostFocus", "OnMouseCaptureChanged", "OnMouseDown", "OnMouseEnter",
+            "OnMouseLeave", "OnMouseUp", "OnPaddingChanged", "OnPaint", "OnTextChanged", "OnVisibleChanged"
+        };
+        var expectedRadioProtected = new[]
+        {
+            "Dispose", "OnAutoSizeChanged", "OnCheckedChanged", "OnDpiChangedAfterParent", "OnEnabledChanged",
+            "OnFontChanged", "OnGotFocus", "OnLostFocus", "OnMouseCaptureChanged", "OnMouseDown", "OnMouseEnter",
+            "OnMouseLeave", "OnMouseUp", "OnPaddingChanged", "OnPaint", "OnTextChanged", "OnVisibleChanged"
+        };
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(typeof(BootstrapCheckBox).BaseType, Is.EqualTo(typeof(CheckBox)));
+            Assert.That(typeof(BootstrapRadioButton).BaseType, Is.EqualTo(typeof(RadioButton)));
+            Assert.That(typeof(BootstrapSwitch).BaseType, Is.EqualTo(typeof(CheckBox)));
+            foreach (var type in types)
+            {
+                Assert.That(GetDeclaredPublicPropertyNames(type), Is.EqualTo(new[] { "ValidationState", "Variant" }), type.Name);
+                Assert.That(GetDeclaredPublicMethodNames(type), Is.EqualTo(new[] { "GetPreferredSize" }), type.Name);
+                Assert.That(GetDeclaredPublicEventNames(type), Is.Empty, type.Name);
+            }
+            Assert.That(GetDeclaredProtectedMethodNames(typeof(BootstrapCheckBox)), Is.EqualTo(expectedCheckBoxProtected));
+            Assert.That(GetDeclaredProtectedMethodNames(typeof(BootstrapRadioButton)), Is.EqualTo(expectedRadioProtected));
+            Assert.That(GetDeclaredProtectedMethodNames(typeof(BootstrapSwitch)), Is.EqualTo(expectedCheckBoxProtected));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapCheckableKind"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapCheckableRenderLogic"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapCheckableMetrics"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapCheckablePalette"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapCheckableLayout"));
+        }));
     }
 
     [Test]
