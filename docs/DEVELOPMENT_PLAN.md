@@ -249,6 +249,10 @@ Only after hardening:
 - Confirm supported Visual Studio/.NET SDK build environment.
 - Produce a release candidate and run the complete verification matrix.
 
+## Post-foundation checkable controls
+
+`BootstrapCheckBox`, `BootstrapRadioButton`, and `BootstrapSwitch` are an approved post-foundation addition. They directly inherit native WinForms controls, reuse Theme/Rendering/DPI infrastructure through one internal pure render helper, add only `Variant` and `ValidationState`, preserve native state/events/keyboard/radio grouping, and use native fallback for Appearance/image modes. The integrated demo and automated pure/STA matrices cover both target frameworks; real 100–200% DPI and Designer checks remain release evidence.
+
 ## Deferred roadmap
 
 After the foundation is stable, candidates include Alert, Badge, Toast, Tooltip, Modal/Dialog, Dropdown, Tabs, Pagination, Skeleton, ComboBox, NumericBox, DatePicker, and other Bootstrap-inspired components.

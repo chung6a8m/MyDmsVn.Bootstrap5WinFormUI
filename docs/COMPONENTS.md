@@ -356,6 +356,35 @@ Manual verification: choose **Select** in the integrated demo. Exercise local si
 
 See `docs/BOOTSTRAP_SELECT.md` for complete usage examples and extension guidance.
 
+## BootstrapCheckBox, BootstrapRadioButton, and BootstrapSwitch
+
+Responsibility: provide Bootstrap 5.3-inspired normal form-check presentation while preserving native WinForms checked state, events, input, accessibility state, and RadioButton grouping.
+
+Public concepts are deliberately limited to:
+
+```text
+BootstrapCheckBox : CheckBox
+BootstrapRadioButton : RadioButton
+BootstrapSwitch : CheckBox
+
+Variant
+ValidationState
+```
+
+Behavior:
+
+- All three controls directly inherit their native WinForms counterpart. `Checked`, `CheckState`, `ThreeState`, `AutoCheck`, state-change events, Space/mnemonic behavior, alignment, padding, text, accessibility metadata, and AutoSize remain inherited and authoritative.
+- Each class adds only `Variant` and `ValidationState`. `Variant` defaults to Primary; enabled Valid/Invalid overrides it with Success/Danger. Validation colors the unchecked border/track and label as well as checked/indeterminate active presentation. Disabled theme tokens have highest precedence; focus remains a separate Focus-token ring.
+- Painting follows the actual native `CheckState`. A programmatically assigned Indeterminate value renders as mixed even when `ThreeState = false`; `ThreeState` controls only the states native user input cycles through. Switch uses a centered thumb/cue for Indeterminate.
+- Default RadioButton same-parent exclusivity and reparenting are native. `AutoCheck = false` is a caller-managed mode in which multiple same-parent radios may remain checked; framework code never traverses siblings or restores exclusivity.
+- CheckBox and RadioButton use a 16-logical-pixel indicator, Switch a 32-by-16 track, and all use theme spacing/border/focus/radius metrics through `DpiScaler`. CheckBox is small-rounded, RadioButton circular, and Switch pill-shaped; V1 exposes no size or radius property.
+- `CheckAlign` and RTL resolve the indicator slot with the characterized native rule exactly once. Switch then mirrors logical thumb start/end inside that resolved track, avoiding double mirroring. `TextAlign`, `UseMnemonic`, keyboard cues, AutoEllipsis, and Padding remain part of text layout.
+- `Appearance.Button` or an effective `Image`/`ImageList` presentation uses native base painting and native preferred-size calculation. Returning to normal text-only appearance restores framework presentation without changing state, Variant, ValidationState, or caller-owned image settings.
+- Runtime Light/Dark changes update framework-owned normal presentation and only framework-created Body fonts. Caller fonts remain caller-owned. Each control owns no child, timer, animation, checked-state mirror, radio registry, global hook, or bitmap cache; disposal removes its theme subscription and font resource.
+- V1 intentionally excludes animation, custom colors, public sizes/radii, custom grouping, and InputGroup integration.
+
+Manual verification: choose **Checks / Radios / Switches**. Exercise unchecked/checked/indeterminate states (including programmatic mixed state with `ThreeState=false`), all variants, Valid/Invalid while unchecked, disabled and `AutoCheck=false`, native/default and caller-managed RadioButton groups, Tab/Shift+Tab/Space/arrows/mnemonics, RTL left/right alignments, Appearance/image fallback and return, live Light/Dark changes, repeated state/fallback changes, and real Windows 100/125/150/175/200% scaling.
+
 ## BootstrapInputGroup
 
 Responsibility: compose supported addon, input, button, and split-button primitives into one horizontal connected row without replacing their native interaction or public state.

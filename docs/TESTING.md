@@ -154,6 +154,8 @@ BootstrapComboBox Stage 6 pure tests cover:
 - Closed-item icon/text layout containment for normal, narrow, empty, and malformed rectangles without negative geometry
 - Long-text bounds suitable for single-line ellipsis while retaining native `GetItemText` as the source of display text
 
+BootstrapCheckBox/RadioButton/Switch pure tests cover 96/120/144/168/192 DPI metrics; square/circular/pill geometry; safe tiny/malformed layout; native-compatible `CheckAlign` plus RTL slot resolution; separate Switch thumb direction; actual Unchecked/Checked/Indeterminate geometry; every semantic Variant in Light/Dark; Disabled > Validation > Variant palette precedence; validation label/border visibility while unchecked; and native fallback detection for Appearance/image modes.
+
 BootstrapSelect border-rendering pure tests cover:
 
 - Shell metrics at logical DPI 96/120/144/192, including normal/focus stroke widths, explicit/theme radius, and half-stroke path inset
@@ -296,6 +298,8 @@ BootstrapComboBox Stage 6 STA tests verify:
 - Disposal before/after handle creation/theme changes releases the static theme subscription and framework-owned font, and repeated lifecycle stress returns handler count to baseline
 - Advanced Inputs demo coverage includes native unbound/bound lists, editable autocomplete, selection-only mode, long text, leading-icon/no-icon, valid/invalid, disabled, radius, and OS-owned popup/edit/arrow note
 
+BootstrapCheckBox/RadioButton/Switch STA tests verify direct native inheritance; exactly `Variant`/`ValidationState` as new public properties; inherited state/event counts; programmatic Indeterminate independently from `ThreeState`; CheckBox/Switch `AutoCheck=false`; default and caller-managed RadioButton grouping/reparenting; mouse/keyboard activation parity; caller-owned accessibility metadata/fonts; no hidden children/static radio registry; native fallback transitions; Light/Dark repaint; and deterministic theme-subscription disposal.
+
 BootstrapSelect border-rendering STA tests verify:
 
 - Focused bitmap coverage uses a shown Form and confirms the Select actually owns focus before sampling the focus-border thickness
@@ -372,6 +376,8 @@ For `BootstrapFormattedTextBox`, remain on **Advanced Inputs** and verify Genera
 
 For BootstrapComboBox Stage 6, stay on **Advanced Inputs**. Verify unbound items, a bound object list using `DisplayMember`/`ValueMember`, editable `DropDown`, selection-only `DropDownList`, native `SuggestAppend` with `ListItems`, long text/ellipsis, leading-icon and no-icon comparison, Valid/Invalid, disabled, and explicit radius examples. Exercise the native arrow and popup plus Up/Down/Enter/Escape, free typing, Tab/Shift+Tab, selected-value changes, and runtime Light/Dark switching without losing binding or selection. Repeat at 100/125/150/175/200% real Windows scaling. Native editable child, arrow button, and popup chrome may remain OS-themed/square; the framework must not replace them merely for visual uniformity.
 
+For BootstrapCheckBox/RadioButton/Switch, choose **Checks / Radios / Switches**. Verify actual native checked states, validation while unchecked, disabled and `AutoCheck=false`, normal and caller-managed radio groups, all variants, event counters, Tab/Shift+Tab/Space/radio arrows/mnemonics, RTL alignments, Switch thumb direction, Appearance/image fallback and return, Light/Dark changes, and repeated transitions. Repeat at 100/125/150/175/200% real Windows scaling; focus rings, vector marks, circular dots, and pill thumbs must remain contained and un-stretched.
+
 For BootstrapSelect border rendering, choose **Select** and compare neutral, focused, valid, invalid, and explicit-radius shells in Light and Dark. Confirm rounded right/bottom strokes remain continuous, the popup's rounded outer border stays distinct from the inset themed search field, and no native square search border touches the overlay corners. With the native search caret active, verify Tab/Shift+Tab close the popup and continue forward/reverse form traversal, then inspect that accessibility exposes one search editor. Repeat at real Windows 100/125/150/200% scaling; these checks cover the nested `BootstrapTextBox` at its real monitor `DeviceDpi` and are not replaced by synthetic host-allocation tests.
 
 For BootstrapDropdown and `BootstrapSplitButton`, use the **Navigation / Tabs** basic/icon/state/long/stress/nested/hosted/mixed/split scenarios. Verify primary versus chevron mouse routing, Tab/Shift+Tab between regions, Enter/Space on each region, native Up/Down/Home/End/Right/Left/Enter/Escape submenu navigation, and outside-click dismissal. Focus/edit/toggle hosted controls, navigate back to menu rows, dismiss, reopen, and confirm the documented fresh-snapshot policy. Cover disabled leaves/submenus/hosts, checked leaves, split loading, Light/Dark changes while root/submenus are visible, default and caller-owned fonts, and primary/menu accessibility names before/after outer `Text` and `AccessibleName` changes. Repeat at 100/125/150/175/200% real Windows scaling and at bottom/right/secondary-monitor edges. Stress repeated open/close/rebuild, hosted disposal, and form disposal while nested content is open; check focus restoration, stale windows, duplicate events, GDI growth, and disposed-object failures. Inherited split `Controls` are observable but must not be mutated or disposed by application code.
@@ -428,6 +434,7 @@ Verify:
 - NumericBox shell padding, border/focus widths, radius, and native editor bounds remain aligned without clipping the native text/spin affordance.
 - ComboBox fixed item height, text/icon slot, border/focus width, and shell radius scale without corrupting native selection, arrow hit-testing, edit child, or popup geometry.
 - Dropdown item padding, icon/check slots, separator inset, border, and logical `MinimumWidth` scale while native ToolStrip focus, keyboard navigation, AutoClose, and working-area placement remain intact.
+- CheckBox/RadioButton 16px indicators, Switch 32x16 track, text gap, vector marks/thumbs, validation labels, focus ring, and native-compatible RTL/CheckAlign placement remain aligned and contained.
 
 The Phase 2 Rendering/DPI demo covers the geometry calculations at all five scale factors. Run the demo under each corresponding Windows display-scaling setting as components are added and during hardening; do not treat the virtual matrix as proof of OS-level DPI behavior.
 
@@ -485,6 +492,8 @@ ComboBox owns one direct theme subscription because it owner-draws item presenta
 
 Dropdown owns one direct theme subscription because an already-open native popup must refresh semantic renderer state and generated icon bitmaps after a runtime theme switch. Theme-matrix tests verify the same public item models remain authoritative, generated images are replaced/disposed rather than retained, and component disposal removes the subscription without disposing the caller-owned target, item models, descriptors, or target `IconRenderer`.
 
+Each checkable control owns one direct theme subscription for owner painting and its theme-created Body font. Theme-matrix tests preserve native state/grouping and caller fonts while disposal returns subscription count to baseline.
+
 DatePicker owns one direct theme subscription because its wrapper paints the shell and owns a theme-created `Body` font. Theme-matrix tests verify the same native-backed instance preserves value/range/format/custom-format/checkbox state while palette/font/layout update, and disposal returns the static theme-handler count to baseline without disposing caller-owned fonts.
 
 ## 5. Interaction matrix
@@ -522,6 +531,8 @@ FormattedTextBox retains the one composite tab stop and native editor owned by `
 ComboBox remains a native `ComboBox`, so it retains one native focus/input path rather than a wrapper redirect. Test `DropDownList` and editable `DropDown`, native arrow/popup open-close, Up/Down/Enter/Escape, free typing, autocomplete, Tab/Shift+Tab traversal, disabled/re-enabled behavior, bound/unbound selection, and native selection/dropdown events. Framework presentation changes must never synthesize those events or create a second selection state.
 
 Dropdown interaction begins on its caller-owned `BootstrapButton` target or one of the split button's two native-focusable regions and transfers to native `ToolStripDropDownMenu` behavior while open. Test primary/chevron Enter/Space routing, Tab/Shift+Tab region traversal, recursive native menu keys, hosted-control focus return, Escape/outside dismissal, disabled rows, and loading suppression. `Checked` is display state rather than a toggle policy. Advanced composition still introduces no second focus, keyboard, placement, or animation engine.
+
+Checkable interaction remains on the inherited native controls. Test Tab/Shift+Tab, Space, mnemonics, RadioButton arrows and grouping, mouse/capture cancellation, `AutoCheck=false`, and exact state-event counts against native peers. Framework visual hooks observe but never consume or duplicate activation.
 
 ## 6. Animation matrix
 
@@ -595,6 +606,8 @@ For ComboBox, all item/shell paint-time paths/brushes/pens remain scoped. The na
 
 For Dropdown, the component owns one native `ToolStripDropDownMenu`, one internal renderer, its target/native/theme subscriptions, short-lived native item snapshots, and only the icon bitmaps generated for those snapshots. Rebuild/theme refresh/disposal must dispose previous generated images and native rows before replacing them. The caller retains ownership of the target button, public item models, icon descriptors, and target `IconRenderer`. Repeated target replacement, open/close, Light/Dark switching, item mutation, and component disposal must not retain stale handlers/images or multiply events. Renderer paint brushes/pens remain scoped and no timer, custom window, or second command cache is retained.
 
+Checkable controls scope every paint-time GDI resource and retain only a framework-created font plus theme subscription. They own no child control, timer, animation, bitmap cache, message hook, or radio registry; caller fonts/images/accessibility metadata remain caller-owned.
+
 ## 8. DataGridView tests
 
 Use realistic scenarios:
@@ -641,6 +654,8 @@ For NumericBox, place `BootstrapNumericBox` in the Designer without theme bootst
 For ComboBox, place `BootstrapComboBox` in the Designer without theme bootstrap code. Verify inherited native `Items`, `DataSource`, `DisplayMember`, `ValueMember`, `DropDownStyle`, and autocomplete properties remain normal native designer surfaces; `ValidationState`, `BorderRadius`, and `LeadingIcon` serialize/reopen normally; `IconRenderer` stays runtime-only/non-serialized. Confirm no framework item wrapper, popup component, private child replacement, DI/bootstrap requirement, timer, or extra selector appears.
 
 For Dropdown, place `BootstrapDropdown` in the Designer component tray without theme bootstrap code. Verify `Target`, `Items`, `Variant`, and `MinimumWidth` serialize/reopen through the component model, including `Item` and `Separator` rows plus mutable text/icon/enabled/checked/tag values. Confirm the owned native `ToolStripDropDownMenu`, internal renderer, and generated image snapshot are not exposed or serialized as public child components, and construction introduces no DI requirement, timer, custom popup `Form`, or live binding service.
+
+For CheckBox/RadioButton/Switch, place each control in the Designer without theme bootstrap code. Verify inherited Text/Checked/CheckState/ThreeState/AutoCheck/CheckAlign/TextAlign/RTL/Appearance/image properties plus Variant/ValidationState serialize normally, no child or group component appears, and construction starts no timer or animation.
 
 ## 10. Build commands
 

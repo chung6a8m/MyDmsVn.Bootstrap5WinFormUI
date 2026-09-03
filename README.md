@@ -54,6 +54,9 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 - `BootstrapButtonGroup`
 - `BootstrapButtonToolbar`
 - `BootstrapTextBox`
+- `BootstrapCheckBox`
+- `BootstrapRadioButton`
+- `BootstrapSwitch`
 - `BootstrapNumericBox`
 - `BootstrapComboBox`
 - `BootstrapSelect`
@@ -86,7 +89,7 @@ MyDmsVn.Bootstrap5WinFormUI.Compatibility
 
 ## Integrated demo
 
-The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Advanced Inputs, Select, Input Groups, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, Pagination, and Navigation / Tabs. Light/Dark switching and Reduced motion remain available while navigating.
+The demo project is a single navigable showcase using `BootstrapSidebar` as the application navigation shell. Its root pages are Theme, Buttons / Groups / Toolbar, Inputs, Checks / Radios / Switches, Advanced Inputs, Select, Input Groups, Cards, Feedback, Collapse / Accordion, Loading / Spinner, Progress, Sidebar, DataGrid, Pagination, and Navigation / Tabs. Light/Dark switching and Reduced motion remain available while navigating.
 
 The Advanced Inputs page is the shared native-backed input showcase. Stage 5 adds `BootstrapNumericBox` examples for integer/default values, decimal formatting/increments, thousands separators, signed ranges, validation states, read-only behavior, disabled behavior, and live `ValueChanged` feedback. Stage 6 extends the same page with `BootstrapComboBox` examples for native unbound and bound items, `DisplayMember` / `ValueMember`, editable `DropDown`, selection-only `DropDownList`, native autocomplete, long text/ellipsis, optional leading icons, validation, disabled state, explicit radius, and live native selection feedback. Stage 9 adds `BootstrapDatePicker` Long/Short/Time and custom date/date-time formats, optional unchecked checkbox, constrained range, valid/invalid, disabled, explicit-radius, and live `ValueChanged` scenarios. ComboBox popup chrome and DatePicker calendar/localized rendering remain WinForms/OS-owned.
 
@@ -145,6 +148,31 @@ customerSelect.Items.Add(new BootstrapSelectItem(3, "Northwind"));
 ```
 
 Set `DataProvider` to an `IBootstrapSelectDataProvider` for remote/service-backed search. The control owns debounce, cancellation, stale-generation rejection, paging, retry, deduplication, and selection snapshots; the provider only returns `BootstrapSelectPage` instances. See [docs/BOOTSTRAP_SELECT.md](docs/BOOTSTRAP_SELECT.md) for local/async examples, custom-value semantics, keyboard/accessibility behavior, ownership, theme/DPI/RTL rules, and the manual validation matrix.
+
+## Check, radio, and switch usage
+
+The checkable controls directly inherit native WinForms controls, so checked state, events, keyboard/mnemonic behavior, `AutoCheck`, three-state cycling, and same-parent radio grouping remain native:
+
+```csharp
+var remember = new BootstrapCheckBox
+{
+    Text = "Remember this device",
+    Variant = BootstrapVariant.Primary,
+    ValidationState = BootstrapValidationState.None
+};
+
+var standardPlan = new BootstrapRadioButton { Text = "Standard", Checked = true };
+var priorityPlan = new BootstrapRadioButton { Text = "Priority" };
+
+var notifications = new BootstrapSwitch
+{
+    Text = "Notifications",
+    Checked = true,
+    Variant = BootstrapVariant.Success
+};
+```
+
+`Valid` and `Invalid` color both the indicator/track and label even while unchecked. Programmatic `CheckState.Indeterminate` is painted regardless of `ThreeState`; `ThreeState` controls only native user cycling. `Appearance.Button` and effective image modes deliberately use native painting and native preferred sizing. RadioButton exclusivity remains the native same-parent behavior; with `AutoCheck = false`, state is entirely caller-managed.
 
 ## Native DatePicker usage
 

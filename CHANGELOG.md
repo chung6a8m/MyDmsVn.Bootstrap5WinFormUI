@@ -6,6 +6,9 @@ All notable release-facing changes to this project are documented here.
 
 ### Added
 
+- `BootstrapCheckBox`, `BootstrapRadioButton`, and `BootstrapSwitch` as direct native WinForms subclasses with Bootstrap-inspired normal form-check rendering, semantic Variant/ValidationState accents, actual-CheckState mixed presentation, native RadioButton grouping/AutoCheck behavior, DPI/RTL-aware layout, runtime theme/font lifecycle, and complete native fallback for Appearance/image modes.
+- Integrated **Checks / Radios / Switches** demo and dual-target pure/STA coverage for state/event parity, validation while unchecked, caller-managed radios, fallback transitions, accessibility ownership, lifecycle, and the manual 100–200% DPI matrix.
+
 - `BootstrapLookupBox` and `BootstrapLookupColumn` for local, Vietnamese-insensitive single-selection lookup, multi-column results, explicit Refresh/Add New, ambiguity-safe exact commits, keyboard-first popup interaction, raw DataGridView value binding, native new-row support, and reuse-safe editing-control lifecycle.
 - Replaced the DataGrid + hidden `BootstrapSelect` editing workaround demo with typed `BindingList<T>` models and native lookup columns.
 
