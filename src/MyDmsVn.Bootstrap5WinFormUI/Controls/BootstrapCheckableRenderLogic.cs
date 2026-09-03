@@ -186,25 +186,92 @@ internal static class BootstrapCheckableRenderLogic
                 ? content.Right - indicatorWidth
                 : content.Left + (content.Width - indicatorWidth) / 2;
         var indicator = new Rectangle(x, y, indicatorWidth, indicatorHeight);
-        var gap = Math.Min(metrics.TextGap, Math.Max(0, content.Width - indicatorWidth));
-        var text = slot == BootstrapCheckableHorizontalSlot.Center
-            ? content
-            : slot == BootstrapCheckableHorizontalSlot.Left
-                ? Rectangle.FromLTRB(Math.Min(content.Right, indicator.Right + gap), content.Top, content.Right, content.Bottom)
-                : Rectangle.FromLTRB(content.Left, content.Top, Math.Max(content.Left, indicator.Left - gap), content.Bottom);
+
+        Rectangle text;
+        if (slot == BootstrapCheckableHorizontalSlot.Center)
+        {
+            var verticalGap = Math.Min(metrics.TextGap, Math.Max(0, content.Height - indicatorHeight));
+            if (checkAlign == ContentAlignment.TopCenter)
+            {
+                var textTop = Math.Min(content.Bottom, indicator.Bottom + verticalGap);
+                text = Rectangle.FromLTRB(content.Left, textTop, content.Right, content.Bottom);
+            }
+            else if (checkAlign == ContentAlignment.BottomCenter)
+            {
+                var textBottom = Math.Max(content.Top, indicator.Top - verticalGap);
+                text = Rectangle.FromLTRB(content.Left, content.Top, content.Right, textBottom);
+            }
+            else
+            {
+                text = content;
+            }
+        }
+        else
+        {
+            var horizontalGap = Math.Min(metrics.TextGap, Math.Max(0, content.Width - indicatorWidth));
+            text = slot == BootstrapCheckableHorizontalSlot.Left
+                ? Rectangle.FromLTRB(Math.Min(content.Right, indicator.Right + horizontalGap), content.Top, content.Right, content.Bottom)
+                : Rectangle.FromLTRB(content.Left, content.Top, Math.Max(content.Left, indicator.Left - horizontalGap), content.Bottom);
+        }
+
         return new BootstrapCheckableLayout(indicator, text);
     }
 
     public static Size GetPreferredSize(Size textSize, Padding padding, BootstrapCheckableMetrics metrics)
+    {
+        return GetPreferredSize(textSize, padding, metrics, ContentAlignment.MiddleLeft);
+    }
+
+    public static Size GetPreferredSize(Size textSize, Padding padding, BootstrapCheckableMetrics metrics, ContentAlignment checkAlign)
     {
         if (textSize.Width < 0 || textSize.Height < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(textSize), textSize, "Text size cannot contain negative dimensions.");
         }
 
-        var width = padding.Horizontal + metrics.IndicatorBoundsSize.Width + (textSize.Width > 0 ? metrics.TextGap + textSize.Width : 0);
-        var height = padding.Vertical + Math.Max(metrics.IndicatorBoundsSize.Height, textSize.Height) + metrics.FocusWidth;
+        ValidateAlignment(checkAlign);
+        var hasText = textSize.Width > 0 || textSize.Height > 0;
+        var indicatorWidth = Math.Max(0, metrics.IndicatorBoundsSize.Width);
+        var indicatorHeight = Math.Max(0, metrics.IndicatorBoundsSize.Height);
+        int width;
+        int height;
+
+        if (checkAlign == ContentAlignment.TopCenter || checkAlign == ContentAlignment.BottomCenter)
+        {
+            width = padding.Horizontal + Math.Max(indicatorWidth, textSize.Width);
+            height = padding.Vertical + indicatorHeight + (hasText ? metrics.TextGap + textSize.Height : 0) + metrics.FocusWidth;
+        }
+        else if (checkAlign == ContentAlignment.MiddleCenter)
+        {
+            width = padding.Horizontal + Math.Max(indicatorWidth, textSize.Width);
+            height = padding.Vertical + Math.Max(indicatorHeight, textSize.Height) + metrics.FocusWidth;
+        }
+        else
+        {
+            width = padding.Horizontal + indicatorWidth + (hasText ? metrics.TextGap + textSize.Width : 0);
+            height = padding.Vertical + Math.Max(indicatorHeight, textSize.Height) + metrics.FocusWidth;
+        }
+
         return new Size(Math.Max(0, width), Math.Max(0, height));
+    }
+
+    public static Rectangle GetRadioDotBounds(Rectangle indicatorBounds)
+    {
+        if (indicatorBounds.Width <= 0 || indicatorBounds.Height <= 0)
+        {
+            return Rectangle.Empty;
+        }
+
+        var diameter = Math.Min(indicatorBounds.Width, indicatorBounds.Height);
+        var inset = Math.Max(3, diameter / 4);
+        var width = indicatorBounds.Width - inset * 2;
+        var height = indicatorBounds.Height - inset * 2;
+        if (width <= 0 || height <= 0)
+        {
+            return Rectangle.Empty;
+        }
+
+        return new Rectangle(indicatorBounds.X + inset, indicatorBounds.Y + inset, width, height);
     }
 
     public static Rectangle GetSwitchThumbBounds(Rectangle track, int inset, CheckState checkState, bool rightToLeft)
@@ -230,7 +297,15 @@ internal static class BootstrapCheckableRenderLogic
 
     public static bool ShouldUseNativeFallback(Appearance appearance, bool hasImage, bool hasImageList, int imageIndex, string? imageKey)
     {
-        return appearance != Appearance.Normal || hasImage || (hasImageList && (imageIndex >= 0 || !string.IsNullOrEmpty(imageKey)));
+        return ShouldUseNativeFallback(appearance, FlatStyle.Standard, hasImage, hasImageList, imageIndex, imageKey);
+    }
+
+    public static bool ShouldUseNativeFallback(Appearance appearance, FlatStyle flatStyle, bool hasImage, bool hasImageList, int imageIndex, string? imageKey)
+    {
+        return flatStyle == FlatStyle.System
+            || appearance != Appearance.Normal
+            || hasImage
+            || (hasImageList && (imageIndex >= 0 || !string.IsNullOrEmpty(imageKey)));
     }
 
     public static TextFormatFlags GetTextFormatFlags(ContentAlignment textAlign, bool useMnemonic, bool showKeyboardCues, bool autoEllipsis, bool rightToLeft)
@@ -249,7 +324,8 @@ internal static class BootstrapCheckableRenderLogic
         if (autoEllipsis) flags |= TextFormatFlags.EndEllipsis;
         if (rightToLeft) flags |= TextFormatFlags.RightToLeft;
 
-        switch (textAlign)
+        var effectiveTextAlign = rightToLeft ? MirrorHorizontalAlignment(textAlign) : textAlign;
+        switch (effectiveTextAlign)
         {
             case ContentAlignment.TopCenter:
             case ContentAlignment.MiddleCenter:
@@ -278,6 +354,20 @@ internal static class BootstrapCheckableRenderLogic
         }
 
         return flags;
+    }
+
+    private static ContentAlignment MirrorHorizontalAlignment(ContentAlignment alignment)
+    {
+        switch (alignment)
+        {
+            case ContentAlignment.TopLeft: return ContentAlignment.TopRight;
+            case ContentAlignment.MiddleLeft: return ContentAlignment.MiddleRight;
+            case ContentAlignment.BottomLeft: return ContentAlignment.BottomRight;
+            case ContentAlignment.TopRight: return ContentAlignment.TopLeft;
+            case ContentAlignment.MiddleRight: return ContentAlignment.MiddleLeft;
+            case ContentAlignment.BottomRight: return ContentAlignment.BottomLeft;
+            default: return alignment;
+        }
     }
 
     private static int AlignVertically(Rectangle bounds, int height, ContentAlignment alignment)
