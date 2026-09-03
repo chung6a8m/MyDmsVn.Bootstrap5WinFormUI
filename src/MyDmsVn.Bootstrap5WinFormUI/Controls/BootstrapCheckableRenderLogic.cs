@@ -311,7 +311,7 @@ internal static class BootstrapCheckableRenderLogic
     public static TextFormatFlags GetTextFormatFlags(ContentAlignment textAlign, bool useMnemonic, bool showKeyboardCues, bool autoEllipsis, bool rightToLeft)
     {
         ValidateAlignment(textAlign);
-        var flags = TextFormatFlags.SingleLine | TextFormatFlags.PreserveGraphicsClipping;
+        var flags = TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl | TextFormatFlags.PreserveGraphicsClipping;
         if (!useMnemonic)
         {
             flags |= TextFormatFlags.NoPrefix;
