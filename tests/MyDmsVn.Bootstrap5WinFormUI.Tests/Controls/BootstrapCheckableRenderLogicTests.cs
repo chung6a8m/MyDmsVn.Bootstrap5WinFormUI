@@ -106,13 +106,13 @@ public sealed class BootstrapCheckableRenderLogicTests
         Assert.That(slot == BootstrapCheckableHorizontalSlot.Left, Is.EqualTo(expectedLeft));
     }
 
-    [TestCase(ContentAlignment.TopCenter, false, 0)]
-    [TestCase(ContentAlignment.TopCenter, true, 0)]
-    [TestCase(ContentAlignment.MiddleCenter, false, 16)]
-    [TestCase(ContentAlignment.MiddleCenter, true, 16)]
-    [TestCase(ContentAlignment.BottomCenter, false, 32)]
-    [TestCase(ContentAlignment.BottomCenter, true, 32)]
-    public void CenterCheckAlignKeepsTheNativeCenterSlotAndFullTextArea(ContentAlignment align, bool rtl, int expectedY)
+    [TestCase(ContentAlignment.TopCenter, false, 0, 24, 24)]
+    [TestCase(ContentAlignment.TopCenter, true, 0, 24, 24)]
+    [TestCase(ContentAlignment.MiddleCenter, false, 16, 0, 48)]
+    [TestCase(ContentAlignment.MiddleCenter, true, 16, 0, 48)]
+    [TestCase(ContentAlignment.BottomCenter, false, 32, 0, 24)]
+    [TestCase(ContentAlignment.BottomCenter, true, 32, 0, 24)]
+    public void CenterCheckAlignReservesVerticalTextSpaceAroundTheIndicator(ContentAlignment align, bool rtl, int expectedIndicatorY, int expectedTextY, int expectedTextHeight)
     {
         var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.CheckBox, BootstrapThemeMetrics.Default, 96);
 
@@ -120,8 +120,8 @@ public sealed class BootstrapCheckableRenderLogicTests
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(layout.IndicatorBounds, Is.EqualTo(new Rectangle(52, expectedY, 16, 16)));
-            Assert.That(layout.TextBounds, Is.EqualTo(new Rectangle(0, 0, 120, 48)));
+            Assert.That(layout.IndicatorBounds, Is.EqualTo(new Rectangle(52, expectedIndicatorY, 16, 16)));
+            Assert.That(layout.TextBounds, Is.EqualTo(new Rectangle(0, expectedTextY, 120, expectedTextHeight)));
         }));
     }
 
@@ -144,6 +144,25 @@ public sealed class BootstrapCheckableRenderLogicTests
         {
             Assert.That(flags & horizontalMask, Is.EqualTo(expectedHorizontal));
             Assert.That(flags & verticalMask, Is.EqualTo(expectedVertical));
+        }));
+    }
+
+    [TestCase(ContentAlignment.TopLeft, TextFormatFlags.Right)]
+    [TestCase(ContentAlignment.MiddleLeft, TextFormatFlags.Right)]
+    [TestCase(ContentAlignment.BottomLeft, TextFormatFlags.Right)]
+    [TestCase(ContentAlignment.TopRight, TextFormatFlags.Left)]
+    [TestCase(ContentAlignment.MiddleRight, TextFormatFlags.Left)]
+    [TestCase(ContentAlignment.BottomRight, TextFormatFlags.Left)]
+    [TestCase(ContentAlignment.MiddleCenter, TextFormatFlags.HorizontalCenter)]
+    public void TextFlagsMirrorHorizontalAlignmentExactlyOnceUnderRtl(ContentAlignment align, TextFormatFlags expectedHorizontal)
+    {
+        var flags = BootstrapCheckableRenderLogic.GetTextFormatFlags(align, true, true, false, true);
+        var horizontalMask = TextFormatFlags.HorizontalCenter | TextFormatFlags.Right;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(flags & horizontalMask, Is.EqualTo(expectedHorizontal));
+            Assert.That(flags.HasFlag(TextFormatFlags.RightToLeft), Is.True);
         }));
     }
 
