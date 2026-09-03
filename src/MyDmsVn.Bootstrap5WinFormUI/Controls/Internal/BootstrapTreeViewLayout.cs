@@ -231,6 +231,25 @@ internal static class BootstrapTreeViewLayout
             selectionBounds);
     }
 
+    internal static Rectangle CalculateContainedImageBounds(Rectangle slotBounds, Size imageSize)
+    {
+        if (slotBounds.Width <= 0 || slotBounds.Height <= 0 || imageSize.Width <= 0 || imageSize.Height <= 0)
+        {
+            return Rectangle.Empty;
+        }
+
+        var widthScale = (double)slotBounds.Width / imageSize.Width;
+        var heightScale = (double)slotBounds.Height / imageSize.Height;
+        var scale = Math.Min(1d, Math.Min(widthScale, heightScale));
+        var width = Math.Max(1, Math.Min(slotBounds.Width, (int)Math.Round(imageSize.Width * scale)));
+        var height = Math.Max(1, Math.Min(slotBounds.Height, (int)Math.Round(imageSize.Height * scale)));
+        return new Rectangle(
+            slotBounds.Left + ((slotBounds.Width - width) / 2),
+            slotBounds.Top + ((slotBounds.Height - height) / 2),
+            width,
+            height);
+    }
+
     internal static BootstrapTreeViewExpanderGlyph CalculateExpanderGlyph(
         Rectangle bounds,
         bool expanded,

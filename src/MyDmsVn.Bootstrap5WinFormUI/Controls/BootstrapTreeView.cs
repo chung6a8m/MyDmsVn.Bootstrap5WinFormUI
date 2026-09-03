@@ -15,6 +15,8 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 public class BootstrapTreeView : TreeView
 {
     private BootstrapVariant _variant = BootstrapVariant.Primary;
+    private IntPtr _nativeStateImageSlotHandle;
+    private int _nativeStateImageSlotWidth;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BootstrapTreeView"/> class.
@@ -160,6 +162,19 @@ public class BootstrapTreeView : TreeView
             node.Nodes.Count,
             ShowPlusMinus,
             ShowRootLines);
+
+        var nodeImageIndex = ResolveNodeImageIndex(node, selected);
+        var nodeImage = ResolveImage(ImageList, nodeImageIndex);
+        var stateImageIndex = ResolveStateImageIndex(node);
+        var stateImage = ResolveImage(StateImageList, stateImageIndex);
+        var drawFrameworkCheckbox = CheckBoxes && StateImageList is null;
+        var hasStateImage = drawFrameworkCheckbox || stateImage is not null;
+        var nativeStateImageSlotWidth = hasStateImage
+            ? ResolveNativeStateImageSlotWidth(node)
+            : 0;
+        var hasNodeImage = nodeImage is not null && ImageList is not null;
+        var nodeImageSize = hasNodeImage ? ImageList!.ImageSize : Size.Empty;
+
         var layout = BootstrapTreeViewLayout.Calculate(new BootstrapTreeViewLayoutInput(
             ClientRectangle,
             rowBounds,
@@ -169,10 +184,10 @@ public class BootstrapTreeView : TreeView
             RightToLeft == RightToLeft.Yes,
             FullRowSelect && !ShowLines,
             hasExpander,
-            hasStateImage: false,
-            nativeStateImageSlotWidth: 0,
-            hasNodeImage: false,
-            nodeImageSize: Size.Empty));
+            hasStateImage,
+            nativeStateImageSlotWidth,
+            hasNodeImage,
+            nodeImageSize));
 
         var backgroundBounds = visibleSelected ? layout.SelectionBounds : layout.TextBounds;
         var background = palette.Background;
@@ -219,6 +234,20 @@ public class BootstrapTreeView : TreeView
                 dpi);
         }
 
+        if (stateImage is not null && !layout.StateImageBounds.IsEmpty)
+        {
+            DrawImageInSlot(graphics, stateImage, layout.StateImageBounds);
+        }
+        else if (drawFrameworkCheckbox && !layout.StateImageBounds.IsEmpty)
+        {
+            DrawFrameworkCheckbox(graphics, layout.StateImageBounds, node.Checked, theme, dpi);
+        }
+
+        if (nodeImage is not null && !layout.NodeImageBounds.IsEmpty)
+        {
+            DrawImageInSlot(graphics, nodeImage, layout.NodeImageBounds);
+        }
+
         if (layout.TextBounds.Width > 0 && layout.TextBounds.Height > 0 && !string.IsNullOrEmpty(node.Text))
         {
             var font = node.NodeFont ?? Font;
@@ -245,6 +274,152 @@ public class BootstrapTreeView : TreeView
         {
             DrawFocusCue(graphics, layout.FocusBounds, theme.Colors.Focus, dpi);
         }
+    }
+
+    private int ResolveNodeImageIndex(TreeNode node, bool selected)
+    {
+        var imageList = ImageList;
+        if (imageList is null || imageList.Images.Count == 0)
+        {
+            return -1;
+        }
+
+        if (selected)
+        {
+            var index = ResolveConfiguredImageIndex(
+                imageList,
+                node.SelectedImageKey,
+                node.SelectedImageIndex);
+            if (index >= 0)
+            {
+                return index;
+            }
+
+            index = ResolveConfiguredImageIndex(
+                imageList,
+                SelectedImageKey,
+                SelectedImageIndex);
+            if (index >= 0)
+            {
+                return index;
+            }
+        }
+
+        var normalIndex = ResolveConfiguredImageIndex(imageList, node.ImageKey, node.ImageIndex);
+        if (normalIndex >= 0)
+        {
+            return normalIndex;
+        }
+
+        return ResolveConfiguredImageIndex(imageList, ImageKey, ImageIndex);
+    }
+
+    private int ResolveStateImageIndex(TreeNode node)
+    {
+        var stateImageList = StateImageList;
+        if (stateImageList is null || stateImageList.Images.Count == 0)
+        {
+            return -1;
+        }
+
+        if (CheckBoxes)
+        {
+            var nativeIndex = node.Checked ? 1 : 0;
+            return nativeIndex < stateImageList.Images.Count ? nativeIndex : -1;
+        }
+
+        return ResolveConfiguredImageIndex(
+            stateImageList,
+            node.StateImageKey,
+            node.StateImageIndex);
+    }
+
+    private static int ResolveConfiguredImageIndex(ImageList imageList, string key, int index)
+    {
+        if (!string.IsNullOrEmpty(key))
+        {
+            var keyIndex = imageList.Images.IndexOfKey(key);
+            if (keyIndex >= 0)
+            {
+                return keyIndex;
+            }
+        }
+
+        if (index < 0 || imageList.Images.Count == 0)
+        {
+            return -1;
+        }
+
+        return Math.Min(index, imageList.Images.Count - 1);
+    }
+
+    private static Image? ResolveImage(ImageList? imageList, int index)
+    {
+        if (imageList is null || index < 0 || index >= imageList.Images.Count)
+        {
+            return null;
+        }
+
+        return imageList.Images[index];
+    }
+
+    private int ResolveNativeStateImageSlotWidth(TreeNode node)
+    {
+        if (!IsHandleCreated || node.TreeView != this)
+        {
+            return 0;
+        }
+
+        var currentHandle = Handle;
+        if (_nativeStateImageSlotHandle != currentHandle)
+        {
+            _nativeStateImageSlotHandle = currentHandle;
+            _nativeStateImageSlotWidth = 0;
+        }
+
+        if (_nativeStateImageSlotWidth > 0)
+        {
+            return _nativeStateImageSlotWidth;
+        }
+
+        var bounds = node.Bounds;
+        if (bounds.IsEmpty)
+        {
+            return 0;
+        }
+
+        var y = bounds.Top + (bounds.Height / 2);
+        var first = -1;
+        var last = -1;
+        for (var x = ClientRectangle.Left; x < ClientRectangle.Right; x++)
+        {
+            var hit = HitTest(x, y);
+            if (hit.Node != node ||
+                (hit.Location & TreeViewHitTestLocations.StateImage) != TreeViewHitTestLocations.StateImage)
+            {
+                continue;
+            }
+
+            if (first < 0)
+            {
+                first = x;
+            }
+
+            last = x;
+        }
+
+        if (first < 0)
+        {
+            return 0;
+        }
+
+        var width = last - first + 1;
+        if (first > ClientRectangle.Left && last < ClientRectangle.Right - 1)
+        {
+            _nativeStateImageSlotWidth = width;
+        }
+
+        return width;
     }
 
     private void DrawConnectorLines(
@@ -365,6 +540,114 @@ public class BootstrapTreeView : TreeView
         finally
         {
             graphics.SmoothingMode = previousSmoothingMode;
+        }
+    }
+
+    private void DrawFrameworkCheckbox(
+        Graphics graphics,
+        Rectangle bounds,
+        bool isChecked,
+        BootstrapTheme theme,
+        int dpi)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+
+        var borderColor = Enabled ? theme.Colors.Border : theme.Colors.Disabled;
+        var fillColor = isChecked
+            ? BootstrapVariantColorResolver.Resolve(theme.Colors, _variant)
+            : theme.Colors.Surface;
+        if (!Enabled)
+        {
+            fillColor = theme.Colors.SurfaceSecondary;
+        }
+
+        using (var fillBrush = new SolidBrush(fillColor))
+        {
+            graphics.FillRectangle(fillBrush, bounds);
+        }
+
+        using (var borderPen = new Pen(borderColor, Math.Max(1, DpiScaler.Scale(1, dpi))))
+        {
+            graphics.DrawRectangle(
+                borderPen,
+                bounds.Left,
+                bounds.Top,
+                Math.Max(0, bounds.Width - 1),
+                Math.Max(0, bounds.Height - 1));
+        }
+
+        if (!isChecked || !Enabled || bounds.Width < 6 || bounds.Height < 6)
+        {
+            return;
+        }
+
+        var checkColor = ColorUtil.GetContrastingTextColor(
+            fillColor,
+            theme.Colors.Light,
+            theme.Colors.Dark);
+        var strokeWidth = Math.Max(1, DpiScaler.Scale(2, dpi));
+        var left = bounds.Left + Math.Max(2, bounds.Width / 5);
+        var middleX = bounds.Left + Math.Max(3, (bounds.Width * 2) / 5);
+        var right = bounds.Right - Math.Max(2, bounds.Width / 5) - 1;
+        var middleY = bounds.Top + (bounds.Height / 2);
+        var bottom = bounds.Bottom - Math.Max(2, bounds.Height / 4) - 1;
+        var top = bounds.Top + Math.Max(2, bounds.Height / 4);
+
+        using var checkPen = new Pen(checkColor, strokeWidth)
+        {
+            StartCap = LineCap.Round,
+            EndCap = LineCap.Round,
+            LineJoin = LineJoin.Round,
+        };
+        var previousSmoothingMode = graphics.SmoothingMode;
+        try
+        {
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            graphics.DrawLine(checkPen, new Point(left, middleY), new Point(middleX, bottom));
+            graphics.DrawLine(checkPen, new Point(middleX, bottom), new Point(right, top));
+        }
+        finally
+        {
+            graphics.SmoothingMode = previousSmoothingMode;
+        }
+    }
+
+    private static void DrawImageInSlot(Graphics graphics, Image image, Rectangle slotBounds)
+    {
+        var targetBounds = BootstrapTreeViewLayout.CalculateContainedImageBounds(slotBounds, image.Size);
+        if (targetBounds.IsEmpty)
+        {
+            return;
+        }
+
+        if (targetBounds.Size == image.Size)
+        {
+            graphics.DrawImageUnscaled(image, targetBounds.Location);
+            return;
+        }
+
+        var previousInterpolationMode = graphics.InterpolationMode;
+        var previousPixelOffsetMode = graphics.PixelOffsetMode;
+        try
+        {
+            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            graphics.DrawImage(
+                image,
+                targetBounds,
+                0,
+                0,
+                image.Width,
+                image.Height,
+                GraphicsUnit.Pixel);
+        }
+        finally
+        {
+            graphics.InterpolationMode = previousInterpolationMode;
+            graphics.PixelOffsetMode = previousPixelOffsetMode;
         }
     }
 
