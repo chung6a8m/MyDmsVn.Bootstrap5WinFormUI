@@ -147,14 +147,20 @@ public sealed class BootstrapCheckBoxTests
     [Test]
     public void AutoSizePreferredSizeUsesTheSameTextPaddingAsPainting()
     {
-        using var control = new BootstrapCheckBox { Text = "Wide italic-like WWW label", AutoSize = true };
+        using var font = new Font("Segoe UI", 24f, FontStyle.Italic);
+        using var control = new BootstrapCheckBox { Text = "WWW italic overhang", Font = font, AutoSize = true };
         var dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
         var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.CheckBox, BootstrapThemeManager.CurrentTheme.Metrics, dpi);
         var flags = BootstrapCheckableRenderLogic.GetTextFormatFlags(control.TextAlign, control.UseMnemonic, false, control.AutoEllipsis, false);
         var paintTextSize = TextRenderer.MeasureText(control.Text, control.Font, Size.Empty, flags);
+        var noPaddingTextSize = TextRenderer.MeasureText(control.Text, control.Font, Size.Empty, flags | TextFormatFlags.NoPadding);
         var expected = BootstrapCheckableRenderLogic.GetPreferredSize(paintTextSize, control.Padding, metrics);
 
-        Assert.That(control.GetPreferredSize(Size.Empty), Is.EqualTo(expected));
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(paintTextSize.Width, Is.GreaterThan(noPaddingTextSize.Width));
+            Assert.That(control.GetPreferredSize(Size.Empty), Is.EqualTo(expected));
+        }));
     }
 
     [Test]
