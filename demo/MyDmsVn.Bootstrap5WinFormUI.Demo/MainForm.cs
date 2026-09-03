@@ -193,6 +193,11 @@ public sealed class MainForm : Form
             () => new TextBoxCardDemoForm());
 
         AddPage(
+            "Checks / Radios / Switches",
+            "Native-backed checks, radios, and switches with variants, validation, RTL, grouping, fallback, and event feedback.",
+            () => new ChecksDemoForm());
+
+        AddPage(
             "Advanced Inputs",
             "Native-backed NumericBox, ComboBox, and DatePicker scenarios with validation, formatting, keyboard, and DPI checks.",
             () => new AdvancedInputsDemoForm());

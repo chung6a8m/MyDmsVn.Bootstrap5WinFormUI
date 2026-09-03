@@ -18,6 +18,7 @@ public sealed class IntegratedDemoApplicationTests
         "Theme",
         "Buttons / Groups / Toolbar",
         "Inputs",
+        "Checks / Radios / Switches",
         "Advanced Inputs",
         "Select",
         "Input Groups",
@@ -102,6 +103,18 @@ public sealed class IntegratedDemoApplicationTests
             embeddedForms.Any(child => child.GetType().Name == "AdvancedInputsDemoForm" && !child.TopLevel),
             Is.True,
             "Advanced input stages should share one reusable integrated demo page.");
+    }
+
+    [Test]
+    public void SelectingChecksNavigationEmbedsChecksDemoInMainWindow()
+    {
+        using var form = new MainForm();
+        form.CreateControl();
+        var sidebar = FindControls<BootstrapSidebar>(form).Single();
+        sidebar.SelectedItem = sidebar.Items.Single(item => item.Text == "Checks / Radios / Switches");
+        form.PerformLayout();
+
+        Assert.That(FindControls<Form>(form).Any(child => child.GetType().Name == "ChecksDemoForm" && !child.TopLevel), Is.True);
     }
 
     [Test]
