@@ -4,11 +4,11 @@
 
 **Goal:** Add a production-ready `BootstrapListView` that applies Bootstrap-inspired, theme-aware, DPI-aware presentation to the native WinForms `ListView` while preserving native items, columns, groups, selection, checks, images, view modes, virtual mode, label editing, keyboard, drag/drop, accessibility, and event semantics.
 
-**Architecture:** `BootstrapListView` derives directly from `System.Windows.Forms.ListView`; the native control remains the data, layout, scrolling, selection, keyboard, editing, virtualization, and accessibility engine. The framework sets `OwnerDraw = true` and owns only painting, hover bookkeeping required for painting, theme/font synchronization, and DPI-scaled drawing geometry anchored to native item/subitem bounds. Small internal render/layout helpers keep visual-state decisions testable without introducing a parallel list model or replacing native interaction behavior.
+**Architecture:** `BootstrapListView` derives directly from `System.Windows.Forms.ListView`; the native control remains the data, layout, scrolling, selection, keyboard, editing, virtualization, and accessibility engine. The framework owns only Bootstrap-aware painting, hover bookkeeping required for painting, theme/font synchronization, double-buffering, and DPI-scaled framework gaps anchored to native item/subitem bounds. In `View.Details`, framework painting is deliberately `DrawSubItem`-centric to avoid the documented Win32 owner-draw bug where an extra `DrawItem` event can repaint a row without accompanying `DrawSubItem` events.
 
 **Tech Stack:** C#, WinForms, `net48;net8.0-windows`, existing `BootstrapThemeManager`, `BootstrapVariant`, `BootstrapVariantColorResolver`, `DpiScaler`, `ColorUtil`, `TextRenderer`, NUnit, integrated demo application.
 
-**Spec:** `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/COMPONENTS.md`, `docs/COMPATIBILITY.md`, `docs/TESTING.md`, plus the explicit public/visual contracts in this plan.
+**Spec:** `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/COMPONENTS.md`, `docs/COMPATIBILITY.md`, `docs/TESTING.md`, plus the explicit public/visual/native contracts in this plan.
 
 ## Global Constraints
 
@@ -16,7 +16,7 @@
 - Production library target frameworks remain exactly `net48;net8.0-windows`.
 - Use native WinForms controls and behavior; Bootstrap is the visual/design inspiration, not a CSS/JavaScript runtime dependency.
 - `BootstrapListView` must derive directly from `System.Windows.Forms.ListView`.
-- Native `Items`, `Columns`, `Groups`, `SelectedItems`, `CheckedItems`, `LargeImageList`, `SmallImageList`, `StateImageList`, `View`, `MultiSelect`, `LabelEdit`, `VirtualMode`, `VirtualListSize`, `ListViewItemSorter`, drag/drop, keyboard, accessibility, and inherited events remain authoritative.
+- Native `Items`, `Columns`, `Groups`, `SelectedItems`, `CheckedItems`, `SelectedIndices`, `CheckedIndices`, `LargeImageList`, `SmallImageList`, `StateImageList`, `View`, `MultiSelect`, `LabelEdit`, `VirtualMode`, `VirtualListSize`, `ListViewItemSorter`, drag/drop, keyboard, accessibility, and inherited events remain authoritative **where the current native `ListView` mode supports them**.
 - Do not introduce a custom item collection, data-binding layer, selection model, sorting model, virtualization provider, group model, or replacement accessibility tree.
 - Reuse `BootstrapThemeManager`, theme tokens, `BootstrapVariantColorResolver`, `DpiScaler`, `ColorUtil`, and existing rendering conventions instead of creating component-local theme infrastructure.
 - Do not require FontAwesome.Sharp or any new external package.
@@ -26,6 +26,20 @@
 - Do not use independent timers, `Thread.Sleep`, or `Task.Delay` for hover, rendering, or lifecycle behavior.
 - Theme switching, handle recreation, DPI changes, and disposal must not mutate caller-owned list data or native interaction state.
 - Keep V1 public API intentionally small; inherited native properties are not renamed or aliased merely to sound more Bootstrap-like.
+- Do not add framework code that attempts to reverse a documented native coercion/restriction such as `Tile` becoming `LargeIcon` when `VirtualMode` is enabled.
+
+---
+
+## Review Corrections Locked Into This Plan
+
+The following decisions are mandatory because they address known native `ListView` constraints and previously identified plan defects:
+
+1. **Details owner-draw workaround:** framework code must not paint `Details` row backgrounds in `OnDrawItem`. All framework `Details` painting is performed in `OnDrawSubItem`; column 0 paints the row/base background before cells are painted. This avoids the documented Win32 bug where `DrawItem` may occur without the corresponding `DrawSubItem` events when the mouse passes over a row.
+2. **Virtual-mode setup order:** subscribe `RetrieveVirtualItem` before assigning a positive `VirtualListSize`. The plan must never show an object initializer that sets `VirtualListSize > 0` before the handler exists.
+3. **Hover hit testing:** use `ListView.HitTest(...)`, not `GetItemAt(...)`. `GetItemAt` is only valid for `Details` and `Tile`, while `HoverHighlight` must work in all supported normal views.
+4. **Double buffering:** the subclass constructor sets protected `DoubleBuffered = true` to reduce owner-draw flicker.
+5. **Virtual-mode restrictions:** when `VirtualMode == true`, normal `Items`, `SelectedItems`, and `CheckedItems` access is not a supported native contract; callers use retrieval events plus `SelectedIndices`/`CheckedIndices`. Enabling virtual mode while `View == Tile` may coerce the native view to `LargeIcon`; Bootstrap code must not force it back.
+6. **Effective style colors:** public WinForms getters expose effective colors, not a reliable public “caller explicitly set this color” flag. V1 therefore preserves **observable effective styles**. A candidate item/subitem color is treated as a custom visual override only when it differs from the inherited list color. If the caller explicitly assigns exactly the same color as the inherited list color, that assignment is intentionally indistinguishable from inheritance and stripes may still apply.
 
 ---
 
@@ -36,29 +50,39 @@ Bootstrap 5 does not define an official desktop `ListView`. The design target is
 Primary WinForms references:
 
 - `ListView`: https://learn.microsoft.com/dotnet/api/system.windows.forms.listview
+- `View`: https://learn.microsoft.com/dotnet/api/system.windows.forms.listview.view
 - `OwnerDraw`: https://learn.microsoft.com/dotnet/api/system.windows.forms.listview.ownerdraw
 - `DrawItem`: https://learn.microsoft.com/dotnet/api/system.windows.forms.listview.drawitem
 - `DrawSubItem`: https://learn.microsoft.com/dotnet/api/system.windows.forms.listview.drawsubitem
 - `DrawColumnHeader`: https://learn.microsoft.com/dotnet/api/system.windows.forms.listview.drawcolumnheader
+- `HitTest`: https://learn.microsoft.com/dotnet/api/system.windows.forms.listview.hittest
 - `VirtualMode`: https://learn.microsoft.com/dotnet/api/system.windows.forms.listview.virtualmode
+- `VirtualListSize`: https://learn.microsoft.com/dotnet/api/system.windows.forms.listview.virtuallistsize
 - Tile view: https://learn.microsoft.com/dotnet/desktop/winforms/controls/how-to-enable-tile-view-in-a-windows-forms-listview-control
 
 Implementation must preserve these native rules:
 
-1. `ListView` supports `LargeIcon`, `SmallIcon`, `List`, `Details`, and `Tile`; V1 must remain usable in all five modes.
+1. `ListView` supports `LargeIcon`, `SmallIcon`, `List`, `Details`, and `Tile`; V1 remains usable in all five normal modes.
 2. When `OwnerDraw == true`, non-`Details` views are rendered through `DrawItem`; `Details` additionally uses `DrawSubItem` and `DrawColumnHeader`.
-3. In `Tile` view, subitem text is part of `DrawItem`; `DrawSubItem` is not the tile renderer.
-4. In `Details`, `DrawSubItem` is raised only for subitems that have a corresponding `ColumnHeader`; the first subitem represents the parent `ListViewItem` itself.
-5. `FullRowSelect`, `GridLines`, `HeaderStyle`, column alignment, column sizing/reordering, and header click behavior remain native contracts rather than framework aliases.
-6. `VirtualMode` means `VirtualListSize` plus native retrieval/cache/search events are authoritative. Rendering code must not enumerate a shadow `Items` model, cache item identity, or require a populated normal `Items` collection.
-7. `LabelEdit` remains the native in-place edit lifecycle. The framework does not replace the edit control or synthesize label-edit events.
-8. `ListViewItemSorter` and native sorting remain caller-owned. V1 does not invent sort descriptors or sort glyph state.
-9. `LargeImageList`, `SmallImageList`, and `StateImageList` are caller-owned. Rendering may read them but never clone, replace, resize, or dispose them behind the caller's back.
-10. If `CheckBoxes == true`, checked state remains `ListViewItem.Checked`; owner drawing must reflect it without maintaining a second checked-state collection.
-11. If a caller supplies `StateImageList` and a valid item `StateImageIndex`, render that state image rather than silently replacing it with framework checkbox art.
-12. Group membership and native group behavior remain supported. WinForms exposes no `DrawListViewGroupHeader` owner-draw event, so V1 must leave group headers native/system-rendered instead of adding Win32 `NM_CUSTOMDRAW`/P/Invoke solely to theme them.
-13. Native mouse/keyboard behavior remains authoritative: arrows, Home/End, PageUp/PageDown, Space/checkbox interaction, Ctrl/Shift multi-selection, activation, label edit, context menus, drag/drop, and inherited selection events must not be reimplemented.
-14. `RightToLeft` / `RightToLeftLayout` and native hit-testing/layout remain authoritative. Custom text/image drawing must use native bounds as anchors rather than building a separate item-positioning engine.
+3. **Framework `Details` drawing uses `DrawSubItem` for all custom row/cell painting.** `OnDrawItem` in `Details` must not paint a framework background because the underlying Win32 control can raise an extra `DrawItem` without corresponding `DrawSubItem` events while the mouse moves over a row.
+4. In `Tile` view, subitem text is part of `DrawItem`; `DrawSubItem` is not the tile renderer.
+5. In `Details`, `DrawSubItem` is raised only for subitems that have a corresponding `ColumnHeader`; the first subitem represents the parent `ListViewItem` itself.
+6. `FullRowSelect`, `GridLines`, `HeaderStyle`, column alignment, column sizing/reordering, and header click behavior remain native contracts rather than framework aliases.
+7. `ListView.HitTest(x, y)` is the framework hover hit-test API. Do not use `GetItemAt` because it is only valid for `Details` and `Tile`.
+8. `VirtualMode` means `VirtualListSize` plus native retrieval/cache/search events are authoritative. Rendering code must not enumerate a shadow `Items` model, cache virtual item identity, or require a populated normal `Items` collection.
+9. When `VirtualMode == true` and `VirtualListSize > 0`, `RetrieveVirtualItem` must already be handled before the positive size is assigned.
+10. In virtual mode, `Items`, `SelectedItems`, and `CheckedItems` are not valid native access paths. Use virtual retrieval plus `SelectedIndices` and `CheckedIndices` where selection/check information is needed.
+11. When `VirtualMode` is enabled while the view is `Tile`, WinForms may change the view to `LargeIcon`. Bootstrap must accept the resulting native `View` value and must not restore `Tile` behind the caller's back.
+12. `LabelEdit` remains the native in-place edit lifecycle. The framework does not replace the edit control or synthesize label-edit events.
+13. `ListViewItemSorter` and native sorting remain caller-owned. V1 does not invent sort descriptors or sort glyph state.
+14. `LargeImageList`, `SmallImageList`, and `StateImageList` are caller-owned. Rendering may read them but never clone, replace, resize, or dispose them behind the caller's back.
+15. If `CheckBoxes == true`, checked state remains `ListViewItem.Checked`; owner drawing reflects it without maintaining a second checked-state collection. Native view limitations still apply; notably, do not manufacture framework checkboxes in `Tile` merely because the property value is true.
+16. If a caller supplies `StateImageList` and a valid item `StateImageIndex`, render that state image rather than silently replacing it with framework checkbox art.
+17. Group membership remains native. Native group display support varies by view; for example, `List` does not display groups. Bootstrap must not copy/reassign items to simulate groups where the native view does not support them.
+18. WinForms exposes no `DrawListViewGroupHeader` owner-draw event, so V1 leaves group headers native/system-rendered instead of adding Win32 `NM_CUSTOMDRAW`/P/Invoke solely to theme them.
+19. Native mouse/keyboard behavior remains authoritative: arrows, Home/End, PageUp/PageDown, Space/checkbox interaction, Ctrl/Shift multi-selection, activation, label edit, context menus, drag/drop, and inherited selection events must not be reimplemented.
+20. `RightToLeft` / `RightToLeftLayout` and native layout remain authoritative. Custom text/image drawing uses native bounds as anchors rather than building a separate item-positioning engine.
+21. The subclass sets protected `DoubleBuffered = true`; it does not introduce a public buffering API.
 
 ---
 
@@ -83,8 +107,9 @@ public class BootstrapListView : ListView
 - Changing `Variant`, `Striped`, or `HoverHighlight` invalidates presentation only; it must not mutate items, selection, checked state, groups, virtual state, view mode, focus, scrolling, or image lists.
 - `Striped` applies only to row-oriented `View.Details` and `View.List`. It has no visual effect in `LargeIcon`, `SmallIcon`, or `Tile`, but the property value remains unchanged when the view changes.
 - `HoverHighlight` is presentation-only. Do not enable or alter inherited `HotTracking`, `HoverSelection`, `Activation`, or selection behavior to implement it.
-- `OwnerDraw` is framework-owned and should remain `true` while Bootstrap rendering is active. Hide/restrict it in the designer only if this can be done without breaking the inherited public contract; do not add a public render-mode abstraction in V1.
-- Existing `ListViewItem.ForeColor`, `ListViewItem.BackColor`, `ListViewItem.Font`, `ListViewSubItem.ForeColor`, `ListViewSubItem.BackColor`, and `ListViewSubItem.Font` remain meaningful for neutral items/cells. Selected, inactive-selection, hover, and disabled states may override colors where necessary for legibility and state visibility.
+- `OwnerDraw` is framework-owned and remains `true` while Bootstrap rendering is active. Do not add a public render-mode abstraction in V1.
+- `DoubleBuffered` is enabled internally and remains protected/native.
+- Existing item/subitem colors and fonts remain meaningful as **effective public styles**. V1 does not claim to distinguish “explicitly assigned the same value as inherited” from normal inheritance because WinForms exposes no reliable public flag for that distinction.
 - Do not add custom selection, checked, activation, sorting, label-edit, or virtual-mode events. Use inherited `ListView` events.
 
 ### Explicit V1 exclusions
@@ -109,9 +134,9 @@ GroupHeaderStyle
 
 Rationale:
 
-- Rounded clipping/borders around a native HWND and its scrollbars require non-client/region behavior that is outside the owner-draw item contract.
-- Native ListView does not expose a reliable managed item-collection changed event suitable for a zero-data overlay; adding an empty-state API would either require Win32 message interception or a separate host/composite control. Keep that out of V1.
-- Loading overlays are useful but orthogonal to the native-backed rendering contract and should be considered together with a future reusable data-state overlay abstraction rather than copied ad hoc from `BootstrapDataGridView`.
+- Rounded clipping/borders around a native HWND and its scrollbars require non-client/region behavior outside the owner-draw item contract.
+- Native `ListView` does not expose a reliable managed item-collection changed event suitable for a zero-data overlay; adding an empty-state API would require Win32 interception or a composite host. Keep that out of V1.
+- Loading overlays are useful but orthogonal to the native-backed rendering contract and should be considered with a future reusable data-state overlay abstraction rather than copied ad hoc from `BootstrapDataGridView`.
 - Header sorting and group-header custom drawing require extra state/Win32 surface area not necessary for a production-ready native-backed V1.
 
 ---
@@ -122,12 +147,11 @@ Rationale:
 
 - Use theme `Surface` as the normal list background and `Text` as normal text.
 - Preserve inherited `BorderStyle`; do not replace it with a rounded framework border.
-- When `BorderStyle.FixedSingle` is used, native border behavior remains authoritative. The framework may set foreground/background theme colors but must not alter border style on every theme change.
 - Do not paint over native scrollbars.
 
 ### Selection
 
-- Resolve the active accent with:
+Resolve the active accent with:
 
 ```csharp
 var accent = BootstrapVariantColorResolver.Resolve(theme.Colors, Variant);
@@ -138,69 +162,90 @@ var selectionText = ColorUtil.GetContrastingTextColor(
 ```
 
 - Active selected items use the resolved variant color and contrasting text.
-- When focus is outside the control and `HideSelection == false`, keep selection visible with a subdued theme surface/border treatment rather than pretending it is active focus.
-- When focus is outside and `HideSelection == true`, do not force a selection highlight that native ListView intends to hide.
-- In `Details`, respect `FullRowSelect`: if false, do not turn selection into a full-row semantic that native ListView did not request.
+- When focus is outside and `HideSelection == false`, keep selection visible with a subdued theme treatment.
+- When focus is outside and `HideSelection == true`, do not force a hidden selection highlight.
+- In `Details`, `FullRowSelect == false` means only the first/label selection region receives selected treatment; other cells retain their neutral/hover background.
 
-### Stripes
+### Stripes and observable caller colors
 
 - `Striped == true` uses `SurfaceSecondary` for odd-index neutral rows only in `Details` and `List`.
-- Explicit neutral item/subitem background overrides take precedence over striped background.
-- Selection and hover take precedence over striped background.
-- Use stable native item index; do not renumber per group or create a shadow index map.
+- Selection and hover take precedence over stripes.
+- Determine caller-color overrides from **observable effective values**, not `Color.Empty` sentinels:
+
+```csharp
+var effectiveBack = styleSource.BackColor;
+var effectiveFore = styleSource.ForeColor;
+var hasBackOverride = effectiveBack.ToArgb() != BackColor.ToArgb();
+var hasForeOverride = effectiveFore.ToArgb() != ForeColor.ToArgb();
+```
+
+- For subitems, choose `styleSource` according to `UseItemStyleForSubItems`: use the item/first-subitem style when true, otherwise use the current subitem style.
+- A differing effective caller background wins over a neutral stripe.
+- If a caller explicitly assigns exactly the current inherited `BackColor`/`ForeColor`, V1 treats it as inherited because that intent is not observable through the public WinForms API.
+- Do not use reflection to access internal WinForms `CustomBackColor`, `CustomForeColor`, or `CustomFont` flags.
 
 ### Hover
 
-- Hover background is a subtle theme-derived highlight; do not use the full active selection color.
+- Hover background is a subtle theme-derived highlight, not the full selected color.
 - Hover never changes `SelectedIndices`, `FocusedItem`, `Checked`, or activation state.
-- Track only the currently hot item index/reference needed to invalidate old/new item bounds.
-- Mouse leave clears hover and invalidates only the previously hot item when practical.
+- Determine hover with `HitTest(e.X, e.Y).Item` in every normal view.
+- Track only the current hot item index needed to invalidate old/new bounds.
+- Mouse leave clears hover and invalidates only the previous item when practical.
 
-### Disabled
+### Disabled and focus
 
-- Disabled presentation uses `MutedText` and a subdued surface while preserving enough contrast to read content.
-- Do not mutate `Enabled` or item state to manufacture disabled visuals.
-
-### Focus
-
+- Disabled presentation uses `MutedText` and a subdued surface while preserving readable contrast.
 - Draw a focus cue only when the control is focused, focus cues should be shown, and the native focused/selected item warrants it.
 - Focus cue geometry follows native item/label bounds and `FullRowSelect` semantics.
-- Do not synthesize focus on mouse hover or selected-but-unfocused rows.
+
+### Details owner-draw strategy
+
+- `OnDrawColumnHeader` renders themed headers.
+- `OnDrawItem` performs **no framework painting when `View == View.Details`**. It may call `base.OnDrawItem(e)` so the inherited event contract remains intact.
+- `OnDrawSubItem` owns framework painting for `Details`:
+  - when `ColumnIndex == 0`, first paint the complete native row/base background once;
+  - paint selection accent only across the full row when `FullRowSelect == true`;
+  - with `FullRowSelect == false`, keep the row base neutral/striped/hovered and apply active selection only to the first-item/label region;
+  - then paint the current cell contents.
+- This structure is mandatory; do not regress to “framework background in `DrawItem`, text in `DrawSubItem`”.
+- Demo/manual acceptance must repeatedly move the mouse across `Details` rows and verify subitem text never disappears.
 
 ### Details header
 
-- Draw `ColumnHeader` background with `SurfaceSecondary`, text with theme `Text`, and separators with theme `Border`.
-- Respect inherited `HeaderStyle`, `ColumnHeader.TextAlign`, column order, native bounds, and RTL.
-- Do not add a sort glyph because native `ListView` has no framework-owned sort state in this control.
+- Draw `ColumnHeader` background with `SurfaceSecondary`, text with theme `Text`, separators with theme `Border`.
+- Respect `HeaderStyle`, `ColumnHeader.TextAlign`, display order, native bounds, and RTL.
+- Do not add a sort glyph because the framework owns no sort state.
 
 ### Images and state images
 
-- Read images from caller-owned `LargeImageList`, `SmallImageList`, and `StateImageList` according to native `View`/item indexes.
-- Use native `ListViewItem.GetBounds(ItemBoundsPortion.Icon/Label/Entire)` and event bounds as primary geometry anchors where available.
-- Never scale or mutate the caller's `ImageList.ImageSize` automatically.
-- Clip drawing to the event/client bounds and tolerate missing/invalid image indexes without throwing.
-- If `StateImageList` supplies the current state image, use it. Otherwise, when `CheckBoxes == true`, draw a lightweight framework-owned checkbox glyph from native `item.Checked` without storing check state separately.
+- Read images from caller-owned `LargeImageList`, `SmallImageList`, and `StateImageList` according to native `View` and item indexes.
+- Use native `ListViewItem.GetBounds(ItemBoundsPortion.Icon/Label/Entire)` and draw-event bounds as geometry anchors where available.
+- Never scale or mutate caller `ImageList.ImageSize` automatically.
+- Clip drawing and tolerate missing/invalid indexes without throwing.
+- If a valid caller `StateImageList`/`StateImageIndex` applies, render it.
+- Otherwise, when native checkbox presentation is valid for the current view and `CheckBoxes == true`, draw a lightweight themed checkbox glyph from `item.Checked` without storing checked state.
+- Do not fabricate checkbox visuals in a view where native `ListView` does not support them.
 
 ### Text
 
-- Use `TextRenderer` for list/header text.
-- Respect item/subitem font overrides in neutral states.
+- Use `TextRenderer`.
+- Respect effective item/subitem font according to `UseItemStyleForSubItems`.
 - Respect `ColumnHeader.TextAlign` in `Details`.
 - Use `NoPrefix` so ampersands in data are not treated as mnemonics.
-- Apply end ellipsis or wrapping according to the native view's available label region; do not let text draw over images, state icons, neighboring columns, or scrollbars.
-- Mirror horizontal text/layout flags for RTL.
+- Apply ellipsis or wrapping according to native view bounds.
+- Mirror horizontal layout/text flags for RTL.
 
 ### Group headers
 
-- V1 does not custom-paint group headers because WinForms owner-draw events do not expose them.
-- Do not disable `ShowGroups`, remove groups, copy items out of groups, or use P/Invoke custom draw to work around that limitation.
-- Demo/docs must call out that item surfaces are Bootstrap-themed while group headers remain native/system-rendered in V1.
+- V1 does not custom-paint group headers.
+- Do not disable `ShowGroups`, remove groups, copy items out of groups, or use P/Invoke custom draw to simulate group support.
+- Demo/docs explicitly state that group headers remain native/system-rendered and that group visibility itself follows native view restrictions.
 
 ---
 
 ## Internal Rendering Contract
 
-Create focused, allocation-light internal helpers rather than placing all state/color/layout decisions inline in `BootstrapListView`.
+Create focused, allocation-light internal helpers rather than placing state/color/layout decisions inline in `BootstrapListView`.
 
 ### `BootstrapListViewRenderLogic`
 
@@ -239,13 +284,17 @@ internal static class BootstrapListViewRenderLogic
 
     internal static bool ShouldUseStripe(View view, bool striped, int itemIndex);
 
+    internal static bool HasEffectiveColorOverride(Color candidate, Color inheritedColor);
+
     internal static BootstrapListViewItemPalette ResolvePalette(
         BootstrapTheme theme,
         BootstrapVariant variant,
         BootstrapListViewItemVisualState state,
         bool striped,
-        Color explicitBackColor,
-        Color explicitForeColor);
+        bool hasCallerBackColor,
+        Color callerBackColor,
+        bool hasCallerForeColor,
+        Color callerForeColor);
 }
 ```
 
@@ -256,12 +305,14 @@ Disabled
   > SelectedActive
   > SelectedInactive
   > Hovered
-  > explicit neutral item/subitem colors
+  > observable caller color override
   > striped neutral background
   > normal theme surface
 ```
 
-If `selected == true`, `controlFocused == false`, and `hideSelection == true`, resolve to neutral/hover according to the mouse rather than forcing `SelectedInactive`.
+If `selected == true`, `controlFocused == false`, and `hideSelection == true`, resolve to neutral/hover instead of `SelectedInactive`.
+
+`HasEffectiveColorOverride(candidate, inheritedColor)` compares observable effective ARGB values. It does not use `Color.Empty` as proof of caller intent.
 
 ### `BootstrapListViewLayoutLogic`
 
@@ -292,9 +343,9 @@ internal static class BootstrapListViewLayoutLogic
 Rules:
 
 - Inputs are already-native bounds whenever possible.
-- Helpers are pure and must not access control handles, global theme state, `Items`, or image lists.
-- Scale only framework-owned gaps/insets with `DpiScaler`; do not rescale native item/column bounds a second time.
-- Return empty rectangles safely when geometry collapses; no negative width/height.
+- Helpers are pure and must not access handles, global theme state, `Items`, or image lists.
+- Scale only framework-owned gaps/insets with `DpiScaler`; do not rescale native bounds a second time.
+- Return `Rectangle.Empty` safely when geometry collapses.
 
 ---
 
@@ -323,17 +374,17 @@ docs/COMPONENTS.md
 
 Responsibilities:
 
-- `BootstrapListView.cs`: native subclass, public properties, owner-draw event handling/overrides, theme/font lifecycle, hover invalidation, image/state-image drawing coordination, handle/DPI lifecycle.
-- `BootstrapListViewRenderLogic.cs`: visual state and palette resolution only.
+- `BootstrapListView.cs`: native subclass, three public appearance properties, double buffering, owner-draw routing, theme/font lifecycle, `HitTest` hover invalidation, image/state-image drawing coordination, handle/DPI lifecycle.
+- `BootstrapListViewRenderLogic.cs`: visual state, effective-color override detection, palette resolution only.
 - `BootstrapListViewLayoutLogic.cs`: deterministic rectangle/text-flag helpers only.
-- `BootstrapListViewTests.cs`: native contract, public API, lifecycle, view-mode, virtual-mode, selection/check/image/group/label-edit behavior.
-- Render/layout tests: pure logic, theme/color precedence, geometry, RTL, zero-size cases.
-- `ListViewDemoForm.cs`: integrated visual/manual verification across modes and states.
-- `docs/COMPONENTS.md`: supported contract, examples, V1 limitations.
+- `BootstrapListViewTests.cs`: native contract, public API, lifecycle, view-mode, virtual-mode restrictions/setup order, hover, selection/check/image/group/label-edit behavior.
+- Render/layout tests: pure state/palette/effective-color/geometry/RTL cases.
+- `ListViewDemoForm.cs`: integrated visual/manual verification across normal views and native virtual-mode behavior.
+- `docs/COMPONENTS.md`: supported contract, examples, view-specific native restrictions, V1 limitations.
 
 ---
 
-## Task 1: Lock the Native-Backed Public Contract with Failing Tests
+## Task 1: Lock the Native-Backed Public Contract and Buffering with Failing Tests
 
 **Files:**
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapListViewTests.cs`
@@ -341,11 +392,9 @@ Responsibilities:
 
 **Interfaces:**
 - Consumes: native `System.Windows.Forms.ListView`, existing `BootstrapVariant`.
-- Produces: `BootstrapListView`, `Variant`, `Striped`, `HoverHighlight` used by all later tasks.
+- Produces: `BootstrapListView`, `Variant`, `Striped`, `HoverHighlight`, framework-owned `OwnerDraw = true`, protected double buffering enabled.
 
-- [ ] **Step 1: Add the STA/non-parallel contract fixture and failing default/native tests.**
-
-Use the existing control-test convention:
+- [ ] **Step 1: Add STA/non-parallel default/native tests.**
 
 ```csharp
 using System;
@@ -363,10 +412,16 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapListViewTests
 {
+    private sealed class TestBootstrapListView : BootstrapListView
+    {
+        public bool DoubleBufferedForTest => DoubleBuffered;
+        public void RecreateHandleForTest() => RecreateHandle();
+    }
+
     [Test]
     public void DefaultsMatchNativeBackedContract()
     {
-        using var list = new BootstrapListView();
+        using var list = new TestBootstrapListView();
 
         Assert.Multiple((Action)(() =>
         {
@@ -375,49 +430,17 @@ public sealed class BootstrapListViewTests
             Assert.That(list.Striped, Is.False);
             Assert.That(list.HoverHighlight, Is.True);
             Assert.That(list.OwnerDraw, Is.True);
-        }));
-    }
-
-    [Test]
-    public void NativeCollectionsAndBehaviorPropertiesRemainCallerOwned()
-    {
-        using var list = new BootstrapListView
-        {
-            View = View.Details,
-            FullRowSelect = true,
-            CheckBoxes = true,
-            MultiSelect = true,
-            LabelEdit = true,
-            HeaderStyle = ColumnHeaderStyle.Clickable
-        };
-        var column = new ColumnHeader { Text = "Name", Width = 180 };
-        var group = new ListViewGroup("Group A");
-        var item = new ListViewItem("Alpha") { Group = group, Checked = true };
-
-        list.Columns.Add(column);
-        list.Groups.Add(group);
-        list.Items.Add(item);
-        item.Selected = true;
-
-        Assert.Multiple((Action)(() =>
-        {
-            Assert.That(list.Columns[0], Is.SameAs(column));
-            Assert.That(list.Groups[0], Is.SameAs(group));
-            Assert.That(list.Items[0], Is.SameAs(item));
-            Assert.That(list.SelectedItems.Contains(item), Is.True);
-            Assert.That(list.CheckedItems.Contains(item), Is.True);
-            Assert.That(list.FullRowSelect, Is.True);
-            Assert.That(list.LabelEdit, Is.True);
+            Assert.That(list.DoubleBufferedForTest, Is.True);
         }));
     }
 }
 ```
 
-- [ ] **Step 2: Add a failing reflection test that prevents API duplication/feature creep.**
+- [ ] **Step 2: Add a reflection test that prevents API duplication/feature creep.**
 
 ```csharp
 [Test]
-public void V1DoesNotDeclareAliasesOrDeferredDataStateApis()
+public void V1DeclaresOnlyBootstrapAppearanceProperties()
 {
     var declared = typeof(BootstrapListView)
         .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
@@ -433,11 +456,9 @@ public void V1DoesNotDeclareAliasesOrDeferredDataStateApis()
 }
 ```
 
-If designer-only shadowing of inherited `OwnerDraw` is later proven necessary, adjust this test deliberately and document why; do not accidentally grow the runtime API.
+- [ ] **Step 3: Add native ownership and presentation-only mutation tests.**
 
-- [ ] **Step 3: Add a failing test proving presentation property changes do not mutate native state.**
-
-Create two items, select/check one, set `Variant`, `Striped`, and `HoverHighlight`, then assert the same item objects, selection, checked state, `View`, `TopItem` where available, groups, and image-list references remain unchanged.
+Create items, columns, groups, image lists, selection and checked state in normal mode. Change `Variant`, `Striped`, and `HoverHighlight`; assert the same caller objects/references and native state remain unchanged.
 
 - [ ] **Step 4: Run focused tests and verify RED.**
 
@@ -447,9 +468,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: compile/test failure because `BootstrapListView` does not exist.
 
-- [ ] **Step 5: Implement the minimal public class skeleton.**
-
-Start with:
+- [ ] **Step 5: Implement the minimal class skeleton including double buffering.**
 
 ```csharp
 public class BootstrapListView : ListView
@@ -461,6 +480,7 @@ public class BootstrapListView : ListView
     public BootstrapListView()
     {
         OwnerDraw = true;
+        DoubleBuffered = true;
     }
 
     [Category("Appearance")]
@@ -504,27 +524,21 @@ public class BootstrapListView : ListView
 }
 ```
 
-Add matching `Description` attributes and XML docs following existing controls.
+Add matching XML docs and `Description` attributes following existing controls.
 
-- [ ] **Step 6: Run focused tests on both target frameworks.**
+- [ ] **Step 6: Run focused tests on both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapListView"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapListView"
-```
 
-Expected: PASS for the contract slice.
-
-- [ ] **Step 7: Commit the contract slice.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapListView.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapListViewTests.cs
 git commit -m "feat: add BootstrapListView native contract"
 ```
 
 ---
 
-## Task 2: Add Pure Visual-State and Layout Logic Before Painting
+## Task 2: Add Pure Visual-State, Effective-Style, and Layout Logic
 
 **Files:**
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapListViewRenderLogic.cs`
@@ -533,61 +547,39 @@ git commit -m "feat: add BootstrapListView native contract"
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapListViewLayoutLogicTests.cs`
 
 **Interfaces:**
-- Consumes: `BootstrapTheme`, `BootstrapVariant`, `BootstrapVariantColorResolver.Resolve(BootstrapThemeColors, BootstrapVariant)`, `ColorUtil.GetContrastingTextColor(...)`, native `View`/`HorizontalAlignment`.
-- Produces: `BootstrapListViewItemVisualState`, `BootstrapListViewItemPalette`, `BootstrapListViewRenderLogic`, `BootstrapListViewLayoutLogic` consumed by owner drawing.
+- Consumes: `BootstrapTheme`, `BootstrapVariant`, `ColorUtil`, native `View`/`HorizontalAlignment`.
+- Produces: pure state/palette/effective-style/layout helpers consumed by all owner drawing.
 
 - [ ] **Step 1: Write failing state-precedence tests.**
 
-Cover at least:
+Cover neutral, hovered, selected-active, selected-inactive, hidden selection, and disabled precedence.
+
+- [ ] **Step 2: Write failing stripe/effective-color tests.**
+
+Required assertions include:
 
 ```csharp
 Assert.That(
-    BootstrapListViewRenderLogic.ResolveState(true, false, true, true, false),
-    Is.EqualTo(BootstrapListViewItemVisualState.Neutral));
-
+    BootstrapListViewRenderLogic.HasEffectiveColorOverride(Color.Red, Color.White),
+    Is.True);
 Assert.That(
-    BootstrapListViewRenderLogic.ResolveState(true, true, true, true, false),
-    Is.EqualTo(BootstrapListViewItemVisualState.SelectedActive));
-
-Assert.That(
-    BootstrapListViewRenderLogic.ResolveState(true, true, false, false, false),
-    Is.EqualTo(BootstrapListViewItemVisualState.SelectedInactive));
-
-Assert.That(
-    BootstrapListViewRenderLogic.ResolveState(true, true, false, true, true),
-    Is.EqualTo(BootstrapListViewItemVisualState.Hovered));
-
-Assert.That(
-    BootstrapListViewRenderLogic.ResolveState(false, true, true, false, true),
-    Is.EqualTo(BootstrapListViewItemVisualState.Disabled));
+    BootstrapListViewRenderLogic.HasEffectiveColorOverride(Color.White, Color.White),
+    Is.False);
 ```
 
-- [ ] **Step 2: Write failing stripe and palette tests.**
-
-Assert:
+Also assert:
 
 - odd `Details`/`List` rows stripe only when enabled;
 - icon/tile modes never stripe;
-- explicit neutral colors override stripe;
-- selected active uses `BootstrapVariantColorResolver.Resolve(...)`;
-- selection foreground uses `ColorUtil.GetContrastingTextColor(...)`;
+- observable differing caller colors override neutral stripes;
+- an effective color equal to the inherited list color is treated as inherited;
+- selected active uses `BootstrapVariantColorResolver.Resolve(...)` and contrasting text;
 - disabled uses muted text;
 - inactive selection differs from active selection.
 
 - [ ] **Step 3: Write failing geometry/text-flag tests.**
 
-Cover:
-
-```csharp
-[TestCase(View.Details, true)]
-[TestCase(View.List, true)]
-[TestCase(View.SmallIcon, false)]
-[TestCase(View.LargeIcon, false)]
-[TestCase(View.Tile, false)]
-public void FullRowFocusUsesEntireItemOnlyForRowOrientedViews(View view, bool expected)
-```
-
-Also test zero/negative-collapse safety, RTL text flags, left/center/right header alignment, tile text rectangles on both LTR and RTL, and `Deflate` clamping to `Rectangle.Empty` rather than returning negative dimensions.
+Cover row-oriented focus, icon/tile focus, zero/negative collapse, RTL, left/center/right header alignment, and tile text rectangles.
 
 - [ ] **Step 4: Run pure tests and verify RED.**
 
@@ -595,53 +587,43 @@ Also test zero/negative-collapse safety, RTL text flags, left/center/right heade
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapListViewRenderLogic|FullyQualifiedName~BootstrapListViewLayoutLogic"
 ```
 
-- [ ] **Step 5: Implement the exact internal contracts from this plan.**
+- [ ] **Step 5: Implement the exact helper contracts in this plan.**
 
-Keep helpers pure. Use `Color.Empty` to mean “no explicit caller color” and do not access `BootstrapThemeManager.CurrentTheme` from the helpers; pass the theme explicitly.
+Do not use reflection to access internal WinForms style flags. Do not use `Color.Empty` as evidence that a caller did or did not explicitly assign a public color.
 
-- [ ] **Step 6: Run pure tests on both TFMs.**
+- [ ] **Step 6: Run pure tests on both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapListViewRenderLogic|FullyQualifiedName~BootstrapListViewLayoutLogic"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapListViewRenderLogic|FullyQualifiedName~BootstrapListViewLayoutLogic"
-```
 
-- [ ] **Step 7: Commit the pure rendering foundation.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapListViewRenderLogic.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapListViewLayoutLogic.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapListViewRenderLogicTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapListViewLayoutLogicTests.cs
 git commit -m "test: define BootstrapListView rendering contract"
 ```
 
 ---
 
-## Task 3: Implement Theme/Font Lifecycle and `Details` Owner Drawing
+## Task 3: Implement Theme/Font Lifecycle and Win32-Safe `Details` Owner Drawing
 
 **Files:**
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapListView.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapListViewTests.cs`
 
 **Interfaces:**
-- Consumes: Task 2 render/layout helpers, `BootstrapThemeManager`, `DpiScaler`.
-- Produces: production owner drawing for `View.Details`, shared theme/font lifecycle used by every view.
+- Consumes: Task 2 helpers, `BootstrapThemeManager`, `DpiScaler`.
+- Produces: production `Details` rendering that never mixes framework row-background painting in `DrawItem` with framework text painting in `DrawSubItem`.
 
-- [ ] **Step 1: Add failing runtime-theme and font-lifecycle tests.**
+- [ ] **Step 1: Add failing runtime-theme/font/handle tests.**
 
-Use the same pattern as `BootstrapDataGridViewTests`:
+Use the same ownership pattern as `BootstrapDataGridViewTests`: Light/Dark updates, caller font takeover, safe disposal, handle recreation, `OwnerDraw` remains true, and caller data survives.
 
-- construct under Light theme and assert `BackColor`/`ForeColor` use theme tokens;
-- switch to Dark and assert presentation updates;
-- set a custom caller font, switch themes, and assert the framework no longer overwrites the caller font;
-- dispose the control, switch theme again, and assert no exception/event leak;
-- recreate the handle and assert `OwnerDraw` remains active without losing items/selection.
+- [ ] **Step 2: Add a test seam that proves `Details` framework painting is subitem-centric.**
 
-- [ ] **Step 2: Add test seams for deterministic drawing without pixel snapshots.**
-
-Prefer testing pure state/layout and native contract. Where the control must prove event routing, create a test subclass that invokes protected lifecycle methods or attaches to inherited draw events; do not introduce public debug APIs solely for tests.
+Use a test subclass with protected-method wrappers and counters in private/protected test-only overrides. The test must prove that invoking the `Details` item path does not execute framework row background painting, while column-0 subitem drawing owns the row-background path. Do not add public diagnostic APIs to production code.
 
 - [ ] **Step 3: Implement theme subscription and theme-font ownership.**
 
-Mirror the proven `BootstrapDataGridView` lifecycle pattern:
+Mirror the existing framework lifecycle pattern:
 
 ```csharp
 private bool _themeSubscribed;
@@ -650,85 +632,94 @@ private bool _useThemeFont = true;
 private Font? _themeFont;
 ```
 
-Constructor:
+Subscribe once, apply theme/font, release only framework-owned font, and unsubscribe exactly once in `Dispose(bool)`.
+
+- [ ] **Step 4: Implement the mandatory `Details` event-routing workaround.**
 
 ```csharp
-BootstrapThemeManager.ThemeChanged += OnThemeChanged;
-_themeSubscribed = true;
-ApplyThemeFont();
-ApplyTheme();
+protected override void OnDrawItem(DrawListViewItemEventArgs e)
+{
+    if (View == View.Details)
+    {
+        // No framework Details painting here. This avoids the documented
+        // Win32 DrawItem-without-DrawSubItem hover repaint bug.
+        base.OnDrawItem(e);
+        return;
+    }
+
+    DrawNonDetailsItem(e);
+    base.OnDrawItem(e);
+}
 ```
 
-`OnFontChanged` marks theme-font ownership off only for caller-driven font changes. `Dispose(bool)` unsubscribes and disposes only `_themeFont`.
+`OnDrawColumnHeader` renders the framework header and then preserves the inherited event contract.
 
-- [ ] **Step 4: Wire `DrawColumnHeader`, `DrawItem`, and `DrawSubItem` for `Details`.**
+`OnDrawSubItem` performs all framework `Details` row/cell painting and then preserves the inherited event contract.
 
-Use protected overrides when available (`OnDrawColumnHeader`, `OnDrawItem`, `OnDrawSubItem`) rather than subscribing the control to its own public events.
+- [ ] **Step 5: Paint the `Details` row/base background only from column 0.**
 
-Header renderer must:
+When `e.ColumnIndex == 0`:
 
-- fill `SurfaceSecondary`;
-- draw theme border separators;
-- use `ColumnHeader.TextAlign` plus RTL-aware `TextRenderer` flags;
-- honor event clipping and zero-sized bounds;
-- avoid sort glyphs and custom header hit-testing.
+1. resolve native item state;
+2. obtain native complete row/item bounds;
+3. paint the base neutral/stripe/hover/inactive-selection background once;
+4. if `FullRowSelect == true` and selection is visible, apply selection to the full row;
+5. if `FullRowSelect == false`, keep the full row base neutral/stripe/hover and reserve active selection treatment for the first label/item region.
 
-- [ ] **Step 5: Render `Details` row backgrounds with native semantics.**
+For later columns, never repaint the full row background.
 
-For each item:
+- [ ] **Step 6: Paint `Details` cell content and effective styles.**
 
-1. Resolve active/inactive/hidden selection from `item.Selected`, `Focused`, `HideSelection`.
-2. Resolve hover from framework hover bookkeeping only.
-3. Apply `Striped` only for neutral odd rows.
-4. Respect explicit item background in neutral state.
-5. If `FullRowSelect == true`, fill the row visual across event/native row bounds.
-6. If `FullRowSelect == false`, do not turn all subitems into a selected row visual; confine selection treatment to the native label/first-item selection region.
+For the first cell:
 
-- [ ] **Step 6: Render `Details` subitems.**
+- resolve state image/native checkbox applicability;
+- resolve small image;
+- draw first-item text within native label/cell bounds.
 
-For subitem index 0:
+For later cells:
 
-- reserve/draw state image or checkbox if present;
-- reserve/draw small image if present;
-- draw item text using item/subitem font/color precedence.
-
-For other subitems:
-
-- use `DrawListViewSubItemEventArgs.Bounds` as the cell anchor;
+- choose effective style source with `UseItemStyleForSubItems`;
+- compare effective colors to `BackColor`/`ForeColor` using `HasEffectiveColorOverride`;
 - respect `ColumnHeader.TextAlign`;
-- respect `UseItemStyleForSubItems` and explicit subitem styles;
-- clip to cell bounds;
-- use `NoPrefix | EndEllipsis | VerticalCenter` and RTL flags.
+- use `NoPrefix | EndEllipsis | VerticalCenter` plus RTL flags;
+- clip to the cell bounds.
 
-- [ ] **Step 7: Implement themed checkbox fallback without state duplication.**
-
-Rules:
+- [ ] **Step 7: Implement state-image/checkbox rendering without state duplication.**
 
 ```text
-if valid caller StateImageList + StateImageIndex:
-    draw caller state image
-else if CheckBoxes:
-    draw framework checkbox glyph from item.Checked
-else:
-    draw no state glyph
+valid caller StateImageList + StateImageIndex
+    => draw caller state image
+else native checkbox presentation valid for current view && CheckBoxes
+    => draw themed glyph from item.Checked
+else
+    => no framework state glyph
 ```
 
-The fallback glyph uses theme border/surface and the resolved variant accent when checked. It must read `item.Checked` only; never write it during paint.
+Never write `item.Checked` during painting.
 
-- [ ] **Step 8: Implement `GridLines`-aware separators only after manual verification.**
+- [ ] **Step 8: Verify grid-line behavior before adding custom separators.**
 
-First verify whether native grid lines remain visible under owner drawing on both TFMs. If native lines are already correct, do not double-draw. If owner draw requires framework separators, draw theme `Border` lines only when `GridLines == true` and add a regression test around the chosen behavior. The goal is semantic preservation, not forcing custom lines unconditionally.
+Run both TFMs with `GridLines = true/false`. If native lines remain correct under the chosen owner-draw path, do not double-draw. If framework separators are required, draw theme `Border` lines only when `GridLines == true` and add a focused regression test.
 
-- [ ] **Step 9: Run focused tests on both TFMs.**
+- [ ] **Step 9: Add a manual regression entry for the Win32 hover repaint bug.**
+
+The demo checklist must include:
+
+```text
+Details Win32 owner-draw regression:
+- populate 3+ columns and 20+ rows
+- move mouse repeatedly across every part of several rows
+- move between selected, hovered, and neutral rows
+- repeat with FullRowSelect true and false
+- subitem text/images must never disappear or be covered by a late row background
+```
+
+- [ ] **Step 10: Run focused tests on both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapListView"
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net48 --filter "FullyQualifiedName~BootstrapListView"
-```
 
-- [ ] **Step 10: Commit `Details` rendering.**
-
-```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapListView.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapListViewTests.cs
 git commit -m "feat: theme BootstrapListView details view"
 ```
@@ -744,18 +735,14 @@ git commit -m "feat: theme BootstrapListView details view"
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapListViewLayoutLogicTests.cs`
 
 **Interfaces:**
-- Consumes: `DrawItem`, native `ListViewItem.GetBounds(ItemBoundsPortion...)`, image lists, Task 2/3 palette rules.
-- Produces: complete owner drawing for all five native `View` values.
+- Consumes: non-Details `DrawItem`, native `GetBounds(...)`, image lists, Task 2/3 palette rules.
+- Produces: complete owner drawing for all five **normal** native `View` values.
 
-- [ ] **Step 1: Add a failing five-view smoke test.**
+- [ ] **Step 1: Add a five-view normal-mode smoke test.**
 
-For each `View` value, create a handle with at least two items, images where applicable, one selected item, and call `DrawToBitmap` or the safest existing test harness supported by the repository. Assert no exception and that native `View`, item count, selection, and image-list references remain unchanged after drawing.
+For each `View`, create a handle with items/images and render through the safest existing harness. Assert no exception and that `View`, item count, selection, and image-list references remain unchanged by Bootstrap drawing.
 
-Do not make fragile per-pixel color assertions for Windows-native text/image rendering.
-
-- [ ] **Step 2: Implement shared item-bound anchoring.**
-
-Use:
+- [ ] **Step 2: Anchor geometry to native bounds.**
 
 ```csharp
 var entire = item.GetBounds(ItemBoundsPortion.Entire);
@@ -763,56 +750,27 @@ var icon = item.GetBounds(ItemBoundsPortion.Icon);
 var label = item.GetBounds(ItemBoundsPortion.Label);
 ```
 
-Treat these as authoritative geometry. Use `DrawListViewItemEventArgs.Bounds` as the clipping/event region. Only calculate framework gaps around those native anchors.
+Only calculate framework gaps around these native anchors.
 
 - [ ] **Step 3: Implement `View.List`.**
 
-- fill neutral/stripe/hover/selection background;
-- draw state/checkbox and small image without overlapping the native label region;
-- draw single-line text with ellipsis;
-- apply `Striped` here;
-- preserve horizontal list scrolling and native hit regions.
+Apply neutral/stripe/hover/selection, small image, single-line label, native scrolling/hit regions. Do not simulate group headers because native `List` does not display groups.
 
-- [ ] **Step 4: Implement `View.SmallIcon`.**
+- [ ] **Step 4: Implement `View.SmallIcon` and `View.LargeIcon`.**
 
-- draw small image using the caller image list;
-- draw label beside native icon bounds;
-- no stripe treatment;
-- selection/hover follows item/label bounds rather than pretending it is a full-width row.
+Use caller image lists and native icon/label bounds; no stripes; preserve native selection/focus geometry.
 
-- [ ] **Step 5: Implement `View.LargeIcon`.**
+- [ ] **Step 5: Implement `View.Tile`.**
 
-- draw large image centered in/around native icon bounds;
-- draw label using native label bounds with centered, wrapping text consistent with the native large-icon layout;
-- no stripe treatment;
-- focus cue follows label/item geometry;
-- tolerate long labels and partially clipped icon rows.
+Render primary text plus visible subitem lines from `DrawItem`; `DrawSubItem` is not used. Use `TileSize`, native item/icon bounds, columns, RTL-aware tile layout, clipping, and `MutedText` for secondary lines unless an observable effective caller foreground differs from the inherited list foreground.
 
-- [ ] **Step 6: Implement `View.Tile`.**
+Do not draw framework checkbox fallback in `Tile` merely because `CheckBoxes` is true; follow native view capability.
 
-Because `DrawSubItem` is not the tile renderer:
+- [ ] **Step 6: Add missing/invalid-image tests.**
 
-- render primary item text plus visible subitem lines from `DrawItem`;
-- use `TileSize`, event/item bounds, native icon bounds, `Columns`, and `BootstrapListViewLayoutLogic.GetTileTextBounds(...)`;
-- keep primary text visually stronger only if this can be done with the existing item font without synthesizing/leaking per-frame fonts; otherwise use one font and theme color hierarchy;
-- use `MutedText` for secondary lines unless the caller supplied an explicit subitem foreground;
-- clip the number of rendered lines to available tile height;
-- no stripe treatment.
+Cover `ImageIndex == -1`, missing `ImageKey`, index beyond list count, absent image list, runtime image-list replacement, and caller disposal/replacement according to normal WinForms ownership.
 
-- [ ] **Step 7: Add missing/invalid-image regression tests.**
-
-Cover:
-
-- `ImageIndex == -1`;
-- `ImageKey` not found;
-- image index beyond list count;
-- no image list;
-- caller replaces an image list at runtime;
-- caller disposes/replaces an image list according to normal WinForms ownership rules.
-
-Rendering must skip missing images without throwing or changing item state.
-
-- [ ] **Step 8: Run focused tests on both TFMs and commit.**
+- [ ] **Step 7: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapListView"
@@ -824,29 +782,23 @@ git commit -m "feat: render all BootstrapListView view modes"
 
 ---
 
-## Task 5: Preserve Hover, Focus, Virtual Mode, Groups, Label Editing, and Native Interaction
+## Task 5: Preserve Hover, Virtual Mode, Groups, Label Editing, and Native Interaction
 
 **Files:**
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapListView.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapListViewTests.cs`
 
 **Interfaces:**
-- Consumes: native mouse/focus/virtual/group/edit APIs.
+- Consumes: native `HitTest`, focus, virtual, group, edit, selection APIs.
 - Produces: interaction-safe presentation bookkeeping with no duplicate behavior model.
 
-- [ ] **Step 1: Add failing hover-is-presentation-only tests.**
+- [ ] **Step 1: Add hover-is-presentation-only tests for all five normal views.**
 
-Use a test subclass to expose mouse methods if necessary. Move the pointer from item A to item B and then outside; assert:
+For `Details`, `List`, `SmallIcon`, `LargeIcon`, and `Tile`, use a test subclass to exercise mouse movement. Assert selection, checked state, `FocusedItem`, `HotTracking`, `HoverSelection`, and `Activation` are unchanged by framework hover bookkeeping.
 
-- selection does not change;
-- checked state does not change;
-- `FocusedItem` is not reassigned by hover code;
-- `HotTracking`, `HoverSelection`, and `Activation` remain exactly as the caller set them;
-- disabling `HoverHighlight` clears framework hover painting state without mutating native item state.
+- [ ] **Step 2: Implement hover with `HitTest`, never `GetItemAt`.**
 
-- [ ] **Step 2: Implement allocation-light hover bookkeeping.**
-
-Keep only what is needed to repaint:
+Keep only:
 
 ```csharp
 private int _hoveredItemIndex = -1;
@@ -854,67 +806,81 @@ private int _hoveredItemIndex = -1;
 
 On mouse move:
 
-1. use native `GetItemAt(e.X, e.Y)`;
-2. compare its current `Index` with `_hoveredItemIndex`;
-3. invalidate old/new item rectangles using native bounds;
-4. never call selection/focus/check APIs.
+```csharp
+var hit = HitTest(e.X, e.Y);
+var index = hit.Item?.Index ?? -1;
+```
 
-On mouse leave, clear the index and invalidate the old item. Handle virtual mode and handle recreation defensively; if an index becomes invalid, fall back to `Invalidate()` rather than throwing.
+Compare with `_hoveredItemIndex`, invalidate old/new native item rectangles, and never call selection/focus/check APIs. On mouse leave, clear the index. If virtual-size/handle changes make a stored index invalid, clear it and fall back to `Invalidate()` rather than caching item references.
 
-- [ ] **Step 3: Add failing virtual-mode tests.**
+- [ ] **Step 3: Add a failing test that locks virtual-mode setup order.**
 
-Create:
+Use the correct sequence:
 
 ```csharp
 using var list = new BootstrapListView
 {
     VirtualMode = true,
-    VirtualListSize = 1000,
     View = View.Details
 };
+
 list.Columns.Add("Name", 180);
 list.RetrieveVirtualItem += (_, e) =>
     e.Item = new ListViewItem($"Item {e.ItemIndex}");
+list.VirtualListSize = 1000;
 ```
 
-Assert handle creation/render smoke tests do not require a populated normal `Items` collection, do not change `VirtualListSize`, and preserve the caller's `RetrieveVirtualItem` event ownership.
+Assert positive `VirtualListSize` succeeds because `RetrieveVirtualItem` is already handled.
 
-Add a separate test changing `VirtualListSize` at runtime and ensure Bootstrap code does not cache stale item references/indexes.
+Also add a native-contract test demonstrating the unsupported ordering throws on the platform/runtime under test; Bootstrap must not hide that native exception.
 
-- [ ] **Step 4: Add group-preservation tests.**
+- [ ] **Step 4: Add virtual-mode restriction/coercion tests.**
 
-With `ShowGroups = true`, multiple groups, and grouped items:
+Cover:
 
-- assert groups/items remain the exact same objects after theme/Variant changes;
-- assert no framework code disables `ShowGroups`;
-- assert owner drawing item surfaces does not remove/reassign groups;
-- manual demo verification records that group headers are native/system-rendered in V1.
+```csharp
+using var list = new BootstrapListView { View = View.Tile };
+list.VirtualMode = true;
+Assert.That(list.View, Is.EqualTo(View.LargeIcon));
+```
 
-- [ ] **Step 5: Add label-edit preservation tests.**
+Do not assign `VirtualListSize > 0` in that coercion test.
 
-Verify `LabelEdit = true` remains enabled through theme changes/handle recreation and Bootstrap code does not manually raise `BeforeLabelEdit`/`AfterLabelEdit`. Where automated edit UI is too environment-sensitive, test property/event ownership and cover actual editing manually in the demo matrix.
+With a properly configured positive virtual list, assert Bootstrap code:
 
-- [ ] **Step 6: Add keyboard/native-selection manual contract checks to the demo checklist, not custom key handlers.**
+- does not access/enumerate normal `Items`, `SelectedItems`, or `CheckedItems` in paint/hover paths;
+- preserves `VirtualListSize`;
+- uses no shadow item collection;
+- accepts `SelectedIndices`/`CheckedIndices` as the native index-based access path;
+- does not force a coerced `LargeIcon` view back to `Tile`.
 
-No `ProcessCmdKey`, `OnKeyDown`, or message filter should be added unless a reproducible owner-draw regression proves native behavior is broken. Required manual checks:
+- [ ] **Step 5: Add runtime `VirtualListSize` change tests.**
+
+Change `VirtualListSize` after the handler is installed and ensure framework hover/paint code does not retain stale virtual item references or out-of-range indexes.
+
+- [ ] **Step 6: Add group-preservation/view-restriction tests.**
+
+With `ShowGroups = true`, verify groups/items remain the same objects across theme/Variant changes. In a native view that displays groups, confirm Bootstrap does not disable/reassign them. Switch to `View.List` and assert Bootstrap does not invent group rendering or mutate membership to compensate for the native view restriction.
+
+- [ ] **Step 7: Add label-edit/focus/native-keyboard preservation coverage.**
+
+Verify `LabelEdit` survives theme/handle changes and Bootstrap does not raise edit events manually. Do not add `ProcessCmdKey`, `OnKeyDown`, or a message filter unless a reproducible owner-draw regression proves native behavior is broken.
+
+Manual checks:
 
 ```text
 Up / Down / Left / Right as appropriate to view
 Home / End
 PageUp / PageDown
 Ctrl+click and Shift+click with MultiSelect
-Space with CheckBoxes
+Space with CheckBoxes where supported
 F2 / label edit when LabelEdit=true
 Enter / ItemActivate according to Activation
 Tab into and out of the ListView
 Context menu keyboard invocation
 ```
 
-- [ ] **Step 7: Add focus/HideSelection regression tests.**
-
-Pure render-logic tests cover color state; control tests must prove toggling focus/HideSelection does not change selected item objects or event semantics.
-
-- [ ] **Step 8: Run tests and commit.**
+- [ ] **Step 8: Run both TFMs and commit.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -f net8.0-windows --filter "FullyQualifiedName~BootstrapListView"
@@ -926,7 +892,7 @@ git commit -m "test: harden BootstrapListView native interaction"
 
 ---
 
-## Task 6: DPI, RTL, Handle-Recreation, Resource, and Performance Hardening
+## Task 6: DPI, RTL, Handle Recreation, Resource, Flicker, and Performance Hardening
 
 **Files:**
 - Modify: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapListView.cs`
@@ -936,66 +902,45 @@ git commit -m "test: harden BootstrapListView native interaction"
 
 **Interfaces:**
 - Consumes: existing DPI/theme infrastructure.
-- Produces: stable rendering across DPI/theme/RTL/lifecycle scenarios without leaks or state mutation.
+- Produces: stable rendering across DPI/theme/RTL/lifecycle scenarios without leaks, flicker-prone framework choices, or state mutation.
 
-- [ ] **Step 1: Add DPI-scaling tests for framework-owned measurements only.**
+- [ ] **Step 1: Add DPI tests for framework-owned measurements only.**
 
-Use `DpiScaler.Scale(...)` through deterministic layout inputs for 96, 120, 144, 168, and 192 DPI. Assert:
-
-- gaps/insets scale monotonically;
-- native bounds passed to helpers are not scaled a second time;
-- zero-size and narrow columns safely collapse;
-- checkbox/vector-glyph size uses DPI-aware framework metrics;
-- image-list dimensions are not changed.
+Use 96, 120, 144, 168, 192 DPI. Scale framework gaps/vector glyph metrics only; never scale native item/column bounds a second time and never resize caller image lists.
 
 - [ ] **Step 2: Handle runtime DPI changes.**
 
-Override the same DPI lifecycle hook used elsewhere in the repository (`OnDpiChangedAfterParent` where available in the shared target surface), invalidate cached framework-owned geometry only, then repaint. Do not resize caller image lists or change native `TileSize`, column widths, or item positions behind the caller's back.
+Use the same shared-target DPI lifecycle hook as existing controls. Invalidate framework-owned cached measurements only. Do not change caller `TileSize`, column widths, image-list size, or native item positions.
 
 - [ ] **Step 3: Add RTL tests.**
 
-Test pure text/layout flags and a handle-level smoke scenario with:
-
-```csharp
-RightToLeft = RightToLeft.Yes,
-RightToLeftLayout = true
-```
-
-for `Details`, `List`, and `Tile`. Assert no state mutation and no exception. Demo must visually verify state image/icon/text order mirrors correctly.
+Test pure layout/text flags plus handle-level `RightToLeft = Yes` and `RightToLeftLayout = true` in `Details`, `List`, and `Tile` normal mode.
 
 - [ ] **Step 4: Add handle-recreation tests.**
 
-Exercise native properties known to recreate or materially update the handle when practical, plus explicit `RecreateHandle()` from a test subclass. Assert:
+Assert caller items/columns/groups/selection/check state/image-list references survive according to native behavior, `OwnerDraw` remains enabled, `DoubleBufferedForTest` remains true, hover index does not become stale, and theme subscription is not duplicated.
 
-- items/columns/groups remain caller-owned;
-- selected/checked state remains native;
-- image-list references remain caller-owned;
-- `OwnerDraw`/framework rendering continues;
-- theme subscription is not duplicated.
-
-Do not add a parallel state cache to “restore” native behavior that WinForms itself intentionally changes during a handle recreation.
-
-- [ ] **Step 5: Audit GDI allocations inside draw paths.**
+- [ ] **Step 5: Audit GDI allocations and flicker behavior.**
 
 Rules:
 
+- `DoubleBuffered` remains true;
 - use `TextRenderer` rather than allocating `StringFormat` per cell;
-- create `Pen`/`Brush` only when an existing static/control-paint path cannot express the visual, and wrap them in `using`;
+- dispose framework `Pen`/`Brush` objects immediately;
 - do not allocate a new `Font` per item/tile line;
 - do not clone images;
-- do not build LINQ collections inside per-item paint events;
-- do not enumerate all items merely to render one item.
+- do not build LINQ collections inside paint events;
+- do not enumerate all items to render one item;
+- do not reintroduce `Details` framework row-background painting in `OnDrawItem`.
 
-- [ ] **Step 6: Add a large-list performance smoke scenario.**
-
-Demo/test harness should include at least:
+- [ ] **Step 6: Add large-list performance smoke scenarios.**
 
 ```text
-Normal mode: 5,000 items in Details
-Virtual mode: VirtualListSize = 100,000
+Normal Details: 5,000 items
+Virtual Details: RetrieveVirtualItem handler installed first, then VirtualListSize = 100,000
 ```
 
-The purpose is to catch O(n)-per-paint framework code, not to assert machine-specific millisecond thresholds in unit tests.
+The purpose is to catch O(n)-per-paint framework code, not to assert machine-specific timing thresholds.
 
 - [ ] **Step 7: Run focused and full tests on both TFMs.**
 
@@ -1028,47 +973,46 @@ git commit -m "fix: harden BootstrapListView rendering lifecycle"
 
 - [ ] **Step 1: Build `ListViewDemoForm` with explicit scenario sections.**
 
-The demo must expose at least:
-
 ```text
 1. Details
-   - columns/subitems
+   - 3+ columns / many subitems
    - FullRowSelect on/off
    - GridLines on/off
    - Striped on/off
    - CheckBoxes
    - image + state image
    - MultiSelect
+   - dedicated repeated-hover regression scenario
 
 2. List / SmallIcon / LargeIcon / Tile
-   - view switcher
+   - normal-mode view switcher
    - long labels
    - image lists
    - selection + hover + focus
+   - native view restrictions demonstrated rather than hidden
 
 3. Groups
-   - 2+ groups
-   - explicit note that group headers are native-rendered in V1
+   - 2+ groups in a native group-capable view
+   - switch to List to demonstrate that Bootstrap does not fake group rendering
+   - explicit note that group headers remain native-rendered in V1
 
 4. Virtual Mode
-   - VirtualListSize = 100000
-   - RetrieveVirtualItem implementation
+   - set VirtualMode = true
+   - install RetrieveVirtualItem handler
+   - then set VirtualListSize = 100000
+   - show/document Tile -> LargeIcon native coercion
    - scroll/search smoke check
 
 5. Runtime / lifecycle
    - Variant selector
-   - Light/Dark through the integrated global theme switch
+   - Light/Dark through integrated theme switch
    - enabled/disabled
    - HideSelection on/off
-   - RTL toggle where the demo architecture permits it
+   - RTL toggle
    - label editing
 ```
 
-Use native controls for demo-only toggles unless an existing Bootstrap control is clearly appropriate. Do not add production APIs just to simplify the demo.
-
 - [ ] **Step 2: Add the page to `MainForm.ConfigurePages()`.**
-
-Place it near `DataGrid`/other data presentation controls:
 
 ```csharp
 AddPage(
@@ -1079,19 +1023,24 @@ AddPage(
 
 - [ ] **Step 3: Document `BootstrapListView` in `docs/COMPONENTS.md`.**
 
-Include:
+Document:
 
-- direct inheritance from `ListView`;
-- V1 public properties `Variant`, `Striped`, `HoverHighlight`;
-- all five supported native views;
-- preserved native collections/events/virtual mode;
-- caller ownership of image lists/items/columns/groups;
-- `Striped` only affects `Details`/`List`;
-- group headers remain native-rendered in V1;
-- no V1 `BorderRadius`, loading/empty-state overlay, custom sort state, or custom group-header renderer;
-- short usage example.
+- direct `ListView` inheritance;
+- `Variant`, `Striped`, `HoverHighlight`;
+- `DoubleBuffered` enabled internally;
+- all five normal views;
+- `Details` Win32 owner-draw workaround implemented internally;
+- hover uses native `HitTest`;
+- `Striped` only in `Details`/`List`;
+- effective-style limitation: exact same-color explicit assignment is indistinguishable from inheritance;
+- virtual-mode setup order: handler before positive size;
+- virtual-mode invalid collections and index-based selection/check access;
+- Tile-to-LargeIcon native coercion under virtual mode;
+- native group/view restrictions;
+- caller ownership of items/columns/groups/image lists;
+- no V1 rounded border, loading/empty overlay, custom sort state, custom group-header renderer.
 
-Use an example such as:
+Normal-mode example:
 
 ```csharp
 var list = new BootstrapListView
@@ -1109,41 +1058,59 @@ list.Columns.Add("Name", 240);
 list.Items.Add(new ListViewItem(new[] { "P-001", "Northwind Widget" }));
 ```
 
-- [ ] **Step 4: Execute the manual acceptance matrix.**
+Virtual-mode example with correct ordering:
 
-Verify on both a .NET 8 demo run and the `net48` build/runtime path used by the repository:
+```csharp
+var list = new BootstrapListView
+{
+    Dock = DockStyle.Fill,
+    View = View.Details,
+    VirtualMode = true
+};
+
+list.Columns.Add("Name", 240);
+list.RetrieveVirtualItem += (_, e) =>
+    e.Item = new ListViewItem($"Item {e.ItemIndex}");
+list.VirtualListSize = 100000;
+```
+
+- [ ] **Step 4: Execute the manual acceptance matrix.**
 
 ```text
 [ ] Light theme
 [ ] Dark theme
 [ ] 96 DPI
-[ ] 144 DPI or 150% Windows scaling
-[ ] 192 DPI or 200% Windows scaling where available
+[ ] 144 DPI / 150%
+[ ] 192 DPI / 200% where available
 [ ] Details
 [ ] List
 [ ] SmallIcon
 [ ] LargeIcon
-[ ] Tile
+[ ] Tile normal mode
 [ ] FullRowSelect true / false
 [ ] GridLines true / false
-[ ] CheckBoxes and StateImageList
+[ ] CheckBoxes where native view supports them
+[ ] StateImageList
 [ ] MultiSelect Ctrl/Shift
-[ ] Groups
-[ ] VirtualMode
+[ ] Groups in supported view
+[ ] List view does not fake groups
+[ ] VirtualMode with handler installed before positive VirtualListSize
+[ ] Virtual Tile coercion accepted, not reversed
 [ ] LabelEdit
 [ ] Keyboard navigation
 [ ] Tab into/out of control
-[ ] Hover without selection mutation
+[ ] Hover works in every normal view without selection mutation
+[ ] Details repeated-hover text-disappearance regression passes
 [ ] HideSelection true / false
 [ ] Disabled state
 [ ] Runtime Variant switch
 [ ] Runtime Light/Dark switch
 [ ] RTL
-[ ] Rapid view switches
+[ ] Rapid normal-view switches
 [ ] Form close/disposal with no exception
 ```
 
-- [ ] **Step 5: Build the demo and commit docs/demo.**
+- [ ] **Step 5: Build demo and commit docs/demo.**
 
 ```powershell
 dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.Demo.csproj -f net8.0-windows -c Debug
@@ -1158,15 +1125,15 @@ git commit -m "docs: add BootstrapListView demo and guidance"
 
 **Files:**
 - Review all files created/modified by Tasks 1–7.
-- Modify only files required to fix findings.
+- Modify only the concrete ListView files that contain an actual finding.
 
 **Interfaces:**
 - Consumes: complete implementation.
 - Produces: release-ready `BootstrapListView` slice.
 
-- [ ] **Step 1: Perform an API-surface review.**
+- [ ] **Step 1: Perform API-surface review.**
 
-Confirm `BootstrapListView` declares only the intended V1 public properties:
+Confirm the only declared public V1 properties are:
 
 ```text
 Variant
@@ -1174,11 +1141,9 @@ Striped
 HoverHighlight
 ```
 
-Inherited native APIs remain the way callers manipulate items, columns, groups, selection, checks, images, virtual mode, sorting, label editing, drag/drop, keyboard, and accessibility.
+- [ ] **Step 2: Search for forbidden parallel state and corrected-plan regressions.**
 
-- [ ] **Step 2: Search for forbidden parallel state/feature creep.**
-
-Search the implementation for accidental additions resembling:
+Search for accidental additions/usages resembling:
 
 ```text
 _customItems
@@ -1194,22 +1159,26 @@ BorderRadius
 Thread.Sleep
 Task.Delay
 Timer
+GetItemAt(
+Color.Empty // when used as caller-style intent sentinel
 ```
 
-Any state required purely for hover/theme/font ownership is acceptable; parallel data/selection state is not.
+Also inspect `OnDrawItem` and verify the `Details` branch performs no framework background/content painting.
 
-- [ ] **Step 3: Verify resource/lifecycle ownership.**
+- [ ] **Step 3: Verify virtual-mode implementation mechanically.**
 
 Confirm:
 
-- theme event unsubscribed exactly once;
-- framework theme font disposed exactly once;
-- no caller font/image/image-list disposed;
-- no per-item GDI leak;
-- no self-subscribed draw/mouse handler duplicated after handle recreation;
-- no timer/message filter remains after disposal.
+- no paint/hover code enumerates `Items`, `SelectedItems`, or `CheckedItems` while virtual mode is active;
+- no framework code sets a positive `VirtualListSize` before the caller/demo has installed `RetrieveVirtualItem`;
+- no framework code restores `Tile` after native virtual-mode coercion;
+- hover stores only an index, not a virtual `ListViewItem` reference.
 
-- [ ] **Step 4: Run final builds/tests.**
+- [ ] **Step 4: Verify resource/lifecycle ownership.**
+
+Confirm theme event unsubscription, framework-font disposal, no caller resource disposal, no per-item GDI leak, no duplicate self-subscription, no timer/message filter, and double buffering remains enabled after handle recreation.
+
+- [ ] **Step 5: Run final builds/tests.**
 
 ```powershell
 dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -f net8.0-windows -c Release
@@ -1223,7 +1192,7 @@ dotnet build demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MyDmsVn.Bootstrap5WinFormUI.D
 
 Expected: all commands succeed with no new warnings attributable to `BootstrapListView`.
 
-- [ ] **Step 5: Review the final diff for accidental unrelated changes.**
+- [ ] **Step 6: Review final diff.**
 
 ```powershell
 git status --short
@@ -1231,18 +1200,17 @@ git diff --stat
 git diff --check
 ```
 
-Only intended ListView implementation/tests/demo/docs changes should remain.
+Only intended `BootstrapListView` implementation/tests/demo/docs changes should remain.
 
-- [ ] **Step 6: Commit any final hardening fix separately.**
+- [ ] **Step 7: Commit a final hardening fix only if Task 8 changed concrete files.**
 
-Example only when a real finding exists:
+If Task 8 finds and fixes an implementation defect, stage exactly the corrected ListView files and commit:
 
 ```powershell
-git add <files-fixed-after-review>
 git commit -m "fix: finalize BootstrapListView compatibility"
 ```
 
-Do not create an empty “finalize” commit if Task 8 finds nothing.
+Do not create an empty final commit.
 
 ---
 
@@ -1253,35 +1221,48 @@ Do not create an empty “finalize” commit if Task 8 finds nothing.
 - [ ] `BootstrapListView` derives directly from native `ListView`.
 - [ ] Both `net48` and `net8.0-windows` production builds succeed.
 - [ ] Full test suite passes on both target frameworks.
-- [ ] `OwnerDraw` renders Bootstrap-aware item presentation without a parallel item/selection model.
-- [ ] `Details`, `List`, `SmallIcon`, `LargeIcon`, and `Tile` all render and interact correctly.
-- [ ] `Variant`, `Striped`, and `HoverHighlight` match the documented defaults and do not mutate native state.
+- [ ] `OwnerDraw` renders Bootstrap-aware presentation without a parallel item/selection model.
+- [ ] Protected `DoubleBuffered` is enabled to reduce owner-draw flicker.
+- [ ] In `Details`, framework row backgrounds are never painted from `OnDrawItem`; custom row/cell painting is `OnDrawSubItem`-centric.
+- [ ] Repeated mouse movement across `Details` rows never causes subitem text/images to disappear behind a late background repaint.
+- [ ] `Details`, `List`, `SmallIcon`, `LargeIcon`, and `Tile` normal modes render and interact correctly.
+- [ ] Hover uses `HitTest`, works across all normal views, and never mutates selection/focus/check/activation.
+- [ ] `Variant`, `Striped`, and `HoverHighlight` match documented defaults and do not mutate native state.
 - [ ] `Striped` is limited to neutral `Details`/`List` rows.
+- [ ] Observable differing caller colors can override neutral stripes; exact same-color explicit assignments are documented as indistinguishable from inheritance.
+- [ ] No reflection/internal WinForms style flags are used to infer caller color intent.
 - [ ] Selection honors focus, `HideSelection`, and `FullRowSelect` semantics.
-- [ ] Checkboxes/state images reflect native item state and caller-provided state images without duplicate checked-state storage.
+- [ ] Checkboxes/state images reflect native capability/state without duplicate checked-state storage.
 - [ ] Caller image lists and images remain caller-owned.
+- [ ] Virtual demo/tests install `RetrieveVirtualItem` before assigning positive `VirtualListSize`.
+- [ ] Virtual paint/hover code does not depend on normal `Items`, `SelectedItems`, or `CheckedItems` collections.
+- [ ] Native `SelectedIndices`/`CheckedIndices` remain the index-based virtual-mode access path.
+- [ ] Native `Tile` -> `LargeIcon` coercion under virtual mode is accepted and never reversed by Bootstrap code.
 - [ ] `VirtualMode` works without a shadow collection or O(n)-per-paint framework scan.
-- [ ] Groups remain intact; V1 native group-header rendering limitation is documented.
+- [ ] Groups remain caller-owned and native view restrictions are respected; V1 native group-header rendering limitation is documented.
 - [ ] Label editing, keyboard navigation, multi-selection, activation, context menus, and drag/drop remain native behavior.
 - [ ] Light/Dark runtime switching updates presentation without changing data or interaction state.
-- [ ] Caller-set fonts remain caller-owned after the first explicit override.
-- [ ] DPI/RTL scenarios are visually verified and do not double-scale native geometry.
-- [ ] Handle recreation does not duplicate framework subscriptions or introduce stale hover/item references.
+- [ ] Caller-set fonts remain caller-owned after explicit override.
+- [ ] DPI/RTL scenarios do not double-scale native geometry.
+- [ ] Handle recreation does not duplicate subscriptions or preserve stale hover/virtual-item references.
 - [ ] No GDI/event/timer resource leak is introduced.
-- [ ] Integrated demo covers all five views, groups, virtual mode, checks/images, selection, theme, and lifecycle scenarios.
-- [ ] `docs/COMPONENTS.md` documents public API, native ownership, usage, and V1 exclusions.
+- [ ] Integrated demo covers all normal views, native virtual-mode behavior, groups, checks/images, selection, theme, hover regression, and lifecycle scenarios.
+- [ ] `docs/COMPONENTS.md` documents public API, native ownership, virtual-mode ordering/restrictions, effective-style limitation, and V1 exclusions.
 - [ ] Final diff contains no unrelated changes.
 
 ## Implementation Notes for Reviewers
 
-Review this control against the same architectural principle already used by `BootstrapDataGridView` and planned for `BootstrapTreeView`: **native WinForms behavior is the source of truth; the framework owns presentation and shared infrastructure only.** A visually ambitious change is not acceptable if it requires replacing native selection, virtualization, item collections, keyboard behavior, accessibility, or caller-owned images.
+Review this control against the architectural principle already used by `BootstrapDataGridView` and planned for `BootstrapTreeView`: **native WinForms behavior is the source of truth; the framework owns presentation and shared infrastructure only.**
 
-The highest-risk review areas are:
+Highest-risk review areas:
 
-1. `Details` owner drawing with `FullRowSelect == false`;
-2. checkbox/state-image placement without modifying checked state;
-3. `Tile` subitem layout because it is handled by `DrawItem`, not `DrawSubItem`;
-4. hover bookkeeping under virtual mode and handle recreation;
-5. group-header expectations, which must remain explicitly native-rendered in V1;
-6. avoiding O(n) work in paint paths for large/virtual lists;
-7. maintaining `net48` compatibility while sharing one implementation path with `net8.0-windows`.
+1. the documented Win32 `Details` owner-draw bug: framework `OnDrawItem` must not repaint `Details` row backgrounds;
+2. `FullRowSelect == false` selection geometry;
+3. state-image/checkbox placement without changing checked state or fabricating unsupported Tile checkboxes;
+4. `Tile` subitem layout through `DrawItem`;
+5. hover through `HitTest` across all normal views;
+6. virtual-mode ordering, invalid normal collections, and native Tile-to-LargeIcon coercion;
+7. group/view restrictions and native group-header rendering;
+8. effective caller color precedence without relying on inaccessible internal WinForms style flags;
+9. avoiding O(n) work and per-item allocations in paint paths;
+10. maintaining one implementation path compatible with both `net48` and `net8.0-windows`.
