@@ -97,6 +97,21 @@ public sealed class BootstrapSwitchTests
     }
 
     [Test]
+    public void FlatStyleSystemUsesNativePreferredSizeFallback()
+    {
+        using var font = new Font("Segoe UI", 9f);
+        using var native = new CheckBox { Text = "System switch", Font = font, FlatStyle = FlatStyle.System, AutoSize = true };
+        using var control = new BootstrapSwitch { Text = "System switch", Font = font, FlatStyle = FlatStyle.System, AutoSize = true, CheckState = CheckState.Indeterminate };
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(control.GetPreferredSize(Size.Empty), Is.EqualTo(native.GetPreferredSize(Size.Empty)));
+            Assert.DoesNotThrow((Action)(() => Draw(control)));
+            Assert.That(control.CheckState, Is.EqualTo(CheckState.Indeterminate));
+        }));
+    }
+
+    [Test]
     public void InvalidEnumsThrowBeforeMutationAndDisposalDetachesTheme()
     {
         var baseline = GetThemeSubscriptionCount();
