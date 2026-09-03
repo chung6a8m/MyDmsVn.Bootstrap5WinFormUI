@@ -117,6 +117,47 @@ public sealed class BootstrapCheckBoxTests
     }
 
     [Test]
+    public void FlatStyleSystemUsesNativePreferredSizeFallback()
+    {
+        using var font = new Font("Segoe UI", 9f);
+        using var native = new CheckBox { Text = "System fallback", Font = font, FlatStyle = FlatStyle.System, AutoSize = true };
+        using var control = new BootstrapCheckBox { Text = "System fallback", Font = font, FlatStyle = FlatStyle.System, AutoSize = true, Checked = true };
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(control.GetPreferredSize(Size.Empty), Is.EqualTo(native.GetPreferredSize(Size.Empty)));
+            Assert.DoesNotThrow((Action)(() => Draw(control)));
+            Assert.That(control.Checked, Is.True);
+        }));
+    }
+
+    [Test]
+    public void TopCenterAutoSizeStacksIndicatorGapAndText()
+    {
+        using var control = new BootstrapCheckBox { Text = "Stacked label", CheckAlign = ContentAlignment.TopCenter, AutoSize = true };
+        var dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
+        var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.CheckBox, BootstrapThemeManager.CurrentTheme.Metrics, dpi);
+        var flags = BootstrapCheckableRenderLogic.GetTextFormatFlags(control.TextAlign, control.UseMnemonic, false, control.AutoEllipsis, false);
+        var textSize = TextRenderer.MeasureText(control.Text, control.Font, Size.Empty, flags);
+        var expectedHeight = control.Padding.Vertical + metrics.IndicatorBoundsSize.Height + metrics.TextGap + textSize.Height + metrics.FocusWidth;
+
+        Assert.That(control.GetPreferredSize(Size.Empty).Height, Is.EqualTo(expectedHeight));
+    }
+
+    [Test]
+    public void AutoSizeTextBoundsAreWideEnoughForPaintMetrics()
+    {
+        using var control = new BootstrapCheckBox { Text = "Wide italic-like WWW label", AutoSize = true };
+        var dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
+        var metrics = BootstrapCheckableRenderLogic.GetMetrics(BootstrapCheckableKind.CheckBox, BootstrapThemeManager.CurrentTheme.Metrics, dpi);
+        var flags = BootstrapCheckableRenderLogic.GetTextFormatFlags(control.TextAlign, control.UseMnemonic, false, control.AutoEllipsis, false);
+        var paintTextSize = TextRenderer.MeasureText(control.Text, control.Font, Size.Empty, flags);
+        var layout = BootstrapCheckableRenderLogic.GetLayout(control.ClientRectangle, control.Padding, metrics, control.CheckAlign, false);
+
+        Assert.That(layout.TextBounds.Width, Is.GreaterThanOrEqualTo(paintTextSize.Width));
+    }
+
+    [Test]
     public void NormalPaintingCoversAllStatesThemesAndTinyBoundsWithoutThrowing()
     {
         using var control = new BootstrapCheckBox { Text = "State", ThreeState = false, Size = new Size(140, 32) };
