@@ -442,6 +442,7 @@ public class BootstrapTreeView : TreeView
 
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = GetCurrentDpi();
+        var mirrorTreeStructure = RightToLeft == RightToLeft.Yes && RightToLeftLayout;
         var selected = (state & TreeNodeStates.Selected) == TreeNodeStates.Selected;
         var visibleSelected = selected && (!HideSelection || Focused);
         var hot = ReferenceEquals(node, _hotNode);
@@ -474,13 +475,14 @@ public class BootstrapTreeView : TreeView
             nativeLabelBounds,
             node.Level,
             dpi,
-            RightToLeft == RightToLeft.Yes,
+            mirrorTreeStructure,
             FullRowSelect && !ShowLines,
             hasExpander,
             hasStateImage,
             nativeStateImageSlotWidth,
             hasNodeImage,
-            nodeImageSize));
+            nodeImageSize,
+            useNativeStateImageSize: stateImage is not null));
 
         var backgroundBounds = visibleSelected ? layout.SelectionBounds : layout.TextBounds;
         var background = palette.Background;
@@ -522,7 +524,7 @@ public class BootstrapTreeView : TreeView
                 graphics,
                 layout.ExpanderBounds,
                 node.IsExpanded,
-                RightToLeft == RightToLeft.Yes,
+                mirrorTreeStructure,
                 expanderColor,
                 dpi);
         }
@@ -762,7 +764,7 @@ public class BootstrapTreeView : TreeView
                     node.Level,
                     ancestorLevel,
                     Indent,
-                    RightToLeft == RightToLeft.Yes);
+                    RightToLeft == RightToLeft.Yes && RightToLeftLayout);
                 var continuation = BootstrapTreeViewLayout.CalculateVerticalConnectorLine(
                     layout.RowBounds,
                     ancestorX,
@@ -872,15 +874,17 @@ public class BootstrapTreeView : TreeView
                 Math.Max(0, bounds.Height - 1));
         }
 
-        if (!isChecked || !Enabled || bounds.Width < 6 || bounds.Height < 6)
+        if (!isChecked || bounds.Width < 6 || bounds.Height < 6)
         {
             return;
         }
 
-        var checkColor = ColorUtil.GetContrastingTextColor(
-            fillColor,
-            theme.Colors.Light,
-            theme.Colors.Dark);
+        var checkColor = Enabled
+            ? ColorUtil.GetContrastingTextColor(
+                fillColor,
+                theme.Colors.Light,
+                theme.Colors.Dark)
+            : theme.Colors.MutedText;
         var strokeWidth = Math.Max(1, DpiScaler.Scale(2, dpi));
         var left = bounds.Left + Math.Max(2, bounds.Width / 5);
         var middleX = bounds.Left + Math.Max(3, (bounds.Width * 2) / 5);
