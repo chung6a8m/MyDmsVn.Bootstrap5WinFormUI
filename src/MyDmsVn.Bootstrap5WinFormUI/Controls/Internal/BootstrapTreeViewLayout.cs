@@ -214,14 +214,15 @@ internal static class BootstrapTreeViewLayout
             ? PlaceBackwardInSlot(ref cursor, input.NativeStateImageSlotWidth, stateImageSize, rowBounds)
             : Rectangle.Empty;
 
-        // Keep the un-clipped native-anchored slot long enough to center both the glyph and the
-        // connector anchor. Clip only the drawable rectangles; horizontal scrolling must not
-        // recenter framework geometry away from the native HitTest column.
+        // Keep the un-clipped native-anchored slot long enough to center the glyph and connector
+        // anchor. The glyph/image destination rectangles also remain un-clipped whenever any part
+        // is visible; the Graphics/client clip reveals only the viewport slice without re-scaling
+        // or re-centering content at the edge during horizontal scrolling.
         var rawExpanderSlot = TakeBackwardSlot(ref cursor, expanderSlotWidth, rowBounds);
         var expanderAnchorX = rawExpanderSlot.Left + (rawExpanderSlot.Width / 2);
         var expanderSlotBounds = Intersect(rawExpanderSlot, rowBounds);
         var expanderBounds = input.HasExpander
-            ? Intersect(CenterInSlot(rawExpanderSlot, expanderSize), rowBounds)
+            ? KeepUnclippedWhenVisible(CenterInSlot(rawExpanderSlot, expanderSize), rowBounds)
             : Rectangle.Empty;
 
         var selectionBounds = input.EffectiveFullRowSelection ? rowBounds : textBounds;
@@ -377,13 +378,13 @@ internal static class BootstrapTreeViewLayout
         var right = cursor - gap;
         var rectangle = CenterVertically(right - width, width, height, rowBounds);
         cursor = right - width;
-        return Intersect(rectangle, rowBounds);
+        return KeepUnclippedWhenVisible(rectangle, rowBounds);
     }
 
     private static Rectangle PlaceBackwardInSlot(ref int cursor, int slotWidth, int desiredSize, Rectangle rowBounds)
     {
         var rawSlot = TakeBackwardSlot(ref cursor, slotWidth, rowBounds);
-        return Intersect(CenterInSlot(rawSlot, desiredSize), rowBounds);
+        return KeepUnclippedWhenVisible(CenterInSlot(rawSlot, desiredSize), rowBounds);
     }
 
     private static Rectangle TakeBackwardSlot(ref int cursor, int slotWidth, Rectangle rowBounds)
@@ -415,6 +416,11 @@ internal static class BootstrapTreeViewLayout
         var safeHeight = Math.Max(0, height);
         var y = rowBounds.Top + ((rowBounds.Height - safeHeight) / 2);
         return new Rectangle(x, y, safeWidth, safeHeight);
+    }
+
+    private static Rectangle KeepUnclippedWhenVisible(Rectangle rectangle, Rectangle rowBounds)
+    {
+        return Intersect(rectangle, rowBounds).IsEmpty ? Rectangle.Empty : rectangle;
     }
 
     private static Rectangle Intersect(Rectangle first, Rectangle second)
