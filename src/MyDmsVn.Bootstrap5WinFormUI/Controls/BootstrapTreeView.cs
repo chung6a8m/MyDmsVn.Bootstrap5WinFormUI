@@ -260,7 +260,8 @@ public class BootstrapTreeView : TreeView
         using var font = new Font(token.FontFamilyName, token.SizeInPoints, token.Style);
         var textHeight = (int)Math.Ceiling(font.GetHeight(dpi));
         var verticalAllowance = DpiScaler.Scale(theme.Metrics.SpacingXS, dpi);
-        return Math.Max(1, textHeight + verticalAllowance);
+        var itemHeight = Math.Max(1, textHeight + verticalAllowance);
+        return itemHeight % 2 == 0 ? itemHeight : itemHeight + 1;
     }
 
     internal static bool ShouldDrawFocusCueForTesting(
@@ -649,7 +650,7 @@ public class BootstrapTreeView : TreeView
         if (CheckBoxes)
         {
             var nativeIndex = node.Checked ? 1 : 0;
-            return nativeIndex < stateImageList.Images.Count ? nativeIndex : -1;
+            return Math.Min(nativeIndex, stateImageList.Images.Count - 1);
         }
 
         var resolvedIndex = ResolveConfiguredImageIndex(
