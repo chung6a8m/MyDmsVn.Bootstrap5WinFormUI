@@ -527,7 +527,7 @@ public class BootstrapTreeView : TreeView
         if (hasExpander && !layout.ExpanderBounds.IsEmpty)
         {
             var expanderColor = theme.Colors.MutedText;
-            if (visibleSelected && layout.SelectionBounds.Contains(layout.ExpanderBounds))
+            if (visibleSelected && layout.SelectionBounds.IntersectsWith(layout.ExpanderBounds))
             {
                 expanderColor = foreground;
             }
