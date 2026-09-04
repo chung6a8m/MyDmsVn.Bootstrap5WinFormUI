@@ -304,16 +304,19 @@ internal static class BootstrapTreeViewLayout
         bool continueAbove,
         bool continueBelow)
     {
-        if (rowBounds.Width <= 0 || rowBounds.Height <= 0 || (!continueAbove && !continueBelow))
+        if (rowBounds.Width <= 0 ||
+            rowBounds.Height <= 0 ||
+            (!continueAbove && !continueBelow) ||
+            x < rowBounds.Left ||
+            x >= rowBounds.Right)
         {
             return new BootstrapTreeViewLineSegment(Point.Empty, Point.Empty);
         }
 
-        var safeX = Clamp(x, rowBounds.Left, rowBounds.Right - 1);
         var centerY = rowBounds.Top + (rowBounds.Height / 2);
         var startY = continueAbove ? rowBounds.Top : centerY;
         var endY = continueBelow ? rowBounds.Bottom - 1 : centerY;
-        return new BootstrapTreeViewLineSegment(new Point(safeX, startY), new Point(safeX, endY));
+        return new BootstrapTreeViewLineSegment(new Point(x, startY), new Point(x, endY));
     }
 
     internal static BootstrapTreeViewLineSegment CalculateHorizontalConnectorLine(
