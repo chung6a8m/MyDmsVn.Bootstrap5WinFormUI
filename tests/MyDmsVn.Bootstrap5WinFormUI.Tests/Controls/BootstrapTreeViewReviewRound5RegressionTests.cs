@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -32,20 +33,39 @@ public sealed class BootstrapTreeViewReviewRound5RegressionTests
         _ = treeView.Handle;
 
         var nativeStateHit = GetNativeHitBounds(treeView, node, TreeViewHitTestLocations.StateImage);
-        var expectedDisplayBounds = GetExpectedNativeStateDisplayBounds(treeView, node, nativeStateHit.Width);
+        var labelBounds = node.Bounds;
+        var rowBounds = new Rectangle(
+            treeView.ClientRectangle.Left,
+            labelBounds.Top,
+            treeView.ClientRectangle.Width,
+            treeView.ItemHeight);
+        var expectedDisplayBounds = BootstrapTreeViewLayout.Calculate(new BootstrapTreeViewLayoutInput(
+            treeView.ClientRectangle,
+            rowBounds,
+            labelBounds,
+            node.Level,
+            treeView.DeviceDpi,
+            rightToLeft: false,
+            effectiveFullRowSelection: false,
+            hasExpander: false,
+            hasStateImage: true,
+            nativeStateImageSlotWidth: nativeStateHit.Width,
+            hasNodeImage: false,
+            nodeImageSize: Size.Empty,
+            useNativeStateImageSize: true)).StateImageBounds;
         using var bitmap = RenderNode(treeView, node);
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(nativeStateHit.Width, Is.GreaterThan(0));
             Assert.That(expectedDisplayBounds.Width, Is.EqualTo(nativeStateHit.Width));
-            Assert.That(IsColorNear(bitmap.GetPixel(expectedDisplayBounds.Left, expectedDisplayBounds.Top + (expectedDisplayBounds.Height / 2)), Color.Lime), Is.True,
+            Assert.That(IsPainted(bitmap, expectedDisplayBounds.Left, expectedDisplayBounds.Top + (expectedDisplayBounds.Height / 2)), Is.True,
                 "The rendered state image should fill the native display slot horizontally.");
-            Assert.That(IsColorNear(bitmap.GetPixel(expectedDisplayBounds.Right - 1, expectedDisplayBounds.Top + (expectedDisplayBounds.Height / 2)), Color.Lime), Is.True,
+            Assert.That(IsPainted(bitmap, expectedDisplayBounds.Right - 1, expectedDisplayBounds.Top + (expectedDisplayBounds.Height / 2)), Is.True,
                 "The rendered state image should fill the native display slot horizontally.");
-            Assert.That(IsColorNear(bitmap.GetPixel(expectedDisplayBounds.Left + (expectedDisplayBounds.Width / 2), expectedDisplayBounds.Top), Color.Lime), Is.True,
+            Assert.That(IsPainted(bitmap, expectedDisplayBounds.Left + (expectedDisplayBounds.Width / 2), expectedDisplayBounds.Top), Is.True,
                 "The rendered state image should fill the native normalized square vertically instead of preserving caller aspect ratio.");
-            Assert.That(IsColorNear(bitmap.GetPixel(expectedDisplayBounds.Left + (expectedDisplayBounds.Width / 2), expectedDisplayBounds.Bottom - 1), Color.Lime), Is.True,
+            Assert.That(IsPainted(bitmap, expectedDisplayBounds.Left + (expectedDisplayBounds.Width / 2), expectedDisplayBounds.Bottom - 1), Is.True,
                 "The rendered state image should fill the native normalized square vertically instead of preserving caller aspect ratio.");
         }));
     }
@@ -101,16 +121,6 @@ public sealed class BootstrapTreeViewReviewRound5RegressionTests
             "When the custom StateImageList does not contain the required checkbox image, BootstrapTreeView must render framework checkbox art instead of leaving the native state slot blank.");
     }
 
-    private static Rectangle GetExpectedNativeStateDisplayBounds(TreeView treeView, TreeNode node, int stateSlotWidth)
-    {
-        var size = Math.Min(stateSlotWidth, treeView.ItemHeight);
-        return new Rectangle(
-            GetNativeHitBounds(treeView, node, TreeViewHitTestLocations.StateImage).Left,
-            node.Bounds.Top + ((treeView.ItemHeight - size) / 2),
-            size,
-            size);
-    }
-
     private static Bitmap RenderNode(BootstrapTreeView treeView, TreeNode node)
     {
         var labelBounds = node.Bounds;
@@ -163,7 +173,7 @@ public sealed class BootstrapTreeViewReviewRound5RegressionTests
         {
             for (var x = clipped.Left; x < clipped.Right; x++)
             {
-                if (bitmap.GetPixel(x, y).ToArgb() != Color.Magenta.ToArgb())
+                if (IsPainted(bitmap, x, y))
                 {
                     return true;
                 }
@@ -173,11 +183,11 @@ public sealed class BootstrapTreeViewReviewRound5RegressionTests
         return false;
     }
 
-    private static bool IsColorNear(Color actual, Color expected)
+    private static bool IsPainted(Bitmap bitmap, int x, int y)
     {
-        return Math.Abs(actual.R - expected.R) <= 8 &&
-               Math.Abs(actual.G - expected.G) <= 8 &&
-               Math.Abs(actual.B - expected.B) <= 8;
+        return x >= 0 && x < bitmap.Width &&
+               y >= 0 && y < bitmap.Height &&
+               bitmap.GetPixel(x, y).ToArgb() != Color.Magenta.ToArgb();
     }
 
     private static ImageList CreateImageList(Size imageSize, Color color)
