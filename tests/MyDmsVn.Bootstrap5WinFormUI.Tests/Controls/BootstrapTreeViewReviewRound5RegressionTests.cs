@@ -62,20 +62,20 @@ public sealed class BootstrapTreeViewReviewRound5RegressionTests
         var sourceImages = new List<Bitmap>();
         for (var index = 0; index < customImageCount; index++)
         {
-            var bitmap = new Bitmap(16, 16);
-            using (var graphics = Graphics.FromImage(bitmap))
+            var sourceBitmap = new Bitmap(16, 16);
+            using (var graphics = Graphics.FromImage(sourceBitmap))
             {
                 graphics.Clear(Color.Red);
             }
 
-            sourceImages.Add(bitmap);
-            stateImages.Images.Add(bitmap);
+            sourceImages.Add(sourceBitmap);
+            stateImages.Images.Add(sourceBitmap);
         }
 
         _ = stateImages.Handle;
-        foreach (var bitmap in sourceImages)
+        foreach (var sourceBitmap in sourceImages)
         {
-            bitmap.Dispose();
+            sourceBitmap.Dispose();
         }
 
         using var treeView = new BootstrapTreeView
