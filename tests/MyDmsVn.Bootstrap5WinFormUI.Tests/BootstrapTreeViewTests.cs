@@ -23,10 +23,11 @@ public sealed class BootstrapTreeViewTests
     [Test]
     public void Constructor_PreservesNativeTreeViewContractAndBootstrapDefaults()
     {
+        using var native = new TreeView();
         using var treeView = new BootstrapTreeView();
 
         Assert.That(treeView, Is.InstanceOf<TreeView>());
-        Assert.That(treeView.BorderStyle, Is.EqualTo(BorderStyle.None));
+        Assert.That(treeView.BorderStyle, Is.EqualTo(native.BorderStyle));
         Assert.That(treeView.DrawMode, Is.EqualTo(TreeViewDrawMode.OwnerDrawAll));
         Assert.That(treeView.HideSelection, Is.True);
         Assert.That(treeView.Variant, Is.EqualTo(BootstrapVariant.Primary));
