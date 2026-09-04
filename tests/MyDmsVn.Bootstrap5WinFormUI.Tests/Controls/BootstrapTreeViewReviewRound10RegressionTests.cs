@@ -92,7 +92,7 @@ public sealed class BootstrapTreeViewReviewRound10RegressionTests
     {
         using var treeView = new BootstrapTreeView
         {
-            Size = new Size(320, 24),
+            ClientSize = new Size(320, 24),
             ItemHeight = 24,
             FullRowSelect = true,
             ShowLines = false,
