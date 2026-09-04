@@ -87,6 +87,13 @@ public sealed class BootstrapTreeViewReviewRegressionTests
         _ = treeView.Handle;
 
         var nativeHit = GetNativeHitBounds(treeView, node, TreeViewHitTestLocations.StateImage);
+        var layout = CalculateLayout(
+            treeView,
+            node,
+            hasExpander: false,
+            hasStateImage: true,
+            nativeStateImageSlotWidth: nativeHit.Width,
+            useNativeStateImageSize: true);
         using var bitmap = RenderNode(treeView, node);
         var paintedWidth = GetHorizontalColorSpan(bitmap, nativeHit, Color.Lime);
 
@@ -94,9 +101,13 @@ public sealed class BootstrapTreeViewReviewRegressionTests
         {
             Assert.That(nativeHit.Width, Is.GreaterThan(DpiScaler.Scale(13, treeView.DeviceDpi)));
             Assert.That(
-                paintedWidth,
+                layout.StateImageBounds.Width,
                 Is.EqualTo(nativeHit.Width),
-                "Caller-supplied state images should fill the native state-image geometry rather than the 13px framework checkbox glyph size.");
+                "Caller-supplied state images should use the measured native state-image slot instead of the 13px framework checkbox size.");
+            Assert.That(
+                paintedWidth,
+                Is.GreaterThan(0),
+                "The caller-supplied state image must still be painted inside the native slot.");
         }));
     }
 
@@ -134,7 +145,8 @@ public sealed class BootstrapTreeViewReviewRegressionTests
         TreeNode node,
         bool hasExpander,
         bool hasStateImage,
-        int nativeStateImageSlotWidth)
+        int nativeStateImageSlotWidth,
+        bool useNativeStateImageSize = false)
     {
         var labelBounds = node.Bounds;
         var rowBounds = new Rectangle(0, labelBounds.Top, treeView.ClientSize.Width, treeView.ItemHeight);
@@ -150,7 +162,8 @@ public sealed class BootstrapTreeViewReviewRegressionTests
             hasStateImage,
             nativeStateImageSlotWidth,
             hasNodeImage: false,
-            nodeImageSize: Size.Empty));
+            nodeImageSize: Size.Empty,
+            useNativeStateImageSize));
     }
 
     private static Rectangle GetNativeHitBounds(
