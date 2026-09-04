@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
@@ -16,6 +17,10 @@ public class BootstrapTreeView : TreeView
 {
     private const int NativeNoImageIndex = -2;
     private const int NativeLogicalStateImageSlotSize = 16;
+    private const int NativeMaximumStateImageIndex = 14;
+    private const int TvFirst = 0x1100;
+    private const int TvmGetImageList = TvFirst + 8;
+    private const int TvsilState = 2;
 
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private IntPtr _nativeStateImageSlotHandle;
@@ -647,10 +652,13 @@ public class BootstrapTreeView : TreeView
             return nativeIndex < stateImageList.Images.Count ? nativeIndex : -1;
         }
 
-        return ResolveConfiguredImageIndex(
+        var resolvedIndex = ResolveConfiguredImageIndex(
             stateImageList,
             node.StateImageKey,
             node.StateImageIndex);
+        return resolvedIndex >= 0 && resolvedIndex <= NativeMaximumStateImageIndex
+            ? resolvedIndex
+            : -1;
     }
 
     private static int ResolveConfiguredImageIndex(ImageList imageList, string key, int index)
@@ -706,7 +714,12 @@ public class BootstrapTreeView : TreeView
             return _nativeStateImageSlotWidth;
         }
 
-        var fallbackWidth = DpiScaler.Scale(NativeLogicalStateImageSlotSize, GetCurrentDpi());
+        var fallbackWidth = ResolveNativeStateImageListWidth();
+        if (fallbackWidth <= 0)
+        {
+            fallbackWidth = NativeLogicalStateImageSlotSize;
+        }
+
         var bounds = node.Bounds;
         if (bounds.IsEmpty)
         {
@@ -746,6 +759,23 @@ public class BootstrapTreeView : TreeView
         }
 
         return Math.Max(width, fallbackWidth);
+    }
+
+    private int ResolveNativeStateImageListWidth()
+    {
+        var nativeImageList = SendMessage(
+            Handle,
+            TvmGetImageList,
+            new IntPtr(TvsilState),
+            IntPtr.Zero);
+        if (nativeImageList == IntPtr.Zero)
+        {
+            return 0;
+        }
+
+        return ImageListGetIconSize(nativeImageList, out var width, out _) && width > 0
+            ? width
+            : 0;
     }
 
     private void DrawConnectorLines(
@@ -1010,4 +1040,11 @@ public class BootstrapTreeView : TreeView
             Math.Max(0, focusBounds.Width - 1),
             Math.Max(0, focusBounds.Height - 1));
     }
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("comctl32.dll", EntryPoint = "ImageList_GetIconSize")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ImageListGetIconSize(IntPtr imageList, out int width, out int height);
 }
