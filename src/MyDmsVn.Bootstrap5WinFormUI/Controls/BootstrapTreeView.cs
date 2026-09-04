@@ -18,6 +18,13 @@ public class BootstrapTreeView : TreeView
     private IntPtr _nativeStateImageSlotHandle;
     private int _nativeStateImageSlotWidth;
     private TreeNode? _hotNode;
+    private bool _themeSubscribed;
+    private bool _settingThemeFont;
+    private bool _useThemeFont = true;
+    private bool _initialized;
+    private Font? _themeFont;
+    private bool _useFrameworkItemHeight = true;
+    private int _frameworkItemHeight;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BootstrapTreeView"/> class.
@@ -28,9 +35,12 @@ public class BootstrapTreeView : TreeView
         DrawMode = TreeViewDrawMode.OwnerDrawAll;
         HideSelection = false;
 
-        var theme = BootstrapThemeManager.CurrentTheme;
-        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        ItemHeight = CalculateDefaultItemHeight(theme, dpi);
+        _initialized = true;
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
+        _themeSubscribed = true;
+        ApplyThemeFont();
+        ApplyFrameworkItemHeight(BootstrapThemeManager.CurrentTheme, GetCurrentDpi());
+        ApplyTheme();
     }
 
     /// <summary>
@@ -55,17 +65,103 @@ public class BootstrapTreeView : TreeView
     }
 
     /// <inheritdoc />
+    protected override void OnFontChanged(EventArgs e)
+    {
+        if (_initialized)
+        {
+            UpdateItemHeightOwnership();
+        }
+
+        var itemHeightBeforeBase = ItemHeight;
+        base.OnFontChanged(e);
+        if (!_initialized)
+        {
+            return;
+        }
+
+        if (_useFrameworkItemHeight && _frameworkItemHeight > 0 && ItemHeight != _frameworkItemHeight)
+        {
+            ItemHeight = _frameworkItemHeight;
+        }
+        else if (_settingThemeFont && !_useFrameworkItemHeight && ItemHeight != itemHeightBeforeBase)
+        {
+            ItemHeight = itemHeightBeforeBase;
+        }
+
+        if (!_settingThemeFont)
+        {
+            _useThemeFont = false;
+            DisposeThemeFont();
+        }
+
+        Invalidate();
+    }
+
+    /// <inheritdoc />
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+        if (_initialized)
+        {
+            UpdateItemHeightOwnership();
+        }
+
+        var callerItemHeight = ItemHeight;
+        base.OnDpiChangedAfterParent(e);
+        if (!_initialized || IsDisposed || Disposing)
+        {
+            return;
+        }
+
+        if (_useFrameworkItemHeight)
+        {
+            ApplyFrameworkItemHeight(BootstrapThemeManager.CurrentTheme, GetCurrentDpi());
+        }
+        else if (ItemHeight != callerItemHeight)
+        {
+            ItemHeight = callerItemHeight;
+        }
+
+        ResetNativeStateImageSlotCache();
+        Invalidate();
+    }
+
+    /// <inheritdoc />
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        ResetNativeStateImageSlotCache();
+        if (_initialized && !IsDisposed && !Disposing)
+        {
+            ApplyTheme();
+            Invalidate();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        ResetNativeStateImageSlotCache();
+        base.OnHandleDestroyed(e);
+    }
+
+    /// <inheritdoc />
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        UpdateHotNode(GetNodeAt(e.Location));
+        if (!IsDisposed && !Disposing)
+        {
+            UpdateHotNode(GetNodeAt(e.Location));
+        }
     }
 
     /// <inheritdoc />
     protected override void OnMouseLeave(EventArgs e)
     {
         base.OnMouseLeave(e);
-        UpdateHotNode(null);
+        if (!IsDisposed && !Disposing)
+        {
+            UpdateHotNode(null);
+        }
     }
 
     /// <inheritdoc />
@@ -93,6 +189,26 @@ public class BootstrapTreeView : TreeView
         }
 
         RenderNodeCore(e.Graphics, node, e.Bounds, node.Bounds, e.State);
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _initialized = false;
+            if (_themeSubscribed)
+            {
+                BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+                _themeSubscribed = false;
+            }
+
+            _hotNode = null;
+            ResetNativeStateImageSlotCache();
+            DisposeThemeFont();
+        }
+
+        base.Dispose(disposing);
     }
 
     internal void RenderNodeForTesting(
@@ -155,9 +271,121 @@ public class BootstrapTreeView : TreeView
                (nodeLevel > 0 || showRootLines);
     }
 
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        if (!_initialized || IsDisposed || Disposing)
+        {
+            return;
+        }
+
+        UpdateItemHeightOwnership();
+        if (_useThemeFont)
+        {
+            ApplyThemeFont();
+        }
+
+        if (_useFrameworkItemHeight)
+        {
+            ApplyFrameworkItemHeight(BootstrapThemeManager.CurrentTheme, GetCurrentDpi());
+        }
+
+        ApplyTheme();
+        ResetNativeStateImageSlotCache();
+        Invalidate();
+    }
+
+    private void ApplyTheme()
+    {
+        var colors = BootstrapThemeManager.CurrentTheme.Colors;
+        BackColor = colors.Surface;
+        ForeColor = colors.Text;
+    }
+
+    private void ApplyThemeFont()
+    {
+        var token = BootstrapThemeManager.CurrentTheme.Typography.Body;
+        if (ThemeFontMatches(token))
+        {
+            return;
+        }
+
+        var nextFont = new Font(token.FontFamilyName, token.SizeInPoints, token.Style);
+        var previous = _themeFont;
+        _themeFont = nextFont;
+        _settingThemeFont = true;
+        try
+        {
+            Font = nextFont;
+        }
+        catch
+        {
+            _themeFont = previous;
+            nextFont.Dispose();
+            throw;
+        }
+        finally
+        {
+            _settingThemeFont = false;
+        }
+
+        previous?.Dispose();
+    }
+
+    private bool ThemeFontMatches(BootstrapFontToken token)
+    {
+        return _themeFont is not null &&
+            string.Equals(_themeFont.Name, token.FontFamilyName, StringComparison.OrdinalIgnoreCase) &&
+            Math.Abs(_themeFont.SizeInPoints - token.SizeInPoints) < 0.01f &&
+            _themeFont.Style == token.Style;
+    }
+
+    private void DisposeThemeFont()
+    {
+        var font = _themeFont;
+        _themeFont = null;
+        font?.Dispose();
+    }
+
+    private int GetCurrentDpi()
+    {
+        return DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+    }
+
+    private void UpdateItemHeightOwnership()
+    {
+        if (_useFrameworkItemHeight &&
+            _frameworkItemHeight > 0 &&
+            ItemHeight != _frameworkItemHeight)
+        {
+            _useFrameworkItemHeight = false;
+        }
+    }
+
+    private void ApplyFrameworkItemHeight(BootstrapTheme theme, int dpi)
+    {
+        if (!_useFrameworkItemHeight)
+        {
+            return;
+        }
+
+        var nextItemHeight = CalculateDefaultItemHeight(theme, dpi);
+        if (ItemHeight != nextItemHeight)
+        {
+            ItemHeight = nextItemHeight;
+        }
+
+        _frameworkItemHeight = ItemHeight;
+    }
+
+    private void ResetNativeStateImageSlotCache()
+    {
+        _nativeStateImageSlotHandle = IntPtr.Zero;
+        _nativeStateImageSlotWidth = 0;
+    }
+
     private void UpdateHotNode(TreeNode? node)
     {
-        if (ReferenceEquals(_hotNode, node))
+        if (IsDisposed || Disposing || ReferenceEquals(_hotNode, node))
         {
             return;
         }
@@ -170,7 +398,7 @@ public class BootstrapTreeView : TreeView
 
     private void InvalidateNodeRow(TreeNode? node)
     {
-        if (node is null || IsDisposed || node.TreeView != this)
+        if (node is null || IsDisposed || Disposing || node.TreeView != this)
         {
             return;
         }
@@ -207,13 +435,13 @@ public class BootstrapTreeView : TreeView
         Rectangle nativeLabelBounds,
         TreeNodeStates state)
     {
-        if (IsDisposed)
+        if (IsDisposed || Disposing)
         {
             return;
         }
 
         var theme = BootstrapThemeManager.CurrentTheme;
-        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var dpi = GetCurrentDpi();
         var selected = (state & TreeNodeStates.Selected) == TreeNodeStates.Selected;
         var visibleSelected = selected && (!HideSelection || Focused);
         var hot = ReferenceEquals(node, _hotNode);
