@@ -63,11 +63,14 @@ public sealed class BootstrapTreeViewReviewRound8RegressionTests
                 Is.GreaterThan(sourceStateImages.ImageSize.Width),
                 "The test must establish native state-image geometry that differs from the managed source list/default 16px fallback.");
 
+            int primedPaintedHeight;
             using (var primed = RenderNode(treeView, node, Color.Magenta))
             {
+                primedPaintedHeight = GetVerticalColorSpan(primed, GetRowBounds(treeView, node), Color.Lime);
                 Assert.That(
-                    GetVerticalColorSpan(primed, GetRowBounds(treeView, node), Color.Lime),
-                    Is.GreaterThanOrEqualTo(fullStateHit.Width - 1));
+                    primedPaintedHeight,
+                    Is.GreaterThan(sourceStateImages.ImageSize.Height),
+                    "A fully visible native state-image hit must prime owner draw with the enlarged native display geometry.");
             }
 
             var partialStateHit = ScrollRightUntilNarrowStateImage(treeView, node, fullStateHit.Width);
@@ -87,8 +90,8 @@ public sealed class BootstrapTreeViewReviewRound8RegressionTests
 
             Assert.That(
                 paintedHeight,
-                Is.GreaterThanOrEqualTo(fullStateHit.Width - 1),
-                "After the measurement cache is reset while the state image is partially clipped, owner draw must use the actual native state image-list size rather than guessing from the current DeviceDpi.");
+                Is.GreaterThanOrEqualTo(primedPaintedHeight - 1),
+                "After the measurement cache is reset while the state image is partially clipped, owner draw must retain the actual native state image-list size rather than guessing from the current DeviceDpi.");
         }
         finally
         {
@@ -104,18 +107,24 @@ public sealed class BootstrapTreeViewReviewRound8RegressionTests
         {
             Size = new Size(320, 120),
             ItemHeight = 24,
+            Indent = 32,
             ShowLines = false,
             ShowPlusMinus = false,
-            ShowRootLines = false,
+            ShowRootLines = true,
             StateImageList = stateImages,
         };
+        var root = new TreeNode("Root");
         var node = new TreeNode("State image key above native maximum")
         {
             StateImageKey = "state-15",
         };
-        treeView.Nodes.Add(node);
+        root.Nodes.Add(node);
+        treeView.Nodes.Add(root);
         _ = treeView.Handle;
+        root.Expand();
+        Application.DoEvents();
 
+        Assert.That(node.Bounds.Left, Is.GreaterThan(16), "The child indentation must leave a visible framework state-image slot for this regression.");
         var nativeStateHit = GetNativeHitBoundsOrEmpty(treeView, node, TreeViewHitTestLocations.StateImage);
         using var bitmap = RenderNode(treeView, node, Color.Magenta);
         var rowBounds = GetRowBounds(treeView, node);
