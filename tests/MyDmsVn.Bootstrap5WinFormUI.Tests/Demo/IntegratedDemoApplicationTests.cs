@@ -28,6 +28,7 @@ public sealed class IntegratedDemoApplicationTests
         "Loading / Spinner",
         "Progress",
         "Sidebar",
+        "TreeView",
         "DataGrid",
         "Pagination",
         "Navigation / Tabs"
@@ -145,6 +146,18 @@ public sealed class IntegratedDemoApplicationTests
         form.PerformLayout();
 
         Assert.That(FindControls<Form>(form).Any(child => child.GetType().Name == "InputGroupDemoForm" && !child.TopLevel), Is.True);
+    }
+
+    [Test]
+    public void SelectingTreeViewNavigationEmbedsTreeViewDemoInMainWindow()
+    {
+        using var form = new MainForm();
+        form.CreateControl();
+        var sidebar = FindControls<BootstrapSidebar>(form).Single();
+        sidebar.SelectedItem = sidebar.Items.Single(item => item.Text == "TreeView");
+        form.PerformLayout();
+
+        Assert.That(FindControls<Form>(form).Any(child => child.GetType().Name == "TreeViewDemoForm" && !child.TopLevel), Is.True);
     }
 
     [Test]

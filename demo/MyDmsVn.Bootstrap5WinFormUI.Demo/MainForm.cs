@@ -247,6 +247,11 @@ public sealed class MainForm : Form
             () => new SidebarDemoForm());
 
         AddPage(
+            "TreeView",
+            "Native-backed business hierarchies with variants, lines, images, checkboxes, editing, drag/drop diagnostics, scrolling, RTL, and hit-test verification.",
+            () => new TreeViewDemoForm());
+
+        AddPage(
             "DataGrid",
             "Bound data, states, large-row performance, and editable product cells using BootstrapSelect through the native editing lifecycle.",
             () => new DemoPageHostForm(
