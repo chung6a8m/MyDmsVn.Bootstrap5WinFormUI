@@ -33,7 +33,6 @@ public class BootstrapTreeView : TreeView
     {
         BorderStyle = BorderStyle.None;
         DrawMode = TreeViewDrawMode.OwnerDrawAll;
-        HideSelection = false;
 
         _initialized = true;
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
@@ -445,7 +444,7 @@ public class BootstrapTreeView : TreeView
         var mirrorTreeStructure = RightToLeft == RightToLeft.Yes && RightToLeftLayout;
         var selected = (state & TreeNodeStates.Selected) == TreeNodeStates.Selected;
         var visibleSelected = selected && (!HideSelection || Focused);
-        var hot = ReferenceEquals(node, _hotNode);
+        var hot = HotTracking && ReferenceEquals(node, _hotNode);
         var visualState = new BootstrapTreeNodeVisualState(
             selected: visibleSelected,
             hot: hot,
