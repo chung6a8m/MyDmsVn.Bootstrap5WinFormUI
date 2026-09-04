@@ -165,14 +165,11 @@ public sealed class IntegratedDemoApplicationTests
     public void TreeViewImageTabsCreateNativeHandlesWithoutDisposedImages(string tabName)
     {
         using var form = new TreeViewDemoForm();
-        form.Show();
-        form.PerformLayout();
+        form.CreateControl();
 
         var tabs = FindControls<TabControl>(form).Single();
         var tab = tabs.TabPages.Cast<TabPage>().Single(page => page.Name == tabName);
-
         tabs.SelectedTab = tab;
-        form.PerformLayout();
 
         var trees = FindControls<BootstrapTreeView>(tab).ToArray();
         Assert.That(trees, Is.Not.Empty);
