@@ -18,7 +18,8 @@ internal readonly struct BootstrapTreeViewLayoutInput
         bool hasStateImage,
         int nativeStateImageSlotWidth,
         bool hasNodeImage,
-        Size nodeImageSize)
+        Size nodeImageSize,
+        bool useNativeStateImageSize = false)
     {
         if (nodeLevel < 0)
         {
@@ -52,6 +53,7 @@ internal readonly struct BootstrapTreeViewLayoutInput
         NativeStateImageSlotWidth = nativeStateImageSlotWidth;
         HasNodeImage = hasNodeImage;
         NodeImageSize = nodeImageSize;
+        UseNativeStateImageSize = useNativeStateImageSize;
     }
 
     internal Rectangle ClientBounds { get; }
@@ -77,6 +79,8 @@ internal readonly struct BootstrapTreeViewLayoutInput
     internal bool HasNodeImage { get; }
 
     internal Size NodeImageSize { get; }
+
+    internal bool UseNativeStateImageSize { get; }
 
     private static Rectangle Normalize(Rectangle rectangle)
     {
@@ -195,7 +199,9 @@ internal static class BootstrapTreeViewLayout
         var imageGap = DpiScaler.Scale(LogicalImageTextGap, input.Dpi);
         var expanderSize = DpiScaler.Scale(LogicalExpanderSize, input.Dpi);
         var expanderSlotWidth = DpiScaler.Scale(LogicalExpanderSlotWidth, input.Dpi);
-        var stateImageSize = DpiScaler.Scale(LogicalStateImageSize, input.Dpi);
+        var stateImageSize = input.UseNativeStateImageSize
+            ? input.NativeStateImageSlotWidth
+            : DpiScaler.Scale(LogicalStateImageSize, input.Dpi);
 
         // TreeNode.Bounds is already reported in the native mirrored coordinate system.
         // Both LTR and RTL native structure slots therefore precede the label's Left edge;
