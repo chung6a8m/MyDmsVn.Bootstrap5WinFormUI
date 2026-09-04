@@ -137,7 +137,7 @@ public sealed class BootstrapTreeViewInteractivePresentationTests
             ShowLines = false,
             ShowPlusMinus = false,
             ShowRootLines = false,
-            HotTracking = false,
+            HotTracking = true,
         };
         treeView.Nodes.Add(new TreeNode("First node"));
         treeView.Nodes.Add(new TreeNode("Second node"));
