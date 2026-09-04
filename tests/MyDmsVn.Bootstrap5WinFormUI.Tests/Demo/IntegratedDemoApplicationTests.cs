@@ -160,6 +160,37 @@ public sealed class IntegratedDemoApplicationTests
         Assert.That(FindControls<Form>(form).Any(child => child.GetType().Name == "TreeViewDemoForm" && !child.TopLevel), Is.True);
     }
 
+    [TestCase("presentationTab")]
+    [TestCase("layoutTab")]
+    public void TreeViewImageTabsCreateNativeHandlesWithoutDisposedImages(string tabName)
+    {
+        using var form = new TreeViewDemoForm();
+        var tabs = FindControls<TabControl>(form).Single();
+        var tab = tabs.TabPages.Cast<TabPage>().Single(page => page.Name == tabName);
+        var trees = FindControls<BootstrapTreeView>(tab).ToArray();
+        Assert.That(trees, Is.Not.Empty);
+
+        var imageLists = trees
+            .SelectMany(tree => new[] { tree.ImageList, tree.StateImageList })
+            .Where(imageList => imageList is not null)
+            .Cast<ImageList>()
+            .Distinct()
+            .ToArray();
+        Assert.That(imageLists, Is.Not.Empty);
+
+        foreach (var imageList in imageLists)
+        {
+            _ = imageList.Handle;
+        }
+
+        foreach (var tree in trees)
+        {
+            _ = tree.Handle;
+        }
+
+        Assert.That(trees.All(tree => tree.IsHandleCreated), Is.True);
+    }
+
     [Test]
     public void ThemeAndReducedMotionControlsRemainAvailableOnEveryPage()
     {

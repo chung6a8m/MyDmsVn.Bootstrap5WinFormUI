@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -19,6 +20,7 @@ public sealed class TreeViewDemoForm : Form
     private readonly Label _dragDiagnostic = CreateDiagnosticLabel("TreeView diagnostic drag event");
     private readonly ImageList _nodeImages = new ImageList();
     private readonly ImageList _stateImages = new ImageList();
+    private readonly List<Bitmap> _ownedImageSources = new List<Bitmap>();
     private readonly Font _largeNodeFont = new Font(FontFamily.GenericSansSerif, 15f, FontStyle.Bold);
     private readonly Font _accentNodeFont = new Font(FontFamily.GenericSansSerif, 10f, FontStyle.Italic);
 
@@ -83,6 +85,11 @@ public sealed class TreeViewDemoForm : Form
         {
             _nodeImages.Dispose();
             _stateImages.Dispose();
+            foreach (var image in _ownedImageSources)
+            {
+                image.Dispose();
+            }
+            _ownedImageSources.Clear();
             _largeNodeFont.Dispose();
             _accentNodeFont.Dispose();
         }
@@ -727,12 +734,10 @@ public sealed class TreeViewDemoForm : Form
         AddImage(_stateImages, "blocked", CreateStateGlyph(Color.IndianRed, false));
     }
 
-    private static void AddImage(ImageList list, string key, Bitmap bitmap)
+    private void AddImage(ImageList list, string key, Bitmap bitmap)
     {
-        using (bitmap)
-        {
-            list.Images.Add(key, bitmap);
-        }
+        list.Images.Add(key, bitmap);
+        _ownedImageSources.Add(bitmap);
     }
 
     private static Bitmap CreateGlyph(Color color, bool open)
