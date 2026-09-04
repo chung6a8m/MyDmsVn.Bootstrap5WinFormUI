@@ -15,6 +15,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 public class BootstrapTreeView : TreeView
 {
     private const int NativeNoImageIndex = -2;
+    private const int NativeLogicalStateImageSlotSize = 16;
 
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private IntPtr _nativeStateImageSlotHandle;
@@ -545,7 +546,16 @@ public class BootstrapTreeView : TreeView
 
         if (nodeImage is not null && !layout.NodeImageBounds.IsEmpty)
         {
-            DrawImageInSlot(graphics, nodeImage, layout.NodeImageBounds);
+            var imageState = graphics.Save();
+            try
+            {
+                graphics.SetClip(layout.RowBounds, CombineMode.Intersect);
+                DrawImageInSlot(graphics, nodeImage, layout.NodeImageBounds);
+            }
+            finally
+            {
+                graphics.Restore(imageState);
+            }
         }
 
         if (layout.TextBounds.Width > 0 && layout.TextBounds.Height > 0 && !string.IsNullOrEmpty(node.Text))
@@ -696,10 +706,11 @@ public class BootstrapTreeView : TreeView
             return _nativeStateImageSlotWidth;
         }
 
+        var fallbackWidth = DpiScaler.Scale(NativeLogicalStateImageSlotSize, GetCurrentDpi());
         var bounds = node.Bounds;
         if (bounds.IsEmpty)
         {
-            return 0;
+            return fallbackWidth;
         }
 
         var y = bounds.Top + (bounds.Height / 2);
@@ -724,16 +735,17 @@ public class BootstrapTreeView : TreeView
 
         if (first < 0)
         {
-            return 0;
+            return fallbackWidth;
         }
 
         var width = last - first + 1;
         if (first > ClientRectangle.Left && last < ClientRectangle.Right - 1)
         {
             _nativeStateImageSlotWidth = width;
+            return width;
         }
 
-        return width;
+        return Math.Max(width, fallbackWidth);
     }
 
     private void DrawConnectorLines(
@@ -743,7 +755,7 @@ public class BootstrapTreeView : TreeView
         Color color,
         int dpi)
     {
-        if (layout.RowBounds.IsEmpty || layout.ExpanderSlotBounds.IsEmpty)
+        if (layout.RowBounds.IsEmpty)
         {
             return;
         }
