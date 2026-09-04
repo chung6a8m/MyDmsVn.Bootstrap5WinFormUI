@@ -1023,9 +1023,46 @@ Behavior:
 
 Manual verification: use the calendar demo scenarios for empty/default, single, range preview/completion, multiple toggle, constrained safe-domain boundaries, leap February, Monday/Sunday culture week starts, keyboard-only navigation, repeated open/close, Light/Dark, disabled/validation states, and 100/125/150/175/200% real Windows scaling. Confirm that `BootstrapDatePicker` remains the separate native `DateTimePicker` wrapper with OS-owned calendar behavior.
 
+## BootstrapTreeView
+
+Responsibility: apply Bootstrap-themed presentation to native WinForms `TreeView` while leaving the native tree, selection, expansion, checking, label editing, keyboard/focus, hit testing, drag/drop, scrolling, and accessibility contracts authoritative.
+
+The V1 public addition is deliberately limited to:
+
+```text
+BootstrapTreeView : TreeView
+
+BootstrapTreeView.Variant
+```
+
+Behavior:
+
+- `BootstrapTreeView` directly inherits `System.Windows.Forms.TreeView`; `Nodes`, `SelectedNode`, `CheckBoxes`, `ImageList`, `StateImageList`, node image/state-image indices and keys, `Indent`, `ItemHeight`, `FullRowSelect`, `ShowLines`, `ShowPlusMinus`, `ShowRootLines`, `LabelEdit`, `HotTracking`, `Scrollable`, `AllowDrop`, the native event set, and accessibility object remain inherited rather than mirrored or re-declared.
+- `Variant` is the only new V1 public property. It defaults to `Primary` and selects the semantic color used for visible selected-node presentation. No `BorderRadius`, custom tree/node model, selection wrapper, or renderer interface is introduced.
+- The constructor configures `DrawMode = TreeViewDrawMode.OwnerDrawAll`; this is the only supported drawing mode because the framework owns the complete themed node presentation. `DrawMode` remains an inherited mutable WinForms property and is not shadowed or artificially made immutable, so callers can assign another value, but operating away from `OwnerDrawAll` is unsupported.
+- Inherited `DrawNode` remains observable and is raised exactly once for each framework node draw. It is an observation/custom-side-effect hook, not a renderer-replacement contract: setting `DrawTreeNodeEventArgs.DrawDefault = true` does not transfer painting back to the native control, and framework rendering remains authoritative after the event.
+- Neutral enabled nodes may use caller-assigned `TreeNode.ForeColor`, `TreeNode.BackColor`, and `TreeNode.NodeFont`; selected/hot/disabled framework states take presentation precedence where required. Caller fonts remain caller-owned.
+- The framework establishes a theme/DPI-derived default `ItemHeight` and continues to update that default while it still owns the value. Once the caller changes inherited `ItemHeight`, ownership transfers to the caller and later theme/DPI changes preserve that value. A large per-node `NodeFont` does not automatically increase row height; callers using larger node fonts must increase inherited `ItemHeight` when clipping would otherwise occur.
+- `Indent` remains entirely caller/native-owned. Framework layout anchors its vector expander, connector lines, state-image/checkbox slot, node image, text, selection background, and focus cue to native row/label geometry instead of inventing a second hierarchy measurement model.
+- `ImageList`, node image keys/indices, selected-image keys/indices, `StateImageList`, and native state indices remain the source of truth. Framework image rendering never disposes caller-owned lists or images. When `CheckBoxes = true` and no custom `StateImageList` is assigned, the framework paints a checkbox in the native state-image slot while native `TreeNode.Checked` and Before/AfterCheck events remain authoritative.
+- State-image display geometry follows the native TreeView state-image slot and hit-test behavior. It is intentionally **not** inferred merely from `StateImageList.ImageSize`, because native TreeView may normalize the displayed slot independently of the source image dimensions. Framework bounds and tests therefore use native hit-test evidence for parity.
+- Full-row selection presentation follows native conditions: framework full-row geometry applies when `FullRowSelect && !ShowLines`; with lines visible, native TreeView does not expose the same full-row selection behavior. Framework code does not impose a second full-row mouse-selection engine.
+- Any full-row mouse correction is evidence-gated. Current native-baseline coverage does not establish a gap requiring a custom selection layer, so clicks, `NodeMouseClick`, selection, expander, checkbox/state-image routing, and native hit testing remain on the native path. A future correction must first be justified by a reproducible native baseline and remain narrowly scoped to that proven gap.
+- Hover invalidation is presentation-only. `HotTracking` remains the inherited native property and no parallel hover-selection or activation policy is introduced.
+- Up/Down, Left/Right, Home/End, PageUp/PageDown, expand/collapse keys and checkbox Space behavior stay on the native key/message path. `BeforeSelect`/`AfterSelect`, expand/collapse, and check event sequences are not duplicated by framework code.
+- `LabelEdit`, `TreeNode.BeginEdit()`, the native edit HWND, commit/cancel lifecycle, and whatever F2 behavior the active WinForms/native runtime actually provides remain native. The framework adds no F2 shortcut or second editor.
+- `ItemDrag` and `AllowDrop`/`DragEnter`/`DragOver`/`DragDrop` remain inherited native events. V1 contains no drag/drop reorder policy or hidden tree mutation.
+- Accessibility uses the inherited native `TreeView` accessibility object/hierarchy. No replacement provider, duplicate accessible node model, or framework accessibility tree is created.
+- Explicit handle recreation caused by inherited properties such as `CheckBoxes`, `Scrollable`, `ImageIndex`, or `SelectedImageIndex` follows native WinForms side effects. The framework reapplies only presentation/theme state and does not cache/restore native expansion, selection, check, edit, scroll, or image state behind WinForms.
+- Theme and DPI changes invalidate/recompute framework-owned presentation, native state-image slot cache, theme-created font, and framework-owned default row height without disposing caller-owned fonts/images or replacing the native handle contract. Disposal removes the theme subscription and releases only framework-created resources.
+- V1 deliberately excludes custom data binding, async/lazy loading, a tri-state data model, filtering/search, per-node disabled state, a rounded outer shell, a virtualized tree, replacement accessibility, and drag/drop reorder policy. These require separate future contracts rather than hidden additions to the native-backed control.
+
+API review confirms that the feature exports no helper family: `BootstrapTreeViewRenderLogic`, `BootstrapTreeNodeVisualState`, `BootstrapTreeNodePalette`, `Controls.Internal.BootstrapTreeViewLayout`, its layout structs, hit-test/state-image helpers, and test seams remain internal/private. The public/protected reflection fingerprint is documented in `docs/PUBLIC_API_BASELINE.md`.
+
+Manual verification: choose **TreeView** in the integrated demo. Exercise mouse and keyboard selection/expand/collapse/checking, Tab/Shift+Tab exit and return, `DrawNode` event counting, `BeginEdit`/native label commit-cancel, native image/state-image hit-test diagnostics, checkboxes, `FullRowSelect` with `ShowLines` both off and on, HotTracking, ItemDrag and AllowDrop observation, RTL, horizontal/vertical scrolling, Light/Dark switching, caller-owned `ItemHeight` plus large `NodeFont`, explicit handle recreation (`CheckBoxes`, `Scrollable`, `ImageIndex`, `SelectedImageIndex`), disposal/recreation, and real Windows 100/125/150/175/200% scaling.
+
 ## Deferred components
 
 Dialog/Modal, Skeleton, and others are not part of the initial foundation contract.
 
 Before adding one, document which existing foundation pieces it reuses.
-

@@ -820,3 +820,40 @@ Run the matrix for local Single/Multiple and async Single/Multiple scenarios in 
 
 For the **Custom product result template** scenario, verify each `ResultRowHeight = 48` row shows product name on line one and unit, price, and stock on line two. Long names must ellipsize without overlap; hot/highlighted/selected/disabled states must remain readable in Light and Dark; keyboard, mouse, paging, maximum-height, and collision behavior must still target the expected rows. The closed selection stays single-line. Repeat at 100%, 150%, and 200% DPI. Where mixed-DPI monitors are available, move the owner between monitors while open and back again: the popup must stay open, rescale and reposition without stale-DPI painting, recreation, or navigation reset. At the final viewport, wheel scrolling must reach the true clamped end even when it is not row-aligned.
 
+## 14. BootstrapTreeView native regression matrix
+
+`BootstrapTreeView` is native-backed, so manual release verification must compare framework presentation with native `TreeView` behavior rather than replacing OS/runtime semantics with framework-specific expectations. Run the integrated **TreeView** page on both supported target frameworks where practical and record environment-dependent results as manual evidence.
+
+Keyboard and focus:
+
+- Use Up/Down to move selection and confirm one native `BeforeSelect`/`AfterSelect` sequence per effective move.
+- Use Right/Left to expand/collapse and move parent/child exactly as the current native TreeView does; also exercise `+`, `-`, and `*` where supported by the runtime.
+- Use Home/End and PageUp/PageDown across enough nodes to scroll. Page-size landing can differ when client geometry differs, but navigation must stay directional and must not reset to the first node.
+- With `CheckBoxes = true`, press Space and confirm one native check transition/event sequence.
+- Tab into the tree, Tab out to the next sibling control, and Shift+Tab back/out in reverse. `TabStop = false` must cause normal WinForms traversal to skip the tree rather than trapping focus.
+
+Drawing, hit testing, and mouse routing:
+
+- Subscribe to inherited `DrawNode`; verify it is observable once per node draw while framework `OwnerDrawAll` presentation remains authoritative even if a handler sets `DrawDefault = true`.
+- Click label, expander, checkbox/state-image, and node-image regions and compare `HitTest` flags, selection, expand/check state, and event counts with a plain native baseline under the same scenario.
+- Test `StateImageList` with source images whose `ImageSize` differs from the native displayed state slot. Diagnostic bounds/hit tests must follow native state-image geometry rather than assuming the raw source size.
+- Compare `FullRowSelect = false`, `FullRowSelect = true` with `ShowLines = false`, and `FullRowSelect = true` with `ShowLines = true`. No framework-only mouse selection layer may appear; any future correction requires a reproducible native-baseline gap first.
+- Toggle inherited `HotTracking` on/off and verify framework hover presentation does not introduce selection or activation side effects.
+
+Editing, drag/drop, RTL, and scrolling:
+
+- Set `LabelEdit = true`; exercise `TreeNode.BeginEdit()` plus native commit/cancel. Also press F2 and accept the behavior of the active WinForms/runtime as the oracle; BootstrapTreeView must not add a private F2 editor shortcut.
+- Start a representative native drag and confirm `ItemDrag` fires once. With `AllowDrop = true`, observe `DragEnter`, `DragOver`, and `DragDrop` once through the native/control path; V1 must not reorder nodes automatically.
+- Set `RightToLeft = Yes` and compare expander/line/state-image/image/text placement plus native hit-test routing without double mirroring.
+- Exercise both horizontal and vertical scrolling with deep/wide trees. Selection, hot state, labels, images, connector lines, and focus cues must remain aligned to native node bounds after scrolling.
+
+Theme, DPI, row ownership, lifecycle, and resources:
+
+- Switch Light -> Dark -> Light while the same tree remains populated and selected; native node identity, expansion, check state, images, scroll position, and event semantics must not be replaced by a framework cache.
+- Repeat at real Windows 100/125/150/175/200% scaling. Verify theme/default `ItemHeight`, indentation, lines/expanders, checkbox/state-image slot, node images, text and focus cue remain contained and aligned.
+- Assign inherited `ItemHeight` explicitly, switch theme/DPI, and confirm the caller value remains authoritative. Assign a larger per-node `NodeFont`; if clipping occurs, increase caller-owned `ItemHeight` and confirm the framework does not secretly resize rows from the node font.
+- Explicitly exercise handle recreation through inherited `CheckBoxes`, `Scrollable`, `ImageIndex`, and `SelectedImageIndex` changes. Compare native side effects and verify the framework reapplies only presentation, not cached expansion/selection/check/edit state.
+- Repeatedly create/show/theme-switch/recreate-handle/dispose trees. The theme subscription and framework-created font/native-state-image cache must be released, and caller-owned `ImageList`, `StateImageList`, images, node fonts, and assigned control fonts must remain usable after tree disposal.
+- Inspect inherited `AccessibilityObject` and representative node children/states against a native peer. No duplicate/replacement accessibility hierarchy should appear.
+
+Automated TreeView suites characterize the stable portions of this matrix on both TFMs: public/native contract, layout and DPI, owner draw, images/state images/checkboxes, interactive presentation, lifecycle/handle recreation, native keyboard/event/edit/drag/accessibility behavior, full-row native baselines, and integrated demo construction. Real Windows display scaling, visual alignment, runtime-specific F2 behavior, physical drag/drop, and OS accessibility tooling remain manual release evidence.

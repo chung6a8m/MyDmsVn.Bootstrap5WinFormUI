@@ -68,7 +68,8 @@ public sealed class Phase15HardeningTests
             new BootstrapAccordion(),
             new BootstrapProgressBar(),
             new BootstrapSidebar(),
-            new BootstrapDataGridView()
+            new BootstrapDataGridView(),
+            new BootstrapTreeView()
         };
 
         try
