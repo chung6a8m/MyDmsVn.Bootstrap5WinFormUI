@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -74,6 +75,33 @@ public sealed class BootstrapTreeViewReviewRound6RegressionTests
             IsColorNear(sample, Color.Lime),
             Is.True,
             "A custom state image crossing the left viewport edge must retain its full native destination geometry so the visible pixels are the right-hand source slice; stretching the whole source into the clipped rectangle incorrectly exposes the red left half.");
+    }
+
+    [Test]
+    public void Layout_PartiallyClippedExpanderKeepsFullLogicalGlyphBounds()
+    {
+        var clientBounds = new Rectangle(0, 0, 80, 24);
+        var layout = BootstrapTreeViewLayout.Calculate(new BootstrapTreeViewLayoutInput(
+            clientBounds,
+            clientBounds,
+            new Rectangle(12, 0, 60, 24),
+            nodeLevel: 0,
+            dpi: 96,
+            rightToLeft: false,
+            effectiveFullRowSelection: false,
+            hasExpander: true,
+            hasStateImage: false,
+            nativeStateImageSlotWidth: 0,
+            hasNodeImage: false,
+            nodeImageSize: Size.Empty));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(layout.ExpanderBounds.Width, Is.EqualTo(9));
+            Assert.That(layout.ExpanderBounds.Height, Is.EqualTo(9));
+            Assert.That(layout.ExpanderBounds.Left, Is.LessThan(0));
+            Assert.That(Rectangle.Intersect(layout.ExpanderBounds, clientBounds).IsEmpty, Is.False);
+        }));
     }
 
     private static Bitmap RenderNode(
