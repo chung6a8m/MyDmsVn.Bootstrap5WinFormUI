@@ -57,6 +57,7 @@ public sealed class BootstrapTreeViewLifecycleTests
     public void RuntimeThemeSwitch_UpdatesControlAndRenderedPaletteWithoutReplacingNativeTreeState()
     {
         using var treeView = CreateTree();
+        treeView.HideSelection = false;
         var root = treeView.Nodes[0];
         var selected = root.Nodes[0];
         treeView.SelectedNode = selected;
@@ -176,6 +177,7 @@ public sealed class BootstrapTreeViewLifecycleTests
         var nativeHandleBefore = native.Handle;
         var bootstrapHandleBefore = bootstrap.Handle;
 
+        bootstrap.HotTracking = true;
         bootstrap.RaiseMouseMove(GetLabelPoint(bootstrap.Nodes[0]));
         ApplyNativeRuntimeChange(native, propertyName);
         ApplyNativeRuntimeChange(bootstrap, propertyName);
