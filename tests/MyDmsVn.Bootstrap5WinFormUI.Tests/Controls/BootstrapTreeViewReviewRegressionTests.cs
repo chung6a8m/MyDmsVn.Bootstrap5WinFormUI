@@ -57,13 +57,24 @@ public sealed class BootstrapTreeViewReviewRegressionTests
             layout.ExpanderBounds,
             expanded: false,
             rightToLeft: false);
+        var incorrectlyMirroredGlyph = BootstrapTreeViewLayout.CalculateExpanderGlyph(
+            layout.ExpanderBounds,
+            expanded: false,
+            rightToLeft: true);
 
         using var bitmap = RenderNode(treeView, root);
 
-        Assert.That(
-            IsPaintedNear(bitmap, expectedGlyph.Tip, Color.Magenta),
-            Is.True,
-            "RightToLeft changes text reading direction, but native structural mirroring requires RightToLeftLayout=true.");
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(
+                IsPaintedAt(bitmap, expectedGlyph.Tip, Color.Magenta),
+                Is.True,
+                "RightToLeft changes text reading direction, but native structural mirroring requires RightToLeftLayout=true.");
+            Assert.That(
+                IsPaintedAt(bitmap, incorrectlyMirroredGlyph.Tip, Color.Magenta),
+                Is.False,
+                "The collapsed expander must not point left when only RTL text reading is enabled.");
+        }));
     }
 
     [Test]
@@ -171,20 +182,14 @@ public sealed class BootstrapTreeViewReviewRegressionTests
         return Rectangle.FromLTRB(first, bounds.Top, last + 1, bounds.Bottom);
     }
 
-    private static bool IsPaintedNear(Bitmap bitmap, Point point, Color background)
+    private static bool IsPaintedAt(Bitmap bitmap, Point point, Color background)
     {
-        for (var y = Math.Max(0, point.Y - 1); y <= Math.Min(bitmap.Height - 1, point.Y + 1); y++)
+        if (point.X < 0 || point.X >= bitmap.Width || point.Y < 0 || point.Y >= bitmap.Height)
         {
-            for (var x = Math.Max(0, point.X - 1); x <= Math.Min(bitmap.Width - 1, point.X + 1); x++)
-            {
-                if (bitmap.GetPixel(x, y).ToArgb() != background.ToArgb())
-                {
-                    return true;
-                }
-            }
+            return false;
         }
 
-        return false;
+        return bitmap.GetPixel(point.X, point.Y).ToArgb() != background.ToArgb();
     }
 
     private static int GetHorizontalColorSpan(Bitmap bitmap, Rectangle bounds, Color expected)
