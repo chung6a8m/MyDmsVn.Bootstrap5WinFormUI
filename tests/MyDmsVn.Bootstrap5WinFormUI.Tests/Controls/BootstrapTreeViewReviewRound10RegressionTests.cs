@@ -108,7 +108,7 @@ public sealed class BootstrapTreeViewReviewRound10RegressionTests
 
         // Keep the full 9px expander rectangle bottom-clipped while leaving its actual
         // chevron strokes visible. This isolates the selected-foreground decision from
-        // anti-aliased endpoint clipping at the viewport edge.
+        // viewport geometry while still exercising the Round 10 full-row/visible-slice split.
         var rowBounds = new Rectangle(0, 10, treeView.ClientSize.Width, treeView.ItemHeight);
         var labelBounds = new Rectangle(80, 10, 80, treeView.ItemHeight);
         var layout = BootstrapTreeViewLayout.Calculate(new BootstrapTreeViewLayoutInput(
@@ -153,11 +153,25 @@ public sealed class BootstrapTreeViewReviewRound10RegressionTests
             theme.Colors,
             treeView.Variant,
             new BootstrapTreeNodeVisualState(selected: true, hot: false, enabled: true));
+        var glyphPixel = FindPixelFarthestFrom(bitmap, visibleExpander, palette.Background);
+        var selectedBlendDistance = DistanceToColorBlend(
+            glyphPixel,
+            palette.Background,
+            palette.Foreground);
+        var mutedBlendDistance = DistanceToColorBlend(
+            glyphPixel,
+            palette.Background,
+            theme.Colors.MutedText);
 
-        Assert.That(
-            ContainsColorNear(bitmap, visibleExpander, palette.Foreground, tolerance: 40),
-            Is.True,
-            "The visible selected expander slice must use selected foreground contrast even though the full glyph extends outside the viewport.");
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(ColorDistanceSquared(glyphPixel, palette.Background), Is.GreaterThan(0),
+                "The visible expander region must contain an anti-aliased glyph pixel distinct from the selected background.");
+            Assert.That(
+                selectedBlendDistance,
+                Is.LessThan(mutedBlendDistance),
+                "The selected expander pixel must lie closer to the anti-aliased selected-foreground blend than to the muted-glyph blend.");
+        }));
     }
 
     private static bool ContainsColorOnRow(Bitmap bitmap, Color expected, int y)
@@ -181,24 +195,66 @@ public sealed class BootstrapTreeViewReviewRound10RegressionTests
         return false;
     }
 
-    private static bool ContainsColorNear(Bitmap bitmap, Rectangle bounds, Color expected, int tolerance)
+    private static Color FindPixelFarthestFrom(Bitmap bitmap, Rectangle bounds, Color background)
     {
         var clipped = Rectangle.Intersect(new Rectangle(Point.Empty, bitmap.Size), bounds);
+        var farthest = background;
+        var farthestDistance = -1d;
         for (var y = clipped.Top; y < clipped.Bottom; y++)
         {
             for (var x = clipped.Left; x < clipped.Right; x++)
             {
-                var actual = bitmap.GetPixel(x, y);
-                var distance = Math.Abs(actual.R - expected.R) +
-                               Math.Abs(actual.G - expected.G) +
-                               Math.Abs(actual.B - expected.B);
-                if (distance <= tolerance)
+                var candidate = bitmap.GetPixel(x, y);
+                var distance = ColorDistanceSquared(candidate, background);
+                if (distance > farthestDistance)
                 {
-                    return true;
+                    farthestDistance = distance;
+                    farthest = candidate;
                 }
             }
         }
 
-        return false;
+        return farthest;
+    }
+
+    private static double DistanceToColorBlend(Color actual, Color start, Color end)
+    {
+        var vr = end.R - start.R;
+        var vg = end.G - start.G;
+        var vb = end.B - start.B;
+        var denominator = (vr * vr) + (vg * vg) + (vb * vb);
+        if (denominator <= 0)
+        {
+            return ColorDistanceSquared(actual, start);
+        }
+
+        var wr = actual.R - start.R;
+        var wg = actual.G - start.G;
+        var wb = actual.B - start.B;
+        var amount = ((wr * vr) + (wg * vg) + (wb * vb)) / (double)denominator;
+        if (amount < 0d)
+        {
+            amount = 0d;
+        }
+        else if (amount > 1d)
+        {
+            amount = 1d;
+        }
+
+        var closestR = start.R + (amount * vr);
+        var closestG = start.G + (amount * vg);
+        var closestB = start.B + (amount * vb);
+        var dr = actual.R - closestR;
+        var dg = actual.G - closestG;
+        var db = actual.B - closestB;
+        return (dr * dr) + (dg * dg) + (db * db);
+    }
+
+    private static double ColorDistanceSquared(Color first, Color second)
+    {
+        var dr = first.R - second.R;
+        var dg = first.G - second.G;
+        var db = first.B - second.B;
+        return (dr * dr) + (dg * dg) + (db * db);
     }
 }
