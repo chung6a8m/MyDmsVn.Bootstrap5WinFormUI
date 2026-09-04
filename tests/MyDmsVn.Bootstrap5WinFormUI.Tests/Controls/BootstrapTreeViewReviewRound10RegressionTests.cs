@@ -87,6 +87,74 @@ public sealed class BootstrapTreeViewReviewRound10RegressionTests
             "The horizontal connector belongs at the full native row center (y=26), below the viewport; clipping must not synthesize a connector at the visible-fragment center.");
     }
 
+    [Test]
+    public void OwnerDraw_BottomClippedSelectedFullRowExpanderKeepsSelectedForeground()
+    {
+        using var treeView = new BootstrapTreeView
+        {
+            Size = new Size(320, 24),
+            ItemHeight = 24,
+            FullRowSelect = true,
+            ShowLines = false,
+            ShowPlusMinus = true,
+            ShowRootLines = true,
+            HideSelection = false,
+            Variant = BootstrapVariant.Primary,
+        };
+        var root = new TreeNode("Root");
+        root.Nodes.Add(new TreeNode("Child"));
+        treeView.Nodes.Add(root);
+        _ = treeView.Handle;
+
+        var rowBounds = new Rectangle(0, 14, treeView.ClientSize.Width, treeView.ItemHeight);
+        var labelBounds = new Rectangle(80, 14, 80, treeView.ItemHeight);
+        var layout = BootstrapTreeViewLayout.Calculate(new BootstrapTreeViewLayoutInput(
+            treeView.ClientRectangle,
+            rowBounds,
+            labelBounds,
+            root.Level,
+            treeView.DeviceDpi,
+            rightToLeft: false,
+            effectiveFullRowSelection: true,
+            hasExpander: true,
+            hasStateImage: false,
+            nativeStateImageSlotWidth: 0,
+            hasNodeImage: false,
+            nodeImageSize: Size.Empty));
+        var visibleExpander = Rectangle.Intersect(layout.ExpanderBounds, treeView.ClientRectangle);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(visibleExpander.IsEmpty, Is.False,
+                "The regression requires a visible slice of the bottom-clipped expander.");
+            Assert.That(layout.SelectionBounds.Contains(layout.ExpanderBounds), Is.False,
+                "The full native expander must extend beyond the clipped selection viewport for this regression.");
+        }));
+
+        using var bitmap = new Bitmap(treeView.ClientSize.Width, treeView.ClientSize.Height);
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.Clear(Color.Magenta);
+            treeView.RenderNodeForTesting(
+                graphics,
+                root,
+                rowBounds,
+                labelBounds,
+                TreeNodeStates.Selected);
+        }
+
+        var theme = BootstrapThemeManager.CurrentTheme;
+        var palette = BootstrapTreeViewRenderLogic.ResolvePalette(
+            theme.Colors,
+            treeView.Variant,
+            new BootstrapTreeNodeVisualState(selected: true, hot: false, enabled: true));
+
+        Assert.That(
+            ContainsColorNear(bitmap, visibleExpander, palette.Foreground, tolerance: 40),
+            Is.True,
+            "The visible selected expander slice must use selected foreground contrast even though the full glyph extends outside the viewport.");
+    }
+
     private static bool ContainsColorOnRow(Bitmap bitmap, Color expected, int y)
     {
         if (y < 0 || y >= bitmap.Height)
@@ -102,6 +170,27 @@ public sealed class BootstrapTreeViewReviewRound10RegressionTests
                 Math.Abs(actual.B - expected.B) <= 8)
             {
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsColorNear(Bitmap bitmap, Rectangle bounds, Color expected, int tolerance)
+    {
+        var clipped = Rectangle.Intersect(new Rectangle(Point.Empty, bitmap.Size), bounds);
+        for (var y = clipped.Top; y < clipped.Bottom; y++)
+        {
+            for (var x = clipped.Left; x < clipped.Right; x++)
+            {
+                var actual = bitmap.GetPixel(x, y);
+                var distance = Math.Abs(actual.R - expected.R) +
+                               Math.Abs(actual.G - expected.G) +
+                               Math.Abs(actual.B - expected.B);
+                if (distance <= tolerance)
+                {
+                    return true;
+                }
             }
         }
 
