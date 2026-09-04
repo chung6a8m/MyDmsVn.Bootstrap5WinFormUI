@@ -14,6 +14,8 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// </summary>
 public class BootstrapTreeView : TreeView
 {
+    private const int NativeNoImageIndex = -2;
+
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private IntPtr _nativeStateImageSlotHandle;
     private int _nativeStateImageSlotWidth;
@@ -31,7 +33,6 @@ public class BootstrapTreeView : TreeView
     /// </summary>
     public BootstrapTreeView()
     {
-        BorderStyle = BorderStyle.None;
         DrawMode = TreeViewDrawMode.OwnerDrawAll;
 
         _initialized = true;
@@ -149,7 +150,12 @@ public class BootstrapTreeView : TreeView
         base.OnMouseMove(e);
         if (!IsDisposed && !Disposing)
         {
-            UpdateHotNode(GetNodeAt(e.Location));
+            var hit = HitTest(e.Location);
+            var nativeOnItemLocations =
+                TreeViewHitTestLocations.Image |
+                TreeViewHitTestLocations.Label |
+                TreeViewHitTestLocations.StateImage;
+            UpdateHotNode((hit.Location & nativeOnItemLocations) != 0 ? hit.Node : null);
         }
     }
 
@@ -593,7 +599,7 @@ public class BootstrapTreeView : TreeView
                 imageList,
                 node.SelectedImageKey,
                 node.SelectedImageIndex);
-            if (index >= 0)
+            if (index == NativeNoImageIndex || index >= 0)
             {
                 return index;
             }
@@ -602,14 +608,14 @@ public class BootstrapTreeView : TreeView
                 imageList,
                 SelectedImageKey,
                 SelectedImageIndex);
-            if (index >= 0)
+            if (index == NativeNoImageIndex || index >= 0)
             {
                 return index;
             }
         }
 
         var normalIndex = ResolveConfiguredImageIndex(imageList, node.ImageKey, node.ImageIndex);
-        if (normalIndex >= 0)
+        if (normalIndex == NativeNoImageIndex || normalIndex >= 0)
         {
             return normalIndex;
         }
@@ -646,6 +652,11 @@ public class BootstrapTreeView : TreeView
             {
                 return keyIndex;
             }
+        }
+
+        if (index == NativeNoImageIndex)
+        {
+            return NativeNoImageIndex;
         }
 
         if (index < 0 || imageList.Images.Count == 0)
