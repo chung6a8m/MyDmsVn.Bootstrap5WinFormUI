@@ -31,16 +31,24 @@ public sealed class BootstrapTreeViewReviewRound10RegressionTests
             hasNodeImage: true,
             nodeImageSize: new Size(16, 16),
             useNativeStateImageSize: true));
+        var horizontalConnector = BootstrapTreeViewLayout.CalculateHorizontalConnectorLine(
+            layout.RowBounds,
+            layout.ExpanderAnchorX,
+            layout.TextBounds.Left);
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(layout.RowBounds, Is.EqualTo(new Rectangle(0, 14, 320, 10)));
+            Assert.That(layout.RowBounds, Is.EqualTo(new Rectangle(0, 14, 320, 24)),
+                "Row geometry must keep the complete native row even when only its top fragment is visible.");
             Assert.That(layout.NodeImageBounds, Is.EqualTo(new Rectangle(93, 18, 16, 16)),
                 "The node image must stay centered in the full 24px native row and only be viewport-clipped by Graphics.");
             Assert.That(layout.StateImageBounds, Is.EqualTo(new Rectangle(77, 18, 16, 16)),
                 "The native state image must not shrink or re-center into the 10px visible row fragment.");
-            Assert.That(layout.ExpanderBounds, Is.EqualTo(new Rectangle(64, 21, 9, 9)),
+            Assert.That(layout.ExpanderBounds, Is.EqualTo(new Rectangle(63, 21, 9, 9)),
                 "The expander must keep its full native-row vertical position when the bottom row is partially visible.");
+            Assert.That(horizontalConnector.Start.Y, Is.EqualTo(26),
+                "Connector geometry must use the native row center rather than the clipped viewport fragment center.");
+            Assert.That(horizontalConnector.End.Y, Is.EqualTo(26));
         }));
     }
 
