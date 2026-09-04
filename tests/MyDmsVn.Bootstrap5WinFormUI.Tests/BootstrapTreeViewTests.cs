@@ -28,7 +28,7 @@ public sealed class BootstrapTreeViewTests
         Assert.That(treeView, Is.InstanceOf<TreeView>());
         Assert.That(treeView.BorderStyle, Is.EqualTo(BorderStyle.None));
         Assert.That(treeView.DrawMode, Is.EqualTo(TreeViewDrawMode.OwnerDrawAll));
-        Assert.That(treeView.HideSelection, Is.False);
+        Assert.That(treeView.HideSelection, Is.True);
         Assert.That(treeView.Variant, Is.EqualTo(BootstrapVariant.Primary));
     }
 
