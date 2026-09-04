@@ -466,7 +466,7 @@ public class BootstrapTreeView : TreeView
         var nodeImage = ResolveImage(ImageList, nodeImageIndex);
         var stateImageIndex = ResolveStateImageIndex(node);
         var stateImage = ResolveImage(StateImageList, stateImageIndex);
-        var drawFrameworkCheckbox = CheckBoxes && StateImageList is null;
+        var drawFrameworkCheckbox = CheckBoxes && stateImage is null;
         var hasStateImage = drawFrameworkCheckbox || stateImage is not null;
         var nativeStateImageSlotWidth = hasStateImage
             ? ResolveNativeStateImageSlotWidth(node)
@@ -536,7 +536,7 @@ public class BootstrapTreeView : TreeView
 
         if (stateImage is not null && !layout.StateImageBounds.IsEmpty)
         {
-            DrawImageInSlot(graphics, stateImage, layout.StateImageBounds);
+            DrawImageInSlot(graphics, stateImage, layout.StateImageBounds, stretchToSlot: true);
         }
         else if (drawFrameworkCheckbox && !layout.StateImageBounds.IsEmpty)
         {
@@ -931,15 +931,21 @@ public class BootstrapTreeView : TreeView
         }
     }
 
-    private static void DrawImageInSlot(Graphics graphics, Image image, Rectangle slotBounds)
+    private static void DrawImageInSlot(
+        Graphics graphics,
+        Image image,
+        Rectangle slotBounds,
+        bool stretchToSlot = false)
     {
-        var targetBounds = BootstrapTreeViewLayout.CalculateContainedImageBounds(slotBounds, image.Size);
+        var targetBounds = stretchToSlot
+            ? slotBounds
+            : BootstrapTreeViewLayout.CalculateContainedImageBounds(slotBounds, image.Size);
         if (targetBounds.IsEmpty)
         {
             return;
         }
 
-        if (targetBounds.Size == image.Size)
+        if (!stretchToSlot && targetBounds.Size == image.Size)
         {
             graphics.DrawImageUnscaled(image, targetBounds.Location);
             return;
