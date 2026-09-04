@@ -17,6 +17,7 @@ public class BootstrapTreeView : TreeView
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private IntPtr _nativeStateImageSlotHandle;
     private int _nativeStateImageSlotWidth;
+    private TreeNode? _hotNode;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BootstrapTreeView"/> class.
@@ -51,6 +52,34 @@ public class BootstrapTreeView : TreeView
             _variant = value;
             Invalidate();
         }
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        UpdateHotNode(GetNodeAt(e.Location));
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        UpdateHotNode(null);
+    }
+
+    /// <inheritdoc />
+    protected override void OnGotFocus(EventArgs e)
+    {
+        base.OnGotFocus(e);
+        InvalidateNodeRow(SelectedNode);
+    }
+
+    /// <inheritdoc />
+    protected override void OnLostFocus(EventArgs e)
+    {
+        base.OnLostFocus(e);
+        InvalidateNodeRow(SelectedNode);
     }
 
     /// <inheritdoc />
@@ -126,6 +155,41 @@ public class BootstrapTreeView : TreeView
                (nodeLevel > 0 || showRootLines);
     }
 
+    private void UpdateHotNode(TreeNode? node)
+    {
+        if (ReferenceEquals(_hotNode, node))
+        {
+            return;
+        }
+
+        var previous = _hotNode;
+        _hotNode = node;
+        InvalidateNodeRow(previous);
+        InvalidateNodeRow(node);
+    }
+
+    private void InvalidateNodeRow(TreeNode? node)
+    {
+        if (node is null || IsDisposed || node.TreeView != this)
+        {
+            return;
+        }
+
+        var bounds = node.Bounds;
+        if (bounds.IsEmpty || ClientRectangle.IsEmpty)
+        {
+            return;
+        }
+
+        var rowBounds = Rectangle.Intersect(
+            ClientRectangle,
+            new Rectangle(ClientRectangle.Left, bounds.Top, ClientRectangle.Width, ItemHeight));
+        if (!rowBounds.IsEmpty)
+        {
+            Invalidate(rowBounds);
+        }
+    }
+
     private void RaiseObservableDrawNodeEvent(DrawTreeNodeEventArgs e)
     {
         base.OnDrawNode(e);
@@ -152,9 +216,10 @@ public class BootstrapTreeView : TreeView
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
         var selected = (state & TreeNodeStates.Selected) == TreeNodeStates.Selected;
         var visibleSelected = selected && (!HideSelection || Focused);
+        var hot = ReferenceEquals(node, _hotNode);
         var visualState = new BootstrapTreeNodeVisualState(
             selected: visibleSelected,
-            hot: false,
+            hot: hot,
             enabled: Enabled);
         var palette = BootstrapTreeViewRenderLogic.ResolvePalette(theme.Colors, _variant, visualState);
         var hasExpander = ShouldDrawExpander(
@@ -193,7 +258,7 @@ public class BootstrapTreeView : TreeView
         var background = palette.Background;
         var foreground = palette.Foreground;
 
-        if (Enabled && !visibleSelected)
+        if (Enabled && !visibleSelected && !hot)
         {
             if (!node.BackColor.IsEmpty)
             {
