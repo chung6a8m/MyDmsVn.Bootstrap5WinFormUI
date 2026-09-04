@@ -555,13 +555,22 @@ public class BootstrapTreeView : TreeView
                 flags |= TextFormatFlags.RightToLeft | TextFormatFlags.Right;
             }
 
-            TextRenderer.DrawText(
-                graphics,
-                node.Text,
-                font,
-                layout.TextBounds,
-                foreground,
-                flags);
+            var textState = graphics.Save();
+            try
+            {
+                graphics.SetClip(layout.TextBounds, CombineMode.Intersect);
+                TextRenderer.DrawText(
+                    graphics,
+                    node.Text,
+                    font,
+                    nativeLabelBounds,
+                    foreground,
+                    flags);
+            }
+            finally
+            {
+                graphics.Restore(textState);
+            }
         }
 
         if (ShouldDrawFocusCueForTesting(visibleSelected, Focused, ShowFocusCues))
