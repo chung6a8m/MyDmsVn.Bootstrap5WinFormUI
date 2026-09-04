@@ -175,13 +175,13 @@ internal static class BootstrapTreeViewLayout
 
     internal static BootstrapTreeViewNodeLayout Calculate(BootstrapTreeViewLayoutInput input)
     {
-        var rowBand = new Rectangle(
+        var nativeRowBounds = new Rectangle(
             input.ClientBounds.Left,
             input.DrawBounds.Top,
             input.ClientBounds.Width,
             input.DrawBounds.Height);
-        var rowBounds = Intersect(rowBand, input.ClientBounds);
-        if (rowBounds.IsEmpty)
+        var visibleRowBounds = Intersect(nativeRowBounds, input.ClientBounds);
+        if (visibleRowBounds.IsEmpty)
         {
             return new BootstrapTreeViewNodeLayout(
                 Rectangle.Empty,
@@ -195,7 +195,7 @@ internal static class BootstrapTreeViewLayout
                 Rectangle.Empty);
         }
 
-        var textBounds = Intersect(input.NativeLabelBounds, rowBounds);
+        var textBounds = Intersect(input.NativeLabelBounds, visibleRowBounds);
         var imageGap = DpiScaler.Scale(LogicalImageTextGap, input.Dpi);
         var expanderSize = DpiScaler.Scale(LogicalExpanderSize, input.Dpi);
         var expanderSlotWidth = DpiScaler.Scale(LogicalExpanderSlotWidth, input.Dpi);
@@ -208,26 +208,30 @@ internal static class BootstrapTreeViewLayout
         // mirroring them a second time around the label would move them away from HitTest regions.
         var cursor = input.NativeLabelBounds.Left;
         var nodeImageBounds = input.HasNodeImage
-            ? PlaceBackward(ref cursor, input.NodeImageSize, imageGap, rowBounds)
+            ? PlaceBackward(ref cursor, input.NodeImageSize, imageGap, nativeRowBounds, visibleRowBounds)
             : Rectangle.Empty;
         var stateImageBounds = input.HasStateImage
-            ? PlaceBackwardInSlot(ref cursor, input.NativeStateImageSlotWidth, stateImageSize, rowBounds)
+            ? PlaceBackwardInSlot(
+                ref cursor,
+                input.NativeStateImageSlotWidth,
+                stateImageSize,
+                nativeRowBounds,
+                visibleRowBounds)
             : Rectangle.Empty;
 
-        // Keep the un-clipped native-anchored slot long enough to center the glyph and connector
-        // anchor. The glyph/image destination rectangles also remain un-clipped whenever any part
-        // is visible; the Graphics/client clip reveals only the viewport slice without re-scaling
-        // or re-centering content at the edge during horizontal scrolling.
-        var rawExpanderSlot = TakeBackwardSlot(ref cursor, expanderSlotWidth, rowBounds);
+        // Keep the complete native row and slot geometry for centering and connector placement.
+        // The viewport intersection is used only to decide visibility and selection/text clipping,
+        // so partial vertical scrolling reveals a slice instead of re-centering or shrinking glyphs.
+        var rawExpanderSlot = TakeBackwardSlot(ref cursor, expanderSlotWidth, nativeRowBounds);
         var expanderAnchorX = rawExpanderSlot.Left + (rawExpanderSlot.Width / 2);
-        var expanderSlotBounds = Intersect(rawExpanderSlot, rowBounds);
+        var expanderSlotBounds = Intersect(rawExpanderSlot, visibleRowBounds);
         var expanderBounds = input.HasExpander
-            ? KeepUnclippedWhenVisible(CenterInSlot(rawExpanderSlot, expanderSize), rowBounds)
+            ? KeepUnclippedWhenVisible(CenterInSlot(rawExpanderSlot, expanderSize), visibleRowBounds)
             : Rectangle.Empty;
 
-        var selectionBounds = input.EffectiveFullRowSelection ? rowBounds : textBounds;
+        var selectionBounds = input.EffectiveFullRowSelection ? visibleRowBounds : textBounds;
         return new BootstrapTreeViewNodeLayout(
-            rowBounds,
+            nativeRowBounds,
             selectionBounds,
             expanderSlotBounds,
             expanderAnchorX,
@@ -374,20 +378,30 @@ internal static class BootstrapTreeViewLayout
         return (int)value;
     }
 
-    private static Rectangle PlaceBackward(ref int cursor, Size size, int gap, Rectangle rowBounds)
+    private static Rectangle PlaceBackward(
+        ref int cursor,
+        Size size,
+        int gap,
+        Rectangle nativeRowBounds,
+        Rectangle visibleRowBounds)
     {
         var width = Math.Max(0, size.Width);
         var height = Math.Max(0, size.Height);
         var right = cursor - gap;
-        var rectangle = CenterVertically(right - width, width, height, rowBounds);
+        var rectangle = CenterVertically(right - width, width, height, nativeRowBounds);
         cursor = right - width;
-        return KeepUnclippedWhenVisible(rectangle, rowBounds);
+        return KeepUnclippedWhenVisible(rectangle, visibleRowBounds);
     }
 
-    private static Rectangle PlaceBackwardInSlot(ref int cursor, int slotWidth, int desiredSize, Rectangle rowBounds)
+    private static Rectangle PlaceBackwardInSlot(
+        ref int cursor,
+        int slotWidth,
+        int desiredSize,
+        Rectangle nativeRowBounds,
+        Rectangle visibleRowBounds)
     {
-        var rawSlot = TakeBackwardSlot(ref cursor, slotWidth, rowBounds);
-        return KeepUnclippedWhenVisible(CenterInSlot(rawSlot, desiredSize), rowBounds);
+        var rawSlot = TakeBackwardSlot(ref cursor, slotWidth, nativeRowBounds);
+        return KeepUnclippedWhenVisible(CenterInSlot(rawSlot, desiredSize), visibleRowBounds);
     }
 
     private static Rectangle TakeBackwardSlot(ref int cursor, int slotWidth, Rectangle rowBounds)
