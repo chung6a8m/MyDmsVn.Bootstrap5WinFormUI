@@ -106,8 +106,11 @@ public sealed class BootstrapTreeViewReviewRound10RegressionTests
         treeView.Nodes.Add(root);
         _ = treeView.Handle;
 
-        var rowBounds = new Rectangle(0, 14, treeView.ClientSize.Width, treeView.ItemHeight);
-        var labelBounds = new Rectangle(80, 14, 80, treeView.ItemHeight);
+        // Keep the full 9px expander rectangle bottom-clipped while leaving its actual
+        // chevron strokes visible. This isolates the selected-foreground decision from
+        // anti-aliased endpoint clipping at the viewport edge.
+        var rowBounds = new Rectangle(0, 10, treeView.ClientSize.Width, treeView.ItemHeight);
+        var labelBounds = new Rectangle(80, 10, 80, treeView.ItemHeight);
         var layout = BootstrapTreeViewLayout.Calculate(new BootstrapTreeViewLayoutInput(
             treeView.ClientRectangle,
             rowBounds,
@@ -129,6 +132,8 @@ public sealed class BootstrapTreeViewReviewRound10RegressionTests
                 "The regression requires a visible slice of the bottom-clipped expander.");
             Assert.That(layout.SelectionBounds.Contains(layout.ExpanderBounds), Is.False,
                 "The full native expander must extend beyond the clipped selection viewport for this regression.");
+            Assert.That(layout.SelectionBounds.IntersectsWith(layout.ExpanderBounds), Is.True,
+                "The visible expander slice must overlap the selected full-row background.");
         }));
 
         using var bitmap = new Bitmap(treeView.ClientSize.Width, treeView.ClientSize.Height);
