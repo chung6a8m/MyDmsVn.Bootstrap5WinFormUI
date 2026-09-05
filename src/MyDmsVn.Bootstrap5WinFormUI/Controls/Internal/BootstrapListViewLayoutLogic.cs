@@ -6,6 +6,11 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 
 internal static class BootstrapListViewLayoutLogic
 {
+    internal static bool ShouldWrapItemText(View view, bool labelWrap)
+    {
+        return view == View.LargeIcon && labelWrap;
+    }
+
     internal static Rectangle Deflate(Rectangle bounds, int horizontal, int vertical)
     {
         if (bounds.Width <= 0 || bounds.Height <= 0)

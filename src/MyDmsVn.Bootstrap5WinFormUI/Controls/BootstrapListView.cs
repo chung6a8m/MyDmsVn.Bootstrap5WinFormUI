@@ -14,15 +14,20 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// </summary>
 public class BootstrapListView : ListView
 {
+    private const int MaxTileColumns = 20;
+
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private bool _striped;
     private bool _hoverHighlight = true;
     private int _hoveredItemIndex = -1;
+    private Rectangle _hoveredItemBounds = Rectangle.Empty;
     private bool _themeSubscribed;
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
     private bool _initialized;
     private Font? _themeFont;
+    private Bitmap? _ownerDrawBuffer;
+    private Graphics? _ownerDrawBufferGraphics;
 
     /// <summary>Initializes a new instance of the <see cref="BootstrapListView"/> class.</summary>
     public BootstrapListView()
@@ -109,6 +114,7 @@ public class BootstrapListView : ListView
         OwnerDraw = true;
         base.OnHandleCreated(e);
         _hoveredItemIndex = -1;
+        _hoveredItemBounds = Rectangle.Empty;
         if (_initialized && !IsDisposed && !Disposing)
         {
             ApplyThemePresentation();
@@ -120,6 +126,7 @@ public class BootstrapListView : ListView
     protected override void OnHandleDestroyed(EventArgs e)
     {
         _hoveredItemIndex = -1;
+        _hoveredItemBounds = Rectangle.Empty;
         base.OnHandleDestroyed(e);
     }
 
@@ -129,7 +136,8 @@ public class BootstrapListView : ListView
         base.OnMouseMove(e);
         if (!_hoverHighlight || IsDisposed || Disposing || !IsHandleCreated) return;
         var hit = HitTest(e.X, e.Y);
-        UpdateHoveredIndex(hit.Item?.Index ?? -1);
+        var index = hit.Item?.Index ?? -1;
+        UpdateHoveredIndex(index, GetItemBounds(index));
     }
 
     /// <inheritdoc />
@@ -156,8 +164,16 @@ public class BootstrapListView : ListView
     /// <inheritdoc />
     protected override void OnDrawColumnHeader(DrawListViewColumnHeaderEventArgs e)
     {
-        base.OnDrawColumnHeader(e);
-        if (e.DrawDefault) return;
+        var bufferGraphics = PrepareOwnerDrawBuffer(e.Graphics, e.Bounds);
+        var bufferedArgs = new DrawListViewColumnHeaderEventArgs(
+            bufferGraphics,
+            e.Bounds,
+            e.ColumnIndex,
+            e.Header,
+            e.State,
+            e.ForeColor,
+            e.BackColor,
+            e.Font);
 
         if (HeaderStyle != ColumnHeaderStyle.None)
         {
@@ -165,9 +181,9 @@ public class BootstrapListView : ListView
             using (var background = new SolidBrush(theme.Colors.SurfaceSecondary))
             using (var separator = new Pen(theme.Colors.Border, Math.Max(1, DpiScaler.Scale(1, GetCurrentDpi()))))
             {
-                e.Graphics.FillRectangle(background, e.Bounds);
-                e.Graphics.DrawLine(separator, e.Bounds.Right - 1, e.Bounds.Top, e.Bounds.Right - 1, e.Bounds.Bottom);
-                e.Graphics.DrawLine(separator, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+                bufferedArgs.Graphics.FillRectangle(background, e.Bounds);
+                bufferedArgs.Graphics.DrawLine(separator, e.Bounds.Right - 1, e.Bounds.Top, e.Bounds.Right - 1, e.Bounds.Bottom);
+                bufferedArgs.Graphics.DrawLine(separator, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
             }
 
             var textBounds = BootstrapListViewLayoutLogic.Deflate(
@@ -183,7 +199,7 @@ public class BootstrapListView : ListView
                 var imageBounds = IsLayoutMirrored
                     ? new Rectangle(textBounds.Right - imageWidth, textBounds.Top, imageWidth, textBounds.Height)
                     : new Rectangle(textBounds.Left, textBounds.Top, imageWidth, textBounds.Height);
-                DrawImage(e.Graphics, headerImage, imageBounds);
+                DrawImage(bufferedArgs.Graphics, headerImage, imageBounds);
                 var gap = DpiScaler.Scale(theme.Metrics.SpacingXS, GetCurrentDpi());
                 textBounds = IsLayoutMirrored
                     ? Rectangle.FromLTRB(textBounds.Left, textBounds.Top, Math.Max(textBounds.Left, imageBounds.Left - gap), textBounds.Bottom)
@@ -193,7 +209,7 @@ public class BootstrapListView : ListView
             if (!textBounds.IsEmpty)
             {
                 TextRenderer.DrawText(
-                    e.Graphics,
+                    bufferedArgs.Graphics,
                     e.Header?.Text ?? string.Empty,
                     Font,
                     textBounds,
@@ -205,28 +221,53 @@ public class BootstrapListView : ListView
             }
         }
 
+        base.OnDrawColumnHeader(bufferedArgs);
+        e.DrawDefault = bufferedArgs.DrawDefault;
+        if (!e.DrawDefault) RenderOwnerDrawBuffer(e.Graphics, e.Bounds);
     }
 
     /// <inheritdoc />
     protected override void OnDrawItem(DrawListViewItemEventArgs e)
     {
-        base.OnDrawItem(e);
-        if (e.DrawDefault) return;
-
         if (View == View.Details)
         {
+            base.OnDrawItem(e);
             return;
         }
 
-        DrawNonDetailsItem(e);
+        var bufferGraphics = PrepareOwnerDrawBuffer(e.Graphics, e.Bounds);
+        var bufferedArgs = new DrawListViewItemEventArgs(
+            bufferGraphics,
+            e.Item,
+            e.Bounds,
+            e.ItemIndex,
+            e.State);
+        DrawNonDetailsItem(bufferedArgs);
+        base.OnDrawItem(bufferedArgs);
+        e.DrawDefault = bufferedArgs.DrawDefault;
+        if (!e.DrawDefault) RenderOwnerDrawBuffer(e.Graphics, e.Bounds);
     }
 
     /// <inheritdoc />
     protected override void OnDrawSubItem(DrawListViewSubItemEventArgs e)
     {
-        base.OnDrawSubItem(e);
-        if (e.DrawDefault) return;
-        if (View == View.Details) DrawDetailsSubItem(e);
+        var paintBounds = e.ColumnIndex == 0 && e.Item is not null
+            ? Rectangle.Union(e.Bounds, GetNativeBounds(e.Item, ItemBoundsPortion.Entire, e.Bounds))
+            : e.Bounds;
+        var bufferGraphics = PrepareOwnerDrawBuffer(e.Graphics, paintBounds);
+        var bufferedArgs = new DrawListViewSubItemEventArgs(
+            bufferGraphics,
+            e.Bounds,
+            e.Item,
+            e.SubItem,
+            e.ItemIndex,
+            e.ColumnIndex,
+            e.Header,
+            e.ItemState);
+        if (View == View.Details) DrawDetailsSubItem(bufferedArgs);
+        base.OnDrawSubItem(bufferedArgs);
+        e.DrawDefault = bufferedArgs.DrawDefault;
+        if (!e.DrawDefault) RenderOwnerDrawBuffer(e.Graphics, paintBounds);
     }
 
     /// <inheritdoc />
@@ -242,6 +283,8 @@ public class BootstrapListView : ListView
             }
 
             _hoveredItemIndex = -1;
+            _hoveredItemBounds = Rectangle.Empty;
+            DisposeOwnerDrawBuffer();
             DisposeThemeFont();
         }
 
@@ -342,7 +385,7 @@ public class BootstrapListView : ListView
                 labelBounds,
                 palette.ForeColor,
                 HorizontalAlignment.Center,
-                View == View.LargeIcon,
+                BootstrapListViewLayoutLogic.ShouldWrapItemText(View, LabelWrap),
                 hotTracked);
         }
 
@@ -370,6 +413,7 @@ public class BootstrapListView : ListView
         var lineHeight = Math.Max(1, bounds.Height / lineCount);
         DrawTileLine(graphics, item, item.SubItems[0], bounds, lineHeight, 0, palette.ForeColor, hotTracked);
         var lineIndex = 1;
+        var projectedColumnCount = 0;
         for (var displayIndex = 0; displayIndex < Columns.Count; displayIndex++)
         {
             for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
@@ -378,6 +422,7 @@ public class BootstrapListView : ListView
                 if (column.DisplayIndex != displayIndex || column.Width == 0) continue;
                 var subItem = ResolveTileSubItem(item, column, columnIndex);
                 if (subItem is null || ReferenceEquals(subItem, item.SubItems[0])) continue;
+                if (projectedColumnCount >= MaxTileColumns) return;
                 DrawTileLine(
                     graphics,
                     item,
@@ -388,6 +433,7 @@ public class BootstrapListView : ListView
                     BootstrapThemeManager.CurrentTheme.Colors.MutedText,
                     hotTracked);
                 lineIndex++;
+                projectedColumnCount++;
             }
         }
     }
@@ -395,11 +441,15 @@ public class BootstrapListView : ListView
     private int CountTileLines(ListViewItem item)
     {
         var count = 1;
+        var projectedColumnCount = 0;
         for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
         {
             var column = Columns[columnIndex];
             var subItem = ResolveTileSubItem(item, column, columnIndex);
-            if (column.Width != 0 && subItem is not null && !ReferenceEquals(subItem, item.SubItems[0])) count++;
+            if (column.Width == 0 || subItem is null || ReferenceEquals(subItem, item.SubItems[0])) continue;
+            if (projectedColumnCount >= MaxTileColumns) break;
+            count++;
+            projectedColumnCount++;
         }
 
         return count;
@@ -593,6 +643,52 @@ public class BootstrapListView : ListView
         graphics.FillRectangle(brush, bounds);
     }
 
+    private Graphics PrepareOwnerDrawBuffer(Graphics targetGraphics, Rectangle targetBounds)
+    {
+        var requiredSize = new Size(
+            Math.Max(1, Math.Max(ClientSize.Width, targetBounds.Right)),
+            Math.Max(1, Math.Max(ClientSize.Height, targetBounds.Bottom)));
+        if (_ownerDrawBuffer is null ||
+            _ownerDrawBuffer.Width < requiredSize.Width ||
+            _ownerDrawBuffer.Height < requiredSize.Height ||
+            Math.Abs(_ownerDrawBuffer.HorizontalResolution - targetGraphics.DpiX) > 0.01f ||
+            Math.Abs(_ownerDrawBuffer.VerticalResolution - targetGraphics.DpiY) > 0.01f)
+        {
+            DisposeOwnerDrawBuffer();
+            _ownerDrawBuffer = new Bitmap(requiredSize.Width, requiredSize.Height);
+            _ownerDrawBuffer.SetResolution(targetGraphics.DpiX, targetGraphics.DpiY);
+            _ownerDrawBufferGraphics = Graphics.FromImage(_ownerDrawBuffer);
+        }
+
+        var graphics = _ownerDrawBufferGraphics!;
+        graphics.ResetTransform();
+        graphics.ResetClip();
+        graphics.Clear(BackColor);
+        return graphics;
+    }
+
+    private void RenderOwnerDrawBuffer(Graphics graphics, Rectangle targetBounds)
+    {
+        if (_ownerDrawBuffer is null) return;
+        var sourceBounds = Rectangle.Intersect(
+            targetBounds,
+            new Rectangle(Point.Empty, _ownerDrawBuffer.Size));
+        if (sourceBounds.IsEmpty) return;
+        graphics.DrawImage(
+            _ownerDrawBuffer,
+            sourceBounds,
+            sourceBounds,
+            GraphicsUnit.Pixel);
+    }
+
+    private void DisposeOwnerDrawBuffer()
+    {
+        _ownerDrawBufferGraphics?.Dispose();
+        _ownerDrawBufferGraphics = null;
+        _ownerDrawBuffer?.Dispose();
+        _ownerDrawBuffer = null;
+    }
+
     private void DrawText(
         Graphics graphics,
         string text,
@@ -657,12 +753,19 @@ public class BootstrapListView : ListView
         if (!focusBounds.IsEmpty) ControlPaint.DrawFocusRectangle(graphics, focusBounds, BootstrapThemeManager.CurrentTheme.Colors.Focus, Color.Transparent);
     }
 
-    private void UpdateHoveredIndex(int index)
+    private void UpdateHoveredIndex(int index, Rectangle bounds)
     {
-        if (_hoveredItemIndex == index) return;
+        if (_hoveredItemIndex == index)
+        {
+            _hoveredItemBounds = bounds;
+            return;
+        }
+
         var previous = _hoveredItemIndex;
+        var previousBounds = _hoveredItemBounds;
         _hoveredItemIndex = index;
-        if (!InvalidateItem(previous) || !InvalidateItem(index)) Invalidate();
+        _hoveredItemBounds = bounds;
+        if (!InvalidateItem(previous, previousBounds) || !InvalidateItem(index, bounds)) Invalidate();
     }
 
     private void ClearHover()
@@ -670,29 +773,36 @@ public class BootstrapListView : ListView
         if (_hoveredItemIndex < 0 || IsDisposed || Disposing)
         {
             _hoveredItemIndex = -1;
+            _hoveredItemBounds = Rectangle.Empty;
             return;
         }
 
         var previous = _hoveredItemIndex;
+        var previousBounds = _hoveredItemBounds;
         _hoveredItemIndex = -1;
-        if (!InvalidateItem(previous)) Invalidate();
+        _hoveredItemBounds = Rectangle.Empty;
+        if (!InvalidateItem(previous, previousBounds)) Invalidate();
     }
 
-    private bool InvalidateItem(int index)
+    private bool InvalidateItem(int index, Rectangle knownBounds)
     {
         if (index < 0 || !IsHandleCreated) return index < 0;
+        var bounds = knownBounds.IsEmpty ? GetItemBounds(index) : knownBounds;
+        if (bounds.IsEmpty) return false;
+        Invalidate(bounds);
+        return true;
+    }
+
+    private Rectangle GetItemBounds(int index)
+    {
+        if (index < 0 || !IsHandleCreated) return Rectangle.Empty;
         try
         {
-            ListViewItem? item = null;
-            if (!VirtualMode && index < Items.Count) item = Items[index];
-            var bounds = item?.GetBounds(ItemBoundsPortion.Entire) ?? Rectangle.Empty;
-            if (bounds.IsEmpty) return false;
-            Invalidate(bounds);
-            return true;
+            return GetItemRect(index, ItemBoundsPortion.Entire);
         }
         catch (Exception exception) when (exception is ArgumentOutOfRangeException || exception is InvalidOperationException)
         {
-            return false;
+            return Rectangle.Empty;
         }
     }
 
