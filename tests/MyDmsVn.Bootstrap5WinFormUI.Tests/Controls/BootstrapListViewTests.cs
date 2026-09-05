@@ -226,6 +226,39 @@ public sealed class BootstrapListViewTests
         }));
     }
 
+    [Test]
+    public void ListViewDrawsCallerImageOnceAtTheNativeIconSlot()
+    {
+        using var images = new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit };
+        using var source = new Bitmap(16, 16);
+        using (var sourceGraphics = Graphics.FromImage(source))
+        {
+            sourceGraphics.Clear(Color.Red);
+            images.Images.Add(source);
+        }
+
+        using var list = new TestBootstrapListView
+        {
+            Size = new Size(320, 100),
+            View = View.List,
+            SmallImageList = images
+        };
+        var item = list.Items.Add("One image", 0);
+        _ = list.Handle;
+        var bounds = item.GetBounds(ItemBoundsPortion.Entire);
+        using var bitmap = new Bitmap(320, 100);
+        using var graphics = Graphics.FromImage(bitmap);
+
+        list.DrawItemForTest(new DrawListViewItemEventArgs(
+            graphics,
+            item,
+            bounds,
+            item.Index,
+            ListViewItemStates.Default));
+
+        Assert.That(CountPixels(bitmap, Color.Red), Is.LessThanOrEqualTo(16 * 16));
+    }
+
     [TestCase(View.Details)]
     [TestCase(View.List)]
     [TestCase(View.SmallIcon)]
@@ -322,6 +355,24 @@ public sealed class BootstrapListViewTests
         Assert.That(eventField, Is.Not.Null);
         var handler = eventField!.GetValue(null) as Delegate;
         return handler?.GetInvocationList().Length ?? 0;
+    }
+
+    private static int CountPixels(Bitmap bitmap, Color expected)
+    {
+        var count = 0;
+        var argb = expected.ToArgb();
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                if (bitmap.GetPixel(x, y).ToArgb() == argb)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
     }
 
     private static bool IsFontUsable(Font font)

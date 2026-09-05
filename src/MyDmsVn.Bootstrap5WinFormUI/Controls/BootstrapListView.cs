@@ -294,7 +294,7 @@ public class BootstrapListView : ListView
         var iconBounds = GetNativeBounds(item, ItemBoundsPortion.Icon, Rectangle.Empty);
         var labelBounds = GetNativeBounds(item, ItemBoundsPortion.Label, e.Bounds);
         var image = ResolveItemImage(item, View);
-        if (image is not null && !iconBounds.IsEmpty) DrawImage(e.Graphics, image, iconBounds);
+        if (View != View.List && image is not null && !iconBounds.IsEmpty) DrawImage(e.Graphics, image, iconBounds);
 
         if (View == View.List)
         {
