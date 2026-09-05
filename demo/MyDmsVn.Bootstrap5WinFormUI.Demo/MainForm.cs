@@ -252,6 +252,11 @@ public sealed class MainForm : Form
             () => new TreeViewDemoForm());
 
         AddPage(
+            "ListView",
+            "Native-backed Details/List/Icon/Tile views with selection, checks, images, groups, virtual mode, Bootstrap theming, and DPI-aware owner drawing.",
+            () => new ListViewDemoForm());
+
+        AddPage(
             "DataGrid",
             "Bound data, states, large-row performance, and editable product cells using BootstrapSelect through the native editing lifecycle.",
             () => new DemoPageHostForm(
