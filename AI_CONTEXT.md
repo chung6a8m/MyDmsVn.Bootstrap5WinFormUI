@@ -58,6 +58,17 @@ Foundation logic is shared. Composite controls compose primitives instead of cop
 - Button loading reuses spinner/loading infrastructure.
 - WinForms Designer safety, keyboard behavior, accessibility metadata, DPI scaling, and GDI lifecycle are product requirements, not polish items.
 
+## Automated WinForms test safety
+
+Unattended GUI tests must fail deterministically instead of waiting for human interaction.
+
+- Read and follow `docs/WINFORMS_TEST_EXECUTION.md` before adding or running handle-based UI tests.
+- Use `./test.ps1` for a full run; focused direct `dotnet test` commands must include bounded `--blame-hang` protection.
+- The test assembly routes unhandled WinForms exceptions to NUnit with `UnhandledExceptionMode.ThrowException`.
+- Hosted `DataGridView` interaction tests use `DataGridViewTestGuard.FailOnDataError(...)` unless `DataError` itself is the behavior under test.
+- Automated tests must not leave `MessageBox`, `ShowDialog`, exception dialogs, or other modal UI waiting for a human or coding agent.
+- Fail-fast behavior belongs in test infrastructure unless it is genuinely part of the production control contract.
+
 ## Compatibility warning
 
 Prototype code in `idea-drafs/` contains constructs such as `Math.Clamp`, nullable syntax, newer property syntax, and placeholder namespaces such as `YourApp`. Do not copy it directly. The current namespace and compatibility rules are authoritative in `docs/`.

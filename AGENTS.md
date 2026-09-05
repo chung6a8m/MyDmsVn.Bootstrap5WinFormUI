@@ -13,7 +13,8 @@ Before modifying product code, read these files completely:
 5. `docs/DEVELOPMENT_PLAN.md`
 6. `docs/COMPATIBILITY.md`
 7. `docs/TESTING.md`
-8. The relevant component section in `docs/COMPONENTS.md`
+8. `docs/WINFORMS_TEST_EXECUTION.md`
+9. The relevant component section in `docs/COMPONENTS.md`
 
 The files under `idea-drafs/` are historical notes only. They contain useful reasoning and prototype code, but also obsolete names, incompatible APIs, and exploratory implementations. Never treat them as the current specification.
 
@@ -91,7 +92,7 @@ At the end of every implementation phase:
 
 ## 9. Testing expectations
 
-Use the strategy in `docs/TESTING.md`.
+Use the strategy in `docs/TESTING.md` and the unattended WinForms execution rules in `docs/WINFORMS_TEST_EXECUTION.md`.
 
 At minimum, new behavior needs coverage for the pure logic that can be tested without a UI handle. Interactive controls also require an STA-based control test or a documented demo/manual verification path.
 
@@ -106,6 +107,20 @@ Always consider:
 - Animation start/stop/restart/dispose
 - Hidden/disposed controls
 - GDI/event/timer resource lifetime
+
+### Mandatory unattended WinForms test rules
+
+These rules apply to Codex and every other automated coding agent:
+
+- Use `./test.ps1` for the full suite. It includes bounded hang detection for both target frameworks.
+- If running a focused raw `dotnet test`, include `--blame-hang --blame-hang-timeout 5m` (or another explicitly justified bounded timeout). Never start an unbounded GUI test run and wait indefinitely.
+- Tests that create WinForms handles or exercise UI interaction must run on STA, normally with NUnit `[Apartment(ApartmentState.STA)]`.
+- Never allow `MessageBox.Show`, an unexpected WinForms exception dialog, an unbounded `ShowDialog()`, or another modal UI to wait for human input during automated tests.
+- Hosted `DataGridView` interaction tests must attach `DataGridViewTestGuard.FailOnDataError(...)` unless the specific test is intentionally characterizing `DataError`. Keep that opt-out local to the test.
+- Do not add fail-fast behavior to production controls merely to make tests deterministic. Test-only guards belong in the test infrastructure.
+- If a GUI test hangs, use the hang/blame diagnostics and fix the root cause. Do not solve it by clicking dialogs, skipping tests, weakening assertions, or extending the timeout without evidence.
+- Keep `Application.DoEvents()` usage finite and at known synchronization points; do not run an unbounded application message loop inside a normal NUnit test.
+- When new GUI-test infrastructure or execution rules are introduced, update `docs/WINFORMS_TEST_EXECUTION.md` in the same change.
 
 ## 10. Repository hygiene
 
