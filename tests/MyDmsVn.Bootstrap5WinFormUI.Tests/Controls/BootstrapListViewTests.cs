@@ -2,9 +2,11 @@ using System;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -19,6 +21,32 @@ public sealed class BootstrapListViewTests
         public bool DoubleBufferedForTest => DoubleBuffered;
 
         public void RecreateHandleForTest() => RecreateHandle();
+
+        public void RaiseMouseMove(Point location) => OnMouseMove(new MouseEventArgs(MouseButtons.None, 0, location.X, location.Y, 0));
+
+        public void RaiseMouseLeave() => OnMouseLeave(EventArgs.Empty);
+
+        public void DrawItemForTest(DrawListViewItemEventArgs e) => OnDrawItem(e);
+
+        public void DrawSubItemForTest(DrawListViewSubItemEventArgs e) => OnDrawSubItem(e);
+    }
+
+    private BootstrapTheme? _originalTheme;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _originalTheme = BootstrapThemeManager.CurrentTheme;
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (_originalTheme is not null)
+        {
+            BootstrapThemeManager.CurrentTheme = _originalTheme;
+        }
     }
 
     [Test]
@@ -93,5 +121,237 @@ public sealed class BootstrapListViewTests
             Assert.That(item.Selected, Is.True);
             Assert.That(item.ImageKey, Is.EqualTo("item"));
         }));
+    }
+
+    [Test]
+    public void RuntimeThemeAndCallerFontLifecyclePreserveNativeData()
+    {
+        var baselineSubscriptions = GetThemeSubscriptionCount();
+        var list = new TestBootstrapListView();
+        var item = list.Items.Add("Theme item");
+        using var callerFont = new Font("Segoe UI", 13f, FontStyle.Italic);
+        list.Font = callerFont;
+
+        var dark = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        BootstrapThemeManager.CurrentTheme = dark;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions + 1));
+            Assert.That(list.BackColor, Is.EqualTo(dark.Colors.Surface));
+            Assert.That(list.ForeColor, Is.EqualTo(dark.Colors.Text));
+            Assert.That(list.Font, Is.SameAs(callerFont));
+            Assert.That(list.Items[0], Is.SameAs(item));
+        }));
+
+        list.Dispose();
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baselineSubscriptions));
+            Assert.That(IsFontUsable(callerFont), Is.True);
+        }));
+    }
+
+    [Test]
+    public void DetailsDrawItemDoesNotPaintButColumnZeroSubItemOwnsBackground()
+    {
+        using var list = new TestBootstrapListView
+        {
+            Size = new Size(240, 80),
+            View = View.Details
+        };
+        list.Columns.Add("Name", 220);
+        var item = list.Items.Add("Alpha");
+        using var bitmap = new Bitmap(240, 40);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.Magenta);
+        var bounds = new Rectangle(0, 0, 220, 24);
+
+        list.DrawItemForTest(new DrawListViewItemEventArgs(
+            graphics,
+            item,
+            bounds,
+            item.Index,
+            ListViewItemStates.Default));
+        Assert.That(bitmap.GetPixel(5, 5).ToArgb(), Is.EqualTo(Color.Magenta.ToArgb()));
+
+        list.DrawSubItemForTest(new DrawListViewSubItemEventArgs(
+            graphics,
+            bounds,
+            item,
+            item.SubItems[0],
+            item.Index,
+            0,
+            list.Columns[0],
+            ListViewItemStates.Default));
+        Assert.That(
+            bitmap.GetPixel(5, 5).ToArgb(),
+            Is.EqualTo(BootstrapThemeManager.CurrentTheme.Colors.Surface.ToArgb()));
+    }
+
+    [TestCase(View.List)]
+    [TestCase(View.SmallIcon)]
+    [TestCase(View.LargeIcon)]
+    [TestCase(View.Tile)]
+    public void NonDetailsRenderingPreservesNativeState(View view)
+    {
+        using var images = new ImageList { ImageSize = new Size(16, 16) };
+        images.Images.Add(new Bitmap(16, 16));
+        using var list = new TestBootstrapListView
+        {
+            Size = new Size(320, 140),
+            View = view,
+            SmallImageList = images,
+            LargeImageList = images
+        };
+        var item = new ListViewItem(new[] { "Primary", "Secondary" }, 0) { Selected = true };
+        list.Items.Add(item);
+        using var bitmap = new Bitmap(320, 140);
+        using var graphics = Graphics.FromImage(bitmap);
+
+        list.DrawItemForTest(new DrawListViewItemEventArgs(
+            graphics,
+            item,
+            new Rectangle(0, 0, 240, 72),
+            item.Index,
+            ListViewItemStates.Selected));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(list.View, Is.EqualTo(view));
+            Assert.That(list.Items[0], Is.SameAs(item));
+            Assert.That(item.Selected, Is.True);
+            Assert.That(list.SmallImageList, Is.SameAs(images));
+            Assert.That(list.LargeImageList, Is.SameAs(images));
+        }));
+    }
+
+    [TestCase(View.Details)]
+    [TestCase(View.List)]
+    [TestCase(View.SmallIcon)]
+    [TestCase(View.LargeIcon)]
+    [TestCase(View.Tile)]
+    public void HoverBookkeepingDoesNotMutateNativeInteractionState(View view)
+    {
+        using var list = new TestBootstrapListView
+        {
+            Size = new Size(320, 140),
+            View = view,
+            CheckBoxes = view != View.Tile,
+            HotTracking = false,
+            HoverSelection = false,
+            Activation = ItemActivation.Standard
+        };
+        if (view == View.Details)
+        {
+            list.Columns.Add("Name", 220);
+        }
+
+        var item = list.Items.Add("Alpha");
+        item.Checked = view != View.Tile;
+        _ = list.Handle;
+        var selectedBefore = item.Selected;
+        var checkedBefore = item.Checked;
+        var focusedBefore = list.FocusedItem;
+
+        list.RaiseMouseMove(new Point(8, 8));
+        list.RaiseMouseLeave();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(item.Selected, Is.EqualTo(selectedBefore));
+            Assert.That(item.Checked, Is.EqualTo(checkedBefore));
+            Assert.That(list.FocusedItem, Is.SameAs(focusedBefore));
+            Assert.That(list.HotTracking, Is.False);
+            Assert.That(list.HoverSelection, Is.False);
+            Assert.That(list.Activation, Is.EqualTo(ItemActivation.Standard));
+        }));
+    }
+
+    [Test]
+    public void VirtualModeUsesNativeSetupOrderAndPreservesTileRestriction()
+    {
+        using var virtualList = new BootstrapListView
+        {
+            VirtualMode = true,
+            View = View.Details
+        };
+        virtualList.Columns.Add("Name", 180);
+        virtualList.RetrieveVirtualItem += (_, e) => e.Item = new ListViewItem($"Item {e.ItemIndex}");
+        virtualList.VirtualListSize = 1000;
+
+        using var nativeTile = new ListView { View = View.Tile };
+        using var bootstrapTile = new BootstrapListView { View = View.Tile };
+        var nativeException = Assert.Catch((Action)(() => nativeTile.VirtualMode = true));
+        var bootstrapException = Assert.Catch((Action)(() => bootstrapTile.VirtualMode = true));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(virtualList.VirtualListSize, Is.EqualTo(1000));
+            Assert.That(bootstrapException?.GetType(), Is.EqualTo(nativeException?.GetType()));
+            Assert.That(bootstrapTile.View, Is.EqualTo(nativeTile.View));
+        }));
+    }
+
+    [Test]
+    public void HandleRecreationRetainsPresentationAndCallerState()
+    {
+        using var list = new TestBootstrapListView { CheckBoxes = true, View = View.Details };
+        var column = list.Columns.Add("Name", 180);
+        var item = list.Items.Add("Alpha");
+        item.Checked = true;
+        item.Selected = true;
+        _ = list.Handle;
+
+        list.RecreateHandleForTest();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(list.OwnerDraw, Is.True);
+            Assert.That(list.DoubleBufferedForTest, Is.True);
+            Assert.That(list.Columns[0], Is.SameAs(column));
+            Assert.That(list.Items[0], Is.SameAs(item));
+            Assert.That(item.Checked, Is.True);
+            Assert.That(item.Selected, Is.True);
+        }));
+    }
+
+    private static int GetThemeSubscriptionCount()
+    {
+        var eventField = typeof(BootstrapThemeManager).GetField("ThemeChanged", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(eventField, Is.Not.Null);
+        var handler = eventField!.GetValue(null) as Delegate;
+        return handler?.GetInvocationList().Length ?? 0;
+    }
+
+    private static bool IsFontUsable(Font font)
+    {
+        IntPtr handle = IntPtr.Zero;
+        try
+        {
+            handle = font.ToHfont();
+            return handle != IntPtr.Zero;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException ||
+            exception is ExternalException ||
+            exception is ObjectDisposedException)
+        {
+            return false;
+        }
+        finally
+        {
+            if (handle != IntPtr.Zero)
+            {
+                NativeMethods.DeleteObject(handle);
+            }
+        }
+    }
+
+    private static class NativeMethods
+    {
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool DeleteObject(IntPtr value);
     }
 }
