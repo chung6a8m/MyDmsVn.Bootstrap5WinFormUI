@@ -21,13 +21,11 @@ public class BootstrapListView : ListView
     private const int CddsPrePaint = 0x00000001;
     private const int CddsPostPaint = 0x00000002;
     private const int CddsItemPrePaint = 0x00010001;
-    private const int CdrfSkipDefault = 0x00000004;
     private const int CdrfNotifyPostPaint = 0x00000010;
     private const int HdmGetItemRect = 0x1207;
     private const int LvcdItemGroup = 0x00000001;
     private const int LvmArrange = 0x1016;
     private const int LvmGetHeader = 0x101F;
-    private const int LvmGetGroupInfo = 0x1095;
     private const int LvmGetItemW = 0x104B;
     private const int LvmSetTileViewInfo = 0x10A2;
     private const int NmCustomDraw = -12;
@@ -35,11 +33,12 @@ public class BootstrapListView : ListView
     private const int WmNotify = 0x004E;
     private const int WmReflectNotify = 0x204E;
     private const uint LvifImage = 0x0002;
-    private const uint LvgfHeader = 0x00000001;
-    private const uint LvgfAlign = 0x00000008;
+    private const uint LvgsCollapsible = 0x00000008;
     private static readonly object? DrawColumnHeaderEventKey = ResolveEventKey("s_drawColumnHeaderEvent", "EVENT_DRAWCOLUMNHEADER");
     private static readonly object? DrawItemEventKey = ResolveEventKey("s_drawItemEvent", "EVENT_DRAWITEM");
     private static readonly object? DrawSubItemEventKey = ResolveEventKey("s_drawSubItemEvent", "EVENT_DRAWSUBITEM");
+    private static readonly PropertyInfo? ListViewGroupIdProperty = typeof(ListViewGroup).GetProperty(
+        "ID", BindingFlags.Instance | BindingFlags.NonPublic);
 
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private bool _striped;
@@ -293,9 +292,6 @@ public class BootstrapListView : ListView
     /// <inheritdoc />
     protected override void OnDrawSubItem(DrawListViewSubItemEventArgs e)
     {
-        var paintBounds = e.ColumnIndex == 0 && e.Item is not null
-            ? Rectangle.Union(e.Bounds, GetNativeBounds(e.Item, ItemBoundsPortion.Entire, e.Bounds))
-            : e.Bounds;
         if (!HasOwnerDrawSubscribers(DrawSubItemEventKey))
         {
             if (View == View.Details) DrawDetailsSubItem(e);
@@ -303,6 +299,9 @@ public class BootstrapListView : ListView
             return;
         }
 
+        var paintBounds = e.ColumnIndex == 0 && e.Item is not null
+            ? Rectangle.Union(e.Bounds, GetNativeBounds(e.Item, ItemBoundsPortion.Entire, e.Bounds))
+            : e.Bounds;
         CaptureOwnerDrawTarget(e.Graphics, paintBounds);
         try
         {
@@ -429,6 +428,7 @@ public class BootstrapListView : ListView
         var selected = IsActuallySelected(item);
         var hotTracked = HotTracking && (e.ItemState & ListViewItemStates.Hot) != 0;
         var hovered = _hoverHighlight && e.ItemIndex == _hoveredItemIndex;
+        var cellBounds = GetDetailsCellBounds(e);
         var rowBounds = e.Bounds;
         if (e.ColumnIndex == 0)
         {
@@ -438,23 +438,23 @@ public class BootstrapListView : ListView
                 item.SubItems[0],
                 ResolveState(FullRowSelect && selected, hovered),
                 e.ItemIndex);
-            Fill(e.Graphics, rowBounds, basePalette.BackColor);
+            FillDetailsRowRemainder(e.Graphics, rowBounds, basePalette.BackColor);
         }
 
         var cellSelected = selected && (FullRowSelect || e.ColumnIndex == 0);
         var palette = ResolvePalette(item, subItem, ResolveState(cellSelected, hovered), e.ItemIndex);
-        Fill(e.Graphics, e.Bounds, palette.BackColor);
+        Fill(e.Graphics, cellBounds, palette.BackColor);
         var textBounds = e.ColumnIndex == 0
-            ? Rectangle.Intersect(e.Bounds, GetNativeBounds(item, ItemBoundsPortion.Label, e.Bounds))
+            ? Rectangle.Intersect(cellBounds, GetNativeBounds(item, ItemBoundsPortion.Label, cellBounds))
             : BootstrapListViewLayoutLogic.Deflate(
-                e.Bounds,
+                cellBounds,
                 DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingXS, GetCurrentDpi()),
                 0);
         if (e.ColumnIndex == 0)
         {
             DrawNativeStateImage(e.Graphics, item, palette.ForeColor);
             var iconBounds = Rectangle.Intersect(
-                e.Bounds,
+                cellBounds,
                 GetNativeBounds(item, ItemBoundsPortion.Icon, Rectangle.Empty));
             var image = ResolveItemImage(item, View.Details);
             if (image is not null && !iconBounds.IsEmpty) DrawImage(e.Graphics, image, iconBounds);
@@ -473,6 +473,47 @@ public class BootstrapListView : ListView
         {
             DrawFocus(e.Graphics, BootstrapListViewLayoutLogic.GetFocusBounds(View.Details, rowBounds, textBounds, FullRowSelect));
         }
+    }
+
+    private Rectangle GetDetailsCellBounds(DrawListViewSubItemEventArgs e)
+    {
+        if (e.ColumnIndex != 0 || !IsHandleCreated) return e.Bounds;
+        var header = GetHeaderHandle();
+        var nativeBounds = new NativeRectangle();
+        if (header == IntPtr.Zero ||
+            SendMessage(header, HdmGetItemRect, IntPtr.Zero, ref nativeBounds) == IntPtr.Zero) return e.Bounds;
+        var displayed = Rectangle.FromLTRB(nativeBounds.Left, e.Bounds.Top, nativeBounds.Right, e.Bounds.Bottom);
+        return displayed.Width > 0 ? displayed : e.Bounds;
+    }
+
+    private void FillDetailsRowRemainder(Graphics graphics, Rectangle rowBounds, Color color)
+    {
+        var header = GetHeaderHandle();
+        if (header == IntPtr.Zero || Columns.Count == 0)
+        {
+            Fill(graphics, rowBounds, color);
+            return;
+        }
+
+        var occupiedLeft = int.MaxValue;
+        var occupiedRight = int.MinValue;
+        for (var index = 0; index < Columns.Count; index++)
+        {
+            if (Columns[index].Width <= 0) continue;
+            var nativeBounds = new NativeRectangle();
+            if (SendMessage(header, HdmGetItemRect, (IntPtr)index, ref nativeBounds) == IntPtr.Zero) continue;
+            occupiedLeft = Math.Min(occupiedLeft, nativeBounds.Left);
+            occupiedRight = Math.Max(occupiedRight, nativeBounds.Right);
+        }
+
+        if (occupiedLeft == int.MaxValue)
+        {
+            Fill(graphics, rowBounds, color);
+            return;
+        }
+
+        Fill(graphics, Rectangle.FromLTRB(rowBounds.Left, rowBounds.Top, Math.Min(rowBounds.Right, occupiedLeft), rowBounds.Bottom), color);
+        Fill(graphics, Rectangle.FromLTRB(Math.Max(rowBounds.Left, occupiedRight), rowBounds.Top, rowBounds.Right, rowBounds.Bottom), color);
     }
 
     private void DrawNonDetailsItem(DrawListViewItemEventArgs e)
@@ -868,7 +909,8 @@ public class BootstrapListView : ListView
 
 
     private static bool IsGroupCustomDraw(NativeListViewCustomDraw customDraw) =>
-        customDraw.CustomDraw.DrawStage == CddsPrePaint && customDraw.ItemType == LvcdItemGroup;
+        (customDraw.CustomDraw.DrawStage == CddsPrePaint || customDraw.CustomDraw.DrawStage == CddsPostPaint) &&
+        customDraw.ItemType == LvcdItemGroup;
 
     private void ApplyGroupHeaderTheme(ref NativeListViewCustomDraw customDraw, ref Message message)
     {
@@ -876,7 +918,13 @@ public class BootstrapListView : ListView
         customDraw.TextColor = ColorToColorRef(colors.Text);
         customDraw.TextBackgroundColor = ColorToColorRef(colors.Surface);
         customDraw.FaceColor = ColorToColorRef(colors.Border);
-        if (PaintGroupHeader(customDraw, colors)) message.Result = (IntPtr)CdrfSkipDefault;
+        if (customDraw.CustomDraw.DrawStage == CddsPrePaint)
+        {
+            message.Result = OrCustomDrawResult(message.Result, CdrfNotifyPostPaint);
+            return;
+        }
+
+        PaintGroupHeader(customDraw, colors);
     }
 
     private bool PaintGroupHeader(NativeListViewCustomDraw customDraw, BootstrapThemeColors colors)
@@ -884,7 +932,8 @@ public class BootstrapListView : ListView
         var deviceContext = customDraw.CustomDraw.DeviceContext;
         var bounds = customDraw.CustomDraw.Rectangle.ToRectangle();
         if (deviceContext == IntPtr.Zero || bounds.Width <= 0 || bounds.Height <= 0 ||
-            !TryGetGroupHeader(customDraw.CustomDraw.ItemSpec, out var header, out var alignment)) return false;
+            !TryGetGroupHeader(customDraw.CustomDraw.ItemSpec, out var header, out var alignment,
+                out var task, out var titleImage, out var groupState)) return false;
 
         var horizontalPadding = DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingSM, GetCurrentDpi());
         var textBounds = customDraw.TextRectangle.ToRectangle();
@@ -893,79 +942,108 @@ public class BootstrapListView : ListView
             textBounds = BootstrapListViewLayoutLogic.Deflate(bounds, horizontalPadding, 0);
         }
 
-        var headerBounds = Rectangle.FromLTRB(bounds.Left, textBounds.Top, bounds.Right, textBounds.Bottom);
-
         using var graphics = Graphics.FromHdc(deviceContext);
         using var background = new SolidBrush(colors.Surface);
         using var separator = new Pen(colors.Border, Math.Max(1, DpiScaler.Scale(1, GetCurrentDpi())));
         using var groupFont = new Font(Font, Font.Style | FontStyle.Bold);
-        graphics.FillRectangle(background, headerBounds);
+        var textSize = TextRenderer.MeasureText(graphics, header, groupFont, Size.Empty, TextFormatFlags.NoPadding);
+        var contentLeft = textBounds.Left + horizontalPadding;
+#if NET8_0_OR_GREATER
+        if (titleImage >= 0 && GroupImageList is not null)
+        {
+            contentLeft += GroupImageList.ImageSize.Width + Math.Max(1, horizontalPadding / 4);
+        }
+#endif
+
+        var contentRight = textBounds.Right - horizontalPadding;
+        if (task.Length > 0)
+        {
+            var taskSize = TextRenderer.MeasureText(graphics, task, Font, Size.Empty, TextFormatFlags.NoPadding);
+            contentRight -= taskSize.Width + horizontalPadding;
+        }
+
+        if ((groupState & LvgsCollapsible) != 0)
+        {
+            contentRight -= DpiScaler.Scale(16, GetCurrentDpi());
+        }
+
+        contentRight = Math.Max(contentLeft, contentRight);
+        var textLeft = alignment == HorizontalAlignment.Right
+            ? Math.Max(contentLeft, contentRight - textSize.Width)
+            : alignment == HorizontalAlignment.Center
+                ? contentLeft + Math.Max(0, (contentRight - contentLeft - textSize.Width) / 2)
+                : contentLeft;
+        var lineHeight = Math.Min(textBounds.Height, Math.Max(groupFont.Height, Font.Height) + 2);
+        var headerTextBounds = new Rectangle(
+            textLeft,
+            textBounds.Top,
+            Math.Min(textSize.Width, Math.Max(0, contentRight - textLeft)),
+            lineHeight);
+        if (headerTextBounds.Width <= 0 || headerTextBounds.Height <= 0) return false;
+
+        graphics.FillRectangle(background, headerTextBounds);
         TextRenderer.DrawText(
             graphics,
             header,
             groupFont,
-            textBounds,
+            headerTextBounds,
             colors.Text,
             BootstrapListViewLayoutLogic.GetTextFlags(alignment, RightToLeft == RightToLeft.Yes, false) |
             TextFormatFlags.VerticalCenter);
-        var textSize = TextRenderer.MeasureText(graphics, header, groupFont, Size.Empty, TextFormatFlags.NoPadding);
-        var separatorY = headerBounds.Top + (headerBounds.Height / 2);
+        var separatorY = headerTextBounds.Top + (headerTextBounds.Height / 2);
         if (alignment == HorizontalAlignment.Right)
         {
-            graphics.DrawLine(separator, headerBounds.Left + horizontalPadding, separatorY,
-                Math.Max(headerBounds.Left + horizontalPadding, textBounds.Right - textSize.Width - horizontalPadding), separatorY);
+            graphics.DrawLine(separator, contentLeft, separatorY,
+                Math.Max(contentLeft, headerTextBounds.Left - horizontalPadding), separatorY);
         }
         else if (alignment == HorizontalAlignment.Center)
         {
-            var textLeft = textBounds.Left + ((textBounds.Width - textSize.Width) / 2);
-            graphics.DrawLine(separator, headerBounds.Left + horizontalPadding, separatorY,
-                Math.Max(headerBounds.Left + horizontalPadding, textLeft - horizontalPadding), separatorY);
-            graphics.DrawLine(separator, Math.Min(headerBounds.Right - horizontalPadding, textLeft + textSize.Width + horizontalPadding), separatorY,
-                headerBounds.Right - horizontalPadding, separatorY);
+            graphics.DrawLine(separator, contentLeft, separatorY,
+                Math.Max(contentLeft, headerTextBounds.Left - horizontalPadding), separatorY);
+            graphics.DrawLine(separator, Math.Min(contentRight, headerTextBounds.Right + horizontalPadding), separatorY,
+                contentRight, separatorY);
         }
         else
         {
-            graphics.DrawLine(separator, Math.Min(headerBounds.Right - horizontalPadding, textBounds.Left + textSize.Width + horizontalPadding), separatorY,
-                headerBounds.Right - horizontalPadding, separatorY);
+            graphics.DrawLine(separator, Math.Min(contentRight, headerTextBounds.Right + horizontalPadding), separatorY,
+                contentRight, separatorY);
         }
 
         return true;
     }
 
-    private bool TryGetGroupHeader(UIntPtr itemSpec, out string header, out HorizontalAlignment alignment)
+    private bool TryGetGroupHeader(
+        UIntPtr itemSpec,
+        out string header,
+        out HorizontalAlignment alignment,
+        out string task,
+        out int titleImage,
+        out uint state)
     {
-        const int bufferCharacters = 512;
         header = string.Empty;
         alignment = HorizontalAlignment.Left;
-        var buffer = Marshal.AllocHGlobal(bufferCharacters * sizeof(char));
-        try
-        {
-            for (var offset = 0; offset < bufferCharacters * sizeof(char); offset += sizeof(int))
-            {
-                Marshal.WriteInt32(buffer, offset, 0);
-            }
+        task = string.Empty;
+        titleImage = -1;
+        state = 0;
+        if (ListViewGroupIdProperty is null) return false;
 
-            var group = new NativeListViewGroup
-            {
-                Size = (uint)Marshal.SizeOf(typeof(NativeListViewGroup)),
-                Mask = LvgfHeader | LvgfAlign,
-                Header = buffer,
-                HeaderLength = bufferCharacters
-            };
-            var groupId = unchecked((int)itemSpec.ToUInt64());
-            if (SendMessage(Handle, LvmGetGroupInfo, (IntPtr)groupId, ref group).ToInt64() == -1) return false;
-            header = Marshal.PtrToStringUni(buffer) ?? string.Empty;
-            alignment = (group.Align & 0x00000004) != 0
-                ? HorizontalAlignment.Right
-                : (group.Align & 0x00000002) != 0
-                    ? HorizontalAlignment.Center
-                    : HorizontalAlignment.Left;
+        var groupId = unchecked((int)itemSpec.ToUInt64());
+        foreach (ListViewGroup managedGroup in Groups)
+        {
+            if (!(ListViewGroupIdProperty.GetValue(managedGroup, null) is int managedGroupId) || managedGroupId != groupId)
+                continue;
+
+            header = managedGroup.Header ?? string.Empty;
+            alignment = managedGroup.HeaderAlignment;
+#if NET8_0_OR_GREATER
+            task = managedGroup.TaskLink ?? string.Empty;
+            titleImage = managedGroup.TitleImageIndex;
+            if (managedGroup.CollapsedState != ListViewGroupCollapsedState.Default) state |= LvgsCollapsible;
+#endif
             return header.Length > 0;
         }
-        finally
-        {
-            Marshal.FreeHGlobal(buffer);
-        }
+
+        return false;
     }
 
     private void PaintHeaderFiller(IntPtr headerHandle, IntPtr deviceContext)
@@ -1193,9 +1271,6 @@ public class BootstrapListView : ListView
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, ref NativeListViewItem item);
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, ref NativeListViewGroup group);
-
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
 
@@ -1241,35 +1316,6 @@ public class BootstrapListView : ListView
         internal IntPtr Columns;
         internal IntPtr ColumnFormats;
         internal int Group;
-    }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct NativeListViewGroup
-    {
-        internal uint Size;
-        internal uint Mask;
-        internal IntPtr Header;
-        internal int HeaderLength;
-        internal IntPtr Footer;
-        internal int FooterLength;
-        internal int GroupId;
-        internal uint StateMask;
-        internal uint State;
-        internal uint Align;
-        internal IntPtr Subtitle;
-        internal uint SubtitleLength;
-        internal IntPtr Task;
-        internal uint TaskLength;
-        internal IntPtr DescriptionTop;
-        internal uint DescriptionTopLength;
-        internal IntPtr DescriptionBottom;
-        internal uint DescriptionBottomLength;
-        internal int TitleImage;
-        internal int ExtendedImage;
-        internal int FirstItem;
-        internal uint ItemCount;
-        internal IntPtr SubsetTitle;
-        internal uint SubsetTitleLength;
     }
 
     [StructLayout(LayoutKind.Sequential)]

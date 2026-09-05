@@ -21,11 +21,19 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
 {
     private sealed class TestBootstrapListView : BootstrapListView
     {
+        public int NativeItemBoundsQueries { get; set; }
+
         public void DrawItemForTest(DrawListViewItemEventArgs e) => OnDrawItem(e);
 
         public void DrawSubItemForTest(DrawListViewSubItemEventArgs e) => OnDrawSubItem(e);
 
         public void RecreateHandleForTest() => RecreateHandle();
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == 0x100E) NativeItemBoundsQueries++;
+            base.WndProc(ref m);
+        }
 
     }
 
@@ -65,6 +73,7 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
         retrievals = 0;
         using var bitmap = new Bitmap(500, 60);
         using var graphics = Graphics.FromImage(bitmap);
+        list.NativeItemBoundsQueries = 0;
 
         list.DrawSubItemForTest(new DrawListViewSubItemEventArgs(
             graphics,
@@ -76,6 +85,7 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
             list.Columns[0],
             ListViewItemStates.Default));
         var retrievalsAfterPrimaryCell = retrievals;
+        var boundsQueriesAfterPrimaryCell = list.NativeItemBoundsQueries;
 
         for (var column = 1; column < 3; column++)
         {
@@ -92,10 +102,66 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(retrievalsAfterPrimaryCell, Is.GreaterThan(0),
-                "The primary cell should establish native row/icon/label geometry.");
+            Assert.That(boundsQueriesAfterPrimaryCell, Is.EqualTo(3),
+                "The no-subscriber primary path should query only row, label, and icon geometry.");
+            Assert.That(retrievalsAfterPrimaryCell, Is.LessThanOrEqualTo(3),
+                "Primary-cell painting must keep virtual retrieval work bounded by required geometry.");
             Assert.That(retrievals, Is.EqualTo(retrievalsAfterPrimaryCell),
                 "Secondary cells already have their native bounds and must not retrieve the virtual item again.");
+        }));
+    }
+
+    [Test]
+    public void ReorderedPrimaryColumnPaintsAllContentInItsDisplayedCell()
+    {
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+        using var itemImages = new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit };
+        using var stateImages = new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit };
+        itemImages.Images.Add(CreateSolidBitmap(16, Color.Lime));
+        stateImages.Images.Add(CreateSolidBitmap(16, Color.Yellow));
+        using var form = new Form { ClientSize = new Size(420, 140), ShowInTaskbar = false };
+        using var list = new TestBootstrapListView
+        {
+            Bounds = new Rectangle(0, 0, 400, 110),
+            FullRowSelect = true,
+            SmallImageList = itemImages,
+            StateImageList = stateImages,
+            View = View.Details
+        };
+        var primaryColumn = list.Columns.Add("Primary", 220);
+        var secondaryColumn = list.Columns.Add("Secondary", 140);
+        secondaryColumn.DisplayIndex = 0;
+        primaryColumn.DisplayIndex = 1;
+        var item = list.Items.Add(new ListViewItem(new[] { "Primary text", "Secondary text" }, 0)
+        {
+            ForeColor = Color.Red,
+            StateImageIndex = 0,
+            UseItemStyleForSubItems = false
+        });
+        item.SubItems[1].ForeColor = Color.Blue;
+        form.Controls.Add(list);
+        form.Show();
+        Application.DoEvents();
+        list.Invalidate();
+        list.Update();
+        Application.DoEvents();
+
+        using var bitmap = CaptureWindowClient(list.Handle);
+        var header = SendMessage(list.Handle, 0x101F, IntPtr.Zero, IntPtr.Zero);
+        var primaryBounds = GetHeaderItemBounds(header, 0, item.Bounds);
+        var secondaryBounds = GetHeaderItemBounds(header, 1, item.Bounds);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(primaryBounds.Left, Is.GreaterThan(secondaryBounds.Left));
+            Assert.That(CountPixelsNear(bitmap, Color.Red, 28, primaryBounds), Is.GreaterThan(8),
+                "Primary text must move with logical column 0.");
+            Assert.That(CountPixelsNear(bitmap, Color.Lime, 8, primaryBounds), Is.GreaterThan(20),
+                "The item image must remain inside the displayed primary cell.");
+            Assert.That(CountPixelsNear(bitmap, Color.Yellow, 8, primaryBounds), Is.GreaterThan(20),
+                "The state image must remain inside the displayed primary cell.");
+            Assert.That(CountPixelsNear(bitmap, Color.Blue, 28, secondaryBounds), Is.GreaterThan(8),
+                "The displaced secondary column must retain its own text.");
         }));
     }
 
@@ -579,6 +645,13 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
         return count;
     }
 
+    private static Rectangle GetHeaderItemBounds(IntPtr header, int columnIndex, Rectangle rowBounds)
+    {
+        var bounds = new NativeRectangle();
+        Assert.That(SendMessage(header, 0x1207, (IntPtr)columnIndex, ref bounds), Is.Not.EqualTo(IntPtr.Zero));
+        return Rectangle.FromLTRB(bounds.Left, rowBounds.Top, bounds.Right, rowBounds.Bottom);
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRectangle
     {
@@ -627,6 +700,9 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
 
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, ref NativeRectangle rectangle);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
