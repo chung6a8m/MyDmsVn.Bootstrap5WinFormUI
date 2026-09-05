@@ -2,12 +2,15 @@
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [ValidateRange(1, 60)]
+    [int]$HangTimeoutMinutes = 5
 )
 
 $ErrorActionPreference = "Stop"
 $repositoryRoot = $PSScriptRoot
 $testProject = Join-Path $repositoryRoot "tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj"
+$hangTimeout = "${HangTimeoutMinutes}m"
 
 function Assert-NativeSuccess([string]$Operation) {
     if ($LASTEXITCODE -ne 0) {
@@ -22,7 +25,8 @@ if (-not $SkipBuild) {
 Push-Location $repositoryRoot
 try {
     foreach ($framework in @("net48", "net8.0-windows")) {
-        dotnet test $testProject -c $Configuration -f $framework --no-build --no-restore
+        dotnet test $testProject -c $Configuration -f $framework --no-build --no-restore `
+            --blame-hang --blame-hang-timeout $hangTimeout
         Assert-NativeSuccess "dotnet test -f $framework"
     }
 }
