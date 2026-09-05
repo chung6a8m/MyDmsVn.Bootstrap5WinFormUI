@@ -607,7 +607,7 @@ public sealed class BootstrapDatePickerTests
         method!.Invoke(control, new object[] { args });
     }
 
-    private static Exception? RecordException(TestDelegate action)
+    private static Exception? RecordException(Action action)
     {
         try
         {
