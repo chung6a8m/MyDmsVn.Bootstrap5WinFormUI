@@ -35,12 +35,12 @@ public sealed class DataGridViewTestGuardTests
         using var grid = new ProbeDataGridView();
         DataGridViewTestGuard.FailOnDataError(grid);
 
-        var exception = Assert.Throws<InvalidOperationException>(() =>
+        var exception = Assert.Throws<InvalidOperationException>((Action)(() =>
             grid.RaiseDataError(
                 exception: null,
                 columnIndex: 3,
                 rowIndex: 7,
-                DataGridViewDataErrorContexts.Parsing));
+                DataGridViewDataErrorContexts.Parsing)));
 
         Assert.That(exception!.Message, Does.Contain("Row=7"));
         Assert.That(exception.Message, Does.Contain("Column=3"));
