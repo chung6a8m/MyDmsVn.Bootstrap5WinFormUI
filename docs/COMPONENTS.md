@@ -1061,6 +1061,73 @@ API review confirms that the feature exports no helper family: `BootstrapTreeVie
 
 Manual verification: choose **TreeView** in the integrated demo. Exercise mouse and keyboard selection/expand/collapse/checking, Tab/Shift+Tab exit and return, `DrawNode` event counting, `BeginEdit`/native label commit-cancel, native image/state-image hit-test diagnostics, checkboxes, `FullRowSelect` with `ShowLines` both off and on, HotTracking, ItemDrag and AllowDrop observation, RTL, horizontal/vertical scrolling, Light/Dark switching, caller-owned `ItemHeight` plus large `NodeFont`, explicit handle recreation (`CheckBoxes`, `Scrollable`, `ImageIndex`, `SelectedImageIndex`), disposal/recreation, and real Windows 100/125/150/175/200% scaling.
 
+## BootstrapListView
+
+Responsibility: apply Bootstrap-themed, DPI-aware presentation to native WinForms `ListView` while leaving items, columns, groups, selection, checks, images, view modes, virtualization, label editing, keyboard, drag/drop, scrolling, events, and accessibility native-owned.
+
+The V1 public addition is deliberately limited to:
+
+```text
+BootstrapListView : ListView
+
+BootstrapListView.Variant
+BootstrapListView.Striped
+BootstrapListView.HoverHighlight
+```
+
+Behavior:
+
+- `BootstrapListView` directly inherits `System.Windows.Forms.ListView`. `Items`, `Columns`, `Groups`, image lists, selection/check collections, `View`, `VirtualMode`, sorting, activation, editing, drag/drop, events, and accessibility remain inherited rather than mirrored.
+- `Variant` defaults to `Primary`; `Striped` defaults to `false`; `HoverHighlight` defaults to `true`. These properties invalidate presentation only and never mutate native data or interaction state.
+- The framework keeps `OwnerDraw = true` and enables protected `DoubleBuffered` internally. No public buffering or rendering-mode API is added.
+- All five normal views—`Details`, `List`, `SmallIcon`, `LargeIcon`, and `Tile`—are supported. Stripes apply only to odd neutral rows in `Details` and `List`.
+- To avoid the Win32 owner-draw hover repaint defect, `Details` row/cell painting is entirely `DrawSubItem`-centric. `OnDrawItem` performs no framework painting in `Details`; column zero establishes the row background before cells are rendered.
+- Hover uses native `HitTest`, stores only the current item index, and never changes selection, focus, checked state, `HotTracking`, `HoverSelection`, or activation.
+- Active selection uses the semantic `Variant`; inactive selection follows `HideSelection`; and `FullRowSelect = false` limits selected treatment to the first label/cell region.
+- Caller item/subitem colors and fonts remain meaningful. A differing effective public color overrides a neutral stripe. WinForms exposes no reliable public flag for an explicit assignment equal to the inherited list color, so that exact same-color assignment is indistinguishable from inheritance and may still receive stripes.
+- Caller-owned `SmallImageList`, `LargeImageList`, `StateImageList`, images, fonts, items, columns, and groups are read for presentation but never cloned, resized, replaced, or disposed by the framework. A valid state image wins over the lightweight framework checkbox fallback; Tile receives no fabricated checkbox.
+- Group membership and view restrictions remain native. V1 does not custom-paint group headers because WinForms exposes no managed group-header draw event, and it does not fake groups in `View.List`.
+- Virtual mode requires the native ordering: attach `RetrieveVirtualItem` before assigning a positive `VirtualListSize`. Normal `Items`, `SelectedItems`, and `CheckedItems` are not supported virtual-mode access paths; use retrieval events and `SelectedIndices`/`CheckedIndices`.
+- Current WinForms runtimes reject enabling `VirtualMode` while `View.Tile` is active with the native `NotSupportedException`. The framework preserves that runtime behavior and does not hide the exception or force a different view. Applications that need virtual mode should select a supported view first.
+- Theme/font subscriptions and framework-owned fonts are released deterministically. Caller-assigned fonts survive theme changes and disposal. DPI changes scale only framework gaps/glyphs, never native bounds, columns, `TileSize`, or image-list dimensions.
+- V1 excludes a rounded outer border, custom item/data model, loading or empty overlay, sort state/glyphs, custom group-header rendering, and replacement accessibility.
+
+Normal-mode example:
+
+```csharp
+var list = new BootstrapListView
+{
+    Dock = DockStyle.Fill,
+    View = View.Details,
+    FullRowSelect = true,
+    GridLines = true,
+    Striped = true,
+    Variant = BootstrapVariant.Primary
+};
+
+list.Columns.Add("Code", 120);
+list.Columns.Add("Name", 240);
+list.Items.Add(new ListViewItem(new[] { "P-001", "Northwind Widget" }));
+```
+
+Virtual-mode example with the required ordering:
+
+```csharp
+var list = new BootstrapListView
+{
+    Dock = DockStyle.Fill,
+    View = View.Details,
+    VirtualMode = true
+};
+
+list.Columns.Add("Name", 240);
+list.RetrieveVirtualItem += (_, e) =>
+    e.Item = new ListViewItem($"Item {e.ItemIndex}");
+list.VirtualListSize = 100000;
+```
+
+Manual verification: choose **ListView** in the integrated demo. Exercise all five normal views, Details `FullRowSelect`/`GridLines`/striping, repeated cross-column hover, checks and state images, Ctrl/Shift multi-selection, label editing, groups plus the native List restriction, the 100,000-row virtual example, native keyboard/context-menu/activation behavior, HideSelection, disabled state, runtime Variant and Light/Dark changes, RTL, rapid view changes, disposal, and real Windows 100/125/150/175/200% scaling. In the Details regression scenario, subitem text/images must never disappear during repeated pointer movement.
+
 ## Deferred components
 
 Dialog/Modal, Skeleton, and others are not part of the initial foundation contract.
