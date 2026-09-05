@@ -156,6 +156,9 @@ public class BootstrapListView : ListView
     /// <inheritdoc />
     protected override void OnDrawColumnHeader(DrawListViewColumnHeaderEventArgs e)
     {
+        base.OnDrawColumnHeader(e);
+        if (e.DrawDefault) return;
+
         if (HeaderStyle != ColumnHeaderStyle.None)
         {
             var theme = BootstrapThemeManager.CurrentTheme;
@@ -202,31 +205,28 @@ public class BootstrapListView : ListView
             }
         }
 
-        base.OnDrawColumnHeader(e);
-        e.DrawDefault = false;
     }
 
     /// <inheritdoc />
     protected override void OnDrawItem(DrawListViewItemEventArgs e)
     {
+        base.OnDrawItem(e);
+        if (e.DrawDefault) return;
+
         if (View == View.Details)
         {
-            base.OnDrawItem(e);
-            e.DrawDefault = false;
             return;
         }
 
         DrawNonDetailsItem(e);
-        base.OnDrawItem(e);
-        e.DrawDefault = false;
     }
 
     /// <inheritdoc />
     protected override void OnDrawSubItem(DrawListViewSubItemEventArgs e)
     {
-        if (View == View.Details) DrawDetailsSubItem(e);
         base.OnDrawSubItem(e);
-        e.DrawDefault = false;
+        if (e.DrawDefault) return;
+        if (View == View.Details) DrawDetailsSubItem(e);
     }
 
     /// <inheritdoc />
@@ -258,6 +258,7 @@ public class BootstrapListView : ListView
         }
 
         var selected = item.Selected || (e.ItemState & ListViewItemStates.Selected) != 0;
+        var hotTracked = HotTracking && (e.ItemState & ListViewItemStates.Hot) != 0;
         var hovered = _hoverHighlight && e.ItemIndex == _hoveredItemIndex;
         var rowBounds = GetNativeBounds(item, ItemBoundsPortion.Entire, e.Bounds);
         if (e.ColumnIndex == 0)
@@ -296,10 +297,11 @@ public class BootstrapListView : ListView
             textBounds,
             palette.ForeColor,
             e.Header?.TextAlign ?? HorizontalAlignment.Left,
-            false);
-        if (cellSelected && Focused && ShowFocusCues && item.Focused)
+            false,
+            hotTracked);
+        if (e.ColumnIndex == 0 && Focused && ShowFocusCues && item.Focused)
         {
-            DrawFocus(e.Graphics, BootstrapListViewLayoutLogic.GetFocusBounds(View.Details, rowBounds, e.Bounds, FullRowSelect));
+            DrawFocus(e.Graphics, BootstrapListViewLayoutLogic.GetFocusBounds(View.Details, rowBounds, textBounds, FullRowSelect));
         }
     }
 
@@ -307,6 +309,7 @@ public class BootstrapListView : ListView
     {
         var item = e.Item;
         var selected = item.Selected || (e.State & ListViewItemStates.Selected) != 0;
+        var hotTracked = HotTracking && (e.State & ListViewItemStates.Hot) != 0;
         var palette = ResolvePalette(
             item,
             item.SubItems[0],
@@ -324,11 +327,11 @@ public class BootstrapListView : ListView
 
         if (View == View.List)
         {
-            DrawText(e.Graphics, item.Text, ResolveFont(item, item.SubItems[0]), labelBounds, palette.ForeColor, HorizontalAlignment.Left, false);
+            DrawText(e.Graphics, item.Text, ResolveFont(item, item.SubItems[0]), labelBounds, palette.ForeColor, HorizontalAlignment.Left, false, hotTracked);
         }
         else if (View == View.Tile)
         {
-            DrawTileText(e.Graphics, item, entireBounds, iconBounds, palette);
+            DrawTileText(e.Graphics, item, entireBounds, iconBounds, palette, hotTracked);
         }
         else
         {
@@ -339,16 +342,23 @@ public class BootstrapListView : ListView
                 labelBounds,
                 palette.ForeColor,
                 HorizontalAlignment.Center,
-                View == View.LargeIcon);
+                View == View.LargeIcon,
+                hotTracked);
         }
 
-        if (selected && Focused && ShowFocusCues && item.Focused)
+        if (Focused && ShowFocusCues && item.Focused)
         {
             DrawFocus(e.Graphics, BootstrapListViewLayoutLogic.GetFocusBounds(View, entireBounds, labelBounds, FullRowSelect));
         }
     }
 
-    private void DrawTileText(Graphics graphics, ListViewItem item, Rectangle itemBounds, Rectangle imageBounds, BootstrapListViewItemPalette palette)
+    private void DrawTileText(
+        Graphics graphics,
+        ListViewItem item,
+        Rectangle itemBounds,
+        Rectangle imageBounds,
+        BootstrapListViewItemPalette palette,
+        bool hotTracked)
     {
         var bounds = BootstrapListViewLayoutLogic.GetTileTextBounds(
             itemBounds,
@@ -358,7 +368,7 @@ public class BootstrapListView : ListView
         if (bounds.IsEmpty) return;
         var lineCount = CountTileLines(item);
         var lineHeight = Math.Max(1, bounds.Height / lineCount);
-        DrawTileLine(graphics, item, item.SubItems[0], bounds, lineHeight, 0, palette.ForeColor);
+        DrawTileLine(graphics, item, item.SubItems[0], bounds, lineHeight, 0, palette.ForeColor, hotTracked);
         var lineIndex = 1;
         for (var displayIndex = 0; displayIndex < Columns.Count; displayIndex++)
         {
@@ -375,7 +385,8 @@ public class BootstrapListView : ListView
                     bounds,
                     lineHeight,
                     lineIndex,
-                    BootstrapThemeManager.CurrentTheme.Colors.MutedText);
+                    BootstrapThemeManager.CurrentTheme.Colors.MutedText,
+                    hotTracked);
                 lineIndex++;
             }
         }
@@ -410,7 +421,8 @@ public class BootstrapListView : ListView
         Rectangle bounds,
         int lineHeight,
         int lineIndex,
-        Color defaultForeground)
+        Color defaultForeground,
+        bool hotTracked)
     {
         var foreground = defaultForeground;
         if (!item.UseItemStyleForSubItems && BootstrapListViewRenderLogic.HasEffectiveColorOverride(subItem.ForeColor, ForeColor))
@@ -419,7 +431,7 @@ public class BootstrapListView : ListView
         }
 
         var line = new Rectangle(bounds.X, bounds.Y + (lineIndex * lineHeight), bounds.Width, lineHeight);
-        DrawText(graphics, subItem.Text, ResolveFont(item, subItem), line, foreground, HorizontalAlignment.Left, false);
+        DrawText(graphics, subItem.Text, ResolveFont(item, subItem), line, foreground, HorizontalAlignment.Left, false, hotTracked);
     }
 
     private void DrawNativeStateImage(Graphics graphics, ListViewItem item, Color foreground)
@@ -581,17 +593,32 @@ public class BootstrapListView : ListView
         graphics.FillRectangle(brush, bounds);
     }
 
-    private void DrawText(Graphics graphics, string text, Font font, Rectangle bounds, Color color, HorizontalAlignment alignment, bool wordWrap)
+    private void DrawText(
+        Graphics graphics,
+        string text,
+        Font font,
+        Rectangle bounds,
+        Color color,
+        HorizontalAlignment alignment,
+        bool wordWrap,
+        bool hotTracked = false)
     {
         if (bounds.Width <= 0 || bounds.Height <= 0 || string.IsNullOrEmpty(text)) return;
+        Font? hotFont = null;
         var state = graphics.Save();
         try
         {
+            if (hotTracked && (font.Style & FontStyle.Underline) == 0)
+            {
+                hotFont = new Font(font, font.Style | FontStyle.Underline);
+            }
+
             graphics.SetClip(bounds, CombineMode.Intersect);
-            TextRenderer.DrawText(graphics, text, font, bounds, color, BootstrapListViewLayoutLogic.GetTextFlags(alignment, RightToLeft == RightToLeft.Yes, wordWrap));
+            TextRenderer.DrawText(graphics, text, hotFont ?? font, bounds, color, BootstrapListViewLayoutLogic.GetTextFlags(alignment, RightToLeft == RightToLeft.Yes, wordWrap));
         }
         finally
         {
+            hotFont?.Dispose();
             graphics.Restore(state);
         }
     }

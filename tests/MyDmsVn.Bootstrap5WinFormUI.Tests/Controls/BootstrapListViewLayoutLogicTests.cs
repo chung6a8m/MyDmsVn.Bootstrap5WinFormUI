@@ -39,8 +39,8 @@ public sealed class BootstrapListViewLayoutLogicTests
     [TestCase(HorizontalAlignment.Left, false, TextFormatFlags.Left)]
     [TestCase(HorizontalAlignment.Center, false, TextFormatFlags.HorizontalCenter)]
     [TestCase(HorizontalAlignment.Right, false, TextFormatFlags.Right)]
-    [TestCase(HorizontalAlignment.Left, true, TextFormatFlags.Right)]
-    [TestCase(HorizontalAlignment.Right, true, TextFormatFlags.Left)]
+    [TestCase(HorizontalAlignment.Left, true, TextFormatFlags.Left)]
+    [TestCase(HorizontalAlignment.Right, true, TextFormatFlags.Right)]
     public void TextFlagsRespectAlignmentAndRtl(
         HorizontalAlignment alignment,
         bool rightToLeft,

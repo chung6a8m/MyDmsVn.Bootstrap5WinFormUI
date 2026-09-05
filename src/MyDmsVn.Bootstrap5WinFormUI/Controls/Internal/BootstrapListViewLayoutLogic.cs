@@ -53,25 +53,17 @@ internal static class BootstrapListViewLayoutLogic
             throw new ArgumentOutOfRangeException(nameof(alignment));
         }
 
-        var effectiveAlignment = alignment;
-        if (rightToLeft && alignment != HorizontalAlignment.Center)
-        {
-            effectiveAlignment = alignment == HorizontalAlignment.Left
-                ? HorizontalAlignment.Right
-                : HorizontalAlignment.Left;
-        }
-
         var flags = TextFormatFlags.NoPrefix |
                     TextFormatFlags.NoPadding |
                     TextFormatFlags.VerticalCenter |
                     TextFormatFlags.EndEllipsis;
         flags |= wordWrap ? TextFormatFlags.WordBreak : TextFormatFlags.SingleLine;
 
-        if (effectiveAlignment == HorizontalAlignment.Center)
+        if (alignment == HorizontalAlignment.Center)
         {
             flags |= TextFormatFlags.HorizontalCenter;
         }
-        else if (effectiveAlignment == HorizontalAlignment.Right)
+        else if (alignment == HorizontalAlignment.Right)
         {
             flags |= TextFormatFlags.Right;
         }
