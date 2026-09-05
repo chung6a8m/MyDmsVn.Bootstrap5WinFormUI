@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Tests.Infrastructure;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -18,7 +19,7 @@ public sealed class BootstrapLookupDataGridViewInteractionTests
     [Test]
     public void InitializingEditorDoesNotScrollResultsBeforePopupHasDisplayRoom()
     {
-        using var host = new GridHost();
+        using var host = new GridHost(failOnDataError: false);
         var dataErrors = 0;
         host.Grid.DataError += (_, _) => dataErrors++;
 
@@ -249,7 +250,7 @@ public sealed class BootstrapLookupDataGridViewInteractionTests
 
     private sealed class GridHost : IDisposable
     {
-        internal GridHost(bool twoRows = false, bool empty = false)
+        internal GridHost(bool twoRows = false, bool empty = false, bool failOnDataError = true)
         {
             Products = new BindingList<Product> { new Product(1, "Alpha"), new Product(2, "Beta") };
             Rows = empty ? new BindingList<OrderLine>() : new BindingList<OrderLine> { new OrderLine { ProductId = 1 } };
@@ -261,6 +262,10 @@ public sealed class BootstrapLookupDataGridViewInteractionTests
                 SearchDebounceMilliseconds = 0
             };
             Grid = new DataGridView { Dock = DockStyle.Fill, AutoGenerateColumns = false, DataSource = Binding };
+            if (failOnDataError)
+            {
+                DataGridViewTestGuard.FailOnDataError(Grid);
+            }
             Grid.Columns.Add(LookupColumn);
             Grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "ReadOnlyText", ReadOnly = true, Visible = false });
             Grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Quantity" });
