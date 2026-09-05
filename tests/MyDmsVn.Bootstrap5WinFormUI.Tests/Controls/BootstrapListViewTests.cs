@@ -349,6 +349,78 @@ public sealed class BootstrapListViewTests
         }));
     }
 
+    [Test]
+    public void GroupsRemainCallerOwnedAcrossThemeAndUnsupportedListViewMode()
+    {
+        using var list = new BootstrapListView { ShowGroups = true, View = View.Details };
+        list.Columns.Add("Name", 180);
+        var group = new ListViewGroup("Native group");
+        var item = new ListViewItem("Grouped item", group);
+        list.Groups.Add(group);
+        list.Items.Add(item);
+
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        list.Variant = BootstrapVariant.Warning;
+        list.View = View.List;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(list.ShowGroups, Is.True);
+            Assert.That(list.Groups[0], Is.SameAs(group));
+            Assert.That(list.Items[0], Is.SameAs(item));
+            Assert.That(item.Group, Is.SameAs(group));
+            Assert.That(list.View, Is.EqualTo(View.List));
+        }));
+    }
+
+    [Test]
+    public void LabelEditAndNativeEventsRemainInheritedAcrossThemeAndHandleChanges()
+    {
+        using var list = new TestBootstrapListView { LabelEdit = true, View = View.Details };
+        list.Columns.Add("Name", 180);
+        var item = list.Items.Add("Editable");
+        var beforeLabelEdit = 0;
+        var afterLabelEdit = 0;
+        list.BeforeLabelEdit += (_, _) => beforeLabelEdit++;
+        list.AfterLabelEdit += (_, _) => afterLabelEdit++;
+        _ = list.Handle;
+
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        list.RecreateHandleForTest();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(list.LabelEdit, Is.True);
+            Assert.That(list.Items[0], Is.SameAs(item));
+            Assert.That(beforeLabelEdit, Is.Zero);
+            Assert.That(afterLabelEdit, Is.Zero);
+            Assert.That(typeof(BootstrapListView).GetMethod("ProcessCmdKey", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly), Is.Null);
+            Assert.That(typeof(BootstrapListView).GetMethod("OnKeyDown", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly), Is.Null);
+        }));
+    }
+
+    [Test]
+    public void VirtualSizeShrinkDoesNotLeaveHoverDependentOnNormalItemsCollection()
+    {
+        using var list = new TestBootstrapListView
+        {
+            Size = new Size(280, 120),
+            VirtualMode = true,
+            View = View.Details
+        };
+        list.Columns.Add("Name", 240);
+        list.RetrieveVirtualItem += (_, e) => e.Item = new ListViewItem($"Virtual {e.ItemIndex}");
+        list.VirtualListSize = 100;
+        _ = list.Handle;
+
+        list.RaiseMouseMove(new Point(8, 24));
+        list.VirtualListSize = 1;
+        list.RaiseMouseMove(new Point(8, 80));
+        list.RaiseMouseLeave();
+
+        Assert.That(list.VirtualListSize, Is.EqualTo(1));
+    }
+
     private static int GetThemeSubscriptionCount()
     {
         var eventField = typeof(BootstrapThemeManager).GetField("ThemeChanged", BindingFlags.Static | BindingFlags.NonPublic);
