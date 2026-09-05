@@ -29,6 +29,7 @@ public sealed class IntegratedDemoApplicationTests
         "Progress",
         "Sidebar",
         "TreeView",
+        "ListView",
         "DataGrid",
         "Pagination",
         "Navigation / Tabs"
@@ -158,6 +159,18 @@ public sealed class IntegratedDemoApplicationTests
         form.PerformLayout();
 
         Assert.That(FindControls<Form>(form).Any(child => child.GetType().Name == "TreeViewDemoForm" && !child.TopLevel), Is.True);
+    }
+
+    [Test]
+    public void SelectingListViewNavigationEmbedsListViewDemoInMainWindow()
+    {
+        using var form = new MainForm();
+        form.CreateControl();
+        var sidebar = FindControls<BootstrapSidebar>(form).Single();
+        sidebar.SelectedItem = sidebar.Items.Single(item => item.Text == "ListView");
+        form.PerformLayout();
+
+        Assert.That(FindControls<Form>(form).Any(child => child.GetType().Name == "ListViewDemoForm" && !child.TopLevel), Is.True);
     }
 
     [TestCase("presentationTab")]

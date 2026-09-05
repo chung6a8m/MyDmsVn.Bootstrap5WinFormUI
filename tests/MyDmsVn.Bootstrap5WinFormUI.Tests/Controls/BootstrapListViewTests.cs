@@ -258,7 +258,12 @@ public sealed class BootstrapListViewTests
             item.Index,
             ListViewItemStates.Default));
 
-        Assert.That(CountPixels(bitmap, Color.Red), Is.LessThanOrEqualTo(16 * 16));
+        var nativeIconBounds = item.GetBounds(ItemBoundsPortion.Icon);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(CountPixels(bitmap, Color.Red), Is.LessThanOrEqualTo(16 * 16));
+            Assert.That(AllPixelsOfColorAreInside(bitmap, Color.Red, nativeIconBounds), Is.True);
+        }));
     }
 
     [TestCase(View.Details)]
@@ -562,6 +567,23 @@ public sealed class BootstrapListViewTests
         }
 
         return count;
+    }
+
+    private static bool AllPixelsOfColorAreInside(Bitmap bitmap, Color expected, Rectangle bounds)
+    {
+        var argb = expected.ToArgb();
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                if (bitmap.GetPixel(x, y).ToArgb() == argb && !bounds.Contains(x, y))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static bool IsFontUsable(Font font)

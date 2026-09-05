@@ -294,11 +294,11 @@ public class BootstrapListView : ListView
         var iconBounds = GetNativeBounds(item, ItemBoundsPortion.Icon, Rectangle.Empty);
         var labelBounds = GetNativeBounds(item, ItemBoundsPortion.Label, e.Bounds);
         var image = ResolveItemImage(item, View);
-        if (View != View.List && image is not null && !iconBounds.IsEmpty) DrawImage(e.Graphics, image, iconBounds);
+        if (image is not null && !iconBounds.IsEmpty) DrawImage(e.Graphics, image, iconBounds);
 
         if (View == View.List)
         {
-            var content = DrawStateAndItemImage(e.Graphics, item, labelBounds, View.List, palette.ForeColor);
+            var content = DrawStateAndItemImage(e.Graphics, item, labelBounds, View.List, palette.ForeColor, false);
             DrawText(e.Graphics, item.Text, ResolveFont(item, item.SubItems[0]), content, palette.ForeColor, HorizontalAlignment.Left, false);
         }
         else if (View == View.Tile)
@@ -347,7 +347,13 @@ public class BootstrapListView : ListView
         }
     }
 
-    private Rectangle DrawStateAndItemImage(Graphics graphics, ListViewItem item, Rectangle bounds, View view, Color foreground)
+    private Rectangle DrawStateAndItemImage(
+        Graphics graphics,
+        ListViewItem item,
+        Rectangle bounds,
+        View view,
+        Color foreground,
+        bool drawItemImage = true)
     {
         if (bounds.IsEmpty) return Rectangle.Empty;
         var dpi = GetCurrentDpi();
@@ -364,7 +370,7 @@ public class BootstrapListView : ListView
             cursor = rightToLeft ? slot.Left - gap : slot.Right + gap;
         }
 
-        var image = ResolveItemImage(item, view);
+        var image = drawItemImage ? ResolveItemImage(item, view) : null;
         if (image is not null)
         {
             var slot = CreateSlot(bounds, cursor, Math.Min(bounds.Height, image.Height), rightToLeft);
@@ -482,12 +488,11 @@ public class BootstrapListView : ListView
         graphics.DrawRectangle(pen, bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1);
         if (!isChecked) return;
         using var checkPen = new Pen(color, 2f);
-        graphics.DrawLines(checkPen, new[]
-        {
-            new Point(bounds.Left + (bounds.Width / 5), bounds.Top + (bounds.Height / 2)),
-            new Point(bounds.Left + (bounds.Width * 2 / 5), bounds.Bottom - (bounds.Height / 5)),
-            new Point(bounds.Right - (bounds.Width / 6), bounds.Top + (bounds.Height / 4))
-        });
+        var start = new Point(bounds.Left + (bounds.Width / 5), bounds.Top + (bounds.Height / 2));
+        var middle = new Point(bounds.Left + (bounds.Width * 2 / 5), bounds.Bottom - (bounds.Height / 5));
+        var end = new Point(bounds.Right - (bounds.Width / 6), bounds.Top + (bounds.Height / 4));
+        graphics.DrawLine(checkPen, start, middle);
+        graphics.DrawLine(checkPen, middle, end);
     }
 
     private void DrawFocus(Graphics graphics, Rectangle bounds)
