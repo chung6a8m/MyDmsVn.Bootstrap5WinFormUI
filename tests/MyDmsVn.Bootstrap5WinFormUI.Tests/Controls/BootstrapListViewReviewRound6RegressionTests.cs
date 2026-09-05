@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
@@ -65,7 +66,18 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
         using var bitmap = new Bitmap(500, 60);
         using var graphics = Graphics.FromImage(bitmap);
 
-        for (var column = 0; column < 3; column++)
+        list.DrawSubItemForTest(new DrawListViewSubItemEventArgs(
+            graphics,
+            new Rectangle(0, 0, list.Columns[0].Width, 24),
+            item,
+            item.SubItems[0],
+            0,
+            0,
+            list.Columns[0],
+            ListViewItemStates.Default));
+        var retrievalsAfterPrimaryCell = retrievals;
+
+        for (var column = 1; column < 3; column++)
         {
             list.DrawSubItemForTest(new DrawListViewSubItemEventArgs(
                 graphics,
@@ -78,8 +90,13 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
                 ListViewItemStates.Default));
         }
 
-        Assert.That(retrievals, Is.EqualTo(3),
-            "Each manual cell draw queries unavoidable native geometry; selection must not add another retrieval per cell.");
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(retrievalsAfterPrimaryCell, Is.GreaterThan(0),
+                "The primary cell should establish native row/icon/label geometry.");
+            Assert.That(retrievals, Is.EqualTo(retrievalsAfterPrimaryCell),
+                "Secondary cells already have their native bounds and must not retrieve the virtual item again.");
+        }));
     }
 
     [Test]
@@ -321,20 +338,61 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
     }
 
     [Test]
-    public void GroupHeaderCustomDrawUsesReadableThemeColorsAfterRuntimeSwitch()
+    public void RealGroupHeadersUseReadableThemeColorsAfterRuntimeSwitch()
     {
-        using var form = new Form { ClientSize = new Size(440, 280), ShowInTaskbar = false };
-        using var list = CreateGroupedList();
-        form.Controls.Add(list);
-        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
-        form.Show();
-        Application.DoEvents();
-        AssertGroupHeaderCustomDrawColors(list);
+        var executable = System.IO.Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "MyDmsVn.Bootstrap5WinFormUI.VisualStyleHost.exe");
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = executable,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true
+        });
+        Assert.That(process, Is.Not.Null);
+        if (!process!.WaitForExit(30000))
+        {
+            process.Kill();
+            Assert.Fail("The common-controls-v6 capture host did not finish within 30 seconds.");
+        }
 
-        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
-        list.Update();
-        Application.DoEvents();
-        AssertGroupHeaderCustomDrawColors(list);
+        Assert.That(process.ExitCode, Is.EqualTo(0), process.StandardError.ReadToEnd());
+    }
+
+    [Test]
+    public void TileSecondaryLineUsesAuthoritativeItemColorAndFont()
+    {
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+        using var list = new TestBootstrapListView
+        {
+            ClientSize = new Size(360, 80),
+            TileSize = new Size(340, 72),
+            View = View.Tile
+        };
+        list.Columns.Add("Secondary");
+        var item = list.Items.Add(new ListViewItem(new[] { string.Empty, "Authoritative item style" })
+        {
+            ForeColor = Color.Red,
+            UseItemStyleForSubItems = true
+        });
+        _ = list.Handle;
+        using var regularFont = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Regular);
+        using var boldFont = new Font(FontFamily.GenericSansSerif, 15f, FontStyle.Bold);
+
+        item.Font = regularFont;
+        using var regular = RenderTileItem(list, item);
+        item.Font = boldFont;
+        using var bold = RenderTileItem(list, item);
+        var secondaryRegion = new Rectangle(0, 36, bold.Width, bold.Height - 36);
+        var regularPixels = CountPixelsNear(regular, Color.Red, 20, secondaryRegion);
+        var boldPixels = CountPixelsNear(bold, Color.Red, 20, secondaryRegion);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(regularPixels, Is.GreaterThan(0), "The secondary line must inherit the item foreground.");
+            Assert.That(boldPixels, Is.GreaterThan(regularPixels), "The secondary line must inherit the item font.");
+        }));
     }
 
     [Test]
@@ -389,23 +447,6 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
         return list;
     }
 
-    private static TestBootstrapListView CreateGroupedList()
-    {
-        var list = new TestBootstrapListView
-        {
-            Bounds = new Rectangle(0, 0, 400, 240),
-            FullRowSelect = true,
-            ShowGroups = true,
-            View = View.Details
-        };
-        list.Columns.Add("Name", 300);
-        var active = list.Groups.Add("active", "Active");
-        var archived = list.Groups.Add("archived", "Archived");
-        list.Items.Add(new ListViewItem("Active item", active) { ForeColor = Color.Magenta });
-        list.Items.Add(new ListViewItem("Archived item", archived) { ForeColor = Color.Magenta });
-        return list;
-    }
-
     private static Bitmap RenderListItem(TestBootstrapListView list)
     {
         var bitmap = new Bitmap(320, 60);
@@ -413,6 +454,16 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
         graphics.Clear(Color.Magenta);
         list.DrawItemForTest(new DrawListViewItemEventArgs(
             graphics, list.Items[0], new Rectangle(0, 0, 280, 28), 0, ListViewItemStates.Default));
+        return bitmap;
+    }
+
+    private static Bitmap RenderTileItem(TestBootstrapListView list, ListViewItem item)
+    {
+        var bitmap = new Bitmap(360, 80);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(list.BackColor);
+        list.DrawItemForTest(new DrawListViewItemEventArgs(
+            graphics, item, new Rectangle(0, 0, 340, 72), 0, ListViewItemStates.Default));
         return bitmap;
     }
 
@@ -469,61 +520,7 @@ public sealed class BootstrapListViewReviewRound6RegressionTests
         Assert.That(bitmap.GetPixel(x, 8).ToArgb(), Is.EqualTo(expected.ToArgb()));
     }
 
-    private static void AssertGroupHeaderCustomDrawColors(TestBootstrapListView list)
-    {
-        using var bitmap = new Bitmap(120, 24);
-        using var graphics = Graphics.FromImage(bitmap);
-        var hdc = graphics.GetHdc();
-        var native = new NativeListViewCustomDraw
-        {
-            CustomDraw = new NativeCustomDraw
-            {
-                Header = new NativeNotifyHeader { WindowFrom = list.Handle, Code = -12 },
-                DrawStage = 0x00010001,
-                DeviceContext = hdc,
-                Rectangle = new NativeRectangle { Right = 120, Bottom = 24 }
-            },
-            ItemType = 1
-        };
-        var memory = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeListViewCustomDraw)));
-        try
-        {
-            Marshal.StructureToPtr(native, memory, false);
-            SendMessage(list.Handle, 0x204E, IntPtr.Zero, memory);
-            native = Marshal.PtrToStructure<NativeListViewCustomDraw>(memory);
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(memory);
-            graphics.ReleaseHdc(hdc);
-        }
-
-        var colors = BootstrapThemeManager.CurrentTheme.Colors;
-        Assert.Multiple((Action)(() =>
-        {
-            Assert.That(native.TextColor, Is.EqualTo(ToColorRef(colors.Text)));
-            Assert.That(native.FaceColor, Is.EqualTo(ToColorRef(colors.Border)));
-            Assert.That(ContrastRatio(colors.Text, colors.Surface), Is.GreaterThanOrEqualTo(4.5));
-        }));
-    }
-
     private static uint ToColorRef(Color color) => (uint)(color.R | (color.G << 8) | (color.B << 16));
-
-    private static double ContrastRatio(Color first, Color second)
-    {
-        var lighter = Math.Max(RelativeLuminance(first), RelativeLuminance(second));
-        var darker = Math.Min(RelativeLuminance(first), RelativeLuminance(second));
-        return (lighter + 0.05) / (darker + 0.05);
-    }
-
-    private static double RelativeLuminance(Color color) =>
-        (0.2126 * Linear(color.R)) + (0.7152 * Linear(color.G)) + (0.0722 * Linear(color.B));
-
-    private static double Linear(byte component)
-    {
-        var value = component / 255d;
-        return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
-    }
 
     private static Rectangle[] CaptureObservedBounds(ListView list, IReadOnlyDictionary<int, Rectangle> observed)
     {

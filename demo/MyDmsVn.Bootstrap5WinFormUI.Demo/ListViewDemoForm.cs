@@ -97,7 +97,7 @@ public sealed class ListViewDemoForm : Form
         groupView.Click += (_, _) => groups.View = groups.View == View.Details ? View.List : View.Details;
         groupToolbar.Controls.Add(groupView);
         split.Panel1.Controls.Add(groups);
-        split.Panel1.Controls.Add(CreateNote("Group headers are native/system-rendered. List view does not display groups, and Bootstrap does not fake them."));
+        split.Panel1.Controls.Add(CreateNote("Group layout and interaction stay native; Bootstrap custom-paints only the header presentation for readable Light/Dark contrast. List view does not display groups."));
         split.Panel1.Controls.Add(groupToolbar);
 
         var virtualList = new BootstrapListView { Dock = DockStyle.Fill, View = View.Details, VirtualMode = true, FullRowSelect = true };

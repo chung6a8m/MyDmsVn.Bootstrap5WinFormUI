@@ -19,5 +19,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\MyDmsVn.Bootstrap5WinFormUI\MyDmsVn.Bootstrap5WinFormUI.csproj" />
     <ProjectReference Include="..\..\demo\MyDmsVn.Bootstrap5WinFormUI.Demo\MyDmsVn.Bootstrap5WinFormUI.Demo.csproj" />
+    <ProjectReference Include="..\MyDmsVn.Bootstrap5WinFormUI.VisualStyleHost\MyDmsVn.Bootstrap5WinFormUI.VisualStyleHost.csproj" />
   </ItemGroup>
 </Project>

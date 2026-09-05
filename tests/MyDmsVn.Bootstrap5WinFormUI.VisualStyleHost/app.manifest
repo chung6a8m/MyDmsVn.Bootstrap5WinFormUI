@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity name="MyDmsVn.Bootstrap5WinFormUI.VisualStyleHost" processorArchitecture="*" type="win32" version="1.0.0.0" />
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity language="*" name="Microsoft.Windows.Common-Controls" processorArchitecture="*" publicKeyToken="6595b64144ccf1df" type="win32" version="6.0.0.0" />
+    </dependentAssembly>
+  </dependency>
+</assembly>
