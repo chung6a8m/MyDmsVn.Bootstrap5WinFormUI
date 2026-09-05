@@ -28,13 +28,17 @@ Use `[NonParallelizable]` when a fixture owns process-global UI state, visible h
 
 ## 3. Unhandled WinForms exceptions must escape to NUnit
 
-The test assembly configures:
+The test assembly configures the application-wide WinForms exception mode:
 
 ```csharp
-Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+Application.SetUnhandledExceptionMode(
+    UnhandledExceptionMode.ThrowException,
+    threadScope: false);
 ```
 
 through `Infrastructure/WinFormsTestEnvironment.cs`.
+
+Using `threadScope: false` is required because NUnit may execute handle-based tests on STA worker threads other than the thread that runs the assembly-level setup fixture. Threads left in `Automatic` mode then inherit the application-wide `ThrowException` policy.
 
 This is intentional. Unexpected exceptions dispatched by the WinForms message loop must propagate to the test runner instead of being converted into the default Windows Forms exception dialog.
 

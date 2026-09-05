@@ -64,7 +64,8 @@ public sealed class WinFormsTestEnvironmentTests
         {
             Assert.That(threadException, Is.Null, "The exception was routed to Application.ThreadException instead of propagating.");
             Assert.That(propagatedException, Is.TypeOf<InvalidOperationException>());
-            Assert.That(propagatedException!.Message, Is.EqualTo("WinForms fail-fast probe"));
         }));
+
+        Assert.That(propagatedException!.Message, Is.EqualTo("WinForms fail-fast probe"));
     }
 }

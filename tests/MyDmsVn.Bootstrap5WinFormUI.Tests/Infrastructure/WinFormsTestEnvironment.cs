@@ -7,6 +7,8 @@ public sealed class WinFormsTestEnvironment
     [OneTimeSetUp]
     public void ConfigureUnhandledExceptionMode()
     {
-        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+        Application.SetUnhandledExceptionMode(
+            UnhandledExceptionMode.ThrowException,
+            threadScope: false);
     }
 }
