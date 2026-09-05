@@ -22,6 +22,8 @@ public sealed class BootstrapListViewTests
 
         public void RecreateHandleForTest() => RecreateHandle();
 
+        public void RaiseDpiChangedAfterParent() => OnDpiChangedAfterParent(EventArgs.Empty);
+
         public void RaiseMouseMove(Point location) => OnMouseMove(new MouseEventArgs(MouseButtons.None, 0, location.X, location.Y, 0));
 
         public void RaiseMouseLeave() => OnMouseLeave(EventArgs.Empty);
@@ -419,6 +421,121 @@ public sealed class BootstrapListViewTests
         list.RaiseMouseLeave();
 
         Assert.That(list.VirtualListSize, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void DpiLifecycleDoesNotRescaleCallerOwnedNativeGeometry()
+    {
+        using var images = new ImageList { ImageSize = new Size(24, 20) };
+        images.Images.Add(new Bitmap(24, 20));
+        using var list = new TestBootstrapListView
+        {
+            View = View.Tile,
+            TileSize = new Size(260, 72),
+            LargeImageList = images
+        };
+        var column = list.Columns.Add("Name", 173);
+        list.Items.Add("Alpha", 0);
+
+        list.RaiseDpiChangedAfterParent();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(list.TileSize, Is.EqualTo(new Size(260, 72)));
+            Assert.That(column.Width, Is.EqualTo(173));
+            Assert.That(images.ImageSize, Is.EqualTo(new Size(24, 20)));
+            Assert.That(list.LargeImageList, Is.SameAs(images));
+        }));
+    }
+
+    [TestCase(View.Details)]
+    [TestCase(View.List)]
+    [TestCase(View.Tile)]
+    public void RtlOwnerDrawingUsesNativeViewWithoutMutatingLayoutProperties(View view)
+    {
+        using var list = new TestBootstrapListView
+        {
+            Size = new Size(320, 120),
+            View = view,
+            RightToLeft = RightToLeft.Yes,
+            RightToLeftLayout = true
+        };
+        if (view == View.Details) list.Columns.Add("Name", 220, HorizontalAlignment.Right);
+        var item = new ListViewItem(new[] { "RTL item", "Secondary" });
+        list.Items.Add(item);
+        _ = list.Handle;
+        using var bitmap = new Bitmap(320, 120);
+        using var graphics = Graphics.FromImage(bitmap);
+
+        if (view == View.Details)
+        {
+            list.DrawSubItemForTest(new DrawListViewSubItemEventArgs(
+                graphics,
+                new Rectangle(0, 0, 220, 24),
+                item,
+                item.SubItems[0],
+                item.Index,
+                0,
+                list.Columns[0],
+                ListViewItemStates.Default));
+        }
+        else
+        {
+            list.DrawItemForTest(new DrawListViewItemEventArgs(
+                graphics,
+                item,
+                new Rectangle(0, 0, 240, 72),
+                item.Index,
+                ListViewItemStates.Default));
+        }
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(list.View, Is.EqualTo(view));
+            Assert.That(list.RightToLeft, Is.EqualTo(RightToLeft.Yes));
+            Assert.That(list.RightToLeftLayout, Is.True);
+            Assert.That(list.Items[0], Is.SameAs(item));
+        }));
+    }
+
+    [Test]
+    public void LargeNormalAndVirtualListsSupportConstantScopePaintSmoke()
+    {
+        using var normal = new TestBootstrapListView { Size = new Size(300, 120), View = View.Details };
+        normal.Columns.Add("Name", 240);
+        for (var index = 0; index < 5000; index++) normal.Items.Add($"Item {index}");
+        using var bitmap = new Bitmap(300, 40);
+        using var graphics = Graphics.FromImage(bitmap);
+        var item = normal.Items[2500];
+        normal.DrawSubItemForTest(new DrawListViewSubItemEventArgs(
+            graphics,
+            new Rectangle(0, 0, 240, 24),
+            item,
+            item.SubItems[0],
+            item.Index,
+            0,
+            normal.Columns[0],
+            ListViewItemStates.Default));
+
+        using var virtualList = new BootstrapListView { VirtualMode = true, View = View.Details };
+        virtualList.Columns.Add("Name", 240);
+        virtualList.RetrieveVirtualItem += (_, e) => e.Item = new ListViewItem($"Virtual {e.ItemIndex}");
+        virtualList.VirtualListSize = 100000;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(normal.Items.Count, Is.EqualTo(5000));
+            Assert.That(virtualList.VirtualListSize, Is.EqualTo(100000));
+        }));
+    }
+
+    [Test]
+    public void InvalidVariantIsRejectedBeforeStateMutation()
+    {
+        using var list = new BootstrapListView();
+
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => list.Variant = (BootstrapVariant)int.MaxValue));
+        Assert.That(list.Variant, Is.EqualTo(BootstrapVariant.Primary));
     }
 
     private static int GetThemeSubscriptionCount()
