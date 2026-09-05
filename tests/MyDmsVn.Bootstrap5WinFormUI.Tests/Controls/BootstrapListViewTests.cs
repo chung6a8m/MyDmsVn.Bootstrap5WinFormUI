@@ -18,7 +18,11 @@ public sealed class BootstrapListViewTests
 {
     private sealed class TestBootstrapListView : BootstrapListView
     {
+        private const int LvmSubItemHitTest = 0x1039;
+
         public bool DoubleBufferedForTest => DoubleBuffered;
+
+        public int NativeHitTestMessageCount { get; private set; }
 
         public void RecreateHandleForTest() => RecreateHandle();
 
@@ -33,6 +37,14 @@ public sealed class BootstrapListViewTests
         public void DrawSubItemForTest(DrawListViewSubItemEventArgs e) => OnDrawSubItem(e);
 
         public void DrawColumnHeaderForTest(DrawListViewColumnHeaderEventArgs e) => OnDrawColumnHeader(e);
+
+        public void ResetNativeHitTestMessageCount() => NativeHitTestMessageCount = 0;
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == LvmSubItemHitTest) NativeHitTestMessageCount++;
+            base.WndProc(ref m);
+        }
     }
 
     private BootstrapTheme? _originalTheme;
@@ -388,6 +400,20 @@ public sealed class BootstrapListViewTests
     }
 
     [Test]
+    public void StateImageBoundsDiscoveryDoesNotScaleWithRowWidth()
+    {
+        var narrowCount = MeasureStateImageHitTests(320);
+        var wideCount = MeasureStateImageHitTests(1600);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(narrowCount, Is.GreaterThan(0));
+            Assert.That(wideCount, Is.LessThanOrEqualTo(narrowCount + 8));
+            Assert.That(wideCount, Is.LessThanOrEqualTo(64));
+        }));
+    }
+
+    [Test]
     public void TileWithoutColumnsDoesNotRenderAdditionalSubItems()
     {
         using var list = new TestBootstrapListView
@@ -454,6 +480,70 @@ public sealed class BootstrapListViewTests
         }));
     }
 
+    [Test]
+    public void TileMatchesNamedColumnsToNamedSubItemsBeforeApplyingDisplayOrder()
+    {
+        using var list = new TestBootstrapListView
+        {
+            Size = new Size(400, 180),
+            TileSize = new Size(320, 120),
+            View = View.Tile
+        };
+        list.Columns.Add(new ColumnHeader { Name = "primary", Text = "Primary", Width = 100 });
+        list.Columns.Add(new ColumnHeader { Name = "city", Text = "City", Width = 100 });
+        list.Columns.Add(new ColumnHeader { Name = "code", Text = "Code", Width = 100 });
+        var item = new ListViewItem("Primary") { UseItemStyleForSubItems = false };
+        item.SubItems[0].Name = "primary";
+        item.SubItems.Add(new ListViewItem.ListViewSubItem(item, "Code", Color.Blue, Color.Empty, list.Font) { Name = "code" });
+        item.SubItems.Add(new ListViewItem.ListViewSubItem(item, "City", Color.Lime, Color.Empty, list.Font) { Name = "city" });
+        list.Items.Add(item);
+        _ = list.Handle;
+        using var bitmap = new Bitmap(list.ClientSize.Width, list.ClientSize.Height);
+        using var graphics = Graphics.FromImage(bitmap);
+
+        list.DrawItemForTest(new DrawListViewItemEventArgs(
+            graphics,
+            item,
+            new Rectangle(0, 0, list.TileSize.Width, list.TileSize.Height),
+            item.Index,
+            ListViewItemStates.Default));
+
+        Assert.That(
+            AverageDominantPixelY(bitmap, Color.Lime),
+            Is.LessThan(AverageDominantPixelY(bitmap, Color.Blue)));
+    }
+
+    [Test]
+    public void TileNamedAdditionalColumnsDoNotDependOnRawPrimaryColumnIndex()
+    {
+        using var list = new TestBootstrapListView
+        {
+            Size = new Size(400, 180),
+            TileSize = new Size(320, 120),
+            View = View.Tile
+        };
+        list.Columns.Add(new ColumnHeader { Name = "city", Text = "City", Width = 100 });
+        list.Columns.Add(new ColumnHeader { Name = "code", Text = "Code", Width = 100 });
+        var item = new ListViewItem("Primary") { UseItemStyleForSubItems = false };
+        item.SubItems.Add(new ListViewItem.ListViewSubItem(item, "Code", Color.Blue, Color.Empty, list.Font) { Name = "code" });
+        item.SubItems.Add(new ListViewItem.ListViewSubItem(item, "City", Color.Lime, Color.Empty, list.Font) { Name = "city" });
+        list.Items.Add(item);
+        _ = list.Handle;
+        using var bitmap = new Bitmap(list.ClientSize.Width, list.ClientSize.Height);
+        using var graphics = Graphics.FromImage(bitmap);
+
+        list.DrawItemForTest(new DrawListViewItemEventArgs(
+            graphics,
+            item,
+            new Rectangle(0, 0, list.TileSize.Width, list.TileSize.Height),
+            item.Index,
+            ListViewItemStates.Default));
+
+        Assert.That(
+            AverageDominantPixelY(bitmap, Color.Lime),
+            Is.LessThan(AverageDominantPixelY(bitmap, Color.Blue)));
+    }
+
     [TestCase(0)]
     [TestCase(2)]
     public void DetailsIndentCountUsesNativeIconAndLabelGeometry(int indentCount)
@@ -500,6 +590,45 @@ public sealed class BootstrapListViewTests
         }));
     }
 
+    [Test]
+    public void DetailsSecondaryColumnsKeepTheirOwnCellTextBounds()
+    {
+        using var list = new TestBootstrapListView
+        {
+            Size = new Size(360, 120),
+            View = View.Details
+        };
+        list.Columns.Add("Primary", 100);
+        list.Columns.Add("Second", 100);
+        list.Columns.Add("Third", 100);
+        var item = new ListViewItem("Primary") { UseItemStyleForSubItems = false };
+        item.SubItems.Add("Second", Color.Red, Color.Empty, list.Font);
+        item.SubItems.Add("Third", Color.Lime, Color.Empty, list.Font);
+        list.Items.Add(item);
+        _ = list.Handle;
+        using var bitmap = new Bitmap(list.ClientSize.Width, list.ClientSize.Height);
+        using var graphics = Graphics.FromImage(bitmap);
+
+        for (var columnIndex = 1; columnIndex <= 2; columnIndex++)
+        {
+            list.DrawSubItemForTest(new DrawListViewSubItemEventArgs(
+                graphics,
+                new Rectangle(columnIndex * 100, item.Bounds.Top, 100, item.Bounds.Height),
+                item,
+                item.SubItems[columnIndex],
+                item.Index,
+                columnIndex,
+                list.Columns[columnIndex],
+                ListViewItemStates.Default));
+        }
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(CountDominantPixels(bitmap, Color.Red), Is.GreaterThan(0));
+            Assert.That(CountDominantPixels(bitmap, Color.Lime), Is.GreaterThan(0));
+        }));
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void ColumnHeaderPreservesIndexAndKeyBackedImages(bool useKey)
@@ -538,6 +667,83 @@ public sealed class BootstrapListViewTests
         {
             Assert.That(CountDominantPixels(bitmap, Color.Lime), Is.GreaterThan(0));
             Assert.That(CountDominantPixels(bitmap, Color.Red), Is.Zero);
+        }));
+    }
+
+    [Test]
+    public void RtlTextWithoutLayoutMirroringKeepsTileTextAfterNativeIcon()
+    {
+        using var images = new ImageList { ImageSize = new Size(32, 32) };
+        images.Images.Add(new Bitmap(32, 32));
+        using var list = new TestBootstrapListView
+        {
+            LargeImageList = images,
+            RightToLeft = RightToLeft.Yes,
+            RightToLeftLayout = false,
+            Size = new Size(360, 160),
+            TileSize = new Size(280, 96),
+            View = View.Tile
+        };
+        var item = list.Items.Add("RTL tile", 0);
+        item.ForeColor = Color.Red;
+        _ = list.Handle;
+        var iconBounds = item.GetBounds(ItemBoundsPortion.Icon);
+        using var bitmap = new Bitmap(list.ClientSize.Width, list.ClientSize.Height);
+        using var graphics = Graphics.FromImage(bitmap);
+        var drawBounds = new Rectangle(0, 0, list.TileSize.Width, list.TileSize.Height);
+
+        list.DrawItemForTest(new DrawListViewItemEventArgs(
+            graphics,
+            item,
+            drawBounds,
+            item.Index,
+            ListViewItemStates.Default));
+
+        var textPixels = FindDominantPixelBounds(bitmap, Color.Red);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(textPixels, Is.Not.EqualTo(Rectangle.Empty));
+            Assert.That(textPixels.Left, Is.GreaterThanOrEqualTo(iconBounds.Right));
+        }));
+    }
+
+    [Test]
+    public void RtlTextWithoutLayoutMirroringKeepsHeaderImageOnNativeLeadingEdge()
+    {
+        using var images = new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit };
+        using var image = new Bitmap(16, 16);
+        using (var imageGraphics = Graphics.FromImage(image)) imageGraphics.Clear(Color.Lime);
+        images.Images.Add(image);
+        using var list = new TestBootstrapListView
+        {
+            RightToLeft = RightToLeft.Yes,
+            RightToLeftLayout = false,
+            Size = new Size(320, 100),
+            SmallImageList = images,
+            View = View.Details
+        };
+        var header = list.Columns.Add("RTL header", 240);
+        header.ImageIndex = 0;
+        _ = list.Handle;
+        using var bitmap = new Bitmap(260, 40);
+        using var graphics = Graphics.FromImage(bitmap);
+        var bounds = new Rectangle(0, 0, 240, 28);
+
+        list.DrawColumnHeaderForTest(new DrawListViewColumnHeaderEventArgs(
+            graphics,
+            bounds,
+            0,
+            header,
+            ListViewItemStates.Default,
+            list.ForeColor,
+            list.BackColor,
+            list.Font));
+
+        var imagePixels = FindDominantPixelBounds(bitmap, Color.Lime);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(imagePixels, Is.Not.EqualTo(Rectangle.Empty));
+            Assert.That(imagePixels.Right, Is.LessThan(bounds.Left + (bounds.Width / 2)));
         }));
     }
 
@@ -959,6 +1165,37 @@ public sealed class BootstrapListViewTests
         return left == int.MaxValue
             ? Rectangle.Empty
             : Rectangle.FromLTRB(left, top, right + 1, bottom + 1);
+    }
+
+    private static int MeasureStateImageHitTests(int width)
+    {
+        using var images = new ImageList { ImageSize = new Size(16, 16) };
+        images.Images.Add(new Bitmap(16, 16));
+        using var list = new TestBootstrapListView
+        {
+            CheckBoxes = true,
+            Size = new Size(width, 100),
+            SmallImageList = images,
+            View = View.Details
+        };
+        list.Columns.Add("Name", width - 20);
+        var item = list.Items.Add("Measured", 0);
+        _ = list.Handle;
+        using var bitmap = new Bitmap(width, 50);
+        using var graphics = Graphics.FromImage(bitmap);
+        list.ResetNativeHitTestMessageCount();
+
+        list.DrawSubItemForTest(new DrawListViewSubItemEventArgs(
+            graphics,
+            new Rectangle(0, item.Bounds.Top, list.Columns[0].Width, item.Bounds.Height),
+            item,
+            item.SubItems[0],
+            item.Index,
+            0,
+            list.Columns[0],
+            ListViewItemStates.Default));
+
+        return list.NativeHitTestMessageCount;
     }
 
     private static bool IsFontUsable(Font font)

@@ -177,12 +177,12 @@ public class BootstrapListView : ListView
             if (headerImage is not null && !textBounds.IsEmpty)
             {
                 var imageWidth = Math.Min(headerImage.Width, textBounds.Width);
-                var imageBounds = RightToLeft == RightToLeft.Yes
+                var imageBounds = IsLayoutMirrored
                     ? new Rectangle(textBounds.Right - imageWidth, textBounds.Top, imageWidth, textBounds.Height)
                     : new Rectangle(textBounds.Left, textBounds.Top, imageWidth, textBounds.Height);
                 DrawImage(e.Graphics, headerImage, imageBounds);
                 var gap = DpiScaler.Scale(theme.Metrics.SpacingXS, GetCurrentDpi());
-                textBounds = RightToLeft == RightToLeft.Yes
+                textBounds = IsLayoutMirrored
                     ? Rectangle.FromLTRB(textBounds.Left, textBounds.Top, Math.Max(textBounds.Left, imageBounds.Left - gap), textBounds.Bottom)
                     : Rectangle.FromLTRB(Math.Min(textBounds.Right, imageBounds.Right + gap), textBounds.Top, textBounds.Right, textBounds.Bottom);
             }
@@ -273,9 +273,12 @@ public class BootstrapListView : ListView
         var cellSelected = selected && (FullRowSelect || e.ColumnIndex == 0);
         var palette = ResolvePalette(item, subItem, ResolveState(cellSelected, hovered), e.ItemIndex);
         Fill(e.Graphics, e.Bounds, palette.BackColor);
-        var textBounds = Rectangle.Intersect(
-            e.Bounds,
-            GetNativeBounds(item, ItemBoundsPortion.Label, e.Bounds));
+        var textBounds = e.ColumnIndex == 0
+            ? Rectangle.Intersect(e.Bounds, GetNativeBounds(item, ItemBoundsPortion.Label, e.Bounds))
+            : BootstrapListViewLayoutLogic.Deflate(
+                e.Bounds,
+                DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingXS, GetCurrentDpi()),
+                0);
         if (e.ColumnIndex == 0)
         {
             DrawNativeStateImage(e.Graphics, item, palette.ForeColor);
@@ -309,7 +312,9 @@ public class BootstrapListView : ListView
             item.SubItems[0],
             ResolveState(selected, _hoverHighlight && e.ItemIndex == _hoveredItemIndex),
             e.ItemIndex);
-        var entireBounds = GetNativeBounds(item, ItemBoundsPortion.Entire, e.Bounds);
+        var entireBounds = View == View.Tile
+            ? e.Bounds
+            : GetNativeBounds(item, ItemBoundsPortion.Entire, e.Bounds);
         Fill(e.Graphics, entireBounds, palette.BackColor);
         var iconBounds = GetNativeBounds(item, ItemBoundsPortion.Icon, Rectangle.Empty);
         var labelBounds = GetNativeBounds(item, ItemBoundsPortion.Label, e.Bounds);
@@ -349,7 +354,7 @@ public class BootstrapListView : ListView
             itemBounds,
             imageBounds,
             DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingSM, GetCurrentDpi()),
-            RightToLeft == RightToLeft.Yes);
+            IsLayoutMirrored);
         if (bounds.IsEmpty) return;
         var lineCount = CountTileLines(item);
         var lineHeight = Math.Max(1, bounds.Height / lineCount);
@@ -357,14 +362,16 @@ public class BootstrapListView : ListView
         var lineIndex = 1;
         for (var displayIndex = 0; displayIndex < Columns.Count; displayIndex++)
         {
-            for (var columnIndex = 1; columnIndex < Columns.Count && columnIndex < item.SubItems.Count; columnIndex++)
+            for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
             {
                 var column = Columns[columnIndex];
                 if (column.DisplayIndex != displayIndex || column.Width == 0) continue;
+                var subItem = ResolveTileSubItem(item, column, columnIndex);
+                if (subItem is null || ReferenceEquals(subItem, item.SubItems[0])) continue;
                 DrawTileLine(
                     graphics,
                     item,
-                    item.SubItems[columnIndex],
+                    subItem,
                     bounds,
                     lineHeight,
                     lineIndex,
@@ -377,12 +384,23 @@ public class BootstrapListView : ListView
     private int CountTileLines(ListViewItem item)
     {
         var count = 1;
-        for (var columnIndex = 1; columnIndex < Columns.Count && columnIndex < item.SubItems.Count; columnIndex++)
+        for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
         {
-            if (Columns[columnIndex].Width != 0) count++;
+            var column = Columns[columnIndex];
+            var subItem = ResolveTileSubItem(item, column, columnIndex);
+            if (column.Width != 0 && subItem is not null && !ReferenceEquals(subItem, item.SubItems[0])) count++;
         }
 
         return count;
+    }
+
+    private static ListViewItem.ListViewSubItem? ResolveTileSubItem(
+        ListViewItem item,
+        ColumnHeader column,
+        int columnIndex)
+    {
+        if (!string.IsNullOrEmpty(column.Name)) return item.SubItems[column.Name];
+        return columnIndex < item.SubItems.Count ? item.SubItems[columnIndex] : null;
     }
 
     private void DrawTileLine(
@@ -419,33 +437,80 @@ public class BootstrapListView : ListView
         var itemBounds = Rectangle.Intersect(ClientRectangle, GetNativeBounds(item, ItemBoundsPortion.Entire, Rectangle.Empty));
         var iconBounds = GetNativeBounds(item, ItemBoundsPortion.Icon, itemBounds);
         if (itemBounds.IsEmpty || iconBounds.IsEmpty) return Rectangle.Empty;
+        var stateWidth = StateImageList?.ImageSize.Width ?? DpiScaler.Scale(16, GetCurrentDpi());
+        if (!TryFindNativeStateHit(item, itemBounds, iconBounds, stateWidth, out var hitPoint)) return Rectangle.Empty;
+        var left = FindStateHitStart(item, itemBounds.Left, hitPoint.X, hitPoint.Y, true);
+        var right = FindStateHitEnd(item, hitPoint.X, itemBounds.Right, hitPoint.Y, true);
+        var top = FindStateHitStart(item, itemBounds.Top, hitPoint.Y, hitPoint.X, false);
+        var bottom = FindStateHitEnd(item, hitPoint.Y, itemBounds.Bottom, hitPoint.X, false);
+        return Rectangle.FromLTRB(left, top, right, bottom);
+    }
 
-        var y = Math.Max(itemBounds.Top, Math.Min(itemBounds.Bottom - 1, iconBounds.Top + (iconBounds.Height / 2)));
-        var firstX = -1;
-        var lastX = -1;
-        for (var x = itemBounds.Left; x < itemBounds.Right; x++)
+    private bool TryFindNativeStateHit(
+        ListViewItem item,
+        Rectangle itemBounds,
+        Rectangle iconBounds,
+        int stateWidth,
+        out Point hitPoint)
+    {
+        var direction = IsLayoutMirrored ? 1 : -1;
+        var iconLeadingEdge = IsLayoutMirrored ? iconBounds.Right - 1 : iconBounds.Left;
+        var likelyX = iconLeadingEdge + (direction * Math.Max(1, stateWidth / 2));
+        var alternateX = iconLeadingEdge;
+        var centerY = iconBounds.Top + (iconBounds.Height / 2);
+        var itemCenterY = itemBounds.Top + (itemBounds.Height / 2);
+        var topY = iconBounds.Top;
+        var bottomY = iconBounds.Bottom - 1;
+
+        return TryNativeStateHit(item, itemBounds, likelyX, centerY, out hitPoint) ||
+               TryNativeStateHit(item, itemBounds, likelyX, itemCenterY, out hitPoint) ||
+               TryNativeStateHit(item, itemBounds, likelyX, topY, out hitPoint) ||
+               TryNativeStateHit(item, itemBounds, likelyX, bottomY, out hitPoint) ||
+               TryNativeStateHit(item, itemBounds, alternateX, centerY, out hitPoint) ||
+               TryNativeStateHit(item, itemBounds, alternateX, itemCenterY, out hitPoint) ||
+               TryNativeStateHit(item, itemBounds, alternateX, topY, out hitPoint) ||
+               TryNativeStateHit(item, itemBounds, alternateX, bottomY, out hitPoint);
+    }
+
+    private bool TryNativeStateHit(ListViewItem item, Rectangle itemBounds, int x, int y, out Point hitPoint)
+    {
+        hitPoint = Point.Empty;
+        if (!itemBounds.Contains(x, y) || !IsNativeStateHit(item, x, y)) return false;
+        hitPoint = new Point(x, y);
+        return true;
+    }
+
+    private int FindStateHitStart(ListViewItem item, int boundary, int inside, int fixedCoordinate, bool horizontal)
+    {
+        if (IsNativeStateHit(item, horizontal ? boundary : fixedCoordinate, horizontal ? fixedCoordinate : boundary)) return boundary;
+        var outside = boundary;
+        while (outside + 1 < inside)
         {
-            var hit = HitTest(x, y);
-            if (!ReferenceEquals(hit.Item, item) || (hit.Location & ListViewHitTestLocations.StateImage) == 0) continue;
-            if (firstX < 0) firstX = x;
-            lastX = x;
+            var middle = outside + ((inside - outside) / 2);
+            if (IsNativeStateHit(item, horizontal ? middle : fixedCoordinate, horizontal ? fixedCoordinate : middle)) inside = middle;
+            else outside = middle;
         }
 
-        if (firstX < 0) return Rectangle.Empty;
-        var probeX = firstX + ((lastX - firstX) / 2);
-        var firstY = -1;
-        var lastY = -1;
-        for (var probeY = itemBounds.Top; probeY < itemBounds.Bottom; probeY++)
+        return inside;
+    }
+
+    private int FindStateHitEnd(ListViewItem item, int inside, int boundary, int fixedCoordinate, bool horizontal)
+    {
+        var outside = boundary;
+        while (inside + 1 < outside)
         {
-            var hit = HitTest(probeX, probeY);
-            if (!ReferenceEquals(hit.Item, item) || (hit.Location & ListViewHitTestLocations.StateImage) == 0) continue;
-            if (firstY < 0) firstY = probeY;
-            lastY = probeY;
+            var middle = inside + ((outside - inside) / 2);
+            if (IsNativeStateHit(item, horizontal ? middle : fixedCoordinate, horizontal ? fixedCoordinate : middle)) inside = middle;
+            else outside = middle;
         }
 
-        return firstY < 0
-            ? Rectangle.Empty
-            : Rectangle.FromLTRB(firstX, firstY, lastX + 1, lastY + 1);
+        return outside;
+    }
+
+    private bool IsNativeStateHit(ListViewItem item, int x, int y)
+    {
+        var hit = HitTest(x, y);
+        return ReferenceEquals(hit.Item, item) && (hit.Location & ListViewHitTestLocations.StateImage) != 0;
     }
 
     private BootstrapListViewItemVisualState ResolveState(bool selected, bool hovered)
@@ -653,4 +718,6 @@ public class BootstrapListView : ListView
     }
 
     private int GetCurrentDpi() => DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+
+    private bool IsLayoutMirrored => RightToLeft == RightToLeft.Yes && RightToLeftLayout;
 }
