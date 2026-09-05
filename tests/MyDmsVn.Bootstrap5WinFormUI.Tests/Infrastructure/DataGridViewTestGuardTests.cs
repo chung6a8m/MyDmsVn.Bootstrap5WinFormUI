@@ -10,22 +10,29 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Infrastructure;
 public sealed class DataGridViewTestGuardTests
 {
     [Test]
-    public void FailOnDataErrorRequestsOriginalExceptionToBeThrown()
+    public void FailOnDataErrorWithExceptionCannotBeSuppressedByLaterHandler()
     {
         using var grid = new ProbeDataGridView();
         DataGridViewTestGuard.FailOnDataError(grid);
+        var laterHandlerRan = false;
+        grid.DataError += (_, e) =>
+        {
+            laterHandlerRan = true;
+            e.ThrowException = false;
+        };
         var expected = new InvalidOperationException("boom");
 
-        var args = grid.RaiseDataError(
-            expected,
-            columnIndex: 3,
-            rowIndex: 7,
-            DataGridViewDataErrorContexts.Commit | DataGridViewDataErrorContexts.CurrentCellChange);
+        var exception = Assert.Throws<InvalidOperationException>((Action)(() =>
+            grid.RaiseDataError(
+                expected,
+                columnIndex: 3,
+                rowIndex: 7,
+                DataGridViewDataErrorContexts.Commit | DataGridViewDataErrorContexts.CurrentCellChange)));
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(args.Exception, Is.SameAs(expected));
-            Assert.That(args.ThrowException, Is.True);
+            Assert.That(exception, Is.SameAs(expected));
+            Assert.That(laterHandlerRan, Is.False);
         }));
     }
 
