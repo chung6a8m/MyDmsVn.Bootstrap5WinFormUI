@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.ExceptionServices;
 using System.Windows.Forms;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Infrastructure;
@@ -19,7 +20,7 @@ internal static class DataGridViewTestGuard
     {
         if (e.Exception is not null)
         {
-            e.ThrowException = true;
+            ExceptionDispatchInfo.Capture(e.Exception).Throw();
             return;
         }
 
