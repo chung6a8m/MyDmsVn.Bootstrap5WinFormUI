@@ -60,7 +60,7 @@ The helper is located at:
 tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Infrastructure/DataGridViewTestGuard.cs
 ```
 
-If the `DataError` contains an exception, the guard requests that the original exception be thrown. If no exception is supplied, it throws a diagnostic `InvalidOperationException` containing row, column, and context information.
+If the `DataError` contains an exception, the guard rethrows the original exception directly with its stack trace preserved so a later event handler cannot suppress the failure. If no exception is supplied, it throws a diagnostic `InvalidOperationException` containing row, column, and context information.
 
 ### Exception: tests that intentionally characterize `DataError`
 
