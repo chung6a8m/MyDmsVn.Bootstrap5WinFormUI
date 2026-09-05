@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -17,7 +18,21 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 public class BootstrapListView : ListView
 {
     private const int MaxTileColumns = 20;
+    private const int CddsPrePaint = 0x00000001;
+    private const int CddsPostPaint = 0x00000002;
+    private const int CddsItemPrePaint = 0x00010001;
+    private const int CdrfNewFont = 0x00000002;
+    private const int CdrfNotifyPostPaint = 0x00000010;
+    private const int HdmGetItemRect = 0x1207;
+    private const int LvcdItemGroup = 0x00000001;
+    private const int LvmArrange = 0x1016;
+    private const int LvmGetHeader = 0x101F;
     private const int LvmGetItemW = 0x104B;
+    private const int LvmSetTileViewInfo = 0x10A2;
+    private const int NmCustomDraw = -12;
+    private const int SourceCopy = 0x00CC0020;
+    private const int WmNotify = 0x004E;
+    private const int WmReflectNotify = 0x204E;
     private const uint LvifImage = 0x0002;
     private static readonly object? DrawColumnHeaderEventKey = ResolveEventKey("s_drawColumnHeaderEvent", "EVENT_DRAWCOLUMNHEADER");
     private static readonly object? DrawItemEventKey = ResolveEventKey("s_drawItemEvent", "EVENT_DRAWITEM");
@@ -35,10 +50,14 @@ public class BootstrapListView : ListView
     private Font? _themeFont;
     private Bitmap? _ownerDrawBuffer;
     private Graphics? _ownerDrawBufferGraphics;
+    private IntPtr _ownerDrawBufferHdc;
+    private IntPtr _activeNativePaintHdc;
+    private readonly BootstrapListViewNativeWindow _nativeWindow;
 
     /// <summary>Initializes a new instance of the <see cref="BootstrapListView"/> class.</summary>
     public BootstrapListView()
     {
+        _nativeWindow = new BootstrapListViewNativeWindow(this);
         OwnerDraw = true;
         DoubleBuffered = true;
         _initialized = true;
@@ -120,6 +139,7 @@ public class BootstrapListView : ListView
     {
         OwnerDraw = true;
         base.OnHandleCreated(e);
+        _nativeWindow.AssignHandle(Handle);
         _hoveredItemIndex = -1;
         _hoveredItemBounds = Rectangle.Empty;
         if (_initialized && !IsDisposed && !Disposing)
@@ -134,6 +154,7 @@ public class BootstrapListView : ListView
     {
         _hoveredItemIndex = -1;
         _hoveredItemBounds = Rectangle.Empty;
+        if (_nativeWindow.Handle != IntPtr.Zero) _nativeWindow.ReleaseHandle();
         base.OnHandleDestroyed(e);
     }
 
@@ -168,6 +189,51 @@ public class BootstrapListView : ListView
         Invalidate();
     }
 
+    private void ProcessNativeMessage(ref Message m, NativeMessageDispatcher dispatch)
+    {
+        var headerDraw = default(NativeCustomDraw);
+        var headerCustomDraw = m.Msg == WmNotify && IsHeaderCustomDraw(m.LParam, out headerDraw);
+        var listDraw = default(NativeListViewCustomDraw);
+        var listCustomDraw = m.Msg == WmReflectNotify && IsListCustomDraw(m.LParam, out listDraw);
+        var groupCustomDraw = listCustomDraw && IsGroupCustomDraw(listDraw);
+        var previousPaintHdc = _activeNativePaintHdc;
+        if (headerCustomDraw) _activeNativePaintHdc = headerDraw.DeviceContext;
+        else if (listCustomDraw) _activeNativePaintHdc = listDraw.CustomDraw.DeviceContext;
+
+        try
+        {
+            dispatch(ref m);
+        }
+        finally
+        {
+            _activeNativePaintHdc = previousPaintHdc;
+        }
+
+        if (headerCustomDraw)
+        {
+            if (headerDraw.DrawStage == CddsPrePaint)
+            {
+                m.Result = OrCustomDrawResult(m.Result, CdrfNotifyPostPaint);
+            }
+            else if (headerDraw.DrawStage == CddsPostPaint)
+            {
+                PaintHeaderFiller(headerDraw.Header.WindowFrom, headerDraw.DeviceContext);
+            }
+        }
+
+        if (groupCustomDraw)
+        {
+            ApplyGroupHeaderTheme(ref listDraw, ref m);
+            Marshal.StructureToPtr(listDraw, m.LParam, false);
+        }
+
+        if (m.Msg == LvmSetTileViewInfo && View == View.Tile && IsHandleCreated)
+        {
+            SendMessage(Handle, LvmArrange, IntPtr.Zero, IntPtr.Zero);
+            Invalidate();
+        }
+    }
+
     /// <inheritdoc />
     protected override void OnDrawColumnHeader(DrawListViewColumnHeaderEventArgs e)
     {
@@ -179,22 +245,17 @@ public class BootstrapListView : ListView
             return;
         }
 
-        var bufferGraphics = PrepareOwnerDrawBuffer(e.Graphics, paintBounds);
-        var bufferedArgs = new DrawListViewColumnHeaderEventArgs(
-            bufferGraphics,
-            e.Bounds,
-            e.ColumnIndex,
-            e.Header,
-            e.State,
-            e.ForeColor,
-            e.BackColor,
-            e.Font);
-
-        PaintColumnHeader(bufferedArgs, paintBounds);
-
-        base.OnDrawColumnHeader(bufferedArgs);
-        e.DrawDefault = bufferedArgs.DrawDefault;
-        if (!e.DrawDefault) RenderOwnerDrawBuffer(e.Graphics, paintBounds);
+        CaptureOwnerDrawTarget(e.Graphics, paintBounds);
+        try
+        {
+            PaintColumnHeader(e, paintBounds);
+            base.OnDrawColumnHeader(e);
+            if (e.DrawDefault) RestoreOwnerDrawTarget(e.Graphics, paintBounds);
+        }
+        finally
+        {
+            ReleaseOwnerDrawBackup();
+        }
     }
 
     /// <inheritdoc />
@@ -213,17 +274,17 @@ public class BootstrapListView : ListView
             return;
         }
 
-        var bufferGraphics = PrepareOwnerDrawBuffer(e.Graphics, e.Bounds);
-        var bufferedArgs = new DrawListViewItemEventArgs(
-            bufferGraphics,
-            e.Item,
-            e.Bounds,
-            e.ItemIndex,
-            e.State);
-        DrawNonDetailsItem(bufferedArgs);
-        base.OnDrawItem(bufferedArgs);
-        e.DrawDefault = bufferedArgs.DrawDefault;
-        if (!e.DrawDefault) RenderOwnerDrawBuffer(e.Graphics, e.Bounds);
+        CaptureOwnerDrawTarget(e.Graphics, e.Bounds);
+        try
+        {
+            DrawNonDetailsItem(e);
+            base.OnDrawItem(e);
+            if (e.DrawDefault) RestoreOwnerDrawTarget(e.Graphics, e.Bounds);
+        }
+        finally
+        {
+            ReleaseOwnerDrawBackup();
+        }
     }
 
     /// <inheritdoc />
@@ -239,20 +300,17 @@ public class BootstrapListView : ListView
             return;
         }
 
-        var bufferGraphics = PrepareOwnerDrawBuffer(e.Graphics, paintBounds);
-        var bufferedArgs = new DrawListViewSubItemEventArgs(
-            bufferGraphics,
-            e.Bounds,
-            e.Item,
-            e.SubItem,
-            e.ItemIndex,
-            e.ColumnIndex,
-            e.Header,
-            e.ItemState);
-        if (View == View.Details) DrawDetailsSubItem(bufferedArgs);
-        base.OnDrawSubItem(bufferedArgs);
-        e.DrawDefault = bufferedArgs.DrawDefault;
-        if (!e.DrawDefault) RenderOwnerDrawBuffer(e.Graphics, paintBounds);
+        CaptureOwnerDrawTarget(e.Graphics, paintBounds);
+        try
+        {
+            if (View == View.Details) DrawDetailsSubItem(e);
+            base.OnDrawSubItem(e);
+            if (e.DrawDefault) RestoreOwnerDrawTarget(e.Graphics, paintBounds);
+        }
+        finally
+        {
+            ReleaseOwnerDrawBackup();
+        }
     }
 
     /// <inheritdoc />
@@ -365,7 +423,7 @@ public class BootstrapListView : ListView
             return;
         }
 
-        var selected = IsActuallySelected(item, e.ItemIndex);
+        var selected = IsActuallySelected(item);
         var hotTracked = HotTracking && (e.ItemState & ListViewItemStates.Hot) != 0;
         var hovered = _hoverHighlight && e.ItemIndex == _hoveredItemIndex;
         var rowBounds = GetNativeBounds(item, ItemBoundsPortion.Entire, e.Bounds);
@@ -416,7 +474,7 @@ public class BootstrapListView : ListView
     private void DrawNonDetailsItem(DrawListViewItemEventArgs e)
     {
         var item = e.Item;
-        var selected = IsActuallySelected(item, e.ItemIndex);
+        var selected = IsActuallySelected(item);
         var hotTracked = HotTracking && (e.State & ListViewItemStates.Hot) != 0;
         var palette = ResolvePalette(
             item,
@@ -521,7 +579,7 @@ public class BootstrapListView : ListView
     private void DrawNativeStateImage(Graphics graphics, ListViewItem item, Color foreground, bool allowCheckboxFallback = true)
     {
         var stateImage = ResolveStateImage(item);
-        if (stateImage is null && (!CheckBoxes || !allowCheckboxFallback)) return;
+        if (stateImage is null && (StateImageList is not null || !CheckBoxes || !allowCheckboxFallback)) return;
         var bounds = GetNativeStateImageBounds(item);
         if (bounds.IsEmpty) return;
         if (stateImage is not null) DrawImage(graphics, stateImage, bounds); else DrawCheckbox(graphics, bounds, item.Checked, foreground);
@@ -614,11 +672,7 @@ public class BootstrapListView : ListView
         return BootstrapListViewRenderLogic.ResolveState(Enabled, selected, Focused, HideSelection, hovered);
     }
 
-    private bool IsActuallySelected(ListViewItem item, int itemIndex)
-    {
-        if (!VirtualMode) return item.Selected;
-        return itemIndex >= 0 && SelectedIndices.Contains(itemIndex);
-    }
+    private static bool IsActuallySelected(ListViewItem item) => item.Selected;
 
     private BootstrapListViewItemPalette ResolvePalette(ListViewItem item, ListViewItem.ListViewSubItem subItem, BootstrapListViewItemVisualState state, int itemIndex)
     {
@@ -705,45 +759,161 @@ public class BootstrapListView : ListView
         graphics.FillRectangle(brush, bounds);
     }
 
-    private Graphics PrepareOwnerDrawBuffer(Graphics targetGraphics, Rectangle targetBounds)
+    private void CaptureOwnerDrawTarget(Graphics targetGraphics, Rectangle targetBounds)
     {
+        if (targetBounds.Width <= 0 || targetBounds.Height <= 0) return;
         var requiredSize = new Size(
             Math.Max(1, targetBounds.Width),
             Math.Max(1, targetBounds.Height));
         if (_ownerDrawBuffer is null ||
-            _ownerDrawBuffer.Size != requiredSize ||
+            _ownerDrawBuffer.Width < requiredSize.Width ||
+            _ownerDrawBuffer.Height < requiredSize.Height ||
             Math.Abs(_ownerDrawBuffer.HorizontalResolution - targetGraphics.DpiX) > 0.01f ||
             Math.Abs(_ownerDrawBuffer.VerticalResolution - targetGraphics.DpiY) > 0.01f)
         {
+            var width = Math.Max(requiredSize.Width, _ownerDrawBuffer?.Width ?? 0);
+            var height = Math.Max(requiredSize.Height, _ownerDrawBuffer?.Height ?? 0);
             DisposeOwnerDrawBuffer();
-            _ownerDrawBuffer = new Bitmap(requiredSize.Width, requiredSize.Height);
+            _ownerDrawBuffer = new Bitmap(width, height, PixelFormat.Format32bppRgb);
             _ownerDrawBuffer.SetResolution(targetGraphics.DpiX, targetGraphics.DpiY);
             _ownerDrawBufferGraphics = Graphics.FromImage(_ownerDrawBuffer);
         }
 
         var graphics = _ownerDrawBufferGraphics!;
-        graphics.ResetTransform();
-        graphics.ResetClip();
-        graphics.Clear(BackColor);
-        graphics.TranslateTransform(-targetBounds.X, -targetBounds.Y);
-        graphics.SetClip(targetBounds);
-        return graphics;
+        graphics.Flush(FlushIntention.Sync);
+        _ownerDrawBufferHdc = graphics.GetHdc();
+        if (_activeNativePaintHdc != IntPtr.Zero)
+        {
+            BitBlt(_ownerDrawBufferHdc, 0, 0, targetBounds.Width, targetBounds.Height,
+                _activeNativePaintHdc, targetBounds.X, targetBounds.Y, SourceCopy);
+        }
+        else
+        {
+            targetGraphics.Flush(FlushIntention.Sync);
+            var sourceHdc = targetGraphics.GetHdc();
+            try
+            {
+                BitBlt(_ownerDrawBufferHdc, 0, 0, targetBounds.Width, targetBounds.Height,
+                    sourceHdc, targetBounds.X, targetBounds.Y, SourceCopy);
+            }
+            finally
+            {
+                targetGraphics.ReleaseHdc(sourceHdc);
+            }
+        }
     }
 
-    private void RenderOwnerDrawBuffer(Graphics graphics, Rectangle targetBounds)
+    private void RestoreOwnerDrawTarget(Graphics targetGraphics, Rectangle targetBounds)
     {
-        if (_ownerDrawBuffer is null) return;
+        if (_ownerDrawBufferHdc == IntPtr.Zero) return;
         if (targetBounds.Width <= 0 || targetBounds.Height <= 0) return;
-        graphics.DrawImageUnscaled(_ownerDrawBuffer, targetBounds.Location);
+        if (_activeNativePaintHdc != IntPtr.Zero)
+        {
+            BitBlt(_activeNativePaintHdc, targetBounds.X, targetBounds.Y, targetBounds.Width, targetBounds.Height,
+                _ownerDrawBufferHdc, 0, 0, SourceCopy);
+        }
+        else
+        {
+            targetGraphics.Flush(FlushIntention.Sync);
+            var destinationHdc = targetGraphics.GetHdc();
+            try
+            {
+                BitBlt(destinationHdc, targetBounds.X, targetBounds.Y, targetBounds.Width, targetBounds.Height,
+                    _ownerDrawBufferHdc, 0, 0, SourceCopy);
+            }
+            finally
+            {
+                targetGraphics.ReleaseHdc(destinationHdc);
+            }
+        }
+    }
+
+    private void ReleaseOwnerDrawBackup()
+    {
+        if (_ownerDrawBufferHdc == IntPtr.Zero || _ownerDrawBufferGraphics is null) return;
+        _ownerDrawBufferGraphics.ReleaseHdc(_ownerDrawBufferHdc);
+        _ownerDrawBufferHdc = IntPtr.Zero;
     }
 
     private void DisposeOwnerDrawBuffer()
     {
+        ReleaseOwnerDrawBackup();
         _ownerDrawBufferGraphics?.Dispose();
         _ownerDrawBufferGraphics = null;
         _ownerDrawBuffer?.Dispose();
         _ownerDrawBuffer = null;
     }
+
+    private bool IsHeaderCustomDraw(IntPtr parameter, out NativeCustomDraw customDraw)
+    {
+        customDraw = default;
+        if (parameter == IntPtr.Zero || !IsHandleCreated) return false;
+        customDraw = Marshal.PtrToStructure<NativeCustomDraw>(parameter);
+        return customDraw.Header.Code == NmCustomDraw && customDraw.Header.WindowFrom == GetHeaderHandle();
+    }
+
+    private static bool IsListCustomDraw(IntPtr parameter, out NativeListViewCustomDraw customDraw)
+    {
+        customDraw = default;
+        if (parameter == IntPtr.Zero) return false;
+        customDraw = Marshal.PtrToStructure<NativeListViewCustomDraw>(parameter);
+        return customDraw.CustomDraw.Header.Code == NmCustomDraw;
+    }
+
+
+    private static bool IsGroupCustomDraw(NativeListViewCustomDraw customDraw) =>
+        customDraw.CustomDraw.DrawStage == CddsItemPrePaint && customDraw.ItemType == LvcdItemGroup;
+
+    private void ApplyGroupHeaderTheme(ref NativeListViewCustomDraw customDraw, ref Message message)
+    {
+        var colors = BootstrapThemeManager.CurrentTheme.Colors;
+        customDraw.TextColor = ColorToColorRef(colors.Text);
+        customDraw.TextBackgroundColor = ColorToColorRef(colors.Surface);
+        customDraw.FaceColor = ColorToColorRef(colors.Border);
+        SetTextColor(customDraw.CustomDraw.DeviceContext, customDraw.TextColor);
+        SetBkColor(customDraw.CustomDraw.DeviceContext, customDraw.TextBackgroundColor);
+        message.Result = OrCustomDrawResult(message.Result, CdrfNewFont);
+    }
+
+    private void PaintHeaderFiller(IntPtr headerHandle, IntPtr deviceContext)
+    {
+        if (headerHandle == IntPtr.Zero || deviceContext == IntPtr.Zero || Columns.Count == 0 ||
+            !GetClientRect(headerHandle, out var clientRectangle)) return;
+
+        var right = clientRectangle.Left;
+        for (var index = 0; index < Columns.Count; index++)
+        {
+            var columnRectangle = new NativeRectangle();
+            if (SendMessage(headerHandle, HdmGetItemRect, (IntPtr)index, ref columnRectangle) == IntPtr.Zero) continue;
+            right = Math.Max(right, columnRectangle.Right);
+        }
+
+        // Header coordinates are logical when WS_EX_LAYOUTRTL is active; GDI maps this trailing
+        // logical rectangle to the physical left side for a mirrored control.
+        var filler = Rectangle.FromLTRB(
+            Math.Min(clientRectangle.Right, right),
+            clientRectangle.Top,
+            clientRectangle.Right,
+            clientRectangle.Bottom);
+        if (filler.Width <= 0 || filler.Height <= 0) return;
+
+        using var graphics = Graphics.FromHdc(deviceContext);
+        var colors = BootstrapThemeManager.CurrentTheme.Colors;
+        using var background = new SolidBrush(colors.SurfaceSecondary);
+        using var separator = new Pen(colors.Border, Math.Max(1, DpiScaler.Scale(1, GetCurrentDpi())));
+        graphics.FillRectangle(background, filler);
+        graphics.DrawLine(separator, filler.Left, filler.Bottom - 1, filler.Right, filler.Bottom - 1);
+    }
+
+    private IntPtr GetHeaderHandle() => IsHandleCreated
+        ? SendMessage(Handle, LvmGetHeader, IntPtr.Zero, IntPtr.Zero)
+        : IntPtr.Zero;
+
+    private static IntPtr OrCustomDrawResult(IntPtr current, int flags) =>
+        new IntPtr(current.ToInt64() | (long)(uint)flags);
+
+    private static uint ColorToColorRef(Color color) =>
+        (uint)(color.R | (color.G << 8) | (color.B << 16));
 
     // WinForms does not expose subscriber presence, but knowing it lets the normal TextRenderer path stay on the
     // final HDC while retaining DrawDefault=true rollback semantics for the inherited owner-draw events.
@@ -879,6 +1049,8 @@ public class BootstrapListView : ListView
         if (_useThemeFont) ApplyThemeFont();
         ApplyThemePresentation();
         Invalidate();
+        var header = GetHeaderHandle();
+        if (header != IntPtr.Zero) InvalidateRect(header, IntPtr.Zero, true);
     }
 
     private void ApplyThemePresentation()
@@ -928,6 +1100,39 @@ public class BootstrapListView : ListView
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, ref NativeListViewItem item);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, ref NativeRectangle rectangle);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClientRect(IntPtr window, out NativeRectangle rectangle);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool InvalidateRect(IntPtr window, IntPtr rectangle, [MarshalAs(UnmanagedType.Bool)] bool erase);
+
+    [DllImport("gdi32.dll")]
+    private static extern uint SetTextColor(IntPtr deviceContext, uint color);
+
+    [DllImport("gdi32.dll")]
+    private static extern uint SetBkColor(IntPtr deviceContext, uint color);
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool BitBlt(
+        IntPtr destination,
+        int destinationX,
+        int destinationY,
+        int width,
+        int height,
+        IntPtr source,
+        int sourceX,
+        int sourceY,
+        int rasterOperation);
+
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct NativeListViewItem
     {
@@ -946,5 +1151,64 @@ public class BootstrapListView : ListView
         internal IntPtr Columns;
         internal IntPtr ColumnFormats;
         internal int Group;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeNotifyHeader
+    {
+        internal IntPtr WindowFrom;
+        internal UIntPtr IdFrom;
+        internal int Code;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRectangle
+    {
+        internal int Left;
+        internal int Top;
+        internal int Right;
+        internal int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeCustomDraw
+    {
+        internal NativeNotifyHeader Header;
+        internal uint DrawStage;
+        internal IntPtr DeviceContext;
+        internal NativeRectangle Rectangle;
+        internal UIntPtr ItemSpec;
+        internal uint ItemState;
+        internal IntPtr ItemParameter;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeListViewCustomDraw
+    {
+        internal NativeCustomDraw CustomDraw;
+        internal uint TextColor;
+        internal uint TextBackgroundColor;
+        internal int SubItem;
+        internal uint ItemType;
+        internal uint FaceColor;
+        internal int IconEffect;
+        internal int IconPhase;
+        internal int PartId;
+        internal int StateId;
+        internal NativeRectangle TextRectangle;
+        internal uint Align;
+    }
+
+    private delegate void NativeMessageDispatcher(ref Message message);
+
+    private sealed class BootstrapListViewNativeWindow : NativeWindow
+    {
+        private readonly BootstrapListView _owner;
+
+        internal BootstrapListViewNativeWindow(BootstrapListView owner) => _owner = owner;
+
+        protected override void WndProc(ref Message m) => _owner.ProcessNativeMessage(ref m, Dispatch);
+
+        private void Dispatch(ref Message message) => base.WndProc(ref message);
     }
 }

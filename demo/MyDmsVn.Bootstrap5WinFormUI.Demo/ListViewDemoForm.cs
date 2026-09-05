@@ -122,7 +122,6 @@ public sealed class ListViewDemoForm : Form
             Striped = true,
             CheckBoxes = true,
             SmallImageList = _smallImages,
-            StateImageList = _stateImages,
             MultiSelect = true,
             LabelEdit = true
         };
@@ -133,8 +132,7 @@ public sealed class ListViewDemoForm : Form
         {
             var item = new ListViewItem(new[] { $"P-{index:000}", $"Business item {index} with a deliberately long label", index % 3 == 0 ? "Review" : "Ready" }, index % 2)
             {
-                Checked = index % 4 == 0,
-                StateImageIndex = index % 2
+                Checked = index % 4 == 0
             };
             list.Items.Add(item);
         }
@@ -150,11 +148,16 @@ public sealed class ListViewDemoForm : Form
             Striped = true,
             SmallImageList = _smallImages,
             LargeImageList = _largeImages,
+            StateImageList = _stateImages,
             TileSize = new Size(360, 72)
         };
         for (var index = 1; index <= 24; index++)
         {
-            list.Items.Add(new ListViewItem(new[] { $"Item {index}: long native label for ellipsis and wrapping", $"Secondary line {index}" }, index % 2));
+            var item = new ListViewItem(new[] { $"Item {index}: long native label for ellipsis and wrapping", $"Secondary line {index}" }, index % 2)
+            {
+                StateImageIndex = index % 2
+            };
+            list.Items.Add(item);
         }
         return list;
     }
