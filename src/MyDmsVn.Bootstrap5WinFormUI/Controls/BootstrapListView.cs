@@ -171,6 +171,22 @@ public class BootstrapListView : ListView
                 e.Bounds,
                 DpiScaler.Scale(theme.Metrics.SpacingSM, GetCurrentDpi()),
                 0);
+            var headerImage = e.Header is null
+                ? null
+                : ResolveImage(SmallImageList, e.Header.ImageKey, e.Header.ImageIndex);
+            if (headerImage is not null && !textBounds.IsEmpty)
+            {
+                var imageWidth = Math.Min(headerImage.Width, textBounds.Width);
+                var imageBounds = RightToLeft == RightToLeft.Yes
+                    ? new Rectangle(textBounds.Right - imageWidth, textBounds.Top, imageWidth, textBounds.Height)
+                    : new Rectangle(textBounds.Left, textBounds.Top, imageWidth, textBounds.Height);
+                DrawImage(e.Graphics, headerImage, imageBounds);
+                var gap = DpiScaler.Scale(theme.Metrics.SpacingXS, GetCurrentDpi());
+                textBounds = RightToLeft == RightToLeft.Yes
+                    ? Rectangle.FromLTRB(textBounds.Left, textBounds.Top, Math.Max(textBounds.Left, imageBounds.Left - gap), textBounds.Bottom)
+                    : Rectangle.FromLTRB(Math.Min(textBounds.Right, imageBounds.Right + gap), textBounds.Top, textBounds.Right, textBounds.Bottom);
+            }
+
             if (!textBounds.IsEmpty)
             {
                 TextRenderer.DrawText(
@@ -257,13 +273,17 @@ public class BootstrapListView : ListView
         var cellSelected = selected && (FullRowSelect || e.ColumnIndex == 0);
         var palette = ResolvePalette(item, subItem, ResolveState(cellSelected, hovered), e.ItemIndex);
         Fill(e.Graphics, e.Bounds, palette.BackColor);
-        var textBounds = BootstrapListViewLayoutLogic.Deflate(
+        var textBounds = Rectangle.Intersect(
             e.Bounds,
-            DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingXS, GetCurrentDpi()),
-            0);
+            GetNativeBounds(item, ItemBoundsPortion.Label, e.Bounds));
         if (e.ColumnIndex == 0)
         {
-            textBounds = DrawStateAndItemImage(e.Graphics, item, textBounds, View.Details, palette.ForeColor);
+            DrawNativeStateImage(e.Graphics, item, palette.ForeColor);
+            var iconBounds = Rectangle.Intersect(
+                e.Bounds,
+                GetNativeBounds(item, ItemBoundsPortion.Icon, Rectangle.Empty));
+            var image = ResolveItemImage(item, View.Details);
+            if (image is not null && !iconBounds.IsEmpty) DrawImage(e.Graphics, image, iconBounds);
         }
 
         DrawText(
@@ -295,11 +315,11 @@ public class BootstrapListView : ListView
         var labelBounds = GetNativeBounds(item, ItemBoundsPortion.Label, e.Bounds);
         var image = ResolveItemImage(item, View);
         if (image is not null && !iconBounds.IsEmpty) DrawImage(e.Graphics, image, iconBounds);
+        if (View != View.Tile) DrawNativeStateImage(e.Graphics, item, palette.ForeColor);
 
         if (View == View.List)
         {
-            var content = DrawStateAndItemImage(e.Graphics, item, labelBounds, View.List, palette.ForeColor, false);
-            DrawText(e.Graphics, item.Text, ResolveFont(item, item.SubItems[0]), content, palette.ForeColor, HorizontalAlignment.Left, false);
+            DrawText(e.Graphics, item.Text, ResolveFont(item, item.SubItems[0]), labelBounds, palette.ForeColor, HorizontalAlignment.Left, false);
         }
         else if (View == View.Tile)
         {
@@ -331,56 +351,101 @@ public class BootstrapListView : ListView
             DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingSM, GetCurrentDpi()),
             RightToLeft == RightToLeft.Yes);
         if (bounds.IsEmpty) return;
-        var lineCount = Math.Max(1, item.SubItems.Count);
+        var lineCount = CountTileLines(item);
         var lineHeight = Math.Max(1, bounds.Height / lineCount);
-        for (var index = 0; index < item.SubItems.Count; index++)
+        DrawTileLine(graphics, item, item.SubItems[0], bounds, lineHeight, 0, palette.ForeColor);
+        var lineIndex = 1;
+        for (var displayIndex = 0; displayIndex < Columns.Count; displayIndex++)
         {
-            var subItem = item.SubItems[index];
-            var line = new Rectangle(bounds.X, bounds.Y + (index * lineHeight), bounds.Width, lineHeight);
-            var foreground = index == 0 ? palette.ForeColor : BootstrapThemeManager.CurrentTheme.Colors.MutedText;
-            if (!item.UseItemStyleForSubItems && BootstrapListViewRenderLogic.HasEffectiveColorOverride(subItem.ForeColor, ForeColor))
+            for (var columnIndex = 1; columnIndex < Columns.Count && columnIndex < item.SubItems.Count; columnIndex++)
             {
-                foreground = subItem.ForeColor;
+                var column = Columns[columnIndex];
+                if (column.DisplayIndex != displayIndex || column.Width == 0) continue;
+                DrawTileLine(
+                    graphics,
+                    item,
+                    item.SubItems[columnIndex],
+                    bounds,
+                    lineHeight,
+                    lineIndex,
+                    BootstrapThemeManager.CurrentTheme.Colors.MutedText);
+                lineIndex++;
             }
-
-            DrawText(graphics, subItem.Text, ResolveFont(item, subItem), line, foreground, HorizontalAlignment.Left, false);
         }
     }
 
-    private Rectangle DrawStateAndItemImage(
+    private int CountTileLines(ListViewItem item)
+    {
+        var count = 1;
+        for (var columnIndex = 1; columnIndex < Columns.Count && columnIndex < item.SubItems.Count; columnIndex++)
+        {
+            if (Columns[columnIndex].Width != 0) count++;
+        }
+
+        return count;
+    }
+
+    private void DrawTileLine(
         Graphics graphics,
         ListViewItem item,
+        ListViewItem.ListViewSubItem subItem,
         Rectangle bounds,
-        View view,
-        Color foreground,
-        bool drawItemImage = true)
+        int lineHeight,
+        int lineIndex,
+        Color defaultForeground)
     {
-        if (bounds.IsEmpty) return Rectangle.Empty;
-        var dpi = GetCurrentDpi();
-        var gap = DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingXS, dpi);
-        var rightToLeft = RightToLeft == RightToLeft.Yes;
-        var cursor = rightToLeft ? bounds.Right : bounds.Left;
+        var foreground = defaultForeground;
+        if (!item.UseItemStyleForSubItems && BootstrapListViewRenderLogic.HasEffectiveColorOverride(subItem.ForeColor, ForeColor))
+        {
+            foreground = subItem.ForeColor;
+        }
+
+        var line = new Rectangle(bounds.X, bounds.Y + (lineIndex * lineHeight), bounds.Width, lineHeight);
+        DrawText(graphics, subItem.Text, ResolveFont(item, subItem), line, foreground, HorizontalAlignment.Left, false);
+    }
+
+    private void DrawNativeStateImage(Graphics graphics, ListViewItem item, Color foreground)
+    {
         var stateImage = ResolveStateImage(item);
-        var drawCheckbox = stateImage is null && CheckBoxes && view != View.Tile;
-        if (stateImage is not null || drawCheckbox)
+        if (stateImage is null && !CheckBoxes) return;
+        var bounds = GetNativeStateImageBounds(item);
+        if (bounds.IsEmpty) return;
+        if (stateImage is not null) DrawImage(graphics, stateImage, bounds); else DrawCheckbox(graphics, bounds, item.Checked, foreground);
+    }
+
+    private Rectangle GetNativeStateImageBounds(ListViewItem item)
+    {
+        if (!IsHandleCreated || item.ListView != this) return Rectangle.Empty;
+        var itemBounds = Rectangle.Intersect(ClientRectangle, GetNativeBounds(item, ItemBoundsPortion.Entire, Rectangle.Empty));
+        var iconBounds = GetNativeBounds(item, ItemBoundsPortion.Icon, itemBounds);
+        if (itemBounds.IsEmpty || iconBounds.IsEmpty) return Rectangle.Empty;
+
+        var y = Math.Max(itemBounds.Top, Math.Min(itemBounds.Bottom - 1, iconBounds.Top + (iconBounds.Height / 2)));
+        var firstX = -1;
+        var lastX = -1;
+        for (var x = itemBounds.Left; x < itemBounds.Right; x++)
         {
-            var size = stateImage is null ? DpiScaler.Scale(16, dpi) : Math.Min(bounds.Height, stateImage.Height);
-            var slot = CreateSlot(bounds, cursor, size, rightToLeft);
-            if (stateImage is not null) DrawImage(graphics, stateImage, slot); else DrawCheckbox(graphics, slot, item.Checked, foreground);
-            cursor = rightToLeft ? slot.Left - gap : slot.Right + gap;
+            var hit = HitTest(x, y);
+            if (!ReferenceEquals(hit.Item, item) || (hit.Location & ListViewHitTestLocations.StateImage) == 0) continue;
+            if (firstX < 0) firstX = x;
+            lastX = x;
         }
 
-        var image = drawItemImage ? ResolveItemImage(item, view) : null;
-        if (image is not null)
+        if (firstX < 0) return Rectangle.Empty;
+        var probeX = firstX + ((lastX - firstX) / 2);
+        var firstY = -1;
+        var lastY = -1;
+        for (var probeY = itemBounds.Top; probeY < itemBounds.Bottom; probeY++)
         {
-            var slot = CreateSlot(bounds, cursor, Math.Min(bounds.Height, image.Height), rightToLeft);
-            DrawImage(graphics, image, slot);
-            cursor = rightToLeft ? slot.Left - gap : slot.Right + gap;
+            var hit = HitTest(probeX, probeY);
+            if (!ReferenceEquals(hit.Item, item) || (hit.Location & ListViewHitTestLocations.StateImage) == 0) continue;
+            if (firstY < 0) firstY = probeY;
+            lastY = probeY;
         }
 
-        return rightToLeft
-            ? Rectangle.FromLTRB(bounds.Left, bounds.Top, Math.Max(bounds.Left, cursor), bounds.Bottom)
-            : Rectangle.FromLTRB(Math.Min(bounds.Right, cursor), bounds.Top, bounds.Right, bounds.Bottom);
+        return firstY < 0
+            ? Rectangle.Empty
+            : Rectangle.FromLTRB(firstX, firstY, lastX + 1, lastY + 1);
     }
 
     private BootstrapListViewItemVisualState ResolveState(bool selected, bool hovered)
@@ -474,15 +539,14 @@ public class BootstrapListView : ListView
         graphics.DrawImage(image, new Rectangle(bounds.X + ((bounds.Width - width) / 2), bounds.Y + ((bounds.Height - height) / 2), width, height));
     }
 
-    private static Rectangle CreateSlot(Rectangle bounds, int cursor, int size, bool rightToLeft)
-    {
-        size = Math.Min(size, Math.Min(bounds.Width, bounds.Height));
-        var x = rightToLeft ? cursor - size : cursor;
-        return new Rectangle(x, bounds.Y + ((bounds.Height - size) / 2), size, size);
-    }
-
     private static void DrawCheckbox(Graphics graphics, Rectangle bounds, bool isChecked, Color color)
     {
+        var size = Math.Min(bounds.Width, bounds.Height);
+        bounds = new Rectangle(
+            bounds.Left + ((bounds.Width - size) / 2),
+            bounds.Top + ((bounds.Height - size) / 2),
+            size,
+            size);
         if (bounds.Width <= 2 || bounds.Height <= 2) return;
         using var pen = new Pen(color, 1f);
         graphics.DrawRectangle(pen, bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1);
