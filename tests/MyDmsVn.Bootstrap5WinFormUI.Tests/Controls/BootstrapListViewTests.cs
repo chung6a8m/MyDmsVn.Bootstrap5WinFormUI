@@ -284,6 +284,7 @@ public sealed class BootstrapListViewTests
     [TestCase(View.List)]
     [TestCase(View.SmallIcon)]
     [TestCase(View.LargeIcon)]
+    [TestCase(View.Tile)]
     public void StateImageRenderingStaysInsideNativeHitRegion(View view)
     {
         using var stateImages = new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit };
@@ -440,7 +441,7 @@ public sealed class BootstrapListViewTests
     }
 
     [Test]
-    public void TileUsesVisibleColumnsInDisplayOrder()
+    public void TileMatchesNativeOrdinalProjectionRegardlessOfColumnPresentation()
     {
         using var list = new TestBootstrapListView
         {
@@ -449,9 +450,10 @@ public sealed class BootstrapListViewTests
             View = View.Tile
         };
         list.Columns.Add("Primary", 100);
-        var hidden = list.Columns.Add("Hidden", 0);
-        var later = list.Columns.Add("Later", 100);
-        var earlier = list.Columns.Add("Earlier", 100);
+        var hidden = new ColumnHeader { Name = "third", Text = "Hidden", Width = 0 };
+        var later = new ColumnHeader { Name = "first", Text = "Later", Width = 100 };
+        var earlier = new ColumnHeader { Name = "second", Text = "Earlier", Width = 100 };
+        list.Columns.AddRange(new[] { hidden, later, earlier });
         earlier.DisplayIndex = 1;
         later.DisplayIndex = 2;
         hidden.DisplayIndex = 3;
@@ -471,17 +473,19 @@ public sealed class BootstrapListViewTests
             item.Index,
             ListViewItemStates.Default));
 
-        var earlierY = AverageDominantPixelY(bitmap, Color.Lime);
+        var hiddenY = AverageDominantPixelY(bitmap, Color.Red);
         var laterY = AverageDominantPixelY(bitmap, Color.Blue);
+        var earlierY = AverageDominantPixelY(bitmap, Color.Lime);
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(CountDominantPixels(bitmap, Color.Red), Is.Zero);
-            Assert.That(earlierY, Is.LessThan(laterY));
+            Assert.That(CountDominantPixels(bitmap, Color.Red), Is.GreaterThan(0));
+            Assert.That(hiddenY, Is.LessThan(laterY));
+            Assert.That(laterY, Is.LessThan(earlierY));
         }));
     }
 
     [Test]
-    public void TileMatchesNamedColumnsToNamedSubItemsBeforeApplyingDisplayOrder()
+    public void TileDoesNotRemapSubItemsByColumnNames()
     {
         using var list = new TestBootstrapListView
         {
@@ -509,12 +513,12 @@ public sealed class BootstrapListViewTests
             ListViewItemStates.Default));
 
         Assert.That(
-            AverageDominantPixelY(bitmap, Color.Lime),
-            Is.LessThan(AverageDominantPixelY(bitmap, Color.Blue)));
+            AverageDominantPixelY(bitmap, Color.Blue),
+            Is.LessThan(AverageDominantPixelY(bitmap, Color.Lime)));
     }
 
     [Test]
-    public void TileNamedAdditionalColumnsDoNotDependOnRawPrimaryColumnIndex()
+    public void TileColumnCountProjectsTheSameNumberOfOrdinalSubItems()
     {
         using var list = new TestBootstrapListView
         {
@@ -540,8 +544,8 @@ public sealed class BootstrapListViewTests
             ListViewItemStates.Default));
 
         Assert.That(
-            AverageDominantPixelY(bitmap, Color.Lime),
-            Is.LessThan(AverageDominantPixelY(bitmap, Color.Blue)));
+            AverageDominantPixelY(bitmap, Color.Blue),
+            Is.LessThan(AverageDominantPixelY(bitmap, Color.Lime)));
     }
 
     [TestCase(0)]

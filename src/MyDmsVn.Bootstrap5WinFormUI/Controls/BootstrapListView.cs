@@ -2,6 +2,8 @@ using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
@@ -15,6 +17,11 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 public class BootstrapListView : ListView
 {
     private const int MaxTileColumns = 20;
+    private const int LvmGetItemW = 0x104B;
+    private const uint LvifImage = 0x0002;
+    private static readonly object? DrawColumnHeaderEventKey = ResolveEventKey("s_drawColumnHeaderEvent", "EVENT_DRAWCOLUMNHEADER");
+    private static readonly object? DrawItemEventKey = ResolveEventKey("s_drawItemEvent", "EVENT_DRAWITEM");
+    private static readonly object? DrawSubItemEventKey = ResolveEventKey("s_drawSubItemEvent", "EVENT_DRAWSUBITEM");
 
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private bool _striped;
@@ -164,7 +171,15 @@ public class BootstrapListView : ListView
     /// <inheritdoc />
     protected override void OnDrawColumnHeader(DrawListViewColumnHeaderEventArgs e)
     {
-        var bufferGraphics = PrepareOwnerDrawBuffer(e.Graphics, e.Bounds);
+        var paintBounds = GetColumnHeaderPaintBounds(e);
+        if (!HasOwnerDrawSubscribers(DrawColumnHeaderEventKey))
+        {
+            PaintColumnHeader(e, paintBounds);
+            base.OnDrawColumnHeader(e);
+            return;
+        }
+
+        var bufferGraphics = PrepareOwnerDrawBuffer(e.Graphics, paintBounds);
         var bufferedArgs = new DrawListViewColumnHeaderEventArgs(
             bufferGraphics,
             e.Bounds,
@@ -175,55 +190,11 @@ public class BootstrapListView : ListView
             e.BackColor,
             e.Font);
 
-        if (HeaderStyle != ColumnHeaderStyle.None)
-        {
-            var theme = BootstrapThemeManager.CurrentTheme;
-            using (var background = new SolidBrush(theme.Colors.SurfaceSecondary))
-            using (var separator = new Pen(theme.Colors.Border, Math.Max(1, DpiScaler.Scale(1, GetCurrentDpi()))))
-            {
-                bufferedArgs.Graphics.FillRectangle(background, e.Bounds);
-                bufferedArgs.Graphics.DrawLine(separator, e.Bounds.Right - 1, e.Bounds.Top, e.Bounds.Right - 1, e.Bounds.Bottom);
-                bufferedArgs.Graphics.DrawLine(separator, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
-            }
-
-            var textBounds = BootstrapListViewLayoutLogic.Deflate(
-                e.Bounds,
-                DpiScaler.Scale(theme.Metrics.SpacingSM, GetCurrentDpi()),
-                0);
-            var headerImage = e.Header is null
-                ? null
-                : ResolveImage(SmallImageList, e.Header.ImageKey, e.Header.ImageIndex);
-            if (headerImage is not null && !textBounds.IsEmpty)
-            {
-                var imageWidth = Math.Min(headerImage.Width, textBounds.Width);
-                var imageBounds = IsLayoutMirrored
-                    ? new Rectangle(textBounds.Right - imageWidth, textBounds.Top, imageWidth, textBounds.Height)
-                    : new Rectangle(textBounds.Left, textBounds.Top, imageWidth, textBounds.Height);
-                DrawImage(bufferedArgs.Graphics, headerImage, imageBounds);
-                var gap = DpiScaler.Scale(theme.Metrics.SpacingXS, GetCurrentDpi());
-                textBounds = IsLayoutMirrored
-                    ? Rectangle.FromLTRB(textBounds.Left, textBounds.Top, Math.Max(textBounds.Left, imageBounds.Left - gap), textBounds.Bottom)
-                    : Rectangle.FromLTRB(Math.Min(textBounds.Right, imageBounds.Right + gap), textBounds.Top, textBounds.Right, textBounds.Bottom);
-            }
-
-            if (!textBounds.IsEmpty)
-            {
-                TextRenderer.DrawText(
-                    bufferedArgs.Graphics,
-                    e.Header?.Text ?? string.Empty,
-                    Font,
-                    textBounds,
-                    theme.Colors.Text,
-                    BootstrapListViewLayoutLogic.GetTextFlags(
-                        e.Header?.TextAlign ?? HorizontalAlignment.Left,
-                        RightToLeft == RightToLeft.Yes,
-                        false));
-            }
-        }
+        PaintColumnHeader(bufferedArgs, paintBounds);
 
         base.OnDrawColumnHeader(bufferedArgs);
         e.DrawDefault = bufferedArgs.DrawDefault;
-        if (!e.DrawDefault) RenderOwnerDrawBuffer(e.Graphics, e.Bounds);
+        if (!e.DrawDefault) RenderOwnerDrawBuffer(e.Graphics, paintBounds);
     }
 
     /// <inheritdoc />
@@ -231,6 +202,13 @@ public class BootstrapListView : ListView
     {
         if (View == View.Details)
         {
+            base.OnDrawItem(e);
+            return;
+        }
+
+        if (!HasOwnerDrawSubscribers(DrawItemEventKey))
+        {
+            DrawNonDetailsItem(e);
             base.OnDrawItem(e);
             return;
         }
@@ -254,6 +232,13 @@ public class BootstrapListView : ListView
         var paintBounds = e.ColumnIndex == 0 && e.Item is not null
             ? Rectangle.Union(e.Bounds, GetNativeBounds(e.Item, ItemBoundsPortion.Entire, e.Bounds))
             : e.Bounds;
+        if (!HasOwnerDrawSubscribers(DrawSubItemEventKey))
+        {
+            if (View == View.Details) DrawDetailsSubItem(e);
+            base.OnDrawSubItem(e);
+            return;
+        }
+
         var bufferGraphics = PrepareOwnerDrawBuffer(e.Graphics, paintBounds);
         var bufferedArgs = new DrawListViewSubItemEventArgs(
             bufferGraphics,
@@ -291,6 +276,86 @@ public class BootstrapListView : ListView
         base.Dispose(disposing);
     }
 
+    private void PaintColumnHeader(DrawListViewColumnHeaderEventArgs e, Rectangle paintBounds)
+    {
+        if (HeaderStyle == ColumnHeaderStyle.None) return;
+        var theme = BootstrapThemeManager.CurrentTheme;
+        using (var background = new SolidBrush(theme.Colors.SurfaceSecondary))
+        using (var separator = new Pen(theme.Colors.Border, Math.Max(1, DpiScaler.Scale(1, GetCurrentDpi()))))
+        {
+            e.Graphics.FillRectangle(background, paintBounds);
+            e.Graphics.DrawLine(separator, e.Bounds.Right - 1, e.Bounds.Top, e.Bounds.Right - 1, e.Bounds.Bottom);
+            e.Graphics.DrawLine(separator, paintBounds.Left, paintBounds.Bottom - 1, paintBounds.Right, paintBounds.Bottom - 1);
+        }
+
+        var textBounds = BootstrapListViewLayoutLogic.Deflate(
+            e.Bounds,
+            DpiScaler.Scale(theme.Metrics.SpacingSM, GetCurrentDpi()),
+            0);
+        var headerImage = e.Header is null
+            ? null
+            : ResolveImage(SmallImageList, e.Header.ImageKey, e.Header.ImageIndex);
+        if (headerImage is not null && !textBounds.IsEmpty)
+        {
+            var imageWidth = Math.Min(headerImage.Width, textBounds.Width);
+            var imageBounds = IsLayoutMirrored
+                ? new Rectangle(textBounds.Right - imageWidth, textBounds.Top, imageWidth, textBounds.Height)
+                : new Rectangle(textBounds.Left, textBounds.Top, imageWidth, textBounds.Height);
+            DrawImage(e.Graphics, headerImage, imageBounds);
+            var gap = DpiScaler.Scale(theme.Metrics.SpacingXS, GetCurrentDpi());
+            textBounds = IsLayoutMirrored
+                ? Rectangle.FromLTRB(textBounds.Left, textBounds.Top, Math.Max(textBounds.Left, imageBounds.Left - gap), textBounds.Bottom)
+                : Rectangle.FromLTRB(Math.Min(textBounds.Right, imageBounds.Right + gap), textBounds.Top, textBounds.Right, textBounds.Bottom);
+        }
+
+        if (textBounds.IsEmpty) return;
+        TextRenderer.DrawText(
+            e.Graphics,
+            e.Header?.Text ?? string.Empty,
+            Font,
+            textBounds,
+            theme.Colors.Text,
+            BootstrapListViewLayoutLogic.GetTextFlags(
+                e.Header?.TextAlign ?? HorizontalAlignment.Left,
+                RightToLeft == RightToLeft.Yes,
+                false));
+    }
+
+    private Rectangle GetColumnHeaderPaintBounds(DrawListViewColumnHeaderEventArgs e)
+    {
+        if (HeaderStyle == ColumnHeaderStyle.None || e.Header is null || !IsLastVisibleColumn(e.ColumnIndex)) return e.Bounds;
+        Rectangle filler;
+        if (IsLayoutMirrored)
+        {
+            filler = Rectangle.FromLTRB(0, e.Bounds.Top, Math.Max(0, e.Bounds.Left), e.Bounds.Bottom);
+        }
+        else
+        {
+            filler = Rectangle.FromLTRB(
+                Math.Min(ClientSize.Width, e.Bounds.Right),
+                e.Bounds.Top,
+                ClientSize.Width,
+                e.Bounds.Bottom);
+        }
+
+        return filler.IsEmpty ? e.Bounds : Rectangle.Union(e.Bounds, filler);
+    }
+
+    private bool IsLastVisibleColumn(int columnIndex)
+    {
+        var lastColumnIndex = -1;
+        var greatestDisplayIndex = -1;
+        for (var index = 0; index < Columns.Count; index++)
+        {
+            var column = Columns[index];
+            if (column.Width <= 0 || column.DisplayIndex <= greatestDisplayIndex) continue;
+            greatestDisplayIndex = column.DisplayIndex;
+            lastColumnIndex = index;
+        }
+
+        return columnIndex == lastColumnIndex;
+    }
+
     private void DrawDetailsSubItem(DrawListViewSubItemEventArgs e)
     {
         var item = e.Item;
@@ -300,7 +365,7 @@ public class BootstrapListView : ListView
             return;
         }
 
-        var selected = item.Selected || (e.ItemState & ListViewItemStates.Selected) != 0;
+        var selected = IsActuallySelected(item, e.ItemIndex);
         var hotTracked = HotTracking && (e.ItemState & ListViewItemStates.Hot) != 0;
         var hovered = _hoverHighlight && e.ItemIndex == _hoveredItemIndex;
         var rowBounds = GetNativeBounds(item, ItemBoundsPortion.Entire, e.Bounds);
@@ -351,7 +416,7 @@ public class BootstrapListView : ListView
     private void DrawNonDetailsItem(DrawListViewItemEventArgs e)
     {
         var item = e.Item;
-        var selected = item.Selected || (e.State & ListViewItemStates.Selected) != 0;
+        var selected = IsActuallySelected(item, e.ItemIndex);
         var hotTracked = HotTracking && (e.State & ListViewItemStates.Hot) != 0;
         var palette = ResolvePalette(
             item,
@@ -366,7 +431,7 @@ public class BootstrapListView : ListView
         var labelBounds = GetNativeBounds(item, ItemBoundsPortion.Label, e.Bounds);
         var image = ResolveItemImage(item, View);
         if (image is not null && !iconBounds.IsEmpty) DrawImage(e.Graphics, image, iconBounds);
-        if (View != View.Tile) DrawNativeStateImage(e.Graphics, item, palette.ForeColor);
+        DrawNativeStateImage(e.Graphics, item, palette.ForeColor, View != View.Tile);
 
         if (View == View.List)
         {
@@ -409,60 +474,29 @@ public class BootstrapListView : ListView
             DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingSM, GetCurrentDpi()),
             IsLayoutMirrored);
         if (bounds.IsEmpty) return;
-        var lineCount = CountTileLines(item);
+        var lineCount = CountTileLines();
         var lineHeight = Math.Max(1, bounds.Height / lineCount);
         DrawTileLine(graphics, item, item.SubItems[0], bounds, lineHeight, 0, palette.ForeColor, hotTracked);
         var lineIndex = 1;
-        var projectedColumnCount = 0;
-        for (var displayIndex = 0; displayIndex < Columns.Count; displayIndex++)
+        var projectedColumnCount = Math.Min(MaxTileColumns, Columns.Count);
+        for (var columnIndex = 0; columnIndex < projectedColumnCount; columnIndex++)
         {
-            for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
-            {
-                var column = Columns[columnIndex];
-                if (column.DisplayIndex != displayIndex || column.Width == 0) continue;
-                var subItem = ResolveTileSubItem(item, column, columnIndex);
-                if (subItem is null || ReferenceEquals(subItem, item.SubItems[0])) continue;
-                if (projectedColumnCount >= MaxTileColumns) return;
-                DrawTileLine(
-                    graphics,
-                    item,
-                    subItem,
-                    bounds,
-                    lineHeight,
-                    lineIndex,
-                    BootstrapThemeManager.CurrentTheme.Colors.MutedText,
-                    hotTracked);
-                lineIndex++;
-                projectedColumnCount++;
-            }
+            var subItemIndex = columnIndex + 1;
+            if (subItemIndex >= item.SubItems.Count) continue;
+            DrawTileLine(
+                graphics,
+                item,
+                item.SubItems[subItemIndex],
+                bounds,
+                lineHeight,
+                lineIndex,
+                BootstrapThemeManager.CurrentTheme.Colors.MutedText,
+                hotTracked);
+            lineIndex++;
         }
     }
 
-    private int CountTileLines(ListViewItem item)
-    {
-        var count = 1;
-        var projectedColumnCount = 0;
-        for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
-        {
-            var column = Columns[columnIndex];
-            var subItem = ResolveTileSubItem(item, column, columnIndex);
-            if (column.Width == 0 || subItem is null || ReferenceEquals(subItem, item.SubItems[0])) continue;
-            if (projectedColumnCount >= MaxTileColumns) break;
-            count++;
-            projectedColumnCount++;
-        }
-
-        return count;
-    }
-
-    private static ListViewItem.ListViewSubItem? ResolveTileSubItem(
-        ListViewItem item,
-        ColumnHeader column,
-        int columnIndex)
-    {
-        if (!string.IsNullOrEmpty(column.Name)) return item.SubItems[column.Name];
-        return columnIndex < item.SubItems.Count ? item.SubItems[columnIndex] : null;
-    }
+    private int CountTileLines() => Math.Max(1, Columns.Count + 1);
 
     private void DrawTileLine(
         Graphics graphics,
@@ -484,10 +518,10 @@ public class BootstrapListView : ListView
         DrawText(graphics, subItem.Text, ResolveFont(item, subItem), line, foreground, HorizontalAlignment.Left, false, hotTracked);
     }
 
-    private void DrawNativeStateImage(Graphics graphics, ListViewItem item, Color foreground)
+    private void DrawNativeStateImage(Graphics graphics, ListViewItem item, Color foreground, bool allowCheckboxFallback = true)
     {
         var stateImage = ResolveStateImage(item);
-        if (stateImage is null && !CheckBoxes) return;
+        if (stateImage is null && (!CheckBoxes || !allowCheckboxFallback)) return;
         var bounds = GetNativeStateImageBounds(item);
         if (bounds.IsEmpty) return;
         if (stateImage is not null) DrawImage(graphics, stateImage, bounds); else DrawCheckbox(graphics, bounds, item.Checked, foreground);
@@ -580,6 +614,12 @@ public class BootstrapListView : ListView
         return BootstrapListViewRenderLogic.ResolveState(Enabled, selected, Focused, HideSelection, hovered);
     }
 
+    private bool IsActuallySelected(ListViewItem item, int itemIndex)
+    {
+        if (!VirtualMode) return item.Selected;
+        return itemIndex >= 0 && SelectedIndices.Contains(itemIndex);
+    }
+
     private BootstrapListViewItemPalette ResolvePalette(ListViewItem item, ListViewItem.ListViewSubItem subItem, BootstrapListViewItemVisualState state, int itemIndex)
     {
         var useItemStyle = item.UseItemStyleForSubItems || ReferenceEquals(subItem, item.SubItems[0]);
@@ -606,7 +646,29 @@ public class BootstrapListView : ListView
     private Image? ResolveItemImage(ListViewItem item, View view)
     {
         var imageList = view == View.LargeIcon || view == View.Tile ? LargeImageList : SmallImageList;
-        return ResolveImage(imageList, item.ImageKey, item.ImageIndex);
+        if (imageList is null || imageList.Images.Count == 0) return null;
+        var index = GetNativeItemImageIndex(item, imageList);
+        return index >= 0 && index < imageList.Images.Count ? imageList.Images[index] : null;
+    }
+
+    private int GetNativeItemImageIndex(ListViewItem item, ImageList imageList)
+    {
+        if (IsHandleCreated && item.ListView == this && item.Index >= 0)
+        {
+            var nativeItem = new NativeListViewItem
+            {
+                Mask = LvifImage,
+                ItemIndex = item.Index,
+                ImageIndex = -1
+            };
+            if (SendMessage(Handle, LvmGetItemW, IntPtr.Zero, ref nativeItem) != IntPtr.Zero)
+            {
+                return nativeItem.ImageIndex;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(item.ImageKey)) return imageList.Images.IndexOfKey(item.ImageKey);
+        return item.ImageIndex;
     }
 
     private Image? ResolveStateImage(ListViewItem item) => ResolveImage(StateImageList, string.Empty, item.StateImageIndex);
@@ -646,11 +708,10 @@ public class BootstrapListView : ListView
     private Graphics PrepareOwnerDrawBuffer(Graphics targetGraphics, Rectangle targetBounds)
     {
         var requiredSize = new Size(
-            Math.Max(1, Math.Max(ClientSize.Width, targetBounds.Right)),
-            Math.Max(1, Math.Max(ClientSize.Height, targetBounds.Bottom)));
+            Math.Max(1, targetBounds.Width),
+            Math.Max(1, targetBounds.Height));
         if (_ownerDrawBuffer is null ||
-            _ownerDrawBuffer.Width < requiredSize.Width ||
-            _ownerDrawBuffer.Height < requiredSize.Height ||
+            _ownerDrawBuffer.Size != requiredSize ||
             Math.Abs(_ownerDrawBuffer.HorizontalResolution - targetGraphics.DpiX) > 0.01f ||
             Math.Abs(_ownerDrawBuffer.VerticalResolution - targetGraphics.DpiY) > 0.01f)
         {
@@ -664,21 +725,16 @@ public class BootstrapListView : ListView
         graphics.ResetTransform();
         graphics.ResetClip();
         graphics.Clear(BackColor);
+        graphics.TranslateTransform(-targetBounds.X, -targetBounds.Y);
+        graphics.SetClip(targetBounds);
         return graphics;
     }
 
     private void RenderOwnerDrawBuffer(Graphics graphics, Rectangle targetBounds)
     {
         if (_ownerDrawBuffer is null) return;
-        var sourceBounds = Rectangle.Intersect(
-            targetBounds,
-            new Rectangle(Point.Empty, _ownerDrawBuffer.Size));
-        if (sourceBounds.IsEmpty) return;
-        graphics.DrawImage(
-            _ownerDrawBuffer,
-            sourceBounds,
-            sourceBounds,
-            GraphicsUnit.Pixel);
+        if (targetBounds.Width <= 0 || targetBounds.Height <= 0) return;
+        graphics.DrawImageUnscaled(_ownerDrawBuffer, targetBounds.Location);
     }
 
     private void DisposeOwnerDrawBuffer()
@@ -687,6 +743,17 @@ public class BootstrapListView : ListView
         _ownerDrawBufferGraphics = null;
         _ownerDrawBuffer?.Dispose();
         _ownerDrawBuffer = null;
+    }
+
+    // WinForms does not expose subscriber presence, but knowing it lets the normal TextRenderer path stay on the
+    // final HDC while retaining DrawDefault=true rollback semantics for the inherited owner-draw events.
+    private bool HasOwnerDrawSubscribers(object? eventKey) => eventKey is null || Events[eventKey] is not null;
+
+    private static object? ResolveEventKey(string currentName, string frameworkName)
+    {
+        const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+        return typeof(ListView).GetField(currentName, flags)?.GetValue(null) ??
+               typeof(ListView).GetField(frameworkName, flags)?.GetValue(null);
     }
 
     private void DrawText(
@@ -857,4 +924,27 @@ public class BootstrapListView : ListView
     private int GetCurrentDpi() => DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
 
     private bool IsLayoutMirrored => RightToLeft == RightToLeft.Yes && RightToLeftLayout;
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, ref NativeListViewItem item);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct NativeListViewItem
+    {
+        internal uint Mask;
+        internal int ItemIndex;
+        internal int SubItemIndex;
+        internal uint State;
+        internal uint StateMask;
+        internal IntPtr Text;
+        internal int TextLength;
+        internal int ImageIndex;
+        internal IntPtr Parameter;
+        internal int Indent;
+        internal int GroupId;
+        internal uint ColumnCount;
+        internal IntPtr Columns;
+        internal IntPtr ColumnFormats;
+        internal int Group;
+    }
 }
