@@ -34,6 +34,7 @@ internal static class Program
             Application.DoEvents();
             Verify(list, BootstrapThemeMode.Light);
             Verify(list, BootstrapThemeMode.Dark);
+            VerifyDefaultGroupTheme();
 #if NET8_0_OR_GREATER
             VerifyNativeGroupAffordances();
 #endif
@@ -70,6 +71,66 @@ internal static class Program
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);
+    }
+
+    private static void VerifyDefaultGroupTheme()
+    {
+        using var form = new Form { ClientSize = new Size(520, 300), ShowInTaskbar = false };
+        using var list = new BootstrapListView
+        {
+            Bounds = new Rectangle(0, 0, 480, 260),
+            ShowGroups = true,
+            View = View.Details
+        };
+        list.Columns.Add("Name", 400);
+        var explicitGroup = list.Groups.Add("explicit", "Explicit group");
+        list.Items.Add(new ListViewItem("Explicit item", explicitGroup));
+        list.Items.Add(new ListViewItem("Ungrouped item"));
+        form.Controls.Add(list);
+        form.Show();
+        Application.DoEvents();
+
+        Require(SendMessage(list.Handle, 0x1098, IntPtr.Zero, IntPtr.Zero).ToInt32() == 2,
+            "The mixed grouped list did not create its native default group.");
+        VerifyEveryNativeGroupUsesTheme(list, BootstrapThemeMode.Light);
+        VerifyEveryNativeGroupUsesTheme(list, BootstrapThemeMode.Dark);
+    }
+
+    private static void VerifyEveryNativeGroupUsesTheme(BootstrapListView list, BootstrapThemeMode mode)
+    {
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+        list.Invalidate();
+        list.Update();
+        Application.DoEvents();
+        using var bitmap = CaptureWindowClient(list.Handle);
+        var colors = BootstrapThemeManager.CurrentTheme.Colors;
+        for (var groupIndex = 0; groupIndex < 2; groupIndex++)
+        {
+            var groupBounds = GetGroupHeaderBounds(list.Handle, groupIndex);
+            Require(CountPixelsNear(bitmap, colors.Text, 32, groupBounds) > 4,
+                $"{mode}: native group {groupIndex} is not using theme text.");
+        }
+    }
+
+    private static Rectangle GetGroupHeaderBounds(IntPtr list, int groupIndex)
+    {
+        var groupId = GetNativeGroupId(list, groupIndex);
+        var bounds = new NativeRectangle { Top = 1 };
+        Require(SendMessage(list, 0x1062, (IntPtr)groupId, ref bounds) != IntPtr.Zero,
+            $"Cannot read native header bounds for group {groupIndex}.");
+        return Rectangle.FromLTRB(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+    }
+
+    private static int GetNativeGroupId(IntPtr list, int groupIndex)
+    {
+        var group = new NativeListViewGroup
+        {
+            Size = (uint)Marshal.SizeOf(typeof(NativeListViewGroup)),
+            Mask = 0x00000010
+        };
+        Require(SendMessage(list, 0x1099, (IntPtr)groupIndex, ref group) != IntPtr.Zero,
+            $"Cannot read native ID for group {groupIndex}.");
+        return group.GroupId;
     }
 
 #if NET8_0_OR_GREATER
@@ -135,10 +196,13 @@ internal static class Program
         var taskHeader = GetGroupHeaderBounds(list.Handle, 1);
         var taskLinkRegion = Rectangle.FromLTRB(taskHeader.Right - 70, taskHeader.Top, taskHeader.Right, taskHeader.Top + 24);
         using var taskCapture = CaptureWindowClient(list.Handle);
-        Require(CountPixelsNear(taskCapture, Color.FromArgb(0, 102, 204), 80, taskLinkRegion) > 0,
-            "The native group task link was suppressed.");
+        var colors = BootstrapThemeManager.CurrentTheme.Colors;
+        Require(GetContrastRatio(colors.Primary, colors.Surface) >= 4.5d,
+            "The theme primary color is not readable on the group surface.");
+        Require(CountPixelsNear(taskCapture, colors.Primary, 32, taskLinkRegion) > 4,
+            "The native group task link is not using a readable theme color.");
         RaiseNativeTaskLinkNotification(list.Handle, GetNativeGroupId(list.Handle, 1));
-        Require(taskEvents > 0, "The native group task link is not clickable.");
+        Require(taskEvents > 0, "The native group task-link notification was not dispatched.");
     }
 
     private static Bitmap CreateSolidBitmap(Color color)
@@ -149,26 +213,24 @@ internal static class Program
         return bitmap;
     }
 
-    private static Rectangle GetGroupHeaderBounds(IntPtr list, int groupIndex)
+    private static double GetContrastRatio(Color first, Color second)
     {
-        var groupId = GetNativeGroupId(list, groupIndex);
-        var bounds = new NativeRectangle { Top = 1 };
-        Require(SendMessage(list, 0x1062, (IntPtr)groupId, ref bounds) != IntPtr.Zero,
-            $"Cannot read native header bounds for group {groupIndex}.");
-        return Rectangle.FromLTRB(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+        var firstLuminance = GetRelativeLuminance(first);
+        var secondLuminance = GetRelativeLuminance(second);
+        return (Math.Max(firstLuminance, secondLuminance) + 0.05d) /
+               (Math.Min(firstLuminance, secondLuminance) + 0.05d);
     }
 
-    private static int GetNativeGroupId(IntPtr list, int groupIndex)
+    private static double GetRelativeLuminance(Color color)
     {
-        var group = new NativeListViewGroup
-        {
-            Size = (uint)Marshal.SizeOf(typeof(NativeListViewGroup)),
-            Mask = 0x00000010
-        };
-        Require(SendMessage(list, 0x1099, (IntPtr)groupIndex, ref group) != IntPtr.Zero,
-            $"Cannot read native ID for group {groupIndex}.");
-        return group.GroupId;
+        var red = GetLinearComponent(color.R / 255d);
+        var green = GetLinearComponent(color.G / 255d);
+        var blue = GetLinearComponent(color.B / 255d);
+        return (0.2126d * red) + (0.7152d * green) + (0.0722d * blue);
     }
+
+    private static double GetLinearComponent(double component) =>
+        component <= 0.04045d ? component / 12.92d : Math.Pow((component + 0.055d) / 1.055d, 2.4d);
 
     private static void RaiseNativeTaskLinkNotification(IntPtr list, int groupId)
     {

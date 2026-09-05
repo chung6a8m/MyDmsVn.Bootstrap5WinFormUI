@@ -25,12 +25,20 @@ public class BootstrapListView : ListView
     private const int HdmGetItemRect = 0x1207;
     private const int LvcdItemGroup = 0x00000001;
     private const int LvmArrange = 0x1016;
+    private const int LvmEnsureVisible = 0x1013;
     private const int LvmGetHeader = 0x101F;
     private const int LvmGetItemW = 0x104B;
+    private const int LvmScroll = 0x1014;
     private const int LvmSetTileViewInfo = 0x10A2;
     private const int NmCustomDraw = -12;
     private const int SourceCopy = 0x00CC0020;
     private const int WmNotify = 0x004E;
+    private const int WmSize = 0x0005;
+    private const int WmKeyDown = 0x0100;
+    private const int WmHScroll = 0x0114;
+    private const int WmVScroll = 0x0115;
+    private const int WmMouseWheel = 0x020A;
+    private const int WmMouseHWheel = 0x020E;
     private const int WmReflectNotify = 0x204E;
     private const uint LvifImage = 0x0002;
     private const uint LvgsCollapsible = 0x00000008;
@@ -39,6 +47,8 @@ public class BootstrapListView : ListView
     private static readonly object? DrawSubItemEventKey = ResolveEventKey("s_drawSubItemEvent", "EVENT_DRAWSUBITEM");
     private static readonly PropertyInfo? ListViewGroupIdProperty = typeof(ListViewGroup).GetProperty(
         "ID", BindingFlags.Instance | BindingFlags.NonPublic);
+    private static readonly PropertyInfo? ListViewDefaultGroupProperty = typeof(ListView).GetProperty(
+        "DefaultGroup", BindingFlags.Instance | BindingFlags.NonPublic);
 
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private bool _striped;
@@ -234,6 +244,8 @@ public class BootstrapListView : ListView
             SendMessage(Handle, LvmArrange, IntPtr.Zero, IntPtr.Zero);
             Invalidate();
         }
+
+        if (IsViewportChangeMessage(m.Msg)) RefreshHoverFromPointer();
     }
 
     /// <inheritdoc />
@@ -536,7 +548,7 @@ public class BootstrapListView : ListView
         if (image is not null && !iconBounds.IsEmpty) DrawImage(e.Graphics, image, iconBounds);
         DrawNativeStateImage(e.Graphics, item, palette.ForeColor, View != View.Tile);
 
-        if (View == View.List)
+        if (View == View.List || View == View.SmallIcon)
         {
             DrawText(e.Graphics, item.Text, ResolveFont(item, item.SubItems[0]), labelBounds, palette.ForeColor, HorizontalAlignment.Left, false, hotTracked);
         }
@@ -955,11 +967,33 @@ public class BootstrapListView : ListView
         }
 #endif
 
+        var lineHeight = Math.Min(textBounds.Height, Math.Max(groupFont.Height, Font.Height) + 2);
         var contentRight = textBounds.Right - horizontalPadding;
         if (task.Length > 0)
         {
             var taskSize = TextRenderer.MeasureText(graphics, task, Font, Size.Empty, TextFormatFlags.NoPadding);
-            contentRight -= taskSize.Width + horizontalPadding;
+            var taskBounds = new Rectangle(
+                Math.Max(contentLeft, contentRight - taskSize.Width),
+                textBounds.Top,
+                Math.Min(taskSize.Width, Math.Max(0, contentRight - contentLeft)),
+                lineHeight);
+            if (taskBounds.Width > 0)
+            {
+                using var taskFont = new Font(Font, Font.Style | FontStyle.Underline);
+                graphics.FillRectangle(background, taskBounds);
+                TextRenderer.DrawText(
+                    graphics,
+                    task,
+                    taskFont,
+                    taskBounds,
+                    colors.Primary,
+                    BootstrapListViewLayoutLogic.GetTextFlags(
+                        HorizontalAlignment.Right,
+                        RightToLeft == RightToLeft.Yes,
+                        false) |
+                    TextFormatFlags.VerticalCenter);
+                contentRight = taskBounds.Left - horizontalPadding;
+            }
         }
 
         if ((groupState & LvgsCollapsible) != 0)
@@ -973,7 +1007,6 @@ public class BootstrapListView : ListView
             : alignment == HorizontalAlignment.Center
                 ? contentLeft + Math.Max(0, (contentRight - contentLeft - textSize.Width) / 2)
                 : contentLeft;
-        var lineHeight = Math.Min(textBounds.Height, Math.Max(groupFont.Height, Font.Height) + 2);
         var headerTextBounds = new Rectangle(
             textLeft,
             textBounds.Top,
@@ -1030,20 +1063,39 @@ public class BootstrapListView : ListView
         var groupId = unchecked((int)itemSpec.ToUInt64());
         foreach (ListViewGroup managedGroup in Groups)
         {
-            if (!(ListViewGroupIdProperty.GetValue(managedGroup, null) is int managedGroupId) || managedGroupId != groupId)
-                continue;
-
-            header = managedGroup.Header ?? string.Empty;
-            alignment = managedGroup.HeaderAlignment;
-#if NET8_0_OR_GREATER
-            task = managedGroup.TaskLink ?? string.Empty;
-            titleImage = managedGroup.TitleImageIndex;
-            if (managedGroup.CollapsedState != ListViewGroupCollapsedState.Default) state |= LvgsCollapsible;
-#endif
-            return header.Length > 0;
+            if (TryResolveGroupHeader(managedGroup, groupId, out header, out alignment, out task, out titleImage, out state))
+                return true;
         }
 
-        return false;
+        var defaultGroup = ListViewDefaultGroupProperty?.GetValue(this, null) as ListViewGroup;
+        return defaultGroup is not null &&
+               TryResolveGroupHeader(defaultGroup, groupId, out header, out alignment, out task, out titleImage, out state);
+    }
+
+    private static bool TryResolveGroupHeader(
+        ListViewGroup group,
+        int expectedId,
+        out string header,
+        out HorizontalAlignment alignment,
+        out string task,
+        out int titleImage,
+        out uint state)
+    {
+        header = string.Empty;
+        alignment = HorizontalAlignment.Left;
+        task = string.Empty;
+        titleImage = -1;
+        state = 0;
+        if (!(ListViewGroupIdProperty?.GetValue(group, null) is int groupId) || groupId != expectedId) return false;
+
+        header = group.Header ?? string.Empty;
+        alignment = group.HeaderAlignment;
+#if NET8_0_OR_GREATER
+        task = group.TaskLink ?? string.Empty;
+        titleImage = group.TitleImageIndex;
+        if (group.CollapsedState != ListViewGroupCollapsedState.Default) state |= LvgsCollapsible;
+#endif
+        return header.Length > 0;
     }
 
     private void PaintHeaderFiller(IntPtr headerHandle, IntPtr deviceContext)
@@ -1165,7 +1217,10 @@ public class BootstrapListView : ListView
     {
         if (_hoveredItemIndex == index)
         {
+            var cachedBounds = _hoveredItemBounds;
             _hoveredItemBounds = bounds;
+            if (cachedBounds != bounds &&
+                (!InvalidateItem(index, cachedBounds) || !InvalidateItem(index, bounds))) Invalidate();
             return;
         }
 
@@ -1190,6 +1245,32 @@ public class BootstrapListView : ListView
         _hoveredItemIndex = -1;
         _hoveredItemBounds = Rectangle.Empty;
         if (!InvalidateItem(previous, previousBounds)) Invalidate();
+    }
+
+    private static bool IsViewportChangeMessage(int message) =>
+        message == WmSize ||
+        message == WmKeyDown ||
+        message == WmHScroll ||
+        message == WmVScroll ||
+        message == WmMouseWheel ||
+        message == WmMouseHWheel ||
+        message == LvmArrange ||
+        message == LvmEnsureVisible ||
+        message == LvmScroll;
+
+    private void RefreshHoverFromPointer()
+    {
+        if (_hoveredItemIndex < 0 || !_hoverHighlight || !IsHandleCreated || IsDisposed || Disposing) return;
+        var pointer = PointToClient(Cursor.Position);
+        if (!ClientRectangle.Contains(pointer))
+        {
+            ClearHover();
+            return;
+        }
+
+        var hit = HitTest(pointer.X, pointer.Y);
+        var index = hit.Item?.Index ?? -1;
+        UpdateHoveredIndex(index, GetItemBounds(index));
     }
 
     private bool InvalidateItem(int index, Rectangle knownBounds)
