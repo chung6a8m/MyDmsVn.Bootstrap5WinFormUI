@@ -533,10 +533,11 @@ public class BootstrapListView : ListView
         var item = e.Item;
         var selected = IsActuallySelected(item);
         var hotTracked = HotTracking && (e.State & ListViewItemStates.Hot) != 0;
+        var visualState = ResolveState(selected, _hoverHighlight && e.ItemIndex == _hoveredItemIndex);
         var palette = ResolvePalette(
             item,
             item.SubItems[0],
-            ResolveState(selected, _hoverHighlight && e.ItemIndex == _hoveredItemIndex),
+            visualState,
             e.ItemIndex);
         var entireBounds = View == View.Tile
             ? e.Bounds
@@ -554,7 +555,7 @@ public class BootstrapListView : ListView
         }
         else if (View == View.Tile)
         {
-            DrawTileText(e.Graphics, item, entireBounds, iconBounds, palette, hotTracked);
+            DrawTileText(e.Graphics, item, entireBounds, iconBounds, palette, visualState, hotTracked);
         }
         else
         {
@@ -581,6 +582,7 @@ public class BootstrapListView : ListView
         Rectangle itemBounds,
         Rectangle imageBounds,
         BootstrapListViewItemPalette palette,
+        BootstrapListViewItemVisualState visualState,
         bool hotTracked)
     {
         var bounds = BootstrapListViewLayoutLogic.GetTileTextBounds(
@@ -607,7 +609,9 @@ public class BootstrapListView : ListView
                 lineIndex,
                 item.UseItemStyleForSubItems
                     ? palette.ForeColor
-                    : BootstrapThemeManager.CurrentTheme.Colors.MutedText,
+                    : visualState == BootstrapListViewItemVisualState.Neutral
+                        ? BootstrapThemeManager.CurrentTheme.Colors.MutedText
+                        : palette.ForeColor,
                 hotTracked);
             lineIndex++;
         }
@@ -945,6 +949,7 @@ public class BootstrapListView : ListView
         var bounds = customDraw.CustomDraw.Rectangle.ToRectangle();
         if (deviceContext == IntPtr.Zero || bounds.Width <= 0 || bounds.Height <= 0 ||
             !TryGetGroupHeader(customDraw.CustomDraw.ItemSpec, out var header, out var alignment,
+                out var subtitle, out var footer, out var footerAlignment,
                 out var task, out var titleImage, out var groupState)) return false;
 
         var horizontalPadding = DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingSM, GetCurrentDpi());
@@ -969,6 +974,11 @@ public class BootstrapListView : ListView
 
         var lineHeight = Math.Min(textBounds.Height, Math.Max(groupFont.Height, Font.Height) + 2);
         var contentRight = textBounds.Right - horizontalPadding;
+        if ((groupState & LvgsCollapsible) != 0)
+        {
+            contentRight -= DpiScaler.Scale(16, GetCurrentDpi());
+        }
+
         if (task.Length > 0)
         {
             var taskSize = TextRenderer.MeasureText(graphics, task, Font, Size.Empty, TextFormatFlags.NoPadding);
@@ -994,11 +1004,6 @@ public class BootstrapListView : ListView
                     TextFormatFlags.VerticalCenter);
                 contentRight = taskBounds.Left - horizontalPadding;
             }
-        }
-
-        if ((groupState & LvgsCollapsible) != 0)
-        {
-            contentRight -= DpiScaler.Scale(16, GetCurrentDpi());
         }
 
         contentRight = Math.Max(contentLeft, contentRight);
@@ -1042,19 +1047,84 @@ public class BootstrapListView : ListView
                 contentRight, separatorY);
         }
 
+        if (subtitle.Length > 0)
+        {
+            PaintGroupAuxiliaryText(
+                graphics,
+                background,
+                subtitle,
+                new Rectangle(
+                    contentLeft,
+                    textBounds.Top + lineHeight,
+                    Math.Max(0, textBounds.Right - horizontalPadding - contentLeft),
+                    Math.Max(0, Math.Min(lineHeight, bounds.Bottom - textBounds.Top - lineHeight))),
+                HorizontalAlignment.Left,
+                colors.MutedText);
+        }
+
+        if (footer.Length > 0)
+        {
+            PaintGroupAuxiliaryText(
+                graphics,
+                background,
+                footer,
+                new Rectangle(
+                    bounds.Left + horizontalPadding,
+                    Math.Max(textBounds.Bottom, bounds.Bottom - lineHeight),
+                    Math.Max(0, bounds.Width - (horizontalPadding * 2)),
+                    lineHeight),
+                footerAlignment,
+                colors.MutedText);
+        }
+
         return true;
+    }
+
+    private void PaintGroupAuxiliaryText(
+        Graphics graphics,
+        Brush background,
+        string text,
+        Rectangle bounds,
+        HorizontalAlignment alignment,
+        Color foreground)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        var textSize = TextRenderer.MeasureText(graphics, text, Font, Size.Empty, TextFormatFlags.NoPadding);
+        var width = Math.Min(textSize.Width, bounds.Width);
+        var left = alignment == HorizontalAlignment.Right
+            ? bounds.Right - width
+            : alignment == HorizontalAlignment.Center
+                ? bounds.Left + ((bounds.Width - width) / 2)
+                : bounds.Left;
+        var textBounds = new Rectangle(left, bounds.Top, width, bounds.Height);
+        if (textBounds.Width <= 0) return;
+        graphics.FillRectangle(background, textBounds);
+        TextRenderer.DrawText(
+            graphics,
+            text,
+            Font,
+            textBounds,
+            foreground,
+            BootstrapListViewLayoutLogic.GetTextFlags(alignment, RightToLeft == RightToLeft.Yes, false) |
+            TextFormatFlags.VerticalCenter);
     }
 
     private bool TryGetGroupHeader(
         UIntPtr itemSpec,
         out string header,
         out HorizontalAlignment alignment,
+        out string subtitle,
+        out string footer,
+        out HorizontalAlignment footerAlignment,
         out string task,
         out int titleImage,
         out uint state)
     {
         header = string.Empty;
         alignment = HorizontalAlignment.Left;
+        subtitle = string.Empty;
+        footer = string.Empty;
+        footerAlignment = HorizontalAlignment.Left;
         task = string.Empty;
         titleImage = -1;
         state = 0;
@@ -1063,13 +1133,15 @@ public class BootstrapListView : ListView
         var groupId = unchecked((int)itemSpec.ToUInt64());
         foreach (ListViewGroup managedGroup in Groups)
         {
-            if (TryResolveGroupHeader(managedGroup, groupId, out header, out alignment, out task, out titleImage, out state))
+            if (TryResolveGroupHeader(managedGroup, groupId, out header, out alignment,
+                    out subtitle, out footer, out footerAlignment, out task, out titleImage, out state))
                 return true;
         }
 
         var defaultGroup = ListViewDefaultGroupProperty?.GetValue(this, null) as ListViewGroup;
         return defaultGroup is not null &&
-               TryResolveGroupHeader(defaultGroup, groupId, out header, out alignment, out task, out titleImage, out state);
+               TryResolveGroupHeader(defaultGroup, groupId, out header, out alignment,
+                   out subtitle, out footer, out footerAlignment, out task, out titleImage, out state);
     }
 
     private static bool TryResolveGroupHeader(
@@ -1077,12 +1149,18 @@ public class BootstrapListView : ListView
         int expectedId,
         out string header,
         out HorizontalAlignment alignment,
+        out string subtitle,
+        out string footer,
+        out HorizontalAlignment footerAlignment,
         out string task,
         out int titleImage,
         out uint state)
     {
         header = string.Empty;
         alignment = HorizontalAlignment.Left;
+        subtitle = string.Empty;
+        footer = string.Empty;
+        footerAlignment = HorizontalAlignment.Left;
         task = string.Empty;
         titleImage = -1;
         state = 0;
@@ -1091,6 +1169,9 @@ public class BootstrapListView : ListView
         header = group.Header ?? string.Empty;
         alignment = group.HeaderAlignment;
 #if NET8_0_OR_GREATER
+        subtitle = group.Subtitle ?? string.Empty;
+        footer = group.Footer ?? string.Empty;
+        footerAlignment = group.FooterAlignment;
         task = group.TaskLink ?? string.Empty;
         titleImage = group.TitleImageIndex;
         if (group.CollapsedState != ListViewGroupCollapsedState.Default) state |= LvgsCollapsible;
@@ -1260,7 +1341,7 @@ public class BootstrapListView : ListView
 
     private void RefreshHoverFromPointer()
     {
-        if (_hoveredItemIndex < 0 || !_hoverHighlight || !IsHandleCreated || IsDisposed || Disposing) return;
+        if (!_hoverHighlight || !IsHandleCreated || IsDisposed || Disposing) return;
         var pointer = PointToClient(Cursor.Position);
         if (!ClientRectangle.Contains(pointer))
         {

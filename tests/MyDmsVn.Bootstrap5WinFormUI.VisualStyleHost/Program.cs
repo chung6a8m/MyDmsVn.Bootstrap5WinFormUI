@@ -148,17 +148,15 @@ internal static class Program
             View = View.Details
         };
         list.Columns.Add("Name", 400);
-        var collapsible = new ListViewGroup("collapsible", "Collapsible")
+        var collapsible = new ListViewGroup("collapsible", "Combined group")
         {
-            CollapsedState = ListViewGroupCollapsedState.Expanded
-        };
-        var rich = new ListViewGroup("rich", "Rich group")
-        {
+            CollapsedState = ListViewGroupCollapsedState.Expanded,
             Subtitle = "Native subtitle",
             Footer = "Native footer",
             TaskLink = "Run task",
             TitleImageIndex = 0
         };
+        var rich = new ListViewGroup("rich", "Following group");
         list.Groups.Add(collapsible);
         list.Groups.Add(rich);
         list.Items.Add(new ListViewItem("Collapsible item", collapsible));
@@ -175,8 +173,43 @@ internal static class Program
         var expandedHeader = GetGroupHeaderBounds(list.Handle, 0);
         var richHeader = GetGroupHeaderBounds(list.Handle, 1);
         using var expanded = CaptureWindowClient(list.Handle);
-        Require(CountPixelsNear(expanded, Color.Lime, 8, richHeader) > 20,
+        Require(CountPixelsNear(expanded, Color.Lime, 8, expandedHeader) > 20,
             "The native group title image was suppressed.");
+        var colors = BootstrapThemeManager.CurrentTheme.Colors;
+        var subtitleRegion = Rectangle.FromLTRB(
+            expandedHeader.Left,
+            expandedHeader.Top + Math.Min(24, expandedHeader.Height),
+            expandedHeader.Right,
+            expandedHeader.Bottom);
+        var footerRegion = Rectangle.FromLTRB(
+            expandedHeader.Left,
+            list.Items[0].Bounds.Bottom,
+            expandedHeader.Right,
+            richHeader.Top);
+        Require(GetContrastRatio(colors.MutedText, colors.Surface) >= 4.5d,
+            "The theme muted text is not readable on the group surface.");
+        Require(CountPixelsNear(expanded, colors.MutedText, 16, subtitleRegion) > 4,
+            "The native group subtitle is not using readable theme text.");
+        Require(CountPixelsNear(expanded, colors.MutedText, 16, footerRegion) > 4,
+            "The native group footer is not using readable theme text.");
+        var taskRegion = Rectangle.FromLTRB(
+            expandedHeader.Right - 120,
+            expandedHeader.Top,
+            expandedHeader.Right - 24,
+            expandedHeader.Top + Math.Min(24, expandedHeader.Height));
+        var collapseRegion = Rectangle.FromLTRB(
+            expandedHeader.Right - 24,
+            expandedHeader.Top,
+            expandedHeader.Right,
+            expandedHeader.Top + Math.Min(24, expandedHeader.Height));
+        Require(CountPixelsNear(expanded, colors.Primary, 32, taskRegion) > 4,
+            "The combined group task link is not using a readable theme color before the collapse slot.");
+        Require(CountPixelsNear(expanded, colors.Primary, 32, collapseRegion) == 0,
+            "The combined group task link overlaps the native collapse affordance.");
+        var taskPixels = FindPixelBoundsNear(expanded, colors.Primary, 32, taskRegion);
+        var taskPoint = new Point(taskPixels.Left + (taskPixels.Width / 2), taskPixels.Top + (taskPixels.Height / 2));
+        Require((GetNativeHitFlags(list.Handle, taskPoint) & 0x40000000u) == 0,
+            "The task presentation falls inside the native collapse hit target.");
 
         collapsible.CollapsedState = ListViewGroupCollapsedState.Collapsed;
         list.Update();
@@ -193,15 +226,14 @@ internal static class Program
         Click(list, collapseHeader.Right - 12, collapseHeader.Top + 10);
         Require(collapsible.CollapsedState == ListViewGroupCollapsedState.Expanded && collapsedEvents > 0,
             "The native collapse affordance is not clickable.");
-        var taskHeader = GetGroupHeaderBounds(list.Handle, 1);
-        var taskLinkRegion = Rectangle.FromLTRB(taskHeader.Right - 70, taskHeader.Top, taskHeader.Right, taskHeader.Top + 24);
+        var taskHeader = GetGroupHeaderBounds(list.Handle, 0);
+        var taskLinkRegion = Rectangle.FromLTRB(taskHeader.Right - 120, taskHeader.Top, taskHeader.Right - 24, taskHeader.Top + 24);
         using var taskCapture = CaptureWindowClient(list.Handle);
-        var colors = BootstrapThemeManager.CurrentTheme.Colors;
         Require(GetContrastRatio(colors.Primary, colors.Surface) >= 4.5d,
             "The theme primary color is not readable on the group surface.");
         Require(CountPixelsNear(taskCapture, colors.Primary, 32, taskLinkRegion) > 4,
             "The native group task link is not using a readable theme color.");
-        RaiseNativeTaskLinkNotification(list.Handle, GetNativeGroupId(list.Handle, 1));
+        RaiseNativeTaskLinkNotification(list.Handle, GetNativeGroupId(list.Handle, 0));
         Require(taskEvents > 0, "The native group task-link notification was not dispatched.");
     }
 
@@ -271,6 +303,13 @@ internal static class Program
         }
     }
 
+    private static uint GetNativeHitFlags(IntPtr window, Point point)
+    {
+        var hit = new NativeListViewHitTestInfo { Point = point };
+        SendMessage(window, 0x1012, IntPtr.Zero, ref hit);
+        return hit.Flags;
+    }
+
     private static int CountPixelDifferences(Bitmap first, Bitmap second, Rectangle region)
     {
         var bounds = Rectangle.Intersect(region, new Rectangle(Point.Empty, first.Size));
@@ -325,6 +364,29 @@ internal static class Program
         return count;
     }
 
+    private static Rectangle FindPixelBoundsNear(Bitmap bitmap, Color expected, int tolerance, Rectangle region)
+    {
+        var bounds = Rectangle.Intersect(region, new Rectangle(Point.Empty, bitmap.Size));
+        var left = bounds.Right;
+        var top = bounds.Bottom;
+        var right = bounds.Left - 1;
+        var bottom = bounds.Top - 1;
+        for (var y = bounds.Top; y < bounds.Bottom; y++)
+        for (var x = bounds.Left; x < bounds.Right; x++)
+        {
+            var actual = bitmap.GetPixel(x, y);
+            if (Math.Abs(actual.R - expected.R) > tolerance ||
+                Math.Abs(actual.G - expected.G) > tolerance ||
+                Math.Abs(actual.B - expected.B) > tolerance) continue;
+            left = Math.Min(left, x);
+            top = Math.Min(top, y);
+            right = Math.Max(right, x);
+            bottom = Math.Max(bottom, y);
+        }
+
+        return right < left ? Rectangle.Empty : Rectangle.FromLTRB(left, top, right + 1, bottom + 1);
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRectangle
     {
@@ -340,6 +402,16 @@ internal static class Program
         internal IntPtr WindowFrom;
         internal UIntPtr IdFrom;
         internal int Code;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeListViewHitTestInfo
+    {
+        internal Point Point;
+        internal uint Flags;
+        internal int Item;
+        internal int SubItem;
+        internal int Group;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -399,6 +471,9 @@ internal static class Program
 
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, ref NativeRectangle rectangle);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, ref NativeListViewHitTestInfo hit);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, ref NativeListViewGroup group);
