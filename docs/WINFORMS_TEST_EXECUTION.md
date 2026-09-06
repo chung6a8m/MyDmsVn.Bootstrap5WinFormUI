@@ -26,6 +26,8 @@ Do not build another custom STA runner when NUnit's apartment support is suffici
 
 Use `[NonParallelizable]` when a fixture owns process-global UI state, visible host forms, static theme state, or other resources that cannot be safely shared across concurrently executing tests.
 
+Tests that validate version-6 common-control-only rendering may use the manifest-enabled `MyDmsVn.Bootstrap5WinFormUI.VisualStyleHost`. Run that host with redirected diagnostics and a finite process timeout. Keeping version-6 activation out of the NUnit process avoids order-dependent behavior after an STA worker has already initialized version-5 controls.
+
 ## 3. Unhandled WinForms exceptions must escape to NUnit
 
 The test assembly configures the application-wide WinForms exception mode:
