@@ -2,8 +2,17 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
+/// <summary>
+/// Creates demo-scoped themes with the Integrated Demo typography hierarchy.
+/// </summary>
 public static class DemoThemeFactory
 {
+    /// <summary>
+    /// Creates a new demo theme without publishing it as the application theme.
+    /// </summary>
+    /// <param name="mode">The requested Light or Dark theme mode.</param>
+    /// <param name="reducedMotion">Whether the returned theme enables reduced motion.</param>
+    /// <returns>A new theme using the Integrated Demo typography tokens.</returns>
     public static BootstrapTheme Create(
         BootstrapThemeMode mode,
         bool reducedMotion = false)
