@@ -6,7 +6,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class MainForm : Form
+public sealed class MainForm : DemoFormBase
 {
     private readonly BootstrapSidebar _navigation = new BootstrapSidebar();
     private readonly Panel _workspace = new Panel();
@@ -341,7 +341,7 @@ public sealed class MainForm : Form
             ? BootstrapThemeMode.Dark
             : BootstrapThemeMode.Light;
 
-        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode, _reducedMotion.Checked);
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(mode, _reducedMotion.Checked);
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)

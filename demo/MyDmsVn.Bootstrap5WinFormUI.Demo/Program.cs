@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
@@ -13,6 +14,7 @@ internal static class Program
 #endif
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(BootstrapThemeMode.Light);
         Application.Run(new MainForm());
     }
 }

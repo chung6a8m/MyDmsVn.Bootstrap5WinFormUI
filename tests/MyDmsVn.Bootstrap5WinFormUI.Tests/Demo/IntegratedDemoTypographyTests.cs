@@ -44,7 +44,10 @@ public sealed class IntegratedDemoTypographyTests
             Assert.That(form.Font.SizeInPoints, Is.EqualTo(12f).Within(0.01f));
         }));
 
-        var themeLabel = FindControls<Label>(form).Single(label => label.Text == "Theme");
+        var settings = FindControls<FlowLayoutPanel>(form).Single(panel =>
+            panel.Controls.OfType<ComboBox>()
+                .Any(combo => combo.Items.Contains("Light") && combo.Items.Contains("Dark")));
+        var themeLabel = settings.Controls.OfType<Label>().Single(label => label.Text == "Theme");
         Assert.That(themeLabel.Font.SizeInPoints, Is.EqualTo(12f).Within(0.01f));
     }
 
