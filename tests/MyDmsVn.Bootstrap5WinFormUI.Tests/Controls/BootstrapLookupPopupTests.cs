@@ -94,6 +94,45 @@ public sealed class BootstrapLookupPopupTests
     }
 
     [Test]
+    public void ThemeSwitchWithUnavailableRequestedFontKeepsLookupAndPopupLabelFontsUsable()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        var unavailableFamily = "BootstrapFontMissing-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = CreateThemeWithBodyFont(
+                BootstrapThemeMode.Light,
+                unavailableFamily);
+            using var host = new Form();
+            using var lookup = CreateLookup();
+            host.Controls.Add(lookup);
+            host.Show();
+            lookup.OpenDropDown();
+            Application.DoEvents();
+            var content = (BootstrapLookupDropDownContent)lookup.ResultsGrid.Parent!;
+            var surface = GetSurface(content);
+            var labels = Descendants(host)
+                .Concat(Descendants(surface))
+                .OfType<Label>()
+                .Distinct()
+                .ToArray();
+
+            Assert.That(lookup.Font.Name, Is.Not.EqualTo(unavailableFamily).IgnoreCase);
+
+            BootstrapThemeManager.CurrentTheme = CreateThemeWithBodyFont(
+                BootstrapThemeMode.Dark,
+                unavailableFamily);
+
+            Assert.That(labels, Is.Not.Empty);
+            Assert.That(labels.All(HasUsableFont), Is.True);
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
+    }
+
+    [Test]
     public void OpenPopupReappliesMetricsAndBoundsWhenOwnerDpiChanges()
     {
         using var host = new Form { Size = new Size(700, 600) };
@@ -257,6 +296,23 @@ public sealed class BootstrapLookupPopupTests
 
     private static BootstrapOverlaySurface GetSurface(BootstrapLookupDropDownContent content) =>
         (BootstrapOverlaySurface)content.Parent!.Parent!;
+
+    private static BootstrapTheme CreateThemeWithBodyFont(
+        BootstrapThemeMode mode,
+        string fontFamilyName)
+    {
+        var defaults = BootstrapTheme.CreateDefault(mode);
+        return new BootstrapTheme(
+            mode,
+            defaults.Colors,
+            defaults.Metrics,
+            new BootstrapThemeTypography(
+                new BootstrapFontToken(fontFamilyName, 9f),
+                defaults.Typography.BodySmall,
+                defaults.Typography.Label,
+                defaults.Typography.HeadingSmall,
+                defaults.Typography.HeadingMedium));
+    }
 
     private static bool HasUsableFont(Label label)
     {
