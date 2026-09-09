@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
@@ -53,6 +54,38 @@ public sealed class BootstrapLookupPopupTests
                 Assert.That(content.Font.SizeInPoints, Is.EqualTo(11f).Within(0.05f));
                 Assert.That(content.Font.Style, Is.EqualTo(FontStyle.Bold));
             }));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
+    }
+
+    [Test]
+    public void DefaultThemeSwitchKeepsLookupAndPopupLabelFontsUsable()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+            using var host = new Form();
+            using var lookup = CreateLookup();
+            host.Controls.Add(lookup);
+            host.Show();
+            lookup.OpenDropDown();
+            Application.DoEvents();
+            var content = (BootstrapLookupDropDownContent)lookup.ResultsGrid.Parent!;
+            var surface = GetSurface(content);
+            var labels = Descendants(host)
+                .Concat(Descendants(surface))
+                .OfType<Label>()
+                .Distinct()
+                .ToArray();
+
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+
+            Assert.That(labels, Is.Not.Empty);
+            Assert.That(labels.All(HasUsableFont), Is.True);
         }
         finally
         {
@@ -225,6 +258,39 @@ public sealed class BootstrapLookupPopupTests
     private static BootstrapOverlaySurface GetSurface(BootstrapLookupDropDownContent content) =>
         (BootstrapOverlaySurface)content.Parent!.Parent!;
 
+    private static bool HasUsableFont(Label label)
+    {
+        IntPtr handle = IntPtr.Zero;
+        try
+        {
+            handle = label.Font.ToHfont();
+            return handle != IntPtr.Zero;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        finally
+        {
+            if (handle != IntPtr.Zero)
+            {
+                DeleteObject(handle);
+            }
+        }
+    }
+
+    private static System.Collections.Generic.IEnumerable<Control> Descendants(Control root)
+    {
+        foreach (Control child in root.Controls)
+        {
+            yield return child;
+            foreach (var descendant in Descendants(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
     private static BootstrapLookupDropDownController GetController(BootstrapLookupBox lookup)
     {
         var field = typeof(BootstrapLookupBox).GetField("_dropDownController", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -237,4 +303,8 @@ public sealed class BootstrapLookupPopupTests
         public int Id { get; }
         public string Name { get; }
     }
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeleteObject(IntPtr handle);
 }
