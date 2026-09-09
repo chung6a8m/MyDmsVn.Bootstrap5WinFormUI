@@ -6,7 +6,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class ButtonGroupToolbarDemoForm : Form
+public sealed class ButtonGroupToolbarDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
     private readonly Label _status = new Label();
@@ -17,7 +17,6 @@ public sealed class ButtonGroupToolbarDemoForm : Form
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(920, 720);
         MinimumSize = new Size(720, 540);
-        AutoScaleMode = AutoScaleMode.Dpi;
 
         ConfigureContent();
         ConfigureStatus();

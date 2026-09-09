@@ -7,7 +7,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class TextBoxCardDemoForm : Form
+public sealed class TextBoxCardDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
     private readonly GroupBox _inputSection = new GroupBox();
@@ -19,7 +19,6 @@ public sealed class TextBoxCardDemoForm : Form
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(980, 760);
         MinimumSize = new Size(760, 560);
-        AutoScaleMode = AutoScaleMode.Dpi;
 
         ConfigureContent();
         BuildInputSection();

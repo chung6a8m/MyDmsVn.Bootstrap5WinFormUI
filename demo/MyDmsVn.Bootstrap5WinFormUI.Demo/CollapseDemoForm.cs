@@ -6,7 +6,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class CollapseDemoForm : Form
+public sealed class CollapseDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _root = new FlowLayoutPanel();
     private readonly FlowLayoutPanel _commands = new FlowLayoutPanel();

@@ -7,7 +7,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class AccordionDemoForm : Form
+public sealed class AccordionDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _root = new FlowLayoutPanel();
     private readonly FlowLayoutPanel _commands = new FlowLayoutPanel();

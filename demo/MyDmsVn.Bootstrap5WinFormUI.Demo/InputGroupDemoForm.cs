@@ -5,7 +5,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class InputGroupDemoForm : Form
+public sealed class InputGroupDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
 

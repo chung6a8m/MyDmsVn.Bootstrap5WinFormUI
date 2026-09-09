@@ -7,7 +7,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class BootstrapSelectDemoForm : Form
+public sealed class BootstrapSelectDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
     private readonly GroupBox _localSection = new GroupBox();
@@ -23,7 +23,6 @@ public sealed class BootstrapSelectDemoForm : Form
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(980, 820);
         MinimumSize = new Size(760, 560);
-        AutoScaleMode = AutoScaleMode.Dpi;
 
         ConfigureContent();
         BuildLocalSection();

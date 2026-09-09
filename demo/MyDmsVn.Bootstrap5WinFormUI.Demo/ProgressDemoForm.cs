@@ -7,7 +7,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class ProgressDemoForm : Form
+public sealed class ProgressDemoForm : DemoFormBase
 {
     private static readonly BootstrapVariant[] Variants =
     {
@@ -32,7 +32,6 @@ public sealed class ProgressDemoForm : Form
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(920, 760);
         MinimumSize = new Size(700, 560);
-        AutoScaleMode = AutoScaleMode.Dpi;
 
         ConfigureToolbar();
         ConfigureContent();
