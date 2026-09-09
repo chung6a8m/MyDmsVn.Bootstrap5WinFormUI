@@ -7,7 +7,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class DataGridDemoForm : Form
+public sealed class DataGridDemoForm : DemoFormBase
 {
     private const int LargeRowCount = 10000;
 

@@ -7,7 +7,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class DataGridSelectEditingDemoForm : Form
+public sealed class DataGridSelectEditingDemoForm : DemoFormBase
 {
     private readonly BootstrapDataGridView _grid = new BootstrapDataGridView();
     private readonly Label _instructions = new Label();
@@ -19,7 +19,7 @@ public sealed class DataGridSelectEditingDemoForm : Form
     public DataGridSelectEditingDemoForm()
     {
         Text = "BootstrapDataGridView + BootstrapLookup Editing Demo";
-        StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(980, 620); MinimumSize = new Size(760, 460); AutoScaleMode = AutoScaleMode.Dpi;
+        StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(980, 620); MinimumSize = new Size(760, 460);
         SeedProducts(); ConfigureText(); ConfigureGrid(); CreateSampleRows();
         Controls.Add(_grid); Controls.Add(_status); Controls.Add(_instructions);
         BootstrapThemeManager.ThemeChanged += OnThemeChanged; ApplyTheme(BootstrapThemeManager.CurrentTheme);

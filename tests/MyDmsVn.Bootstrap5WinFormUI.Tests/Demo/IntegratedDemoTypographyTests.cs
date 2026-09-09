@@ -94,6 +94,27 @@ public sealed class IntegratedDemoTypographyTests
     }
 
     [Test]
+    public void IntegratedDemoShellAndPageFormsUseSharedDemoFormBase()
+    {
+        var demoAssembly = typeof(MainForm).Assembly;
+        var offenders = demoAssembly
+            .GetTypes()
+            .Where(type =>
+                type.Namespace == "MyDmsVn.Bootstrap5WinFormUI.Demo" &&
+                !type.IsAbstract &&
+                typeof(Form).IsAssignableFrom(type) &&
+                (type.Name == "MainForm" ||
+                 type.Name == "DemoPageHostForm" ||
+                 type.Name.EndsWith("DemoForm", StringComparison.Ordinal)))
+            .Where(type => !typeof(DemoFormBase).IsAssignableFrom(type))
+            .Select(type => type.FullName)
+            .OrderBy(name => name)
+            .ToArray();
+
+        Assert.That(offenders, Is.Empty);
+    }
+
+    [Test]
     public void FrameworkDefaultTypographyRemainsCompactAndIsNotRewrittenForTheDemo()
     {
         Assert.Multiple((Action)(() =>

@@ -6,7 +6,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class PaginationDemoForm : Form
+public sealed class PaginationDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
     private readonly BootstrapDataGridView _grid = new BootstrapDataGridView();
