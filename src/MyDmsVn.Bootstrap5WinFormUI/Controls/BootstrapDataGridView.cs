@@ -23,6 +23,7 @@ public class BootstrapDataGridView : DataGridView
     private bool _useThemeFont = true;
     private bool _initialized;
     private Font? _themeFont;
+    private BootstrapFontToken? _themeFontToken;
 
     /// <summary>
     /// Initializes a designer-safe Bootstrap-inspired data grid.
@@ -316,6 +317,7 @@ public class BootstrapDataGridView : DataGridView
         var nextFont = new Font(token.FontFamilyName, token.SizeInPoints, token.Style);
         var previous = _themeFont;
         _themeFont = nextFont;
+        _themeFontToken = token;
         _settingThemeFont = true;
         try
         {
@@ -333,15 +335,17 @@ public class BootstrapDataGridView : DataGridView
     private bool ThemeFontMatches(BootstrapFontToken token)
     {
         return _themeFont is not null &&
-            string.Equals(_themeFont.Name, token.FontFamilyName, StringComparison.OrdinalIgnoreCase) &&
-            Math.Abs(_themeFont.SizeInPoints - token.SizeInPoints) < 0.01f &&
-            _themeFont.Style == token.Style;
+            _themeFontToken is not null &&
+            string.Equals(_themeFontToken.FontFamilyName, token.FontFamilyName, StringComparison.OrdinalIgnoreCase) &&
+            Math.Abs(_themeFontToken.SizeInPoints - token.SizeInPoints) < 0.01f &&
+            _themeFontToken.Style == token.Style;
     }
 
     private void DisposeThemeFont()
     {
         var font = _themeFont;
         _themeFont = null;
+        _themeFontToken = null;
         font?.Dispose();
     }
 

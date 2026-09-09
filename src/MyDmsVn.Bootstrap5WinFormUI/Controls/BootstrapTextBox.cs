@@ -39,6 +39,7 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
     private Font? _themeFont;
+    private BootstrapFontToken? _themeFontToken;
 
     /// <summary>
     /// Initializes a designer-safe text box using the current application theme.
@@ -641,9 +642,15 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
     private void ApplyThemeFont()
     {
         var token = BootstrapThemeManager.CurrentTheme.Typography.Body;
+        if (ThemeFontMatches(token))
+        {
+            return;
+        }
+
         var nextFont = new Font(token.FontFamilyName, token.SizeInPoints, token.Style);
         var previous = _themeFont;
         _themeFont = nextFont;
+        _themeFontToken = token;
         _settingThemeFont = true;
         try
         {
@@ -658,6 +665,15 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
         ApplyChildFonts();
     }
 
+    private bool ThemeFontMatches(BootstrapFontToken token)
+    {
+        return _themeFont is not null &&
+            _themeFontToken is not null &&
+            string.Equals(_themeFontToken.FontFamilyName, token.FontFamilyName, StringComparison.OrdinalIgnoreCase) &&
+            Math.Abs(_themeFontToken.SizeInPoints - token.SizeInPoints) < 0.01f &&
+            _themeFontToken.Style == token.Style;
+    }
+
     private void ApplyChildFonts()
     {
         _editor.Font = Font;
@@ -669,6 +685,7 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
     {
         var font = _themeFont;
         _themeFont = null;
+        _themeFontToken = null;
         font?.Dispose();
     }
 
