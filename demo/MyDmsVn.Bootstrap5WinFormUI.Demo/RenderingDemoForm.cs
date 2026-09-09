@@ -7,7 +7,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-internal sealed class RenderingDemoForm : Form
+internal sealed class RenderingDemoForm : DemoFormBase
 {
     private readonly RenderingPreviewSurface _preview = new RenderingPreviewSurface();
     private readonly Label _instructions = new Label();

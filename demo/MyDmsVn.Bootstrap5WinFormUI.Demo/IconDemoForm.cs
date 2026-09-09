@@ -8,7 +8,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-internal sealed class IconDemoForm : Form
+internal sealed class IconDemoForm : DemoFormBase
 {
     private readonly Label _instructions = new Label();
     private readonly IconPreviewSurface _preview = new IconPreviewSurface();

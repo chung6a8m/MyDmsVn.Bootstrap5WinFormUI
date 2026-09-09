@@ -5,7 +5,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-internal sealed class ThemeDemoForm : Form
+internal sealed class ThemeDemoForm : DemoFormBase
 {
     private readonly Label _summary = new Label();
     private readonly TableLayoutPanel _palette = new TableLayoutPanel();

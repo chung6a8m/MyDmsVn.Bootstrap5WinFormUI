@@ -6,7 +6,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class AnimationDemoForm : Form
+public sealed class AnimationDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _commandBar = new FlowLayoutPanel();
     private readonly Button _finiteStart = new Button();
