@@ -1,22 +1,26 @@
 # AI_CONTEXT.md
 
-Compact project context for AI assistants.
+Compact working context for AI assistants.
 
 ## Identity
 
 - Repository: `chung6a8m/MyDmsVn.Bootstrap5WinFormUI`
 - Product: Bootstrap-inspired native WinForms UI framework
 - Root namespace: `MyDmsVn.Bootstrap5WinFormUI`
-- Required runtimes: .NET Framework 4.8 and .NET 8 on Windows
-- Intended TFMs: `net48;net8.0-windows`
+- Target frameworks: `net48;net8.0-windows`
+- UI technology: native Windows Forms
 
-## Product intent
+## Current source of truth
 
-Create a small, maintainable WinForms design system that borrows Bootstrap 5's visual language, semantic variants, component concepts, and interaction expectations while remaining completely native WinForms.
+The active implementation queue is `docs/ROADMAP.md`. It contains only unfinished planned work and defines execution order unless the user explicitly overrides it.
 
-This is not a CSS runtime, browser wrapper, WebView solution, or pixel-perfect Bootstrap port.
+Read only the current plan being implemented. Do not preload all active plans, old phase documents, `docs/archive/`, or `idea-drafs/`.
 
-## Architecture summary
+Historical roadmaps are archived under `docs/archive/` and are not current specifications.
+
+## Product model
+
+Bootstrap supplies visual language and component ideas. Native WinForms remains authoritative for desktop behavior wherever practical.
 
 ```text
 Compatibility
@@ -30,59 +34,47 @@ Theme ---- Rendering ---- Icons
       Composite controls
 ```
 
-Foundation logic is shared. Composite controls compose primitives instead of copying their behavior.
+Foundation infrastructure is shared. Composite controls compose primitives instead of duplicating behavior engines.
 
-## High-priority components
+## Stable decisions
 
-1. Theme, metrics, typography, DPI/rendering helpers
-2. Icon abstraction
-3. Animation primitives
-4. Spinner
-5. Button + loading
-6. ButtonGroup + ButtonToolbar
-7. TextBox + Card
-8. Collapse
-9. Accordion + AccordionHeader
-10. ProgressBar
-11. Sidebar
-12. DataGridView
+- Use semantic theme/design-system tokens rather than component-local Bootstrap constants.
+- Runtime theme changes flow through `BootstrapThemeManager`.
+- Keep `net48` compatibility explicit and first-class.
+- Prefer native value, focus, keyboard, accessibility, layout, popup, and lifecycle semantics when a suitable WinForms control exists.
+- FontAwesome.Sharp integration is optional and must not become a core dependency.
+- Animation and scheduling are shared; avoid ad-hoc control-local timers.
+- Designer safety, DPI scaling, accessibility, keyboard behavior, and GDI/event lifecycle are product requirements.
+- Public APIs should stay small, coherent, and native-friendly.
 
-## Key design decisions
+## Unattended WinForms test safety
 
-- Use semantic theme tokens; controls should not embed Bootstrap hex values directly.
-- Runtime theme changes are event-driven, not manual `RefreshTheme()` calls throughout application code.
-- SVG, Segoe MDL2 Assets, and FontAwesome are icon sources behind abstractions.
-- FontAwesome.Sharp integration is optional and must not be a core dependency.
-- Animation is UI-thread based and shared; no ad-hoc timers in each animated control.
-- `BootstrapAccordion` is built on `BootstrapCollapse`.
-- Button loading reuses spinner/loading infrastructure.
-- WinForms Designer safety, keyboard behavior, accessibility metadata, DPI scaling, and GDI lifecycle are product requirements, not polish items.
+- Use `./test.ps1` for the full suite.
+- Follow `docs/WINFORMS_TEST_EXECUTION.md` for handle-based/UI tests.
+- Focused UI-capable `dotnet test` runs require bounded hang detection.
+- Tests must not leave exception dialogs, `MessageBox`, unbounded modal windows, or other human-interaction blockers open.
+- Fail-fast guards belong in test infrastructure unless failure behavior is genuinely part of the production contract.
 
-## Automated WinForms test safety
+## Load supporting context only when needed
 
-Unattended GUI tests must fail deterministically instead of waiting for human interaction.
+- Architecture/ownership: `docs/ARCHITECTURE.md`
+- Theme/typography/metrics: `docs/DESIGN_SYSTEM.md`
+- Existing component contract: relevant section of `docs/COMPONENTS.md`
+- Cross-target concerns: `docs/COMPATIBILITY.md`
+- Tests: `docs/TESTING.md`, `docs/WINFORMS_TEST_EXECUTION.md`
+- Public/protected API changes: `docs/PUBLIC_API_BASELINE.md`
+- Product-scope ambiguity: `docs/PRD.md`, then `docs/DECISIONS.md`
 
-- Read and follow `docs/WINFORMS_TEST_EXECUTION.md` before adding or running handle-based UI tests.
-- Use `./test.ps1` for a full run; focused direct `dotnet test` commands must include bounded `--blame-hang` protection.
-- The test assembly routes unhandled WinForms exceptions to NUnit with `UnhandledExceptionMode.ThrowException`.
-- Hosted `DataGridView` interaction tests use `DataGridViewTestGuard.FailOnDataError(...)` unless `DataError` itself is the behavior under test.
-- Automated tests must not leave `MessageBox`, `ShowDialog`, exception dialogs, or other modal UI waiting for a human or coding agent.
-- Fail-fast behavior belongs in test infrastructure unless it is genuinely part of the production control contract.
+## Precedence
 
-## Compatibility warning
-
-Prototype code in `idea-drafs/` contains constructs such as `Math.Clamp`, nullable syntax, newer property syntax, and placeholder namespaces such as `YourApp`. Do not copy it directly. The current namespace and compatibility rules are authoritative in `docs/`.
-
-## Source-of-truth order
-
-When documents disagree, use this precedence:
+When information conflicts, use this order:
 
 1. Explicit current user instruction
-2. `docs/DECISIONS.md`
-3. `docs/PRD.md`
-4. `docs/ARCHITECTURE.md`
-5. `docs/COMPONENTS.md`
-6. `docs/DEVELOPMENT_PLAN.md`
-7. Historical notes in `idea-drafs/`
+2. The current active plan
+3. `docs/DECISIONS.md`
+4. `docs/PRD.md`
+5. `docs/ARCHITECTURE.md`
+6. Relevant current component/design/testing documentation
+7. Archived/historical material
 
-Read `AGENTS.md` before implementation work.
+Read `AGENTS.md` for repository execution rules.
