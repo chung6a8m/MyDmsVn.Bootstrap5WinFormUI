@@ -317,6 +317,72 @@ public sealed class IntegratedDemoTypographyTests
     }
 
     [Test]
+    public void PaginationSectionHeadingTracksActiveHeadingSmallTypography()
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
+
+        using var form = new PaginationDemoForm();
+        var heading = FindControls<Label>(form)
+            .Single(label => label.Text == "Button sizes");
+
+        Assert.That(heading.Font.SizeInPoints, Is.EqualTo(15f).Within(0.001f));
+
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base14Px);
+        Assert.That(heading.Font.SizeInPoints, Is.EqualTo(13.125f).Within(0.001f));
+
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Dark,
+            DemoTypographyPreset.Default);
+        Assert.That(heading.Font.SizeInPoints, Is.EqualTo(11f).Within(0.001f));
+    }
+
+    [Test]
+    public void AccordionSemanticSectionHeadingTracksActiveLabelTypography()
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
+
+        using var form = new AccordionDemoForm();
+        var heading = FindControls<Label>(form)
+            .Single(label => label.Text == "Single-open composition (normal bordered style)");
+
+        AssertTitleFont(heading, 12f);
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Dark,
+            DemoTypographyPreset.Base14Px);
+        AssertTitleFont(heading, 10.5f);
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Default);
+        AssertTitleFont(heading, 9f);
+    }
+
+    [TestCase(typeof(CollapseDemoForm), "BootstrapCollapse — auto measurement, fixed height, reversal and reduced motion")]
+    [TestCase(typeof(NavigationDemoForm), "Tabs style")]
+    public void OtherRetainedSemanticHeadingsTrackActiveLabelTypography(
+        Type formType,
+        string headingText)
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
+
+        using var form = (Form)Activator.CreateInstance(formType)!;
+        var heading = FindControls<Label>(form).Single(label => label.Text == headingText);
+
+        AssertTitleFont(heading, 12f);
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Dark,
+            DemoTypographyPreset.Default);
+        AssertTitleFont(heading, 9f);
+    }
+
+    [Test]
     public void ConstructingDemoFormDoesNotReplaceApplicationTheme()
     {
         var installed = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark, reducedMotion: true);

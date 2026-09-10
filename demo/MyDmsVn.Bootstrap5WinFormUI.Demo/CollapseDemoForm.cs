@@ -16,6 +16,8 @@ public sealed class CollapseDemoForm : DemoFormBase
     private readonly Button _toggleFixed = new Button();
     private readonly Label _autoStatus = new Label();
     private readonly Label _fixedStatus = new Label();
+    private readonly Label _title = new Label();
+    private Font? _titleFont;
     private readonly BootstrapCollapse _autoCollapse = new BootstrapCollapse();
     private readonly BootstrapCollapse _fixedCollapse = new BootstrapCollapse();
     private readonly FlowLayoutPanel _variableContent = new FlowLayoutPanel();
@@ -55,6 +57,12 @@ public sealed class CollapseDemoForm : DemoFormBase
         }
 
         base.Dispose(disposing);
+
+        if (disposing)
+        {
+            _titleFont?.Dispose();
+            _titleFont = null;
+        }
     }
 
     private void ConfigureLayout()
@@ -65,13 +73,9 @@ public sealed class CollapseDemoForm : DemoFormBase
         _root.WrapContents = false;
         _root.Padding = new Padding(16);
 
-        var title = new Label
-        {
-            AutoSize = true,
-            Text = "BootstrapCollapse — auto measurement, fixed height, reversal and reduced motion",
-            Font = new Font(Font, FontStyle.Bold),
-            Margin = new Padding(0, 0, 0, 8)
-        };
+        _title.AutoSize = true;
+        _title.Text = "BootstrapCollapse — auto measurement, fixed height, reversal and reduced motion";
+        _title.Margin = new Padding(0, 0, 0, 8);
 
         var instructions = new Label
         {
@@ -100,7 +104,7 @@ public sealed class CollapseDemoForm : DemoFormBase
         _fixedStatus.AutoSize = true;
         _fixedStatus.Margin = new Padding(0, 16, 0, 4);
 
-        _root.Controls.Add(title);
+        _root.Controls.Add(_title);
         _root.Controls.Add(instructions);
         _root.Controls.Add(_commands);
         _root.Controls.Add(_autoStatus);
@@ -220,6 +224,7 @@ public sealed class CollapseDemoForm : DemoFormBase
 
     private void ApplyTheme(BootstrapTheme theme)
     {
+        UpdateTitleFont(theme);
         BackColor = theme.Colors.Body;
         ForeColor = theme.Colors.Text;
         _root.BackColor = theme.Colors.Body;
@@ -251,5 +256,20 @@ public sealed class CollapseDemoForm : DemoFormBase
             control.BackColor = theme.Colors.Surface;
             control.ForeColor = theme.Colors.Text;
         }
+    }
+
+    private void UpdateTitleFont(BootstrapTheme theme)
+    {
+        var token = theme.Typography.Label;
+        if (_titleFont is not null && DemoTypography.FontMatchesToken(_titleFont, token))
+        {
+            return;
+        }
+
+        var replacement = DemoTypography.CreateFont(token);
+        var previous = _titleFont;
+        _titleFont = replacement;
+        _title.Font = replacement;
+        previous?.Dispose();
     }
 }
