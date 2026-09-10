@@ -6,19 +6,17 @@ Do not preload every plan into an agent context. Read `AGENTS.md`, `AI_CONTEXT.m
 
 ## Active queue
 
-1. [Integrated Demo Typography Profiles](./plans/20260910-001-integrated-demo-typography-profiles.md)
-   - Add runtime `Default`, `Base 14px`, and `Base 16px` typography profiles to the Integrated Demo while preserving core framework defaults and current theme/reduced-motion semantics.
-2. [Bootstrap ToolStrip Family](./plans/20260907-001-bootstrap-toolstrip-family.md)
+1. [Bootstrap ToolStrip Family](./plans/20260907-001-bootstrap-toolstrip-family.md)
    - Add native-backed `BootstrapToolStrip`, `BootstrapMenuStrip`, `BootstrapContextMenuStrip`, and `BootstrapStatusStrip` with a shared Bootstrap renderer and no parallel menu/layout engine.
-3. [BootstrapRange / TrackBar](./plans/20260907-002-bootstrap-range-trackbar.md)
+2. [BootstrapRange / TrackBar](./plans/20260907-002-bootstrap-range-trackbar.md)
    - Add `BootstrapRange : TrackBar`, gated by verified native `NM_CUSTOMDRAW` support, while preserving native range, input, accessibility, and lifecycle behavior.
-4. [BootstrapModal](./plans/20260907-004-bootstrap-modal.md)
+3. [BootstrapModal](./plans/20260907-004-bootstrap-modal.md)
    - Add a native `Form`-based Bootstrap modal that keeps `ShowDialog` semantics authoritative and layers theme, backdrop, sizing, placement, and reduced-motion transitions on top.
-5. [BootstrapListGroup](./plans/20260907-005-bootstrap-list-group.md)
+4. [BootstrapListGroup](./plans/20260907-005-bootstrap-list-group.md)
    - Add a lightweight composition control for short static/actionable lists without duplicating `BootstrapListView` or large-data responsibilities.
-6. [BootstrapBreadcrumb](./plans/20260907-006-bootstrap-breadcrumb.md)
+5. [BootstrapBreadcrumb](./plans/20260907-006-bootstrap-breadcrumb.md)
    - Add an ordered hierarchy/navigation trail built from native links/labels with deterministic wrapping, RTL layout, and native keyboard/accessibility behavior.
-7. [BootstrapPlaceholder / Skeleton](./plans/20260907-007-bootstrap-placeholder-skeleton.md)
+6. [BootstrapPlaceholder / Skeleton](./plans/20260907-007-bootstrap-placeholder-skeleton.md)
    - Add the owner-painted `BootstrapPlaceholder` primitive with Bootstrap-compatible sizing and Glow/Wave animation; Skeleton remains normal WinForms composition rather than a second framework.
 
 ## Execution rules

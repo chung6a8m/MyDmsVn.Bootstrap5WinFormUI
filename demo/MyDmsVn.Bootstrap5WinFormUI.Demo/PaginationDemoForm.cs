@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
@@ -14,16 +15,12 @@ public sealed class PaginationDemoForm : DemoFormBase
     private readonly BootstrapPagination _gridPagination = new BootstrapPagination();
     private readonly Label _gridStatus = new Label();
     private readonly DataTable _orders = CreateOrdersTable(53);
-    private readonly Font _sectionTitleFont;
+    private readonly List<Label> _sectionTitleLabels = new List<Label>();
+    private Font? _sectionTitleFont;
 
     public PaginationDemoForm()
     {
-        var headingTypography = BootstrapThemeManager.CurrentTheme.Typography.HeadingSmall;
-        _sectionTitleFont = new Font(
-            headingTypography.FontFamilyName,
-            headingTypography.SizeInPoints,
-            headingTypography.Style,
-            GraphicsUnit.Point);
+        UpdateSectionTitleFont(BootstrapThemeManager.CurrentTheme);
 
         Text = "BootstrapPagination Demo";
         StartPosition = FormStartPosition.CenterParent;
@@ -37,6 +34,7 @@ public sealed class PaginationDemoForm : DemoFormBase
         AddSizeScenarios();
         AddVisibilityScenario();
         AddGridScenario();
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
     }
 
     protected override void Dispose(bool disposing)
@@ -44,13 +42,15 @@ public sealed class PaginationDemoForm : DemoFormBase
         if (disposing)
         {
             _grid.DpiChangedAfterParent -= OnGridDpiChangedAfterParent;
+            BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
         }
 
         base.Dispose(disposing);
 
         if (disposing)
         {
-            _sectionTitleFont.Dispose();
+            _sectionTitleFont?.Dispose();
+            _sectionTitleFont = null;
         }
     }
 
@@ -228,6 +228,7 @@ public sealed class PaginationDemoForm : DemoFormBase
             Text = title,
             Margin = new Padding(0, 0, 0, 2)
         };
+        _sectionTitleLabels.Add(titleLabel);
         var descriptionLabel = new Label
         {
             AutoSize = true,
@@ -238,6 +239,30 @@ public sealed class PaginationDemoForm : DemoFormBase
         panel.Controls.Add(titleLabel, 0, 0);
         panel.Controls.Add(descriptionLabel, 0, 1);
         return panel;
+    }
+
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        UpdateSectionTitleFont(e.NewTheme);
+    }
+
+    private void UpdateSectionTitleFont(BootstrapTheme theme)
+    {
+        var token = theme.Typography.HeadingSmall;
+        if (_sectionTitleFont is not null && DemoTypography.FontMatchesToken(_sectionTitleFont, token))
+        {
+            return;
+        }
+
+        var replacement = DemoTypography.CreateFont(token);
+        foreach (var label in _sectionTitleLabels)
+        {
+            label.Font = replacement;
+        }
+
+        var previous = _sectionTitleFont;
+        _sectionTitleFont = replacement;
+        previous?.Dispose();
     }
 
     private static DataTable CreateOrdersTable(int rowCount)

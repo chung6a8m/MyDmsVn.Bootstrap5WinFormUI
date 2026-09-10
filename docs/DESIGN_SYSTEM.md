@@ -67,6 +67,12 @@ Font ownership must be explicit. Do not dispose shared theme fonts from individu
 
 ## 6. Density and control sizing
 
+### Integrated Demo typography profiles
+
+The core framework default remains `BootstrapThemeTypography.Default`. The Integrated Demo starts with its Base 16px profile for continuity with the established demo baseline and exposes `Default`, `Base 14px`, and `Base 16px` through the `Base font` selector for visual and regression comparison. These are demo evaluation profiles, not new public framework presets or a change to the core default.
+
+Typography profile, Light/Dark mode, and reduced motion are independent inputs. The demo publishes every settings change as one complete `BootstrapTheme` through `BootstrapThemeManager`. If application code installs a custom `BootstrapThemeTypography` object, changing only Theme or Reduced motion preserves that exact object and leaves the Base font selector blank until a demo preset is chosen explicitly. The demo preset type and preset/custom-typography factory overloads remain internal implementation details.
+
 The framework targets productive desktop/business applications, so the default density should remain compact without becoming cramped.
 
 Recommended starting metrics at 100% DPI:

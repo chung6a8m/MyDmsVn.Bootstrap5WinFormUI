@@ -138,7 +138,7 @@ Additionally, Light/Dark and reduced-motion changes must be valid while an arbit
 - Adds internally: `DemoThemeFactory.Create(BootstrapThemeMode mode, DemoTypographyPreset typographyPreset, bool reducedMotion = false)`.
 - Adds internally: `DemoThemeFactory.Create(BootstrapThemeMode mode, BootstrapThemeTypography typography, bool reducedMotion = false)` so MainForm can preserve an arbitrary current typography object while changing Theme or Reduced motion.
 
-- [ ] **Step 1: Add friend-assembly access and failing factory/profile tests before changing implementation**
+- [x] **Step 1: Add friend-assembly access and failing factory/profile tests before changing implementation**
 
 Create `Properties/AssemblyInfo.cs`:
 
@@ -221,7 +221,7 @@ public void FactoryCanPreserveArbitraryTypographyByReference()
 
 Also add a test that an out-of-range `DemoTypographyPreset` passed to the internal preset overload throws `ArgumentOutOfRangeException` rather than silently falling back.
 
-- [ ] **Step 2: Run the focused tests and confirm the missing enum/overloads fail**
+- [x] **Step 2: Run the focused tests and confirm the missing enum/overloads fail**
 
 Run on Windows:
 
@@ -234,7 +234,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: compilation/test failure because `DemoTypographyPreset` and the new internal factory overloads do not exist yet.
 
-- [ ] **Step 3: Add the internal `DemoTypographyPreset`**
+- [x] **Step 3: Add the internal `DemoTypographyPreset`**
 
 Create:
 
@@ -251,7 +251,7 @@ internal enum DemoTypographyPreset
 
 This is demo implementation state, not public API. Tests compile against it only because of the explicit friend-assembly declaration from Step 1.
 
-- [ ] **Step 4: Refactor `DemoTypography` into centralized immutable profiles**
+- [x] **Step 4: Refactor `DemoTypography` into centralized immutable profiles**
 
 Replace the single-profile constants with two demo-owned immutable objects while reusing the framework default by reference:
 
@@ -320,7 +320,7 @@ internal static bool FontMatchesToken(Font font, BootstrapFontToken token)
 
 Do not keep `CreateBodyFont()` hard-coded to 12pt; all font creation must receive the active token.
 
-- [ ] **Step 5: Add internal composition overloads without widening the public surface**
+- [x] **Step 5: Add internal composition overloads without widening the public surface**
 
 Keep the existing public signature and make it delegate to Base16:
 
@@ -363,7 +363,7 @@ internal static BootstrapTheme Create(
 
 Do not add mutable typography state to `DemoThemeFactory`; it remains a pure composition factory. The arbitrary-typography overload exists specifically so callers can preserve an existing typography object while changing unrelated theme dimensions.
 
-- [ ] **Step 6: Run the focused profile tests on both TFMs**
+- [x] **Step 6: Run the focused profile tests on both TFMs**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -379,7 +379,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the profile/factory slice**
+- [x] **Step 7: Commit the profile/factory slice**
 
 ```bash
 git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoTypographyPreset.cs \
@@ -403,7 +403,7 @@ git commit -m "feat: add integrated demo typography profiles"
 - Produces: every existing `DemoFormBase` instance tracks `BootstrapThemeManager.CurrentTheme.Typography.Body` for its inherited native `Form.Font`, including arbitrary externally installed typography.
 - Preserves: constructing a demo form must not assign a new application theme.
 
-- [ ] **Step 1: Replace the old fixed-12pt test with runtime profile-transition coverage**
+- [x] **Step 1: Replace the old fixed-12pt test with runtime profile-transition coverage**
 
 Update the PR #62 test so it explicitly installs Base16 before construction and verifies profile changes on the same form instance:
 
@@ -459,11 +459,11 @@ public void DemoFormBaseDoesNotReplaceOwnedFontWhenTypographyTokenIsUnchanged()
 }
 ```
 
-- [ ] **Step 2: Run the new tests and confirm runtime transition currently fails**
+- [x] **Step 2: Run the new tests and confirm runtime transition currently fails**
 
 Use the same bounded focused test command from Task 1. Expected: the constructor-created body font remains 12pt after the theme changes.
 
-- [ ] **Step 3: Subscribe `DemoFormBase` to `BootstrapThemeManager.ThemeChanged` and apply `Typography.Body`**
+- [x] **Step 3: Subscribe `DemoFormBase` to `BootstrapThemeManager.ThemeChanged` and apply `Typography.Body`**
 
 Refactor the base class along these lines:
 
@@ -505,15 +505,15 @@ In `Dispose(bool)`: unsubscribe `BootstrapThemeManager.ThemeChanged` while dispo
 
 Do not publish a theme from this base class. It only consumes the current theme.
 
-- [ ] **Step 4: Verify native inherited controls and existing Bootstrap controls after a profile change**
+- [x] **Step 4: Verify native inherited controls and existing Bootstrap controls after a profile change**
 
 Extend the runtime test with a representative `BootstrapButton` from `ButtonDemoForm` and assert its font follows the same body sizes. This proves native inheritance and framework theme consumption stay synchronized without introducing demo-specific logic into the control.
 
-- [ ] **Step 5: Run `IntegratedDemoTypographyTests` on both targets**
+- [x] **Step 5: Run `IntegratedDemoTypographyTests` on both targets**
 
 Expected: PASS with no modal dialogs or hangs.
 
-- [ ] **Step 6: Commit runtime body-font synchronization**
+- [x] **Step 6: Commit runtime body-font synchronization**
 
 ```bash
 git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoFormBase.cs \
@@ -537,7 +537,7 @@ git commit -m "feat: update demo body font on theme changes"
 - Produces: MainForm page-title font follows `theme.Typography.Label` and refreshes without unnecessary font allocation.
 - Produces: one and only one `ThemeChanged` publication per user change to Theme, Base font, or Reduced motion.
 
-- [ ] **Step 1: Add failing UI-contract tests for the new selector**
+- [x] **Step 1: Add failing UI-contract tests for the new selector**
 
 In `IntegratedDemoTypographyTests`, add a helper that finds the ComboBox by `AccessibleName == "Integrated demo base font profile"`, then test:
 
@@ -575,7 +575,7 @@ public void MainFormExposesBaseFontSelectorBesideThemeSelector()
 
 Also assert the relative settings order is Theme label → Theme ComboBox → Base font label → Base font ComboBox → Reduced motion CheckBox. Use the controls collection order established by `Controls.Add(...)`, not screen coordinates.
 
-- [ ] **Step 2: Add failing interaction tests for all three known dimensions**
+- [x] **Step 2: Add failing interaction tests for all three known dimensions**
 
 Create a test that starts at Light + Base16 + reduced motion false and performs these transitions on the same `MainForm`:
 
@@ -587,7 +587,7 @@ Create a test that starts at Light + Base16 + reduced motion false and performs 
 
 Use `SelectedIndex` and `Checked` exactly as a user interaction would drive the handlers.
 
-- [ ] **Step 3: Add a failing regression test for externally installed custom typography**
+- [x] **Step 3: Add a failing regression test for externally installed custom typography**
 
 Use a custom `BootstrapThemeTypography` object that is not one of the three demo-owned instances:
 
@@ -630,7 +630,7 @@ public void MainFormPreservesUnknownTypographyAcrossUnrelatedSettingChanges()
 
 This test is mandatory: leaving the old selector value in place for unknown typography would cause the next Theme/Reduced-motion edit to silently replace custom typography with that stale demo preset.
 
-- [ ] **Step 4: Add a failing regression test for exactly one publication per user change**
+- [x] **Step 4: Add a failing regression test for exactly one publication per user change**
 
 Subscribe only after MainForm construction so setup synchronization is not counted:
 
@@ -672,7 +672,7 @@ public void MainFormPublishesExactlyOneThemeChangePerUserSettingChange()
 
 Do not weaken this to final-state-only assertions. The contract is that selector synchronization does not trigger a second publication.
 
-- [ ] **Step 5: Add the header fields and configure the selector**
+- [x] **Step 5: Add the header fields and configure the selector**
 
 Add fields:
 
@@ -700,7 +700,7 @@ _baseFontPreset.SelectedIndexChanged += (_, _) => PublishSelectedTheme();
 
 If exact width needs a small adjustment during the minimum-size layout test, keep it compact enough to preserve the existing 900x600 shell and do not change item text.
 
-- [ ] **Step 6: Resolve typography for publication without losing unknown external typography**
+- [x] **Step 6: Resolve typography for publication without losing unknown external typography**
 
 Keep the preset-index mapping explicit:
 
@@ -759,7 +759,7 @@ private void PublishSelectedTheme()
 
 Do not store a second `_currentTypography` field. `BootstrapThemeManager.CurrentTheme.Typography` remains the source of truth when the selector cannot represent the active object.
 
-- [ ] **Step 7: Extend `SyncSelection(BootstrapTheme theme)` with explicit unknown-state behavior**
+- [x] **Step 7: Extend `SyncSelection(BootstrapTheme theme)` with explicit unknown-state behavior**
 
 Within the existing `_updatingSelection` guard:
 
@@ -773,7 +773,7 @@ Use the guard around all three assignments. This both exposes the custom state h
 
 Do **not** leave a stale previous preset selected for unknown typography, and do not infer a preset from body size.
 
-- [ ] **Step 8: Refresh the MainForm cached page-title font from `Typography.Label`**
+- [x] **Step 8: Refresh the MainForm cached page-title font from `Typography.Label`**
 
 PR #62's current page-title font is 12pt Bold at Base16. Preserve that visual result by using the `Label` semantic role, not `HeadingSmall`:
 
@@ -798,7 +798,7 @@ Call it from `ApplyTheme(theme)`. Continue disposing `_pageTitleFont` in `Dispos
 
 Extend `ApplyTheme` to set the new label/combo colors from `theme.Colors.SurfaceSecondary`, `theme.Colors.Surface`, and `theme.Colors.Text` in the same pattern as the existing Theme controls.
 
-- [ ] **Step 9: Make Base16 startup explicit in `Program.Main`**
+- [x] **Step 9: Make Base16 startup explicit in `Program.Main`**
 
 Replace the implicit overload call with:
 
@@ -810,11 +810,11 @@ BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
 
 `Program` is in the demo assembly, so it can use the internal preset overload without exposing that overload publicly.
 
-- [ ] **Step 10: Verify interaction, custom-typography, and single-publication tests on both TFMs**
+- [x] **Step 10: Verify interaction, custom-typography, and single-publication tests on both TFMs**
 
 Run the focused typography suite with bounded hang detection on `net8.0-windows` and `net48`. Expected: PASS.
 
-- [ ] **Step 11: Commit the shell selector slice**
+- [x] **Step 11: Commit the shell selector slice**
 
 ```bash
 git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs \
@@ -837,7 +837,7 @@ git commit -m "feat: add base font selector to integrated demo"
 - Produces: Pagination section headings track `theme.Typography.HeadingSmall` at runtime on the already-created form.
 - Preserves: intentionally per-paint, immediately disposed fonts that read the current theme are not converted into unrelated caching infrastructure.
 
-- [ ] **Step 1: Add a failing Pagination semantic-heading transition test**
+- [x] **Step 1: Add a failing Pagination semantic-heading transition test**
 
 Add a test equivalent to:
 
@@ -869,7 +869,7 @@ public void PaginationSectionHeadingTracksActiveHeadingSmallTypography()
 
 Expected before implementation: first assertion passes, later assertions fail because `_sectionTitleFont` was captured in the constructor.
 
-- [ ] **Step 2: Replace readonly one-shot Pagination heading font ownership with refreshable ownership**
+- [x] **Step 2: Replace readonly one-shot Pagination heading font ownership with refreshable ownership**
 
 Change:
 
@@ -888,7 +888,7 @@ Add `using System.Collections.Generic;` if not already present.
 
 Create/update the heading font from `BootstrapThemeManager.CurrentTheme.Typography.HeadingSmall` before building sections, and register each title label in `CreateSection(...)`.
 
-- [ ] **Step 3: Subscribe Pagination to theme changes only for its semantic heading role**
+- [x] **Step 3: Subscribe Pagination to theme changes only for its semantic heading role**
 
 Add a local `ThemeChanged` handler that calls `UpdateSectionTitleFont(e.NewTheme)`. The helper must:
 
@@ -902,7 +902,7 @@ Unsubscribe in `Dispose(bool)` and dispose the final owned font once.
 
 Do not duplicate `DemoFormBase` body-font logic here; Pagination's handler exists only because its section titles opt into a non-body semantic role.
 
-- [ ] **Step 4: Audit the rest of the demo for stale cached typography-derived fonts**
+- [x] **Step 4: Audit the rest of the demo for stale cached typography-derived fonts**
 
 Run:
 
@@ -921,11 +921,11 @@ Classify every result:
 
 The audit is complete only when no retained semantic font can stay on the previous profile after `ThemeChanged`.
 
-- [ ] **Step 5: Run focused typography tests on both TFMs**
+- [x] **Step 5: Run focused typography tests on both TFMs**
 
 Expected: Pagination heading changes correctly and the full existing typography suite remains green.
 
-- [ ] **Step 6: Commit the cached-font hardening slice**
+- [x] **Step 6: Commit the cached-font hardening slice**
 
 ```bash
 git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/PaginationDemoForm.cs \
@@ -946,7 +946,7 @@ git commit -m "fix: refresh demo semantic fonts across profiles"
 - Consumes: all three working typography profiles and MainForm selector behavior.
 - Produces: automated evidence that shell chrome, representative native/Bootstrap controls, Theme summary, custom-typography preservation, and live page instances remain coherent while switching profiles.
 
-- [ ] **Step 1: Parameterize shell containment tests for all three known profiles**
+- [x] **Step 1: Parameterize shell containment tests for all three known profiles**
 
 Replace the fixed `MainShellChromeRemainsContainedAtTwelvePointBodyTypography` assumption with a profile-aware test. For each profile, install the theme **before** constructing `MainForm`, then verify containment for:
 
@@ -976,7 +976,7 @@ Run each profile at both logical shell sizes:
 
 Keep `AssertContained(...)` as the core geometry assertion. The page-title/description already use ellipsis, so assert containment and non-zero bounds rather than a fixed title width.
 
-- [ ] **Step 2: Parameterize representative native + Bootstrap control sizing**
+- [x] **Step 2: Parameterize representative native + Bootstrap control sizing**
 
 Replace the fixed 12pt test with three cases that create `ButtonDemoForm` and assert:
 
@@ -987,7 +987,7 @@ Replace the fixed 12pt test with three cases that create `ButtonDemoForm` and as
 
 This guards against a font token changing while the control remains clipped at old text measurements.
 
-- [ ] **Step 3: Make the Theme page summary test profile-aware**
+- [x] **Step 3: Make the Theme page summary test profile-aware**
 
 For each profile, construct MainForm on the Theme page and assert the summary contains the active body value:
 
@@ -999,7 +999,7 @@ Base16Px  -> "Body Segoe UI 12pt"
 
 Continue asserting usable non-zero bounds.
 
-- [ ] **Step 4: Prove that switching the selector updates the already-created Theme page**
+- [x] **Step 4: Prove that switching the selector updates the already-created Theme page**
 
 Create `MainForm`, locate the Theme summary label, capture the label instance, then change the Base font selector from Base16 → Base14 → Default. After each selection:
 
@@ -1010,7 +1010,7 @@ Create `MainForm`, locate the Theme summary label, capture the label instance, t
 
 This explicitly prevents an implementation that solves typography switching by destroying and recreating the current demo page.
 
-- [ ] **Step 5: Keep custom typography preservation and event-count tests in the focused regression set**
+- [x] **Step 5: Keep custom typography preservation and event-count tests in the focused regression set**
 
 Ensure the Task 3 tests remain included in the fixture/filter used for this feature. They must continue proving:
 
@@ -1021,7 +1021,7 @@ Ensure the Task 3 tests remain included in the fixture/filter used for this feat
 
 Do not replace these behavioral assertions with layout-only coverage.
 
-- [ ] **Step 6: Run both Integrated Demo typography test fixtures with bounded hang detection**
+- [x] **Step 6: Run both Integrated Demo typography test fixtures with bounded hang detection**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -1037,7 +1037,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the expanded regression coverage**
+- [x] **Step 7: Commit the expanded regression coverage**
 
 ```bash
 git add tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/IntegratedDemoTypographyTests.cs \
@@ -1058,7 +1058,7 @@ git commit -m "test: cover integrated demo typography switching"
 - Produces: documented custom-typography preservation semantics for the Integrated Demo shell.
 - Produces: final evidence across both target frameworks and manual Windows DPI checks.
 
-- [ ] **Step 1: Document the Integrated Demo typography-profile behavior**
+- [x] **Step 1: Document the Integrated Demo typography-profile behavior**
 
 Add a concise subsection under typography/design-system demo guidance that states:
 
@@ -1072,7 +1072,7 @@ Add a concise subsection under typography/design-system demo guidance that state
 
 Do not describe Base14/Base16 as new core-framework defaults or public theme presets.
 
-- [ ] **Step 2: Build the complete solution in Release configuration**
+- [x] **Step 2: Build the complete solution in Release configuration**
 
 ```powershell
 dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release
@@ -1080,7 +1080,7 @@ dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release
 
 Expected: successful builds for both `net48` and `net8.0-windows` projects with no new warnings introduced by this change.
 
-- [ ] **Step 3: Run the repository's bounded full test suite**
+- [x] **Step 3: Run the repository's bounded full test suite**
 
 ```powershell
 ./test.ps1
@@ -1088,7 +1088,7 @@ Expected: successful builds for both `net48` and `net8.0-windows` projects with 
 
 Expected: both target-framework suites pass; no hang dump, unexpected dialog, or DataError wait is produced.
 
-- [ ] **Step 4: Launch the Integrated Demo and execute the profile/theme interaction matrix**
+- [x] **Step 4: Launch the Integrated Demo and execute the profile/theme interaction matrix**
 
 Run the demo using the normal repository-supported launch path, for example:
 
@@ -1106,7 +1106,7 @@ Verify:
 6. install/drive the automated custom-typography scenario and confirm unrelated setting changes preserve it while Base font shows no selected preset;
 7. return to Base16 and confirm the visual baseline matches PR #62.
 
-- [ ] **Step 5: Perform the minimum-size and DPI visual matrix**
+- [x] **Step 5: Perform the minimum-size and DPI visual matrix**
 
 At minimum test:
 
@@ -1153,11 +1153,11 @@ Check for:
 
 If a visual issue is found, fix the owning layout/font-refresh logic and add a focused regression test before completing the task. Do not globally increase metrics as a shortcut unless evidence shows a framework metric itself is incorrect for all profiles.
 
-- [ ] **Step 6: Re-run focused typography tests after any visual-matrix fix**
+- [x] **Step 6: Re-run focused typography tests after any visual-matrix fix**
 
 Run both Integrated Demo typography fixtures on both TFMs with bounded hang detection, then run `./test.ps1` again if code changed after Step 3.
 
-- [ ] **Step 7: Commit documentation/final hardening**
+- [x] **Step 7: Commit documentation/final hardening**
 
 ```bash
 git add docs/DESIGN_SYSTEM.md

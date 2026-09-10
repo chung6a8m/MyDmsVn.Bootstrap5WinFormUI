@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -16,6 +17,8 @@ public sealed class AccordionDemoForm : DemoFormBase
     private readonly Button _expandAll = new Button();
     private readonly BootstrapAccordion _singleAccordion = new BootstrapAccordion();
     private readonly BootstrapAccordion _multipleFlushAccordion = new BootstrapAccordion();
+    private readonly List<Label> _semanticLabels = new List<Label>();
+    private Font? _semanticLabelFont;
     private int _dynamicItemNumber = 2;
 
     public AccordionDemoForm()
@@ -41,6 +44,12 @@ public sealed class AccordionDemoForm : DemoFormBase
         }
 
         base.Dispose(disposing);
+
+        if (disposing)
+        {
+            _semanticLabelFont?.Dispose();
+            _semanticLabelFont = null;
+        }
     }
 
     private void ConfigureLayout()
@@ -55,9 +64,9 @@ public sealed class AccordionDemoForm : DemoFormBase
         {
             AutoSize = true,
             Text = "Accordion — single/multiple open, flush, icons, keyboard and nested content",
-            Font = new Font(Font, FontStyle.Bold),
             Margin = new Padding(0, 0, 0, 8)
         };
+        RegisterSemanticLabel(title);
 
         var instructions = new Label
         {
@@ -199,16 +208,16 @@ public sealed class AccordionDemoForm : DemoFormBase
         };
     }
 
-    private static Label CreateSectionLabel(string text)
+    private Label CreateSectionLabel(string text)
     {
-        var typography = BootstrapThemeManager.CurrentTheme.Typography.Label;
-        return new Label
+        var label = new Label
         {
             AutoSize = true,
             Text = text,
-            Font = new Font(typography.FontFamilyName, typography.SizeInPoints, FontStyle.Bold),
             Margin = new Padding(0, 4, 0, 6)
         };
+        RegisterSemanticLabel(label);
+        return label;
     }
 
     private static void ConfigureButton(Button button, string text, EventHandler click)
@@ -227,6 +236,7 @@ public sealed class AccordionDemoForm : DemoFormBase
 
     private void ApplyTheme(BootstrapTheme theme)
     {
+        UpdateSemanticLabelFont(theme);
         BackColor = theme.Colors.Body;
         ForeColor = theme.Colors.Text;
         _root.BackColor = theme.Colors.Body;
@@ -241,6 +251,34 @@ public sealed class AccordionDemoForm : DemoFormBase
         }
 
         ApplyThemeRecursively(_root, theme);
+    }
+
+    private void RegisterSemanticLabel(Label label)
+    {
+        _semanticLabels.Add(label);
+        if (_semanticLabelFont is not null)
+        {
+            label.Font = _semanticLabelFont;
+        }
+    }
+
+    private void UpdateSemanticLabelFont(BootstrapTheme theme)
+    {
+        var token = theme.Typography.Label;
+        if (_semanticLabelFont is not null && DemoTypography.FontMatchesToken(_semanticLabelFont, token))
+        {
+            return;
+        }
+
+        var replacement = DemoTypography.CreateFont(token);
+        foreach (var label in _semanticLabels)
+        {
+            label.Font = replacement;
+        }
+
+        var previous = _semanticLabelFont;
+        _semanticLabelFont = replacement;
+        previous?.Dispose();
     }
 
     private static void ApplyThemeRecursively(Control root, BootstrapTheme theme)

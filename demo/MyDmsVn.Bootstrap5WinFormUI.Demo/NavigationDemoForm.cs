@@ -15,6 +15,8 @@ public sealed class NavigationDemoForm : DemoFormBase
     private readonly ImageList _images = new ImageList();
     private readonly List<BootstrapDropdown> _dropdowns = new List<BootstrapDropdown>();
     private readonly List<Font> _ownedFonts = new List<Font>();
+    private readonly List<Label> _sectionTitleLabels = new List<Label>();
+    private Font? _sectionTitleFont;
 
     public NavigationDemoForm()
     {
@@ -47,12 +49,15 @@ public sealed class NavigationDemoForm : DemoFormBase
         AddContentScenario();
         AddVariantScenario();
         AddDropdownScenarios();
+        UpdateSectionTitleFont(BootstrapThemeManager.CurrentTheme);
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
     }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
+            BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
             foreach (var dropdown in _dropdowns)
             {
                 dropdown.Dispose();
@@ -72,6 +77,8 @@ public sealed class NavigationDemoForm : DemoFormBase
             }
 
             _ownedFonts.Clear();
+            _sectionTitleFont?.Dispose();
+            _sectionTitleFont = null;
         }
     }
 
@@ -502,7 +509,7 @@ public sealed class NavigationDemoForm : DemoFormBase
         return page;
     }
 
-    private static TableLayoutPanel CreateSection(string title, string description, Control content)
+    private TableLayoutPanel CreateSection(string title, string description, Control content)
     {
         var panel = new TableLayoutPanel
         {
@@ -522,7 +529,7 @@ public sealed class NavigationDemoForm : DemoFormBase
             Text = title,
             Margin = new Padding(0, 0, 0, 2)
         };
-        titleLabel.Font = new Font(titleLabel.Font, FontStyle.Bold);
+        _sectionTitleLabels.Add(titleLabel);
         panel.Controls.Add(titleLabel, 0, 0);
         panel.Controls.Add(new Label
         {
@@ -532,5 +539,29 @@ public sealed class NavigationDemoForm : DemoFormBase
         }, 0, 1);
         panel.Controls.Add(content, 0, 2);
         return panel;
+    }
+
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        UpdateSectionTitleFont(e.NewTheme);
+    }
+
+    private void UpdateSectionTitleFont(BootstrapTheme theme)
+    {
+        var token = theme.Typography.Label;
+        if (_sectionTitleFont is not null && DemoTypography.FontMatchesToken(_sectionTitleFont, token))
+        {
+            return;
+        }
+
+        var replacement = DemoTypography.CreateFont(token);
+        foreach (var label in _sectionTitleLabels)
+        {
+            label.Font = replacement;
+        }
+
+        var previous = _sectionTitleFont;
+        _sectionTitleFont = replacement;
+        previous?.Dispose();
     }
 }
