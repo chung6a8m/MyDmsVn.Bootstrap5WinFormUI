@@ -3,11 +3,12 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class DataGridSelectEditingDemoForm : Form
+public sealed class DataGridSelectEditingDemoForm : DemoFormBase
 {
     private readonly BootstrapDataGridView _grid = new BootstrapDataGridView();
     private readonly Label _instructions = new Label();
@@ -19,7 +20,7 @@ public sealed class DataGridSelectEditingDemoForm : Form
     public DataGridSelectEditingDemoForm()
     {
         Text = "BootstrapDataGridView + BootstrapLookup Editing Demo";
-        StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(980, 620); MinimumSize = new Size(760, 460); AutoScaleMode = AutoScaleMode.Dpi;
+        StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(980, 620); MinimumSize = new Size(760, 460);
         SeedProducts(); ConfigureText(); ConfigureGrid(); CreateSampleRows();
         Controls.Add(_grid); Controls.Add(_status); Controls.Add(_instructions);
         BootstrapThemeManager.ThemeChanged += OnThemeChanged; ApplyTheme(BootstrapThemeManager.CurrentTheme);
@@ -27,7 +28,11 @@ public sealed class DataGridSelectEditingDemoForm : Form
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+        if (disposing)
+        {
+            BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+            _grid.DpiChangedAfterParent -= OnGridDpiChangedAfterParent;
+        }
         base.Dispose(disposing);
     }
 
@@ -51,7 +56,8 @@ public sealed class DataGridSelectEditingDemoForm : Form
     {
         _grid.Dock = DockStyle.Fill; _grid.AutoGenerateColumns = false; _grid.AllowUserToAddRows = true; _grid.AllowUserToDeleteRows = true;
         _grid.AllowUserToOrderColumns = false; _grid.SelectionMode = DataGridViewSelectionMode.CellSelect; _grid.MultiSelect = false;
-        _grid.EditMode = DataGridViewEditMode.EditOnEnter; _grid.RowHeadersVisible = false; _grid.RowTemplate.Height = 36; _grid.EmptyStateText = "No order lines.";
+        _grid.EditMode = DataGridViewEditMode.EditOnEnter; _grid.RowHeadersVisible = false; _grid.EmptyStateText = "No order lines.";
+        _grid.DpiChangedAfterParent += OnGridDpiChangedAfterParent;
 
         var product = new BootstrapLookupColumn
         {
@@ -84,6 +90,7 @@ public sealed class DataGridSelectEditingDemoForm : Form
         var total = TextColumn("LineTotalColumn", "Thành tiền", "LineTotal", 150, "N0"); total.ReadOnly = true; _grid.Columns.Add(total);
         _grid.CellValueChanged += (_, e) => { if (e.RowIndex >= 0 && (e.ColumnIndex == 2 || e.ColumnIndex == 3)) Recalculate(e.RowIndex); };
         _grid.DataError += (_, e) => { e.ThrowException = false; _status.Text = "Invalid edit value: " + (e.Exception?.Message ?? "Unknown data error."); };
+        DemoDataGridRowMetrics.Apply(_grid, BootstrapThemeManager.CurrentTheme);
         _grid.DataSource = _lines;
     }
 
@@ -107,10 +114,21 @@ public sealed class DataGridSelectEditingDemoForm : Form
     private static DataGridViewTextBoxColumn TextColumn(string name, string header, string member, int width, string format) => new DataGridViewTextBoxColumn
     { Name = name, HeaderText = header, DataPropertyName = member, Width = width, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = format, NullValue = "0" } };
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e) => ApplyTheme(e.NewTheme);
+    private void OnGridDpiChangedAfterParent(object? sender, EventArgs e)
+    {
+        var dpi = _grid.DeviceDpi > 0 ? _grid.DeviceDpi : DpiScaler.DefaultDpi;
+        RebindGridForDpi(dpi);
+    }
+
+    private void RebindGridForDpi(int dpi)
+    {
+        DemoDataGridRowMetrics.Rebind(_grid, BootstrapThemeManager.CurrentTheme, dpi);
+    }
     private void ApplyTheme(BootstrapTheme theme)
     {
         BackColor = theme.Colors.Body; ForeColor = theme.Colors.Text; _instructions.BackColor = theme.Colors.Body;
         _instructions.ForeColor = theme.Colors.MutedText; _status.BackColor = theme.Colors.SurfaceSecondary; _status.ForeColor = theme.Colors.Text;
+        DemoDataGridRowMetrics.Apply(_grid, theme);
     }
 
     private sealed class ProductOption

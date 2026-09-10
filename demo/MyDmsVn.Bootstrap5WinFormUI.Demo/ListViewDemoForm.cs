@@ -6,7 +6,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class ListViewDemoForm : Form
+public sealed class ListViewDemoForm : DemoFormBase
 {
     private readonly TabControl _tabs = new TabControl();
     private readonly ImageList _smallImages = new ImageList { ImageSize = new Size(16, 16) };

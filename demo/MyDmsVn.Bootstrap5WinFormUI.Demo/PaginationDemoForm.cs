@@ -3,19 +3,28 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class PaginationDemoForm : Form
+public sealed class PaginationDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
     private readonly BootstrapDataGridView _grid = new BootstrapDataGridView();
     private readonly BootstrapPagination _gridPagination = new BootstrapPagination();
     private readonly Label _gridStatus = new Label();
     private readonly DataTable _orders = CreateOrdersTable(53);
+    private readonly Font _sectionTitleFont;
 
     public PaginationDemoForm()
     {
+        var headingTypography = BootstrapThemeManager.CurrentTheme.Typography.HeadingSmall;
+        _sectionTitleFont = new Font(
+            headingTypography.FontFamilyName,
+            headingTypography.SizeInPoints,
+            headingTypography.Style,
+            GraphicsUnit.Point);
+
         Text = "BootstrapPagination Demo";
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(1080, 760);
@@ -28,6 +37,21 @@ public sealed class PaginationDemoForm : Form
         AddSizeScenarios();
         AddVisibilityScenario();
         AddGridScenario();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _grid.DpiChangedAfterParent -= OnGridDpiChangedAfterParent;
+        }
+
+        base.Dispose(disposing);
+
+        if (disposing)
+        {
+            _sectionTitleFont.Dispose();
+        }
     }
 
     private void ConfigureContent()
@@ -122,6 +146,7 @@ public sealed class PaginationDemoForm : Form
         _grid.AllowUserToDeleteRows = false;
         _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         _grid.EmptyStateText = "No rows for this page.";
+        _grid.DpiChangedAfterParent += OnGridDpiChangedAfterParent;
 
         _gridPagination.TotalItems = _orders.Rows.Count;
         _gridPagination.PageSize = 10;
@@ -149,8 +174,14 @@ public sealed class PaginationDemoForm : Form
             page.ImportRow(_orders.Rows[index]);
         }
 
+        DemoDataGridRowMetrics.Apply(_grid, BootstrapThemeManager.CurrentTheme);
         _grid.DataSource = page;
         _gridStatus.Text = $"Page {_gridPagination.CurrentPage} of {_gridPagination.TotalPages} — rows {start + 1}–{endExclusive} of {_orders.Rows.Count}.";
+    }
+
+    private void OnGridDpiChangedAfterParent(object? sender, EventArgs e)
+    {
+        ApplyGridPage();
     }
 
     private static BootstrapPagination CreatePagination(
@@ -169,14 +200,14 @@ public sealed class PaginationDemoForm : Form
         };
     }
 
-    private static TableLayoutPanel CreateScenario(string title, string description, BootstrapPagination pagination)
+    private TableLayoutPanel CreateScenario(string title, string description, BootstrapPagination pagination)
     {
         var panel = CreateSection(title, description);
         panel.Controls.Add(pagination, 0, 2);
         return panel;
     }
 
-    private static TableLayoutPanel CreateSection(string title, string description)
+    private TableLayoutPanel CreateSection(string title, string description)
     {
         var panel = new TableLayoutPanel
         {
@@ -193,7 +224,7 @@ public sealed class PaginationDemoForm : Form
         var titleLabel = new Label
         {
             AutoSize = true,
-            Font = new Font(FontFamily.GenericSansSerif, 9f, FontStyle.Bold),
+            Font = _sectionTitleFont,
             Text = title,
             Margin = new Padding(0, 0, 0, 2)
         };

@@ -9,7 +9,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class FeedbackDemoForm : Form
+public sealed class FeedbackDemoForm : DemoFormBase
 {
     private static readonly BootstrapVariant[] Variants =
     {
@@ -81,7 +81,6 @@ public sealed class FeedbackDemoForm : Form
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(900, 720);
         MinimumSize = new Size(640, 420);
-        AutoScaleMode = AutoScaleMode.Dpi;
 
         ConfigureContent();
         Controls.Add(_content);

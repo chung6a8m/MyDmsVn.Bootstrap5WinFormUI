@@ -7,7 +7,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class SpinnerDemoForm : Form
+public sealed class SpinnerDemoForm : DemoFormBase
 {
     private static readonly BootstrapVariant[] Variants =
     {
@@ -34,7 +34,6 @@ public sealed class SpinnerDemoForm : Form
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(880, 650);
         MinimumSize = new Size(680, 500);
-        AutoScaleMode = AutoScaleMode.Dpi;
 
         ConfigureToolbar();
         ConfigureContent();

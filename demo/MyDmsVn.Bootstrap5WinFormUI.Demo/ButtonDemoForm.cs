@@ -8,7 +8,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class ButtonDemoForm : Form
+public sealed class ButtonDemoForm : DemoFormBase
 {
     private static readonly BootstrapVariant[] Variants =
     {
@@ -31,7 +31,6 @@ public sealed class ButtonDemoForm : Form
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(920, 720);
         MinimumSize = new Size(720, 540);
-        AutoScaleMode = AutoScaleMode.Dpi;
 
         ConfigureContent();
         ConfigureStatus();

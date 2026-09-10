@@ -6,7 +6,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class MainForm : Form
+public sealed class MainForm : DemoFormBase
 {
     private readonly BootstrapSidebar _navigation = new BootstrapSidebar();
     private readonly Panel _workspace = new Panel();
@@ -20,6 +20,7 @@ public sealed class MainForm : Form
     private readonly Label _themeLabel = new Label();
     private readonly ComboBox _themeMode = new ComboBox();
     private readonly CheckBox _reducedMotion = new CheckBox();
+    private Font? _pageTitleFont;
     private Form? _currentPage;
     private bool _updatingSelection;
 
@@ -56,6 +57,12 @@ public sealed class MainForm : Form
         }
 
         base.Dispose(disposing);
+
+        if (disposing)
+        {
+            _pageTitleFont?.Dispose();
+            _pageTitleFont = null;
+        }
     }
 
     private void ConfigureWorkspace()
@@ -99,7 +106,8 @@ public sealed class MainForm : Form
         _pageTitle.AutoEllipsis = true;
         _pageTitle.TextAlign = ContentAlignment.BottomLeft;
         _pageTitle.AccessibleName = "Current demo page title";
-        _pageTitle.Font = new Font(_pageTitle.Font, FontStyle.Bold);
+        _pageTitleFont = new Font(Font, FontStyle.Bold);
+        _pageTitle.Font = _pageTitleFont;
 
         _pageDescription.Dock = DockStyle.Fill;
         _pageDescription.AutoEllipsis = true;
@@ -341,7 +349,7 @@ public sealed class MainForm : Form
             ? BootstrapThemeMode.Dark
             : BootstrapThemeMode.Light;
 
-        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode, _reducedMotion.Checked);
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(mode, _reducedMotion.Checked);
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)

@@ -18,7 +18,7 @@ internal sealed class DemoPageSection
     public Func<Form> CreateForm { get; }
 }
 
-internal sealed class DemoPageHostForm : Form
+internal sealed class DemoPageHostForm : DemoFormBase
 {
     private readonly TabControl _tabs = new TabControl();
 

@@ -7,7 +7,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class TreeViewDemoForm : Form
+public sealed class TreeViewDemoForm : DemoFormBase
 {
     private readonly Panel _topBar = new Panel();
     private readonly TabControl _tabs = new TabControl();

@@ -8,7 +8,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class NavigationDemoForm : Form
+public sealed class NavigationDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _content = new FlowLayoutPanel();
     private readonly Label _selectionStatus = new Label();

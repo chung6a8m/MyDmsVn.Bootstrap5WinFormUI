@@ -8,7 +8,7 @@ using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class SidebarDemoForm : Form
+public sealed class SidebarDemoForm : DemoFormBase
 {
     private readonly FlowLayoutPanel _toolbar = new FlowLayoutPanel();
     private readonly Panel _workspace = new Panel();
@@ -25,7 +25,6 @@ public sealed class SidebarDemoForm : Form
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(980, 700);
         MinimumSize = new Size(760, 520);
-        AutoScaleMode = AutoScaleMode.Dpi;
 
         ConfigureToolbar();
         ConfigureWorkspace();

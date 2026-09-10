@@ -3,11 +3,12 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-public sealed class DataGridDemoForm : Form
+public sealed class DataGridDemoForm : DemoFormBase
 {
     private const int LargeRowCount = 10000;
 
@@ -46,6 +47,7 @@ public sealed class DataGridDemoForm : Form
         if (disposing)
         {
             BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+            _grid.DpiChangedAfterParent -= OnGridDpiChangedAfterParent;
         }
 
         base.Dispose(disposing);
@@ -86,6 +88,7 @@ public sealed class DataGridDemoForm : Form
         _grid.MultiSelect = true;
         _grid.EmptyStateText = "No rows in this scenario.";
         _grid.LoadingText = "Loading records...";
+        _grid.DpiChangedAfterParent += OnGridDpiChangedAfterParent;
 
         _grid.Columns.Add(new DataGridViewTextBoxColumn
         {
@@ -220,6 +223,17 @@ public sealed class DataGridDemoForm : Form
         ApplyTheme(e.NewTheme);
     }
 
+    private void OnGridDpiChangedAfterParent(object? sender, EventArgs e)
+    {
+        var dpi = _grid.DeviceDpi > 0 ? _grid.DeviceDpi : DpiScaler.DefaultDpi;
+        RebindGridForDpi(dpi);
+    }
+
+    private void RebindGridForDpi(int dpi)
+    {
+        DemoDataGridRowMetrics.Rebind(_grid, BootstrapThemeManager.CurrentTheme, dpi);
+    }
+
     private void ApplyTheme(BootstrapTheme theme)
     {
         BackColor = theme.Colors.Body;
@@ -230,6 +244,7 @@ public sealed class DataGridDemoForm : Form
         _status.ForeColor = theme.Colors.Text;
         _instructions.BackColor = theme.Colors.Body;
         _instructions.ForeColor = theme.Colors.MutedText;
+        DemoDataGridRowMetrics.Apply(_grid, theme);
 
         foreach (var button in new[] { _sampleButton, _emptyButton, _largeButton, _loadingButton })
         {
