@@ -6,6 +6,7 @@ using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Demo;
+using MyDmsVn.Bootstrap5WinFormUI.Tests.Infrastructure;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
@@ -85,6 +86,40 @@ public sealed class DataGridDemoFormTests
             Assert.That(buttonTexts, Does.Contain("Load 10,000 rows"));
             Assert.That(buttonTexts, Does.Contain("Toggle loading"));
         }));
+    }
+
+    [Test]
+    public void ThemeChangePreservesRowSharingForTheLargeScenario()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(BootstrapThemeMode.Light);
+            var demoType = typeof(MainForm).Assembly.GetType("MyDmsVn.Bootstrap5WinFormUI.Demo.DataGridDemoForm");
+            using var form = (Form)Activator.CreateInstance(demoType!)!;
+            form.Show();
+            form.PerformLayout();
+
+            var grid = FindControls<BootstrapDataGridView>(form).Single();
+            DataGridViewTestGuard.FailOnDataError(grid);
+            FindControls<Button>(form).Single(button => button.Text == "Load 10,000 rows").PerformClick();
+            Application.DoEvents();
+            var unsharedCount = 0;
+            grid.RowUnshared += (_, _) => unsharedCount++;
+
+            BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(BootstrapThemeMode.Dark);
+            Application.DoEvents();
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(grid.Rows.Count, Is.EqualTo(10000));
+                Assert.That(unsharedCount, Is.Zero);
+            }));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
     }
 
     [Test]

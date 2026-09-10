@@ -89,6 +89,7 @@ public sealed class DataGridSelectEditingDemoForm : DemoFormBase
         var total = TextColumn("LineTotalColumn", "Thành tiền", "LineTotal", 150, "N0"); total.ReadOnly = true; _grid.Columns.Add(total);
         _grid.CellValueChanged += (_, e) => { if (e.RowIndex >= 0 && (e.ColumnIndex == 2 || e.ColumnIndex == 3)) Recalculate(e.RowIndex); };
         _grid.DataError += (_, e) => { e.ThrowException = false; _status.Text = "Invalid edit value: " + (e.Exception?.Message ?? "Unknown data error."); };
+        DemoDataGridRowMetrics.Apply(_grid, BootstrapThemeManager.CurrentTheme);
         _grid.DataSource = _lines;
     }
 

@@ -27,9 +27,5 @@ internal static class DemoDataGridRowMetrics
         var dpi = grid.DeviceDpi > 0 ? grid.DeviceDpi : DpiScaler.DefaultDpi;
         var height = Calculate(grid.Font, theme.Metrics, dpi);
         grid.RowTemplate.Height = height;
-        foreach (DataGridViewRow row in grid.Rows)
-        {
-            row.Height = height;
-        }
     }
 }
