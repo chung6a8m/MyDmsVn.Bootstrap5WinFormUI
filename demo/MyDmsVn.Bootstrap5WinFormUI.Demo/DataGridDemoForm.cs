@@ -3,6 +3,7 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
@@ -224,7 +225,13 @@ public sealed class DataGridDemoForm : DemoFormBase
 
     private void OnGridDpiChangedAfterParent(object? sender, EventArgs e)
     {
-        DemoDataGridRowMetrics.Apply(_grid, BootstrapThemeManager.CurrentTheme);
+        var dpi = _grid.DeviceDpi > 0 ? _grid.DeviceDpi : DpiScaler.DefaultDpi;
+        RebindGridForDpi(dpi);
+    }
+
+    private void RebindGridForDpi(int dpi)
+    {
+        DemoDataGridRowMetrics.Rebind(_grid, BootstrapThemeManager.CurrentTheme, dpi);
     }
 
     private void ApplyTheme(BootstrapTheme theme)

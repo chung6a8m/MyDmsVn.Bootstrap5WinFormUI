@@ -103,6 +103,41 @@ public sealed class DataGridSelectEditingDemoFormTests
         }
     }
 
+    [TestCase(144, 54)]
+    [TestCase(192, 72)]
+    public void PostBindDpiTransitionRecreatesEditableRowsBeforeOpeningTheLookupEditor(
+        int dpi,
+        int expectedHeight)
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            var theme = DemoThemeFactory.Create(BootstrapThemeMode.Light);
+            BootstrapThemeManager.CurrentTheme = theme;
+            using var form = CreateAndShow();
+            var grid = Find<BootstrapDataGridView>(form).Single();
+
+            InvokeDpiRebind(form, dpi);
+            Application.DoEvents();
+            grid.CurrentCell = grid.Rows[0].Cells["ProductColumn"];
+            Assert.That(grid.BeginEdit(true), Is.True);
+            Application.DoEvents();
+
+            var editor = (BootstrapLookupBox)grid.EditingControl!;
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(grid.EditMode, Is.EqualTo(DataGridViewEditMode.EditOnEnter));
+                Assert.That(grid.RowTemplate.Height, Is.EqualTo(expectedHeight));
+                Assert.That(grid.Rows.Cast<DataGridViewRow>().All(row => row.Height == expectedHeight), Is.True);
+                Assert.That(editor.Height, Is.LessThanOrEqualTo(grid.Rows[0].Height));
+            }));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
+    }
+
     [Test]
     public void EditingQuantityRecalculatesLineTotal()
     {
@@ -129,5 +164,12 @@ public sealed class DataGridSelectEditingDemoFormTests
             if (child is T match) yield return match;
             foreach (var nested in Find<T>(child)) yield return nested;
         }
+    }
+
+    private static void InvokeDpiRebind(Form form, int dpi)
+    {
+        var rebind = form.GetType().GetMethod("RebindGridForDpi", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(rebind, Is.Not.Null, "The demo must provide a post-bind DPI rebind path.");
+        rebind!.Invoke(form, new object[] { dpi });
     }
 }

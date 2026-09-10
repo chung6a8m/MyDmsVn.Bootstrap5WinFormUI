@@ -28,4 +28,24 @@ internal static class DemoDataGridRowMetrics
         var height = Calculate(grid.Font, theme.Metrics, dpi);
         grid.RowTemplate.Height = height;
     }
+
+    public static void Rebind(DataGridView grid, BootstrapTheme theme, int dpi)
+    {
+        if (grid is null) throw new ArgumentNullException(nameof(grid));
+        if (theme is null) throw new ArgumentNullException(nameof(theme));
+
+        var dataSource = grid.DataSource;
+        var editMode = grid.EditMode;
+        try
+        {
+            grid.EditMode = DataGridViewEditMode.EditProgrammatically;
+            grid.DataSource = null;
+            grid.RowTemplate.Height = Calculate(grid.Font, theme.Metrics, dpi);
+            grid.DataSource = dataSource;
+        }
+        finally
+        {
+            grid.EditMode = editMode;
+        }
+    }
 }

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
@@ -113,8 +114,16 @@ public sealed class DataGridSelectEditingDemoForm : DemoFormBase
     private static DataGridViewTextBoxColumn TextColumn(string name, string header, string member, int width, string format) => new DataGridViewTextBoxColumn
     { Name = name, HeaderText = header, DataPropertyName = member, Width = width, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = format, NullValue = "0" } };
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e) => ApplyTheme(e.NewTheme);
-    private void OnGridDpiChangedAfterParent(object? sender, EventArgs e) =>
-        DemoDataGridRowMetrics.Apply(_grid, BootstrapThemeManager.CurrentTheme);
+    private void OnGridDpiChangedAfterParent(object? sender, EventArgs e)
+    {
+        var dpi = _grid.DeviceDpi > 0 ? _grid.DeviceDpi : DpiScaler.DefaultDpi;
+        RebindGridForDpi(dpi);
+    }
+
+    private void RebindGridForDpi(int dpi)
+    {
+        DemoDataGridRowMetrics.Rebind(_grid, BootstrapThemeManager.CurrentTheme, dpi);
+    }
     private void ApplyTheme(BootstrapTheme theme)
     {
         BackColor = theme.Colors.Body; ForeColor = theme.Colors.Text; _instructions.BackColor = theme.Colors.Body;
