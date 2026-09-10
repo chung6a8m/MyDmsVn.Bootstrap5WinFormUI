@@ -107,8 +107,54 @@ public sealed class IntegratedDemoTypographyTests
     }
 
     [Test]
+    public void DemoFormBaseTracksBodyTypographyAcrossRuntimeProfileChanges()
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
+
+        using var form = new ButtonDemoForm();
+        var nativeLabel = FindControls<Label>(form).First();
+        var bootstrapButton = FindControls<BootstrapButton>(form).First();
+
+        AssertBodyTypography(form, nativeLabel, bootstrapButton, 12f);
+
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base14Px);
+        AssertBodyTypography(form, nativeLabel, bootstrapButton, 10.5f);
+
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Default);
+        AssertBodyTypography(form, nativeLabel, bootstrapButton, 9f);
+    }
+
+    [Test]
+    public void DemoFormBaseDoesNotReplaceOwnedFontWhenTypographyTokenIsUnchanged()
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base14Px);
+
+        using var form = new ButtonDemoForm();
+        var originalFont = form.Font;
+
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Dark,
+            DemoTypographyPreset.Base14Px,
+            reducedMotion: true);
+
+        Assert.That(form.Font, Is.SameAs(originalFont));
+    }
+
+    [Test]
     public void MainFormUsesBrowserEquivalentTwelvePointNativeBodyTypography()
     {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
+
         using var form = new MainForm();
 
         Assert.Multiple((Action)(() =>
@@ -223,5 +269,19 @@ public sealed class IntegratedDemoTypographyTests
             new BootstrapFontToken("Segoe UI", 10f, FontStyle.Bold),
             new BootstrapFontToken("Segoe UI", 12f, FontStyle.Bold),
             new BootstrapFontToken("Segoe UI", 15f, FontStyle.Bold));
+    }
+
+    private static void AssertBodyTypography(
+        Form form,
+        Label nativeLabel,
+        BootstrapButton bootstrapButton,
+        float expectedSize)
+    {
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(form.Font.SizeInPoints, Is.EqualTo(expectedSize).Within(0.001f));
+            Assert.That(nativeLabel.Font.SizeInPoints, Is.EqualTo(expectedSize).Within(0.001f));
+            Assert.That(bootstrapButton.Font.SizeInPoints, Is.EqualTo(expectedSize).Within(0.001f));
+        }));
     }
 }

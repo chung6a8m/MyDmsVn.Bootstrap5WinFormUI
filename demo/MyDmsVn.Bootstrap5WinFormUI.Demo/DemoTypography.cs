@@ -77,11 +77,6 @@ internal static class DemoTypography
             GraphicsUnit.Point);
     }
 
-    internal static Font CreateBodyFont()
-    {
-        return CreateFont(Base16Typography.Body);
-    }
-
     internal static bool FontMatchesToken(Font font, BootstrapFontToken token)
     {
         return string.Equals(font.Name, token.FontFamilyName, StringComparison.OrdinalIgnoreCase) &&
