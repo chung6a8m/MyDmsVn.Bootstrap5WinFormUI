@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -122,12 +123,12 @@ public sealed class IntegratedDemoTypographyLayoutTests
         }));
     }
 
-    [TestCase((int)DemoTypographyPreset.Default, "Body Segoe UI 9pt")]
-    [TestCase((int)DemoTypographyPreset.Base14Px, "Body Segoe UI 10.5pt")]
-    [TestCase((int)DemoTypographyPreset.Base16Px, "Body Segoe UI 12pt")]
+    [TestCase((int)DemoTypographyPreset.Default, 9f)]
+    [TestCase((int)DemoTypographyPreset.Base14Px, 10.5f)]
+    [TestCase((int)DemoTypographyPreset.Base16Px, 12f)]
     public void ThemePageSummaryReportsProfileBodyTypographyAndHasUsableBounds(
         int presetValue,
-        string expectedText)
+        float expectedSize)
     {
         BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
             BootstrapThemeMode.Light,
@@ -136,6 +137,7 @@ public sealed class IntegratedDemoTypographyLayoutTests
         form.CreateControl();
         form.PerformLayout();
 
+        var expectedText = FormatBodyTypography(expectedSize);
         var summary = FindControls<Label>(form)
             .Single(label => label.Text.Contains(expectedText));
 
@@ -144,6 +146,25 @@ public sealed class IntegratedDemoTypographyLayoutTests
             Assert.That(summary.ClientSize.Width, Is.GreaterThan(0));
             Assert.That(summary.ClientSize.Height, Is.GreaterThan(0));
         }));
+    }
+
+    [Test]
+    [SetCulture("vi-VN")]
+    public void ThemePageSummarySupportsCommaDecimalSeparatorCulture()
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base14Px);
+        using var form = new MainForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var expectedText = FormatBodyTypography(10.5f);
+        var summary = FindControls<Label>(form)
+            .Single(label => label.Text.Contains(expectedText));
+
+        Assert.That(expectedText, Is.EqualTo("Body Segoe UI 10,5pt"));
+        Assert.That(summary.Text, Does.Contain(expectedText));
     }
 
     [Test]
@@ -159,14 +180,19 @@ public sealed class IntegratedDemoTypographyLayoutTests
         var baseFont = FindControls<ComboBox>(form)
             .Single(combo => combo.AccessibleName == "Integrated demo base font profile");
         var summary = FindControls<Label>(form)
-            .Single(label => label.Text.Contains("Body Segoe UI 12pt"));
+            .Single(label => label.Text.Contains(FormatBodyTypography(12f)));
         var page = FindAncestorForm(summary);
 
         baseFont.SelectedIndex = 1;
-        AssertSameLivePage(form, page, summary, "Body Segoe UI 10.5pt", 10.5f);
+        AssertSameLivePage(form, page, summary, FormatBodyTypography(10.5f), 10.5f);
 
         baseFont.SelectedIndex = 0;
-        AssertSameLivePage(form, page, summary, "Body Segoe UI 9pt", 9f);
+        AssertSameLivePage(form, page, summary, FormatBodyTypography(9f), 9f);
+    }
+
+    private static string FormatBodyTypography(float sizeInPoints)
+    {
+        return $"Body Segoe UI {sizeInPoints.ToString("0.##", CultureInfo.CurrentCulture)}pt";
     }
 
     private static Form FindAncestorForm(Control control)
