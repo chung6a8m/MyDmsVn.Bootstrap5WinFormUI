@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -30,6 +31,79 @@ public sealed class IntegratedDemoTypographyTests
         {
             BootstrapThemeManager.CurrentTheme = _originalTheme;
         }
+    }
+
+    [Test]
+    public void DefaultPresetReusesExactFrameworkDefaultTypography()
+    {
+        var theme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Default);
+
+        Assert.That(theme.Typography, Is.SameAs(BootstrapThemeTypography.Default));
+    }
+
+    [TestCase((int)DemoTypographyPreset.Base14Px, 10.5f, 9.1875f, 10.5f, 13.125f, 15.75f)]
+    [TestCase((int)DemoTypographyPreset.Base16Px, 12f, 10.5f, 12f, 15f, 18f)]
+    public void DemoThemeFactoryCreatesRequestedTypographyProfile(
+        int presetValue,
+        float body,
+        float bodySmall,
+        float label,
+        float headingSmall,
+        float headingMedium)
+    {
+        var theme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            (DemoTypographyPreset)presetValue);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(theme.Typography.Body.FontFamilyName, Is.EqualTo("Segoe UI"));
+            Assert.That(theme.Typography.Body.SizeInPoints, Is.EqualTo(body).Within(0.001f));
+            Assert.That(theme.Typography.BodySmall.SizeInPoints, Is.EqualTo(bodySmall).Within(0.001f));
+            Assert.That(theme.Typography.Label.SizeInPoints, Is.EqualTo(label).Within(0.001f));
+            Assert.That(theme.Typography.Label.Style, Is.EqualTo(FontStyle.Bold));
+            Assert.That(theme.Typography.HeadingSmall.SizeInPoints, Is.EqualTo(headingSmall).Within(0.001f));
+            Assert.That(theme.Typography.HeadingMedium.SizeInPoints, Is.EqualTo(headingMedium).Within(0.001f));
+        }));
+    }
+
+    [Test]
+    public void ExistingPublicFactoryOverloadStillMeansBase16Px()
+    {
+        var theme = DemoThemeFactory.Create(BootstrapThemeMode.Dark, reducedMotion: true);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(theme.Mode, Is.EqualTo(BootstrapThemeMode.Dark));
+            Assert.That(theme.ReducedMotion, Is.True);
+            Assert.That(theme.Typography.Body.SizeInPoints, Is.EqualTo(12f).Within(0.001f));
+        }));
+    }
+
+    [Test]
+    public void FactoryCanPreserveArbitraryTypographyByReference()
+    {
+        var custom = CreateCustomTypography();
+
+        var theme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Dark,
+            custom,
+            reducedMotion: true);
+
+        Assert.That(theme.Typography, Is.SameAs(custom));
+    }
+
+    [Test]
+    public void FactoryRejectsUnknownDemoTypographyPreset()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+        {
+            _ = DemoThemeFactory.Create(
+                BootstrapThemeMode.Light,
+                (DemoTypographyPreset)999);
+        }));
     }
 
     [Test]
@@ -139,5 +213,15 @@ public sealed class IntegratedDemoTypographyTests
                 yield return nested;
             }
         }
+    }
+
+    private static BootstrapThemeTypography CreateCustomTypography()
+    {
+        return new BootstrapThemeTypography(
+            new BootstrapFontToken("Segoe UI", 10f),
+            new BootstrapFontToken("Segoe UI", 9f),
+            new BootstrapFontToken("Segoe UI", 10f, FontStyle.Bold),
+            new BootstrapFontToken("Segoe UI", 12f, FontStyle.Bold),
+            new BootstrapFontToken("Segoe UI", 15f, FontStyle.Bold));
     }
 }

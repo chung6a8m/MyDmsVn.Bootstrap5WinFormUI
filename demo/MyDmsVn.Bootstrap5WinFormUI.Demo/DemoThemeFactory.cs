@@ -17,11 +17,30 @@ public static class DemoThemeFactory
         BootstrapThemeMode mode,
         bool reducedMotion = false)
     {
+        return Create(mode, DemoTypographyPreset.Base16Px, reducedMotion);
+    }
+
+    internal static BootstrapTheme Create(
+        BootstrapThemeMode mode,
+        DemoTypographyPreset typographyPreset,
+        bool reducedMotion = false)
+    {
+        return Create(
+            mode,
+            DemoTypography.CreateThemeTypography(typographyPreset),
+            reducedMotion);
+    }
+
+    internal static BootstrapTheme Create(
+        BootstrapThemeMode mode,
+        BootstrapThemeTypography typography,
+        bool reducedMotion = false)
+    {
         return new BootstrapTheme(
             mode,
             BootstrapThemeColors.CreateDefault(mode),
             BootstrapThemeMetrics.Default,
-            DemoTypography.CreateThemeTypography(),
+            typography,
             reducedMotion);
     }
 }
