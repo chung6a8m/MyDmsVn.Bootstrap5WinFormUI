@@ -64,6 +64,11 @@ public sealed class IntegratedDemoTypographyLayoutTests
         AssertContained(themeLabel, settings);
         AssertContained(themeMode, settings);
         AssertContained(reducedMotion, settings);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(pageTitle.Font.SizeInPoints, Is.EqualTo(12f).Within(0.01f));
+            Assert.That(pageTitle.Font.Bold, Is.True);
+        }));
     }
 
     [Test]

@@ -20,6 +20,7 @@ public sealed class MainForm : DemoFormBase
     private readonly Label _themeLabel = new Label();
     private readonly ComboBox _themeMode = new ComboBox();
     private readonly CheckBox _reducedMotion = new CheckBox();
+    private Font? _pageTitleFont;
     private Form? _currentPage;
     private bool _updatingSelection;
 
@@ -56,6 +57,12 @@ public sealed class MainForm : DemoFormBase
         }
 
         base.Dispose(disposing);
+
+        if (disposing)
+        {
+            _pageTitleFont?.Dispose();
+            _pageTitleFont = null;
+        }
     }
 
     private void ConfigureWorkspace()
@@ -99,7 +106,8 @@ public sealed class MainForm : DemoFormBase
         _pageTitle.AutoEllipsis = true;
         _pageTitle.TextAlign = ContentAlignment.BottomLeft;
         _pageTitle.AccessibleName = "Current demo page title";
-        _pageTitle.Font = new Font(_pageTitle.Font, FontStyle.Bold);
+        _pageTitleFont = new Font(Font, FontStyle.Bold);
+        _pageTitle.Font = _pageTitleFont;
 
         _pageDescription.Dock = DockStyle.Fill;
         _pageDescription.AutoEllipsis = true;

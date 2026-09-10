@@ -6,12 +6,14 @@ using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Demo;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Demo;
 
 [TestFixture]
 [Apartment(ApartmentState.STA)]
+[NonParallelizable]
 public sealed class DataGridDemoFormTests
 {
     [Test]
@@ -34,6 +36,35 @@ public sealed class DataGridDemoFormTests
             Assert.That(table, Is.Not.Null, "Demo should use a real tabular binding source.");
             Assert.That(table!.Rows.Count, Is.GreaterThan(0), "Demo should start with sample rows.");
         }));
+    }
+
+    [Test]
+    public void BoundRowsFitTheDemoBodyFontAndBootstrapControlMetrics()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(BootstrapThemeMode.Light);
+            var demoType = typeof(MainForm).Assembly.GetType("MyDmsVn.Bootstrap5WinFormUI.Demo.DataGridDemoForm");
+            using var form = (Form)Activator.CreateInstance(demoType!)!;
+            form.CreateControl();
+            form.PerformLayout();
+
+            var grid = FindControls<BootstrapDataGridView>(form).Single();
+            var dpi = grid.DeviceDpi > 0 ? grid.DeviceDpi : 96;
+            var expectedMinimum = (int)Math.Round(36d * dpi / 96d, MidpointRounding.AwayFromZero);
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(grid.Font.SizeInPoints, Is.EqualTo(12f).Within(0.01f));
+                Assert.That(grid.RowTemplate.Height, Is.GreaterThanOrEqualTo(expectedMinimum));
+                Assert.That(grid.Rows.Cast<DataGridViewRow>().All(row => row.Height >= expectedMinimum), Is.True);
+            }));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
     }
 
     [Test]

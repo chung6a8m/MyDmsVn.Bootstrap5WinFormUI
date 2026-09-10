@@ -27,7 +27,11 @@ public sealed class DataGridSelectEditingDemoForm : DemoFormBase
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+        if (disposing)
+        {
+            BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+            _grid.DpiChangedAfterParent -= OnGridDpiChangedAfterParent;
+        }
         base.Dispose(disposing);
     }
 
@@ -51,7 +55,8 @@ public sealed class DataGridSelectEditingDemoForm : DemoFormBase
     {
         _grid.Dock = DockStyle.Fill; _grid.AutoGenerateColumns = false; _grid.AllowUserToAddRows = true; _grid.AllowUserToDeleteRows = true;
         _grid.AllowUserToOrderColumns = false; _grid.SelectionMode = DataGridViewSelectionMode.CellSelect; _grid.MultiSelect = false;
-        _grid.EditMode = DataGridViewEditMode.EditOnEnter; _grid.RowHeadersVisible = false; _grid.RowTemplate.Height = 36; _grid.EmptyStateText = "No order lines.";
+        _grid.EditMode = DataGridViewEditMode.EditOnEnter; _grid.RowHeadersVisible = false; _grid.EmptyStateText = "No order lines.";
+        _grid.DpiChangedAfterParent += OnGridDpiChangedAfterParent;
 
         var product = new BootstrapLookupColumn
         {
@@ -107,10 +112,13 @@ public sealed class DataGridSelectEditingDemoForm : DemoFormBase
     private static DataGridViewTextBoxColumn TextColumn(string name, string header, string member, int width, string format) => new DataGridViewTextBoxColumn
     { Name = name, HeaderText = header, DataPropertyName = member, Width = width, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight, Format = format, NullValue = "0" } };
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e) => ApplyTheme(e.NewTheme);
+    private void OnGridDpiChangedAfterParent(object? sender, EventArgs e) =>
+        DemoDataGridRowMetrics.Apply(_grid, BootstrapThemeManager.CurrentTheme);
     private void ApplyTheme(BootstrapTheme theme)
     {
         BackColor = theme.Colors.Body; ForeColor = theme.Colors.Text; _instructions.BackColor = theme.Colors.Body;
         _instructions.ForeColor = theme.Colors.MutedText; _status.BackColor = theme.Colors.SurfaceSecondary; _status.ForeColor = theme.Colors.Text;
+        DemoDataGridRowMetrics.Apply(_grid, theme);
     }
 
     private sealed class ProductOption

@@ -46,6 +46,7 @@ public sealed class DataGridDemoForm : DemoFormBase
         if (disposing)
         {
             BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+            _grid.DpiChangedAfterParent -= OnGridDpiChangedAfterParent;
         }
 
         base.Dispose(disposing);
@@ -86,6 +87,7 @@ public sealed class DataGridDemoForm : DemoFormBase
         _grid.MultiSelect = true;
         _grid.EmptyStateText = "No rows in this scenario.";
         _grid.LoadingText = "Loading records...";
+        _grid.DpiChangedAfterParent += OnGridDpiChangedAfterParent;
 
         _grid.Columns.Add(new DataGridViewTextBoxColumn
         {
@@ -220,6 +222,11 @@ public sealed class DataGridDemoForm : DemoFormBase
         ApplyTheme(e.NewTheme);
     }
 
+    private void OnGridDpiChangedAfterParent(object? sender, EventArgs e)
+    {
+        DemoDataGridRowMetrics.Apply(_grid, BootstrapThemeManager.CurrentTheme);
+    }
+
     private void ApplyTheme(BootstrapTheme theme)
     {
         BackColor = theme.Colors.Body;
@@ -230,6 +237,7 @@ public sealed class DataGridDemoForm : DemoFormBase
         _status.ForeColor = theme.Colors.Text;
         _instructions.BackColor = theme.Colors.Body;
         _instructions.ForeColor = theme.Colors.MutedText;
+        DemoDataGridRowMetrics.Apply(_grid, theme);
 
         foreach (var button in new[] { _sampleButton, _emptyButton, _largeButton, _loadingButton })
         {

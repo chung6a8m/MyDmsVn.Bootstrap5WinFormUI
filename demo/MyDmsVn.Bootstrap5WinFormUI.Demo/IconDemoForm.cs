@@ -103,12 +103,13 @@ internal sealed class IconDemoForm : DemoFormBase
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.Clear(_theme.Colors.Body);
 
-            var columnCount = ClientSize.Width >= 760 ? 3 : 2;
-            var spacing = 12;
-            var outer = 16;
+            var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+            var columnCount = ClientSize.Width >= DpiScaler.Scale(760, dpi) ? 3 : 2;
+            var spacing = DpiScaler.Scale(12, dpi);
+            var outer = DpiScaler.Scale(16, dpi);
             var availableWidth = Math.Max(1, ClientSize.Width - (outer * 2) - ((columnCount - 1) * spacing));
-            var cardWidth = Math.Max(140, availableWidth / columnCount);
-            var cardHeight = 132;
+            var cardWidth = Math.Max(DpiScaler.Scale(140, dpi), availableWidth / columnCount);
+            var cardHeight = DpiScaler.Scale(132, dpi);
 
             for (var index = 0; index < Items.Length; index++)
             {
@@ -120,26 +121,21 @@ internal sealed class IconDemoForm : DemoFormBase
                     cardWidth,
                     cardHeight);
 
-                DrawItem(e.Graphics, Items[index], bounds);
+                DrawItem(e.Graphics, Items[index], bounds, dpi);
             }
         }
 
-        private void DrawItem(Graphics graphics, PreviewItem item, Rectangle bounds)
+        private void DrawItem(Graphics graphics, PreviewItem item, Rectangle bounds, int dpi)
         {
-            using var path = RoundedPath.Create(bounds, new CornerRadius(_theme.Metrics.Radius));
+            using var path = RoundedPath.Create(
+                bounds,
+                new CornerRadius(DpiScaler.Scale(_theme.Metrics.Radius, dpi)));
             using var surfaceBrush = new SolidBrush(_theme.Colors.Surface);
-            using var borderPen = new Pen(_theme.Colors.Border, Math.Max(1, _theme.Metrics.BorderWidth));
+            using var borderPen = new Pen(
+                _theme.Colors.Border,
+                Math.Max(1, DpiScaler.Scale(_theme.Metrics.BorderWidth, dpi)));
             graphics.FillPath(surfaceBrush, path);
             graphics.DrawPath(borderPen, path);
-
-            var iconSize = Math.Min(48, Math.Max(28, bounds.Height - 72));
-            var iconBounds = new Rectangle(
-                bounds.Left + ((bounds.Width - iconSize) / 2),
-                bounds.Top + 16,
-                iconSize,
-                iconSize);
-
-            var rendered = _renderer.TryRender(graphics, item.Descriptor, iconBounds, _theme.Colors.Primary);
 
             using var titleFont = new Font(
                 _theme.Typography.Body.FontFamilyName,
@@ -149,15 +145,18 @@ internal sealed class IconDemoForm : DemoFormBase
                 _theme.Typography.BodySmall.FontFamilyName,
                 _theme.Typography.BodySmall.SizeInPoints,
                 _theme.Typography.BodySmall.Style);
-
-            var titleBounds = new Rectangle(bounds.Left + 8, iconBounds.Bottom + 8, bounds.Width - 16, 24);
-            var sourceBounds = new Rectangle(bounds.Left + 8, titleBounds.Bottom, bounds.Width - 16, 22);
+            var layout = IconPreviewItemLayout.Calculate(graphics, bounds, dpi, titleFont, sourceFont);
+            var rendered = _renderer.TryRender(
+                graphics,
+                item.Descriptor,
+                layout.IconBounds,
+                _theme.Colors.Primary);
 
             TextRenderer.DrawText(
                 graphics,
                 item.Title,
                 titleFont,
-                titleBounds,
+                layout.TitleBounds,
                 _theme.Colors.Text,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
 
@@ -166,7 +165,7 @@ internal sealed class IconDemoForm : DemoFormBase
                 graphics,
                 sourceText,
                 sourceFont,
-                sourceBounds,
+                layout.SourceBounds,
                 _theme.Colors.MutedText,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
         }
