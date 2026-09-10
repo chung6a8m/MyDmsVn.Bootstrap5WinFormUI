@@ -4,7 +4,7 @@
 
 **Goal:** Add an Integrated Demo `Base font` selector beside the existing Light/Dark theme selector so the demo can switch at runtime among `Default`, `Base 14px`, and `Base 16px` typography profiles while preserving the Base 16px startup behavior introduced by PR #62.
 
-**Architecture:** Treat theme mode, typography profile, and reduced-motion preference as three independent inputs that are composed into one immutable `BootstrapTheme` and published only through `BootstrapThemeManager.CurrentTheme`. Keep all profile definitions in demo-scoped typography infrastructure, reuse `BootstrapThemeTypography.Default` for the framework-default profile, and make every demo-owned native/cached font react to `ThemeChanged` without recreating demo pages. Do not change the framework's core default typography or add a second global typography manager/event channel.
+**Architecture:** Treat theme mode, typography profile, and reduced-motion preference as independent inputs composed into one immutable `BootstrapTheme` and published only through `BootstrapThemeManager.CurrentTheme`. Keep profile definitions and preset APIs internal to the demo assembly, reuse `BootstrapThemeTypography.Default` for the framework-default profile, preserve an externally installed custom typography object when the user changes only Theme or Reduced motion, and make every demo-owned native/cached font react to `ThemeChanged` without recreating demo pages. Do not change the framework's core default typography or add a second global typography manager/event channel.
 
 **Tech Stack:** C#, native WinForms, `net48;net8.0-windows`, existing `BootstrapTheme`, `BootstrapThemeManager`, `BootstrapThemeTypography`, `BootstrapFontToken`, Integrated Demo project, NUnit 4, STA WinForms tests.
 
@@ -15,10 +15,13 @@
 - Read `README.md`, `AI_CONTEXT.md`, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/COMPATIBILITY.md`, `docs/TESTING.md`, `docs/WINFORMS_TEST_EXECUTION.md`, and relevant design-system/demo documentation before changing product/demo code, as required by `AGENTS.md`.
 - Keep root namespace `MyDmsVn.Bootstrap5WinFormUI` and project targets `net48;net8.0-windows` unchanged.
 - This feature belongs to the Integrated Demo. Do **not** change `BootstrapThemeTypography.Default`, `BootstrapTheme.CreateDefault(...)`, or the default typography of the core package.
-- Keep Light/Dark mode, typography profile, and reduced motion independent. The selected typography profile must survive Light/Dark and reduced-motion changes, and changing typography must preserve the current mode and reduced-motion value.
+- Do not expose demo implementation details merely to make tests easier. `DemoTypographyPreset` and factory overloads that accept demo presets/arbitrary typography must remain `internal`; tests receive access through `InternalsVisibleTo` for `MyDmsVn.Bootstrap5WinFormUI.Tests`.
+- Keep Light/Dark mode, typography profile, and reduced motion independent. A known selected typography preset must survive Light/Dark and reduced-motion changes, and changing typography must preserve the current mode and reduced-motion value.
+- If an external caller installs a valid `BootstrapTheme` whose `Typography` object is not one of the three known demo profiles, the Base font selector must show no selected demo preset (`SelectedIndex == -1`). Theme-mode and reduced-motion changes must preserve that exact typography object by reference. Selecting one of the three Base font items is the explicit action that replaces custom typography with a demo preset.
 - Publish all combinations as a complete immutable `BootstrapTheme` through `BootstrapThemeManager.CurrentTheme`. Do **not** add `DemoTypographyManager`, a second global event, static mutable font-size state, or per-control font-size settings.
+- Each user change to Theme, Base font, or Reduced motion must publish exactly one replacement theme and therefore produce exactly one `BootstrapThemeManager.ThemeChanged` notification. Selector synchronization caused by that event must not republish.
 - The normal Integrated Demo startup must remain **Base 16px** so this change does not silently revert PR #62 behavior.
-- The selector label is `Base font`; its items, in order, are exactly `Default`, `Base 14px`, and `Base 16px`.
+- The selector label is `Base font`; its items, in order, are exactly `Default`, `Base 14px`, and `Base 16px`. Do not add a fourth `Custom` item; unknown external typography is represented by no selected demo preset.
 - `Default` must reuse the exact framework typography object `BootstrapThemeTypography.Default`; do not copy its current numeric values into demo constants.
 - `Base 16px` must preserve the typography hierarchy introduced by PR #62: Segoe UI; Body `12f`; BodySmall `10.5f`; Label `12f` Bold; HeadingSmall `15f` Bold; HeadingMedium `18f` Bold.
 - `Base 14px` is the initial 14/16 proportional version of the PR #62 profile: Segoe UI; Body `10.5f`; BodySmall `9.1875f`; Label `10.5f` Bold; HeadingSmall `13.125f` Bold; HeadingMedium `15.75f` Bold. Keep these values centralized in the profile definition; controls must never calculate `14f / 16f` themselves.
@@ -48,6 +51,7 @@ The implementation starts from these facts on `main`:
 7. `ThemeDemoForm` already rebuilds its summary from `theme.Typography`, so it should update automatically once profile changes are published correctly.
 8. `PaginationDemoForm` currently snapshots `HeadingSmall` into `_sectionTitleFont` in its constructor. That cached font would become stale after a runtime typography-profile switch and therefore needs explicit refresh logic.
 9. PR #62 added `IntegratedDemoTypographyTests` and `IntegratedDemoTypographyLayoutTests`; extend these tests instead of creating a competing test architecture.
+10. `BootstrapThemeManager.CurrentTheme` accepts any valid immutable `BootstrapTheme`, not only themes created by `DemoThemeFactory`, so MainForm must not silently overwrite an externally installed custom typography object when the user changes an unrelated setting.
 
 ---
 
@@ -63,6 +67,8 @@ Theme  [ Light ▼ ]   Base font  [ Base 16px ▼ ]   ☐ Reduced motion
 
 The typography selector must be a native `ComboBox` with `DropDownStyle = ComboBoxStyle.DropDownList`. Give it `AccessibleName = "Integrated demo base font profile"` so tests and accessibility tooling do not have to identify it only from item contents.
 
+For an externally installed custom typography object that does not match a known demo profile, the same control remains present but has `SelectedIndex == -1`. Do not invent a `Custom` item. While this state is active, Theme and Reduced motion edits preserve the exact current `BootstrapThemeTypography` instance. Choosing `Default`, `Base 14px`, or `Base 16px` explicitly exits the custom state.
+
 ### Profile matrix
 
 | Selector item | `Typography.Body` | `BodySmall` | `Label` | `HeadingSmall` | `HeadingMedium` | Meaning |
@@ -73,7 +79,7 @@ The typography selector must be a native `ComboBox` with `DropDownStyle = ComboB
 
 ### Combination matrix
 
-All six Light/Dark + typography combinations must be valid, with reduced motion independently on or off:
+All six Light/Dark + known typography combinations must be valid, with reduced motion independently on or off:
 
 ```text
 Light + Default
@@ -84,7 +90,7 @@ Dark  + Base 14px
 Dark  + Base 16px
 ```
 
-Changing one selector must not reset either of the other two settings.
+Additionally, Light/Dark and reduced-motion changes must be valid while an arbitrary external typography object is installed. Changing one setting must not reset another setting merely because MainForm cannot map that typography object to a demo preset.
 
 ---
 
@@ -92,17 +98,18 @@ Changing one selector must not reset either of the other two settings.
 
 ### Create
 
-- `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoTypographyPreset.cs` — demo-only enum defining the three selectable profiles.
+- `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoTypographyPreset.cs` — **internal** demo-only enum defining the three selectable profiles.
+- `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/Properties/AssemblyInfo.cs` — grants the test assembly friend access to demo internals without widening the demo's public API.
 
 ### Modify
 
 - `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoTypography.cs` — central immutable profile definitions, profile lookup, and demo-owned `Font` creation/comparison helpers.
-- `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoThemeFactory.cs` — compose requested mode + typography preset + reduced motion while preserving the existing Base 16px overload behavior.
+- `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoThemeFactory.cs` — compose mode + typography + reduced motion while preserving the existing public Base 16px overload behavior; new preset/custom-typography overloads remain internal.
 - `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoFormBase.cs` — synchronize the native inherited body font with `theme.Typography.Body` on runtime theme changes and dispose it safely.
-- `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs` — add the `Base font` selector, compose all three settings, synchronize selector state, theme the new header controls, and refresh the cached page-title semantic font.
+- `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs` — add the `Base font` selector, preserve unknown external typography on unrelated setting changes, synchronize selector state, prevent recursive republishing, theme the new header controls, and refresh the cached page-title semantic font.
 - `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/PaginationDemoForm.cs` — refresh the cached HeadingSmall font and all section-title labels when the typography profile changes.
 - `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/Program.cs` — make Base 16px startup selection explicit rather than depending only on an overload default.
-- `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/IntegratedDemoTypographyTests.cs` — profile/factory/selector/runtime font regression coverage.
+- `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/IntegratedDemoTypographyTests.cs` — profile/factory/selector/runtime font/custom-typography/single-publication regression coverage.
 - `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/IntegratedDemoTypographyLayoutTests.cs` — parameterized containment/clipping checks for all profiles and shell sizes.
 - `docs/DESIGN_SYSTEM.md` — document that Integrated Demo offers three evaluation profiles while core framework defaults remain unchanged.
 
@@ -112,23 +119,36 @@ Changing one selector must not reset either of the other two settings.
 
 ---
 
-### Task 1: Introduce the three demo typography profiles and theme-factory contract
+### Task 1: Introduce internal demo typography profiles and theme-factory contracts
 
 **Files:**
 - Create: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoTypographyPreset.cs`
+- Create: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/Properties/AssemblyInfo.cs`
 - Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoTypography.cs`
 - Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoThemeFactory.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/IntegratedDemoTypographyTests.cs`
 
 **Interfaces:**
-- Produces: `public enum DemoTypographyPreset { Default, Base14Px, Base16Px }` in the demo assembly.
+- Produces: `internal enum DemoTypographyPreset { Default, Base14Px, Base16Px }` in the demo assembly.
+- Produces: friend access from `MyDmsVn.Bootstrap5WinFormUI.Tests` to demo internals; no new public type is introduced merely for tests.
 - Produces: `DemoTypography.CreateThemeTypography(DemoTypographyPreset preset)` returning the immutable typography object for the requested preset.
 - Produces: `DemoTypography.TryGetPreset(BootstrapThemeTypography typography, out DemoTypographyPreset preset)` for MainForm synchronization of known demo profiles.
 - Produces: `DemoTypography.CreateFont(BootstrapFontToken token)` and `DemoTypography.FontMatchesToken(Font font, BootstrapFontToken token)` for deterministic demo-owned GDI font management.
-- Preserves: existing `DemoThemeFactory.Create(BootstrapThemeMode mode, bool reducedMotion = false)` behavior as Base 16px.
-- Adds: `DemoThemeFactory.Create(BootstrapThemeMode mode, DemoTypographyPreset typographyPreset, bool reducedMotion = false)`.
+- Preserves: existing **public** `DemoThemeFactory.Create(BootstrapThemeMode mode, bool reducedMotion = false)` behavior as Base 16px.
+- Adds internally: `DemoThemeFactory.Create(BootstrapThemeMode mode, DemoTypographyPreset typographyPreset, bool reducedMotion = false)`.
+- Adds internally: `DemoThemeFactory.Create(BootstrapThemeMode mode, BootstrapThemeTypography typography, bool reducedMotion = false)` so MainForm can preserve an arbitrary current typography object while changing Theme or Reduced motion.
 
-- [ ] **Step 1: Add failing factory/profile tests before changing the demo implementation**
+- [ ] **Step 1: Add friend-assembly access and failing factory/profile tests before changing implementation**
+
+Create `Properties/AssemblyInfo.cs`:
+
+```csharp
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("MyDmsVn.Bootstrap5WinFormUI.Tests")]
+```
+
+Do not make `DemoTypographyPreset`, `DemoTypography`, or the new factory overloads public for test access.
 
 Extend `IntegratedDemoTypographyTests` with focused tests equivalent to:
 
@@ -168,7 +188,7 @@ public void DemoThemeFactoryCreatesRequestedTypographyProfile(
 }
 
 [Test]
-public void ExistingFactoryOverloadStillMeansBase16Px()
+public void ExistingPublicFactoryOverloadStillMeansBase16Px()
 {
     var theme = DemoThemeFactory.Create(BootstrapThemeMode.Dark, reducedMotion: true);
 
@@ -179,11 +199,29 @@ public void ExistingFactoryOverloadStillMeansBase16Px()
         Assert.That(theme.Typography.Body.SizeInPoints, Is.EqualTo(12f).Within(0.001f));
     }));
 }
+
+[Test]
+public void FactoryCanPreserveArbitraryTypographyByReference()
+{
+    var custom = new BootstrapThemeTypography(
+        new BootstrapFontToken("Segoe UI", 10f),
+        new BootstrapFontToken("Segoe UI", 9f),
+        new BootstrapFontToken("Segoe UI", 10f, FontStyle.Bold),
+        new BootstrapFontToken("Segoe UI", 12f, FontStyle.Bold),
+        new BootstrapFontToken("Segoe UI", 15f, FontStyle.Bold));
+
+    var theme = DemoThemeFactory.Create(
+        BootstrapThemeMode.Dark,
+        custom,
+        reducedMotion: true);
+
+    Assert.That(theme.Typography, Is.SameAs(custom));
+}
 ```
 
-Also add a test that an out-of-range `DemoTypographyPreset` passed to the new overload throws `ArgumentOutOfRangeException` rather than silently falling back.
+Also add a test that an out-of-range `DemoTypographyPreset` passed to the internal preset overload throws `ArgumentOutOfRangeException` rather than silently falling back.
 
-- [ ] **Step 2: Run the focused tests and confirm they fail for the missing enum/overload**
+- [ ] **Step 2: Run the focused tests and confirm the missing enum/overloads fail**
 
 Run on Windows:
 
@@ -194,19 +232,16 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   --blame-hang --blame-hang-timeout 5m
 ```
 
-Expected: compilation/test failure because `DemoTypographyPreset` and the new factory overload do not exist yet.
+Expected: compilation/test failure because `DemoTypographyPreset` and the new internal factory overloads do not exist yet.
 
-- [ ] **Step 3: Add `DemoTypographyPreset`**
+- [ ] **Step 3: Add the internal `DemoTypographyPreset`**
 
 Create:
 
 ```csharp
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
-/// <summary>
-/// Identifies the typography profiles that can be previewed by the Integrated Demo.
-/// </summary>
-public enum DemoTypographyPreset
+internal enum DemoTypographyPreset
 {
     Default = 0,
     Base14Px = 1,
@@ -214,11 +249,11 @@ public enum DemoTypographyPreset
 }
 ```
 
-This type is public only because the demo project is referenced by the test project and `DemoThemeFactory` is already public. It is **not** a public API of the core `MyDmsVn.Bootstrap5WinFormUI` package.
+This is demo implementation state, not public API. Tests compile against it only because of the explicit friend-assembly declaration from Step 1.
 
 - [ ] **Step 4: Refactor `DemoTypography` into centralized immutable profiles**
 
-Replace the single-profile constants with two demo-owned immutable objects while reusing the framework default by reference. The implementation should have this shape:
+Replace the single-profile constants with two demo-owned immutable objects while reusing the framework default by reference:
 
 ```csharp
 internal static class DemoTypography
@@ -252,13 +287,16 @@ internal static class DemoTypography
             case DemoTypographyPreset.Base16Px:
                 return Base16Typography;
             default:
-                throw new ArgumentOutOfRangeException(nameof(preset), preset, "Unsupported demo typography preset.");
+                throw new ArgumentOutOfRangeException(
+                    nameof(preset),
+                    preset,
+                    "Unsupported demo typography preset.");
         }
     }
 }
 ```
 
-Add `TryGetPreset(...)` using the known immutable profile objects. Recognize `BootstrapThemeTypography.Default`, Base14, and Base16. If an arbitrary application-defined typography object does not match a known demo profile, return `false` rather than guessing from body size alone.
+Add `TryGetPreset(...)` using **reference identity** against the three immutable known profile objects. Do not guess a preset from body size or token values: an application-defined typography object remains custom even if one token happens to match.
 
 Add centralized font helpers:
 
@@ -282,9 +320,9 @@ internal static bool FontMatchesToken(Font font, BootstrapFontToken token)
 
 Do not keep `CreateBodyFont()` hard-coded to 12pt; all font creation must receive the active token.
 
-- [ ] **Step 5: Add the new `DemoThemeFactory` overload without breaking the existing one**
+- [ ] **Step 5: Add internal composition overloads without widening the public surface**
 
-Keep the existing signature and make it delegate to Base16:
+Keep the existing public signature and make it delegate to Base16:
 
 ```csharp
 public static BootstrapTheme Create(
@@ -295,24 +333,35 @@ public static BootstrapTheme Create(
 }
 ```
 
-Add:
+Add internal overloads:
 
 ```csharp
-public static BootstrapTheme Create(
+internal static BootstrapTheme Create(
     BootstrapThemeMode mode,
     DemoTypographyPreset typographyPreset,
+    bool reducedMotion = false)
+{
+    return Create(
+        mode,
+        DemoTypography.CreateThemeTypography(typographyPreset),
+        reducedMotion);
+}
+
+internal static BootstrapTheme Create(
+    BootstrapThemeMode mode,
+    BootstrapThemeTypography typography,
     bool reducedMotion = false)
 {
     return new BootstrapTheme(
         mode,
         BootstrapThemeColors.CreateDefault(mode),
         BootstrapThemeMetrics.Default,
-        DemoTypography.CreateThemeTypography(typographyPreset),
+        typography,
         reducedMotion);
 }
 ```
 
-Do not add typography state to `DemoThemeFactory`; it remains a pure composition factory.
+Do not add mutable typography state to `DemoThemeFactory`; it remains a pure composition factory. The arbitrary-typography overload exists specifically so callers can preserve an existing typography object while changing unrelated theme dimensions.
 
 - [ ] **Step 6: Run the focused profile tests on both TFMs**
 
@@ -334,6 +383,7 @@ Expected: PASS.
 
 ```bash
 git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoTypographyPreset.cs \
+        demo/MyDmsVn.Bootstrap5WinFormUI.Demo/Properties/AssemblyInfo.cs \
         demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoTypography.cs \
         demo/MyDmsVn.Bootstrap5WinFormUI.Demo/DemoThemeFactory.cs \
         tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/IntegratedDemoTypographyTests.cs
@@ -350,12 +400,12 @@ git commit -m "feat: add integrated demo typography profiles"
 
 **Interfaces:**
 - Consumes: `DemoTypography.CreateFont(BootstrapFontToken)` and `DemoTypography.FontMatchesToken(...)` from Task 1.
-- Produces: every existing `DemoFormBase` instance tracks `BootstrapThemeManager.CurrentTheme.Typography.Body` for its inherited native `Form.Font`.
+- Produces: every existing `DemoFormBase` instance tracks `BootstrapThemeManager.CurrentTheme.Typography.Body` for its inherited native `Form.Font`, including arbitrary externally installed typography.
 - Preserves: constructing a demo form must not assign a new application theme.
 
 - [ ] **Step 1: Replace the old fixed-12pt test with runtime profile-transition coverage**
 
-Update the PR #62 test so it explicitly installs Base16 before construction and then verifies profile changes on the same form instance:
+Update the PR #62 test so it explicitly installs Base16 before construction and verifies profile changes on the same form instance:
 
 ```csharp
 [Test]
@@ -409,9 +459,9 @@ public void DemoFormBaseDoesNotReplaceOwnedFontWhenTypographyTokenIsUnchanged()
 }
 ```
 
-- [ ] **Step 2: Run the two new tests and confirm the runtime transition currently fails**
+- [ ] **Step 2: Run the new tests and confirm runtime transition currently fails**
 
-Use the same bounded focused test command from Task 1. Expected: the fixed constructor-created font remains 12pt after the theme changes.
+Use the same bounded focused test command from Task 1. Expected: the constructor-created body font remains 12pt after the theme changes.
 
 - [ ] **Step 3: Subscribe `DemoFormBase` to `BootstrapThemeManager.ThemeChanged` and apply `Typography.Body`**
 
@@ -451,11 +501,7 @@ public abstract class DemoFormBase : Form
 }
 ```
 
-In `Dispose(bool)`:
-
-1. unsubscribe `BootstrapThemeManager.ThemeChanged` while disposing;
-2. call `base.Dispose(disposing)`;
-3. dispose `_demoBodyFont` exactly once and set it to `null`.
+In `Dispose(bool)`: unsubscribe `BootstrapThemeManager.ThemeChanged` while disposing, call `base.Dispose(disposing)`, then dispose `_demoBodyFont` exactly once and set it to `null`.
 
 Do not publish a theme from this base class. It only consumes the current theme.
 
@@ -477,7 +523,7 @@ git commit -m "feat: update demo body font on theme changes"
 
 ---
 
-### Task 3: Add the `Base font` selector and compose it with Theme/Reduced motion
+### Task 3: Add the `Base font` selector and compose it safely with Theme/Reduced motion
 
 **Files:**
 - Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs`
@@ -485,10 +531,11 @@ git commit -m "feat: update demo body font on theme changes"
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/IntegratedDemoTypographyTests.cs`
 
 **Interfaces:**
-- Consumes: new `DemoThemeFactory.Create(mode, preset, reducedMotion)` overload from Task 1.
+- Consumes: internal `DemoThemeFactory.Create(mode, preset, reducedMotion)` and `Create(mode, typography, reducedMotion)` overloads from Task 1.
 - Consumes: `DemoTypography.TryGetPreset(...)` and semantic-font helpers from Task 1.
-- Produces: a `Base font` `ComboBox` adjacent to the existing Theme selector with indices `0=Default`, `1=Base14Px`, `2=Base16Px`.
+- Produces: a `Base font` `ComboBox` adjacent to the existing Theme selector with indices `0=Default`, `1=Base14Px`, `2=Base16Px`, or `-1` when the active typography is an unknown external object.
 - Produces: MainForm page-title font follows `theme.Typography.Label` and refreshes without unnecessary font allocation.
+- Produces: one and only one `ThemeChanged` publication per user change to Theme, Base font, or Reduced motion.
 
 - [ ] **Step 1: Add failing UI-contract tests for the new selector**
 
@@ -526,11 +573,11 @@ public void MainFormExposesBaseFontSelectorBesideThemeSelector()
 }
 ```
 
-Also assert the relative settings order is Theme label → Theme ComboBox → Base font label → Base font ComboBox → Reduced motion CheckBox. Do not rely on screen coordinates for this contract; use `settings.Controls.GetChildIndex(...)` or the collection order established by `Controls.Add(...)`.
+Also assert the relative settings order is Theme label → Theme ComboBox → Base font label → Base font ComboBox → Reduced motion CheckBox. Use the controls collection order established by `Controls.Add(...)`, not screen coordinates.
 
-- [ ] **Step 2: Add failing interaction tests for all three dimensions**
+- [ ] **Step 2: Add failing interaction tests for all three known dimensions**
 
-Create tests that start at Light + Base16 + reduced motion false and then perform these transitions on the same `MainForm`:
+Create a test that starts at Light + Base16 + reduced motion false and performs these transitions on the same `MainForm`:
 
 1. select Base14 → theme remains Light, reduced motion remains false, Body becomes 10.5pt;
 2. select Dark → Base14 remains selected and Body remains 10.5pt;
@@ -538,9 +585,94 @@ Create tests that start at Light + Base16 + reduced motion false and then perfor
 4. select Default → Dark/reduced-motion remain unchanged and `theme.Typography` is the same object as `BootstrapThemeTypography.Default`;
 5. select Base16 → mode/reduced-motion remain unchanged and Body returns to 12pt.
 
-Use `SelectedIndex` and `Checked` exactly as a user interaction would drive the existing event handlers.
+Use `SelectedIndex` and `Checked` exactly as a user interaction would drive the handlers.
 
-- [ ] **Step 3: Add the header fields and configure the selector**
+- [ ] **Step 3: Add a failing regression test for externally installed custom typography**
+
+Use a custom `BootstrapThemeTypography` object that is not one of the three demo-owned instances:
+
+```csharp
+[Test]
+public void MainFormPreservesUnknownTypographyAcrossUnrelatedSettingChanges()
+{
+    var custom = new BootstrapThemeTypography(
+        new BootstrapFontToken("Segoe UI", 10f),
+        new BootstrapFontToken("Segoe UI", 9f),
+        new BootstrapFontToken("Segoe UI", 10f, FontStyle.Bold),
+        new BootstrapFontToken("Segoe UI", 12f, FontStyle.Bold),
+        new BootstrapFontToken("Segoe UI", 15f, FontStyle.Bold));
+
+    BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+        BootstrapThemeMode.Light,
+        custom,
+        reducedMotion: false);
+
+    using var form = new MainForm();
+    var themeMode = FindThemeModeCombo(form);
+    var baseFont = FindBaseFontCombo(form);
+    var reducedMotion = FindReducedMotionCheckBox(form);
+
+    Assert.That(baseFont.SelectedIndex, Is.EqualTo(-1));
+
+    themeMode.SelectedIndex = 1;
+    Assert.That(BootstrapThemeManager.CurrentTheme.Typography, Is.SameAs(custom));
+    Assert.That(baseFont.SelectedIndex, Is.EqualTo(-1));
+
+    reducedMotion.Checked = true;
+    Assert.That(BootstrapThemeManager.CurrentTheme.Typography, Is.SameAs(custom));
+    Assert.That(baseFont.SelectedIndex, Is.EqualTo(-1));
+
+    baseFont.SelectedIndex = 1;
+    Assert.That(BootstrapThemeManager.CurrentTheme.Typography,
+        Is.SameAs(DemoTypography.CreateThemeTypography(DemoTypographyPreset.Base14Px)));
+}
+```
+
+This test is mandatory: leaving the old selector value in place for unknown typography would cause the next Theme/Reduced-motion edit to silently replace custom typography with that stale demo preset.
+
+- [ ] **Step 4: Add a failing regression test for exactly one publication per user change**
+
+Subscribe only after MainForm construction so setup synchronization is not counted:
+
+```csharp
+[Test]
+public void MainFormPublishesExactlyOneThemeChangePerUserSettingChange()
+{
+    BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+        BootstrapThemeMode.Light,
+        DemoTypographyPreset.Base16Px);
+
+    using var form = new MainForm();
+    var themeMode = FindThemeModeCombo(form);
+    var baseFont = FindBaseFontCombo(form);
+    var reducedMotion = FindReducedMotionCheckBox(form);
+    var eventCount = 0;
+
+    EventHandler<BootstrapThemeChangedEventArgs> handler = (_, _) => eventCount++;
+    BootstrapThemeManager.ThemeChanged += handler;
+    try
+    {
+        baseFont.SelectedIndex = 1;
+        Assert.That(eventCount, Is.EqualTo(1), "Base font change");
+
+        eventCount = 0;
+        themeMode.SelectedIndex = 1;
+        Assert.That(eventCount, Is.EqualTo(1), "Theme change");
+
+        eventCount = 0;
+        reducedMotion.Checked = true;
+        Assert.That(eventCount, Is.EqualTo(1), "Reduced motion change");
+    }
+    finally
+    {
+        BootstrapThemeManager.ThemeChanged -= handler;
+    }
+}
+```
+
+Do not weaken this to final-state-only assertions. The contract is that selector synchronization does not trigger a second publication.
+
+- [ ] **Step 5: Add the header fields and configure the selector**
 
 Add fields:
 
@@ -566,11 +698,11 @@ _baseFontPreset.Items.Add("Base 16px");
 _baseFontPreset.SelectedIndexChanged += (_, _) => PublishSelectedTheme();
 ```
 
-If the exact width needs a small adjustment during the minimum-size layout test, keep it compact enough to preserve the existing 900x600 shell and do not change item text.
+If exact width needs a small adjustment during the minimum-size layout test, keep it compact enough to preserve the existing 900x600 shell and do not change item text.
 
-- [ ] **Step 4: Compose all settings in `PublishSelectedTheme()`**
+- [ ] **Step 6: Resolve typography for publication without losing unknown external typography**
 
-Require both ComboBoxes to have valid selections, then map the typography selection explicitly:
+Keep the preset-index mapping explicit:
 
 ```csharp
 private static DemoTypographyPreset GetTypographyPreset(int selectedIndex)
@@ -589,18 +721,45 @@ private static DemoTypographyPreset GetTypographyPreset(int selectedIndex)
 }
 ```
 
-Publish:
+Add a resolver whose only source of fallback state is `BootstrapThemeManager.CurrentTheme`:
 
 ```csharp
-BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
-    mode,
-    GetTypographyPreset(_baseFontPreset.SelectedIndex),
-    _reducedMotion.Checked);
+private BootstrapThemeTypography ResolveTypographyForPublish()
+{
+    if (_baseFontPreset.SelectedIndex >= 0)
+    {
+        return DemoTypography.CreateThemeTypography(
+            GetTypographyPreset(_baseFontPreset.SelectedIndex));
+    }
+
+    return BootstrapThemeManager.CurrentTheme.Typography;
+}
 ```
 
-Do not assign fonts directly from the selector event. The theme event is the single propagation mechanism.
+Then publish exactly once:
 
-- [ ] **Step 5: Extend `SyncSelection(BootstrapTheme theme)`**
+```csharp
+private void PublishSelectedTheme()
+{
+    if (_updatingSelection || _themeMode.SelectedIndex < 0)
+    {
+        return;
+    }
+
+    var mode = _themeMode.SelectedIndex == 1
+        ? BootstrapThemeMode.Dark
+        : BootstrapThemeMode.Light;
+
+    BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+        mode,
+        ResolveTypographyForPublish(),
+        _reducedMotion.Checked);
+}
+```
+
+Do not store a second `_currentTypography` field. `BootstrapThemeManager.CurrentTheme.Typography` remains the source of truth when the selector cannot represent the active object.
+
+- [ ] **Step 7: Extend `SyncSelection(BootstrapTheme theme)` with explicit unknown-state behavior**
 
 Within the existing `_updatingSelection` guard:
 
@@ -608,15 +767,15 @@ Within the existing `_updatingSelection` guard:
 - synchronize Reduced motion exactly as today;
 - call `DemoTypography.TryGetPreset(theme.Typography, out var preset)`;
 - for known demo profiles set `_baseFontPreset.SelectedIndex = (int)preset`;
-- if an arbitrary unknown typography object is installed externally, leave the previous selector value unchanged rather than guessing.
+- for arbitrary unknown typography set `_baseFontPreset.SelectedIndex = -1`.
 
-This prevents event recursion while keeping factory-created/default themes accurately reflected in the shell.
+Use the guard around all three assignments. This both exposes the custom state honestly and prevents `SelectedIndexChanged` / `CheckedChanged` from recursively publishing another theme.
 
-- [ ] **Step 6: Refresh the MainForm cached page-title font from `Typography.Label`**
+Do **not** leave a stale previous preset selected for unknown typography, and do not infer a preset from body size.
 
-PR #62's current page-title font is 12pt Bold at Base16. Preserve that visual result by using the `Label` semantic role, not `HeadingSmall`.
+- [ ] **Step 8: Refresh the MainForm cached page-title font from `Typography.Label`**
 
-Add a helper:
+PR #62's current page-title font is 12pt Bold at Base16. Preserve that visual result by using the `Label` semantic role, not `HeadingSmall`:
 
 ```csharp
 private void UpdatePageTitleFont(BootstrapTheme theme)
@@ -639,7 +798,7 @@ Call it from `ApplyTheme(theme)`. Continue disposing `_pageTitleFont` in `Dispos
 
 Extend `ApplyTheme` to set the new label/combo colors from `theme.Colors.SurfaceSecondary`, `theme.Colors.Surface`, and `theme.Colors.Text` in the same pattern as the existing Theme controls.
 
-- [ ] **Step 7: Make Base16 startup explicit in `Program.Main`**
+- [ ] **Step 9: Make Base16 startup explicit in `Program.Main`**
 
 Replace the implicit overload call with:
 
@@ -649,13 +808,13 @@ BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
     DemoTypographyPreset.Base16Px);
 ```
 
-This records the compatibility decision directly at the Integrated Demo entry point.
+`Program` is in the demo assembly, so it can use the internal preset overload without exposing that overload publicly.
 
-- [ ] **Step 8: Verify interaction tests on both TFMs**
+- [ ] **Step 10: Verify interaction, custom-typography, and single-publication tests on both TFMs**
 
 Run the focused typography suite with bounded hang detection on `net8.0-windows` and `net48`. Expected: PASS.
 
-- [ ] **Step 9: Commit the shell selector slice**
+- [ ] **Step 11: Commit the shell selector slice**
 
 ```bash
 git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs \
@@ -785,9 +944,9 @@ git commit -m "fix: refresh demo semantic fonts across profiles"
 
 **Interfaces:**
 - Consumes: all three working typography profiles and MainForm selector behavior.
-- Produces: automated evidence that shell chrome, representative native/Bootstrap controls, and the Theme summary remain coherent while switching profiles.
+- Produces: automated evidence that shell chrome, representative native/Bootstrap controls, Theme summary, custom-typography preservation, and live page instances remain coherent while switching profiles.
 
-- [ ] **Step 1: Parameterize shell containment tests for all three profiles**
+- [ ] **Step 1: Parameterize shell containment tests for all three known profiles**
 
 Replace the fixed `MainShellChromeRemainsContainedAtTwelvePointBodyTypography` assumption with a profile-aware test. For each profile, install the theme **before** constructing `MainForm`, then verify containment for:
 
@@ -815,7 +974,7 @@ Run each profile at both logical shell sizes:
 1280 x 800
 ```
 
-Keep `AssertContained(...)` as the core geometry assertion. The page-title/description already use ellipsis, so the test should assert containment and non-zero bounds rather than require a fixed title width.
+Keep `AssertContained(...)` as the core geometry assertion. The page-title/description already use ellipsis, so assert containment and non-zero bounds rather than a fixed title width.
 
 - [ ] **Step 2: Parameterize representative native + Bootstrap control sizing**
 
@@ -824,7 +983,7 @@ Replace the fixed 12pt test with three cases that create `ButtonDemoForm` and as
 - first representative native `Label` follows the expected Body size;
 - representative `BootstrapButton` follows the expected Body size;
 - `button.GetPreferredSize(Size.Empty).Height >= TextRenderer.MeasureText(button.Text, button.Font).Height`;
-- `button.AutoSize` remains true where that existing scenario expects it.
+- `button.AutoSize` remains true where the existing scenario expects it.
 
 This guards against a font token changing while the control remains clipped at old text measurements.
 
@@ -851,7 +1010,18 @@ Create `MainForm`, locate the Theme summary label, capture the label instance, t
 
 This explicitly prevents an implementation that solves typography switching by destroying and recreating the current demo page.
 
-- [ ] **Step 5: Run both Integrated Demo typography test fixtures with bounded hang detection**
+- [ ] **Step 5: Keep custom typography preservation and event-count tests in the focused regression set**
+
+Ensure the Task 3 tests remain included in the fixture/filter used for this feature. They must continue proving:
+
+- unknown custom typography maps to `Base font.SelectedIndex == -1`;
+- Theme and Reduced motion preserve the exact custom typography object;
+- selecting a known Base font intentionally replaces it;
+- each actual user setting change raises exactly one `ThemeChanged` event.
+
+Do not replace these behavioral assertions with layout-only coverage.
+
+- [ ] **Step 6: Run both Integrated Demo typography test fixtures with bounded hang detection**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -867,7 +1037,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the expanded regression coverage**
+- [ ] **Step 7: Commit the expanded regression coverage**
 
 ```bash
 git add tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/IntegratedDemoTypographyTests.cs \
@@ -885,6 +1055,7 @@ git commit -m "test: cover integrated demo typography switching"
 
 **Interfaces:**
 - Produces: documented distinction between core framework default typography and Integrated Demo evaluation presets.
+- Produces: documented custom-typography preservation semantics for the Integrated Demo shell.
 - Produces: final evidence across both target frameworks and manual Windows DPI checks.
 
 - [ ] **Step 1: Document the Integrated Demo typography-profile behavior**
@@ -895,7 +1066,9 @@ Add a concise subsection under typography/design-system demo guidance that state
 - Integrated Demo starts at Base 16px for continuity with PR #62;
 - the `Base font` selector exposes `Default`, `Base 14px`, and `Base 16px` for visual/regression comparison;
 - typography profile is independent from Light/Dark and reduced motion;
-- profile changes are published as a complete `BootstrapTheme` through `BootstrapThemeManager`.
+- an externally installed custom typography object is preserved while changing only Theme/Reduced motion, with the selector blank until a demo preset is explicitly chosen;
+- profile/settings changes are published as a complete `BootstrapTheme` through `BootstrapThemeManager`;
+- demo preset types/factory overloads remain internal and are not new public framework APIs.
 
 Do not describe Base14/Base16 as new core-framework defaults or public theme presets.
 
@@ -928,9 +1101,10 @@ Verify:
 1. startup selector is `Base 16px`;
 2. switch Base16 → Base14 → Default → Base16 without changing page;
 3. repeat in Light and Dark;
-4. toggle Reduced motion while on Base14 and confirm the typography remains Base14;
+4. toggle Reduced motion while on Base14 and confirm typography remains Base14;
 5. change Light/Dark while on Default and confirm typography remains Default;
-6. return to Base16 and confirm the visual baseline matches PR #62.
+6. install/drive the automated custom-typography scenario and confirm unrelated setting changes preserve it while Base font shows no selected preset;
+7. return to Base16 and confirm the visual baseline matches PR #62.
 
 - [ ] **Step 5: Perform the minimum-size and DPI visual matrix**
 
@@ -977,7 +1151,7 @@ Check for:
 - focus rectangles/text baselines becoming incorrect after runtime switching;
 - popup/select content retaining an old typography profile after the owning control changes.
 
-If a visual issue is found, fix the owning layout/font-refresh logic and add a focused regression test before completing the task. Do not globally increase metrics as a shortcut unless the evidence shows a framework metric itself is incorrect for all profiles.
+If a visual issue is found, fix the owning layout/font-refresh logic and add a focused regression test before completing the task. Do not globally increase metrics as a shortcut unless evidence shows a framework metric itself is incorrect for all profiles.
 
 - [ ] **Step 6: Re-run focused typography tests after any visual-matrix fix**
 
@@ -999,10 +1173,14 @@ The implementation is complete only when all of the following are true:
 
 - Integrated Demo header contains `Theme [Light/Dark]`, `Base font [Default/Base 14px/Base 16px]`, and Reduced motion in that order.
 - Normal startup remains Light + Base 16px + reduced motion off unless another existing startup setting explicitly says otherwise.
+- `DemoTypographyPreset` and the new preset/custom-typography factory overloads remain internal; test access is provided through `InternalsVisibleTo`, not by widening the demo public API.
 - `Default` uses the exact `BootstrapThemeTypography.Default` object and does not mutate core defaults.
 - Base14 and Base16 typography values match the profile matrix in this plan.
-- Theme mode, typography profile, and reduced motion preserve one another across all selector changes.
-- A profile change publishes exactly one complete replacement `BootstrapTheme` through `BootstrapThemeManager.CurrentTheme`; there is no second typography state/event channel.
+- Theme mode, known typography profile, and reduced motion preserve one another across all selector changes.
+- An arbitrary externally installed `BootstrapThemeTypography` that is not a known demo profile results in Base font `SelectedIndex == -1`; changing only Theme or Reduced motion preserves that exact typography object by reference.
+- Selecting a Base font item while custom typography is active intentionally replaces the custom object with the chosen known demo profile.
+- Every user change to Theme, Base font, or Reduced motion publishes exactly one complete replacement `BootstrapTheme` through `BootstrapThemeManager.CurrentTheme` and raises exactly one `ThemeChanged` event; selector synchronization never republishes.
+- There is no second typography state/event channel and no hidden mutable `_currentTypography` state in MainForm.
 - Existing `DemoFormBase` instances update their native inherited body font at runtime.
 - A Light/Dark/reduced-motion-only change does not allocate a replacement native body font when its typography token did not change.
 - MainForm page-title semantic font updates with the active profile and remains Bold.
@@ -1015,7 +1193,7 @@ The implementation is complete only when all of the following are true:
 - Focused typography tests pass on both TFMs with bounded hang detection.
 - `./test.ps1` passes without hangs or modal UI.
 - Manual checks pass at 100%, 125%, 150%, and 200% Windows display scaling for the identified high-density demo pages.
-- `docs/DESIGN_SYSTEM.md` clearly states that the three choices are Integrated Demo evaluation profiles, not a change to the core framework default.
+- `docs/DESIGN_SYSTEM.md` clearly states that the three choices are Integrated Demo evaluation profiles, not a change to the core framework default or new public framework presets.
 
 ---
 
@@ -1025,13 +1203,15 @@ Do not expand this plan into any of the following without separate approval:
 
 - changing `BootstrapThemeTypography.Default` from 9pt;
 - adding public Base14/Base16 presets to the core framework package;
+- exposing demo preset types or preset-specific factory overloads publicly merely for testing;
 - adding user persistence/settings storage for the selected Integrated Demo profile;
 - scaling `BootstrapThemeMetrics` automatically from typography size;
 - changing all component default heights or density tokens;
 - adding arbitrary/custom font-size input;
+- adding a visible fourth `Custom` Base font item;
 - adding font-family selection;
 - redesigning the Integrated Demo header/navigation;
 - changing component typography semantics unrelated to stale runtime profile propagation;
 - introducing a global font cache or new dependency.
 
-The purpose of this feature is to make the Integrated Demo a reliable comparison harness for three typography profiles while preserving the architecture and behavior established by PR #62.
+The purpose of this feature is to make the Integrated Demo a reliable comparison harness for three typography profiles while preserving the architecture and behavior established by PR #62, without widening the public API or destroying externally supplied typography during unrelated shell-setting changes.
