@@ -22,7 +22,6 @@ public sealed class IntegratedDemoTypographyLayoutTests
     public void SetUp()
     {
         _originalTheme = BootstrapThemeManager.CurrentTheme;
-        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(BootstrapThemeMode.Light);
     }
 
     [TearDown]
@@ -34,10 +33,23 @@ public sealed class IntegratedDemoTypographyLayoutTests
         }
     }
 
-    [Test]
-    public void MainShellChromeRemainsContainedAtTwelvePointBodyTypography()
+    [TestCase((int)DemoTypographyPreset.Default, 9f, 900, 600)]
+    [TestCase((int)DemoTypographyPreset.Default, 9f, 1280, 800)]
+    [TestCase((int)DemoTypographyPreset.Base14Px, 10.5f, 900, 600)]
+    [TestCase((int)DemoTypographyPreset.Base14Px, 10.5f, 1280, 800)]
+    [TestCase((int)DemoTypographyPreset.Base16Px, 12f, 900, 600)]
+    [TestCase((int)DemoTypographyPreset.Base16Px, 12f, 1280, 800)]
+    public void MainShellChromeRemainsContainedForTypographyProfile(
+        int presetValue,
+        float expectedSize,
+        int width,
+        int height)
     {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            (DemoTypographyPreset)presetValue);
         using var form = new MainForm();
+        form.ClientSize = new Size(width, height);
         form.CreateControl();
         form.PerformLayout();
 
@@ -53,6 +65,9 @@ public sealed class IntegratedDemoTypographyLayoutTests
             .Single(combo => combo.Items.Contains("Light") && combo.Items.Contains("Dark"));
         var settings = themeMode.Parent!;
         var themeLabel = settings.Controls.OfType<Label>().Single(label => label.Text == "Theme");
+        var baseFontLabel = settings.Controls.OfType<Label>().Single(label => label.Text == "Base font");
+        var baseFont = settings.Controls.OfType<ComboBox>()
+            .Single(combo => combo.AccessibleName == "Integrated demo base font profile");
         var reducedMotion = settings.Controls.OfType<CheckBox>()
             .Single(checkBox => checkBox.Text == "Reduced motion");
 
@@ -63,17 +78,31 @@ public sealed class IntegratedDemoTypographyLayoutTests
         AssertContained(pageDescription, titleBlock);
         AssertContained(themeLabel, settings);
         AssertContained(themeMode, settings);
+        AssertContained(baseFontLabel, settings);
+        AssertContained(baseFont, settings);
         AssertContained(reducedMotion, settings);
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(pageTitle.Font.SizeInPoints, Is.EqualTo(12f).Within(0.01f));
+            Assert.That(pageTitle.Bounds.Width, Is.GreaterThan(0));
+            Assert.That(pageTitle.Bounds.Height, Is.GreaterThan(0));
+            Assert.That(pageDescription.Bounds.Width, Is.GreaterThan(0));
+            Assert.That(pageDescription.Bounds.Height, Is.GreaterThan(0));
+            Assert.That(form.Font.SizeInPoints, Is.EqualTo(expectedSize).Within(0.01f));
+            Assert.That(pageTitle.Font.SizeInPoints, Is.EqualTo(expectedSize).Within(0.01f));
             Assert.That(pageTitle.Font.Bold, Is.True);
         }));
     }
 
-    [Test]
-    public void NativeLabelAndThemeFontButtonUseTwelvePointBodySizingWithoutClipping()
+    [TestCase((int)DemoTypographyPreset.Default, 9f)]
+    [TestCase((int)DemoTypographyPreset.Base14Px, 10.5f)]
+    [TestCase((int)DemoTypographyPreset.Base16Px, 12f)]
+    public void NativeLabelAndThemeFontButtonUseProfileBodySizingWithoutClipping(
+        int presetValue,
+        float expectedSize)
     {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            (DemoTypographyPreset)presetValue);
         using var form = new ButtonDemoForm();
         form.CreateControl();
         form.PerformLayout();
@@ -85,28 +114,85 @@ public sealed class IntegratedDemoTypographyLayoutTests
 
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(label.Font.SizeInPoints, Is.EqualTo(12f).Within(0.01f));
-            Assert.That(button.Font.SizeInPoints, Is.EqualTo(12f).Within(0.01f));
+            Assert.That(label.Font.SizeInPoints, Is.EqualTo(expectedSize).Within(0.01f));
+            Assert.That(button.Font.SizeInPoints, Is.EqualTo(expectedSize).Within(0.01f));
             Assert.That(button.AutoSize, Is.True);
             Assert.That(preferredSize.Height, Is.GreaterThan(0));
             Assert.That(preferredSize.Height, Is.GreaterThanOrEqualTo(measuredText.Height));
         }));
     }
 
-    [Test]
-    public void ThemePageSummaryReportsDemoBodyTypographyAndHasUsableBounds()
+    [TestCase((int)DemoTypographyPreset.Default, "Body Segoe UI 9pt")]
+    [TestCase((int)DemoTypographyPreset.Base14Px, "Body Segoe UI 10.5pt")]
+    [TestCase((int)DemoTypographyPreset.Base16Px, "Body Segoe UI 12pt")]
+    public void ThemePageSummaryReportsProfileBodyTypographyAndHasUsableBounds(
+        int presetValue,
+        string expectedText)
     {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            (DemoTypographyPreset)presetValue);
         using var form = new MainForm();
         form.CreateControl();
         form.PerformLayout();
 
         var summary = FindControls<Label>(form)
-            .Single(label => label.Text.Contains("Body Segoe UI 12"));
+            .Single(label => label.Text.Contains(expectedText));
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(summary.ClientSize.Width, Is.GreaterThan(0));
             Assert.That(summary.ClientSize.Height, Is.GreaterThan(0));
+        }));
+    }
+
+    [Test]
+    public void SwitchingBaseFontUpdatesExistingThemePageInstance()
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
+        using var form = new MainForm();
+        form.CreateControl();
+        form.PerformLayout();
+
+        var baseFont = FindControls<ComboBox>(form)
+            .Single(combo => combo.AccessibleName == "Integrated demo base font profile");
+        var summary = FindControls<Label>(form)
+            .Single(label => label.Text.Contains("Body Segoe UI 12pt"));
+        var page = FindAncestorForm(summary);
+
+        baseFont.SelectedIndex = 1;
+        AssertSameLivePage(form, page, summary, "Body Segoe UI 10.5pt", 10.5f);
+
+        baseFont.SelectedIndex = 0;
+        AssertSameLivePage(form, page, summary, "Body Segoe UI 9pt", 9f);
+    }
+
+    private static Form FindAncestorForm(Control control)
+    {
+        var current = control.Parent;
+        while (current is not Form)
+        {
+            current = current?.Parent;
+        }
+
+        return (Form)current;
+    }
+
+    private static void AssertSameLivePage(
+        MainForm shell,
+        Form page,
+        Label summary,
+        string expectedText,
+        float expectedShellSize)
+    {
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(page.IsDisposed, Is.False);
+            Assert.That(FindControls<Label>(shell).Contains(summary), Is.True);
+            Assert.That(summary.Text, Does.Contain(expectedText));
+            Assert.That(shell.Font.SizeInPoints, Is.EqualTo(expectedShellSize).Within(0.01f));
         }));
     }
 

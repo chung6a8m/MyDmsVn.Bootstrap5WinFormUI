@@ -105,11 +105,13 @@ public sealed class MainForm : DemoFormBase
         _titleBlock.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
 
         _pageTitle.Dock = DockStyle.Fill;
+        _pageTitle.Margin = Padding.Empty;
         _pageTitle.AutoEllipsis = true;
         _pageTitle.TextAlign = ContentAlignment.BottomLeft;
         _pageTitle.AccessibleName = "Current demo page title";
 
         _pageDescription.Dock = DockStyle.Fill;
+        _pageDescription.Margin = Padding.Empty;
         _pageDescription.AutoEllipsis = true;
         _pageDescription.TextAlign = ContentAlignment.TopLeft;
         _pageDescription.AccessibleName = "Current demo page description";
@@ -130,7 +132,7 @@ public sealed class MainForm : DemoFormBase
         _themeLabel.Margin = new Padding(0, 14, 6, 0);
 
         _themeMode.DropDownStyle = ComboBoxStyle.DropDownList;
-        _themeMode.Width = 112;
+        _themeMode.Width = 88;
         _themeMode.Margin = new Padding(0, 8, 0, 0);
         _themeMode.Items.Add("Light");
         _themeMode.Items.Add("Dark");
@@ -138,10 +140,10 @@ public sealed class MainForm : DemoFormBase
 
         _baseFontLabel.AutoSize = true;
         _baseFontLabel.Text = "Base font";
-        _baseFontLabel.Margin = new Padding(12, 14, 6, 0);
+        _baseFontLabel.Margin = new Padding(8, 14, 4, 0);
 
         _baseFontPreset.DropDownStyle = ComboBoxStyle.DropDownList;
-        _baseFontPreset.Width = 120;
+        _baseFontPreset.Width = 104;
         _baseFontPreset.Margin = new Padding(0, 8, 0, 0);
         _baseFontPreset.AccessibleName = "Integrated demo base font profile";
         _baseFontPreset.Items.Add("Default");
@@ -151,7 +153,7 @@ public sealed class MainForm : DemoFormBase
 
         _reducedMotion.AutoSize = true;
         _reducedMotion.Text = "Reduced motion";
-        _reducedMotion.Margin = new Padding(16, 13, 0, 0);
+        _reducedMotion.Margin = new Padding(10, 13, 0, 0);
         _reducedMotion.CheckedChanged += (_, _) => PublishSelectedTheme();
 
         _settings.Controls.Add(_themeLabel);
