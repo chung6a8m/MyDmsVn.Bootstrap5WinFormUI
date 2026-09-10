@@ -1088,7 +1088,7 @@ Expected: successful builds for both `net48` and `net8.0-windows` projects with 
 
 Expected: both target-framework suites pass; no hang dump, unexpected dialog, or DataError wait is produced.
 
-- [ ] **Step 4: Launch the Integrated Demo and execute the profile/theme interaction matrix**
+- [x] **Step 4: Launch the Integrated Demo and execute the profile/theme interaction matrix**
 
 Run the demo using the normal repository-supported launch path, for example:
 
@@ -1106,7 +1106,7 @@ Verify:
 6. install/drive the automated custom-typography scenario and confirm unrelated setting changes preserve it while Base font shows no selected preset;
 7. return to Base16 and confirm the visual baseline matches PR #62.
 
-- [ ] **Step 5: Perform the minimum-size and DPI visual matrix**
+- [x] **Step 5: Perform the minimum-size and DPI visual matrix**
 
 At minimum test:
 
@@ -1153,7 +1153,7 @@ Check for:
 
 If a visual issue is found, fix the owning layout/font-refresh logic and add a focused regression test before completing the task. Do not globally increase metrics as a shortcut unless evidence shows a framework metric itself is incorrect for all profiles.
 
-- [ ] **Step 6: Re-run focused typography tests after any visual-matrix fix**
+- [x] **Step 6: Re-run focused typography tests after any visual-matrix fix**
 
 Run both Integrated Demo typography fixtures on both TFMs with bounded hang detection, then run `./test.ps1` again if code changed after Step 3.
 
