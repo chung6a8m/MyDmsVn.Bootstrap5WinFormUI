@@ -19,6 +19,8 @@ public sealed class MainForm : DemoFormBase
     private readonly Label _pageDescription = new Label();
     private readonly Label _themeLabel = new Label();
     private readonly ComboBox _themeMode = new ComboBox();
+    private readonly Label _baseFontLabel = new Label();
+    private readonly ComboBox _baseFontPreset = new ComboBox();
     private readonly CheckBox _reducedMotion = new CheckBox();
     private Font? _pageTitleFont;
     private Form? _currentPage;
@@ -106,8 +108,6 @@ public sealed class MainForm : DemoFormBase
         _pageTitle.AutoEllipsis = true;
         _pageTitle.TextAlign = ContentAlignment.BottomLeft;
         _pageTitle.AccessibleName = "Current demo page title";
-        _pageTitleFont = new Font(Font, FontStyle.Bold);
-        _pageTitle.Font = _pageTitleFont;
 
         _pageDescription.Dock = DockStyle.Fill;
         _pageDescription.AutoEllipsis = true;
@@ -136,6 +136,19 @@ public sealed class MainForm : DemoFormBase
         _themeMode.Items.Add("Dark");
         _themeMode.SelectedIndexChanged += (_, _) => PublishSelectedTheme();
 
+        _baseFontLabel.AutoSize = true;
+        _baseFontLabel.Text = "Base font";
+        _baseFontLabel.Margin = new Padding(12, 14, 6, 0);
+
+        _baseFontPreset.DropDownStyle = ComboBoxStyle.DropDownList;
+        _baseFontPreset.Width = 120;
+        _baseFontPreset.Margin = new Padding(0, 8, 0, 0);
+        _baseFontPreset.AccessibleName = "Integrated demo base font profile";
+        _baseFontPreset.Items.Add("Default");
+        _baseFontPreset.Items.Add("Base 14px");
+        _baseFontPreset.Items.Add("Base 16px");
+        _baseFontPreset.SelectedIndexChanged += (_, _) => PublishSelectedTheme();
+
         _reducedMotion.AutoSize = true;
         _reducedMotion.Text = "Reduced motion";
         _reducedMotion.Margin = new Padding(16, 13, 0, 0);
@@ -143,6 +156,8 @@ public sealed class MainForm : DemoFormBase
 
         _settings.Controls.Add(_themeLabel);
         _settings.Controls.Add(_themeMode);
+        _settings.Controls.Add(_baseFontLabel);
+        _settings.Controls.Add(_baseFontPreset);
         _settings.Controls.Add(_reducedMotion);
 
         _header.Controls.Add(_navigationToggle, 0, 0);
@@ -349,7 +364,36 @@ public sealed class MainForm : DemoFormBase
             ? BootstrapThemeMode.Dark
             : BootstrapThemeMode.Light;
 
-        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(mode, _reducedMotion.Checked);
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            mode,
+            ResolveTypographyForPublish(),
+            _reducedMotion.Checked);
+    }
+
+    private BootstrapThemeTypography ResolveTypographyForPublish()
+    {
+        if (_baseFontPreset.SelectedIndex >= 0)
+        {
+            return DemoTypography.CreateThemeTypography(
+                GetTypographyPreset(_baseFontPreset.SelectedIndex));
+        }
+
+        return BootstrapThemeManager.CurrentTheme.Typography;
+    }
+
+    private static DemoTypographyPreset GetTypographyPreset(int selectedIndex)
+    {
+        switch (selectedIndex)
+        {
+            case 0:
+                return DemoTypographyPreset.Default;
+            case 1:
+                return DemoTypographyPreset.Base14Px;
+            case 2:
+                return DemoTypographyPreset.Base16Px;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(selectedIndex));
+        }
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
@@ -364,6 +408,9 @@ public sealed class MainForm : DemoFormBase
         try
         {
             _themeMode.SelectedIndex = theme.Mode == BootstrapThemeMode.Dark ? 1 : 0;
+            _baseFontPreset.SelectedIndex = DemoTypography.TryGetPreset(theme.Typography, out var preset)
+                ? (int)preset
+                : -1;
             _reducedMotion.Checked = theme.ReducedMotion;
         }
         finally
@@ -374,6 +421,7 @@ public sealed class MainForm : DemoFormBase
 
     private void ApplyTheme(BootstrapTheme theme)
     {
+        UpdatePageTitleFont(theme);
         BackColor = theme.Colors.Body;
         ForeColor = theme.Colors.Text;
         _workspace.BackColor = theme.Colors.Body;
@@ -390,10 +438,29 @@ public sealed class MainForm : DemoFormBase
         _themeLabel.ForeColor = theme.Colors.Text;
         _themeMode.BackColor = theme.Colors.Surface;
         _themeMode.ForeColor = theme.Colors.Text;
+        _baseFontLabel.BackColor = theme.Colors.SurfaceSecondary;
+        _baseFontLabel.ForeColor = theme.Colors.Text;
+        _baseFontPreset.BackColor = theme.Colors.Surface;
+        _baseFontPreset.ForeColor = theme.Colors.Text;
         _reducedMotion.BackColor = theme.Colors.SurfaceSecondary;
         _reducedMotion.ForeColor = theme.Colors.Text;
         _navigationToggle.BackColor = theme.Colors.Surface;
         _navigationToggle.ForeColor = theme.Colors.Text;
+    }
+
+    private void UpdatePageTitleFont(BootstrapTheme theme)
+    {
+        var token = theme.Typography.Label;
+        if (_pageTitleFont is not null && DemoTypography.FontMatchesToken(_pageTitleFont, token))
+        {
+            return;
+        }
+
+        var replacement = DemoTypography.CreateFont(token);
+        var previous = _pageTitleFont;
+        _pageTitleFont = replacement;
+        _pageTitle.Font = replacement;
+        previous?.Dispose();
     }
 
     private sealed class DemoPageDefinition

@@ -172,6 +172,151 @@ public sealed class IntegratedDemoTypographyTests
     }
 
     [Test]
+    public void MainFormExposesBaseFontSelectorBesideThemeSelector()
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
+
+        using var form = new MainForm();
+        var settings = FindThemeModeCombo(form).Parent!;
+        var controls = settings.Controls.Cast<Control>().ToArray();
+        var baseFont = FindBaseFontCombo(form);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(baseFont.DropDownStyle, Is.EqualTo(ComboBoxStyle.DropDownList));
+            Assert.That(baseFont.Items.Cast<string>(), Is.EqualTo(new[]
+            {
+                "Default",
+                "Base 14px",
+                "Base 16px"
+            }));
+            Assert.That(baseFont.SelectedIndex, Is.EqualTo(2));
+            Assert.That(controls[0].Text, Is.EqualTo("Theme"));
+            Assert.That(controls[1], Is.SameAs(FindThemeModeCombo(form)));
+            Assert.That(controls[2].Text, Is.EqualTo("Base font"));
+            Assert.That(controls[3], Is.SameAs(baseFont));
+            Assert.That(controls[4], Is.SameAs(FindReducedMotionCheckBox(form)));
+        }));
+    }
+
+    [Test]
+    public void MainFormComposesThemeTypographyAndReducedMotionIndependently()
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
+
+        using var form = new MainForm();
+        var themeMode = FindThemeModeCombo(form);
+        var baseFont = FindBaseFontCombo(form);
+        var reducedMotion = FindReducedMotionCheckBox(form);
+
+        baseFont.SelectedIndex = 1;
+        AssertTheme(BootstrapThemeMode.Light, 10.5f, false);
+
+        themeMode.SelectedIndex = 1;
+        AssertTheme(BootstrapThemeMode.Dark, 10.5f, false);
+        Assert.That(baseFont.SelectedIndex, Is.EqualTo(1));
+
+        reducedMotion.Checked = true;
+        AssertTheme(BootstrapThemeMode.Dark, 10.5f, true);
+
+        baseFont.SelectedIndex = 0;
+        Assert.That(BootstrapThemeManager.CurrentTheme.Typography,
+            Is.SameAs(BootstrapThemeTypography.Default));
+        AssertTheme(BootstrapThemeMode.Dark, 9f, true);
+
+        baseFont.SelectedIndex = 2;
+        AssertTheme(BootstrapThemeMode.Dark, 12f, true);
+    }
+
+    [Test]
+    public void MainFormPreservesUnknownTypographyAcrossUnrelatedSettingChanges()
+    {
+        var custom = CreateCustomTypography();
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            custom);
+
+        using var form = new MainForm();
+        var themeMode = FindThemeModeCombo(form);
+        var baseFont = FindBaseFontCombo(form);
+        var reducedMotion = FindReducedMotionCheckBox(form);
+
+        Assert.That(baseFont.SelectedIndex, Is.EqualTo(-1));
+
+        themeMode.SelectedIndex = 1;
+        Assert.That(BootstrapThemeManager.CurrentTheme.Typography, Is.SameAs(custom));
+        Assert.That(baseFont.SelectedIndex, Is.EqualTo(-1));
+
+        reducedMotion.Checked = true;
+        Assert.That(BootstrapThemeManager.CurrentTheme.Typography, Is.SameAs(custom));
+        Assert.That(baseFont.SelectedIndex, Is.EqualTo(-1));
+
+        baseFont.SelectedIndex = 1;
+        Assert.That(BootstrapThemeManager.CurrentTheme.Typography,
+            Is.SameAs(DemoTypography.CreateThemeTypography(DemoTypographyPreset.Base14Px)));
+    }
+
+    [Test]
+    public void MainFormPublishesExactlyOneThemeChangePerUserSettingChange()
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
+
+        using var form = new MainForm();
+        var themeMode = FindThemeModeCombo(form);
+        var baseFont = FindBaseFontCombo(form);
+        var reducedMotion = FindReducedMotionCheckBox(form);
+        var eventCount = 0;
+
+        EventHandler<BootstrapThemeChangedEventArgs> handler = (_, _) => eventCount++;
+        BootstrapThemeManager.ThemeChanged += handler;
+        try
+        {
+            baseFont.SelectedIndex = 1;
+            Assert.That(eventCount, Is.EqualTo(1), "Base font change");
+
+            eventCount = 0;
+            themeMode.SelectedIndex = 1;
+            Assert.That(eventCount, Is.EqualTo(1), "Theme change");
+
+            eventCount = 0;
+            reducedMotion.Checked = true;
+            Assert.That(eventCount, Is.EqualTo(1), "Reduced motion change");
+        }
+        finally
+        {
+            BootstrapThemeManager.ThemeChanged -= handler;
+        }
+    }
+
+    [Test]
+    public void MainFormPageTitleTracksActiveLabelTypography()
+    {
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
+
+        using var form = new MainForm();
+        var title = FindControls<Label>(form)
+            .Single(label => label.AccessibleName == "Current demo page title");
+
+        AssertTitleFont(title, 12f);
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base14Px);
+        AssertTitleFont(title, 10.5f);
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Dark,
+            DemoTypographyPreset.Default);
+        AssertTitleFont(title, 9f);
+    }
+
+    [Test]
     public void ConstructingDemoFormDoesNotReplaceApplicationTheme()
     {
         var installed = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark, reducedMotion: true);
@@ -183,9 +328,11 @@ public sealed class IntegratedDemoTypographyTests
     }
 
     [Test]
-    public void ThemeAndReducedMotionChangesPreserveDemoTypography()
+    public void ThemeAndReducedMotionChangesPreserveKnownDemoTypography()
     {
-        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+        BootstrapThemeManager.CurrentTheme = DemoThemeFactory.Create(
+            BootstrapThemeMode.Light,
+            DemoTypographyPreset.Base16Px);
         using var form = new MainForm();
 
         var themeMode = FindControls<ComboBox>(form)
@@ -269,6 +416,47 @@ public sealed class IntegratedDemoTypographyTests
             new BootstrapFontToken("Segoe UI", 10f, FontStyle.Bold),
             new BootstrapFontToken("Segoe UI", 12f, FontStyle.Bold),
             new BootstrapFontToken("Segoe UI", 15f, FontStyle.Bold));
+    }
+
+    private static ComboBox FindThemeModeCombo(Control root)
+    {
+        return FindControls<ComboBox>(root)
+            .Single(combo => combo.Items.Contains("Light") && combo.Items.Contains("Dark"));
+    }
+
+    private static ComboBox FindBaseFontCombo(Control root)
+    {
+        return FindControls<ComboBox>(root)
+            .Single(combo => combo.AccessibleName == "Integrated demo base font profile");
+    }
+
+    private static CheckBox FindReducedMotionCheckBox(Control root)
+    {
+        return FindControls<CheckBox>(root)
+            .Single(checkBox => checkBox.Text == "Reduced motion");
+    }
+
+    private static void AssertTheme(
+        BootstrapThemeMode expectedMode,
+        float expectedBodySize,
+        bool expectedReducedMotion)
+    {
+        var theme = BootstrapThemeManager.CurrentTheme;
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(theme.Mode, Is.EqualTo(expectedMode));
+            Assert.That(theme.Typography.Body.SizeInPoints, Is.EqualTo(expectedBodySize).Within(0.001f));
+            Assert.That(theme.ReducedMotion, Is.EqualTo(expectedReducedMotion));
+        }));
+    }
+
+    private static void AssertTitleFont(Label title, float expectedSize)
+    {
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(title.Font.SizeInPoints, Is.EqualTo(expectedSize).Within(0.001f));
+            Assert.That(title.Font.Bold, Is.True);
+        }));
     }
 
     private static void AssertBodyTypography(
