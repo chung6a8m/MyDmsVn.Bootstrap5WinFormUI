@@ -88,6 +88,8 @@ The BootstrapTreeView fingerprint was reviewed against the compiled reflection s
 
 The BootstrapListView fingerprint was approved only after the compatibility gate deliberately failed against the TreeView baseline and printed `8623b04f5c891fdf2d14a01f430f9fd338faa31a80049fe0cda2b84954378815`. Review confirmed the delta is limited to `BootstrapListView`, its three planned public appearance properties, and the protected native owner-draw/lifecycle overrides listed above. Render state, palette, layout, hover index, theme-font ownership, and image coordination remain internal/private; no existing exported signature changed and `AssemblyVersion` remains `1.0.0.0`.
 
+The Bootstrap ToolStrip family fingerprint was approved after the gate deliberately failed against the BootstrapListView baseline and printed `e4215e2ff2e076d3a303318de4e3c38fdbc47d7b13f7699044b2d246025f718c`. Review confirmed the delta is limited to the four direct-native public classes `BootstrapToolStrip`, `BootstrapMenuStrip`, `BootstrapContextMenuStrip`, and `BootstrapStatusStrip`; each adds only a parameterless constructor, `Variant`, and the required protected `Dispose(bool)`, while ContextMenuStrip also adds its native-compatible `IContainer` constructor. Shared renderer, render logic, appearance controller, palettes, metrics, geometry, and the message-loop test host remain non-exported; no existing signature changed and `AssemblyVersion` remains `1.0.0.0`.
+
 ## Version compatibility policy
 
 - `1.0.0-rc.*`: release-candidate validation of the proposed v1 surface. Any API change requires explicit review, documentation, and an intentional baseline update.
