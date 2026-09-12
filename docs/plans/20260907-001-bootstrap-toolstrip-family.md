@@ -413,7 +413,7 @@ git commit -m "test: add WinForms message loop host"
 
 **Produces:** one reusable ToolStrip rendering engine with `BootstrapDropdownRenderer` delegating to it.
 
-- [ ] **Step 1: Add failing pure render-logic tests.** Cover 96/144/192 DPI metric scaling; surface-kind palette differences; disabled/pressed/checked/selected precedence; variant accent resolution; horizontal and vertical separator geometry; check/arrow geometry; split-button divider/arrow geometry derived from supplied native rectangles; and dark/light theme colors.
+- [x] **Step 1: Add failing pure render-logic tests.** Cover 96/144/192 DPI metric scaling; surface-kind palette differences; disabled/pressed/checked/selected precedence; variant accent resolution; horizontal and vertical separator geometry; check/arrow geometry; split-button divider/arrow geometry derived from supplied native rectangles; and dark/light theme colors.
 
 ```csharp
 [TestCase(96)]
@@ -431,9 +431,9 @@ public void ResolveMetrics_scales_all_custom_geometry_from_dpi(int dpi)
 }
 ```
 
-- [ ] **Step 2: Add orientation regression tests before extracting the current separator code.** Construct render-logic inputs for `vertical: false` and `vertical: true`; assert horizontal separators vary X while holding Y constant, and vertical separators vary Y while holding X constant. This prevents the existing dropdown-only horizontal assumption from leaking into vertical `BootstrapToolStrip`.
-- [ ] **Step 3: Add a `BootstrapDropdown` regression test before refactoring.** Create a dropdown with normal, selected, disabled, checked, separator, and nested items and assert that the renderer remains custom, its variant is propagated, and its resolved palette/metrics match the pre-refactor behavior.
-- [ ] **Step 4: Run the focused tests and verify the new render-logic tests fail because the shared types do not exist.**
+- [x] **Step 2: Add orientation regression tests before extracting the current separator code.** Construct render-logic inputs for `vertical: false` and `vertical: true`; assert horizontal separators vary X while holding Y constant, and vertical separators vary Y while holding X constant. This prevents the existing dropdown-only horizontal assumption from leaking into vertical `BootstrapToolStrip`.
+- [x] **Step 3: Add a `BootstrapDropdown` regression test before refactoring.** Create a dropdown with normal, selected, disabled, checked, separator, and nested items and assert that the renderer remains custom, its variant is propagated, and its resolved palette/metrics match the pre-refactor behavior.
+- [x] **Step 4: Run the focused tests and verify the new render-logic tests fail because the shared types do not exist.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -444,13 +444,13 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: new tests fail to compile or fail assertions while the existing dropdown regression remains green before moving logic.
 
-- [ ] **Step 5: Implement `BootstrapToolStripSurfaceKind` and pure `BootstrapToolStripRenderLogic`.** Move palette/metrics/state calculations out of `BootstrapDropdownRenderer`; use `BootstrapVariantColorResolver`, `ColorUtil`, and `DpiScaler`; no `Control` handles inside pure calculations. Include orientation-aware separator geometry and split-button helper geometry that accepts already-resolved native rectangles rather than calculating layout ownership.
-- [ ] **Step 6: Implement `BootstrapToolStripRendererBase : ToolStripRenderer`.** Move common drawing overrides from `BootstrapDropdownRenderer` into the base and add button, split-button, grip, overflow, status sizing-grip, and `OnRenderToolStripStatusLabelBackground` hooks needed by the new family.
-- [ ] **Step 7: Implement split-button painting correctly.** In `OnRenderSplitButtonBackground`, inspect `ToolStripSplitButton.ButtonBounds` and `DropDownButtonBounds`; paint main/drop-down portions from their native states, draw the divider, and draw the arrow there. Do not expect `OnRenderArrow` to be invoked separately for the split-button arrow.
-- [ ] **Step 8: Implement `BootstrapToolStripRenderer` as the concrete renderer used by the four new controls.** Keep variant mutable internally so the appearance controller can update it without replacing renderer instances.
-- [ ] **Step 9: Reduce `BootstrapDropdownRenderer` to a thin adapter over the shared base.** Remove duplicate drawing/palette logic only after the shared tests cover it. Do not change `BootstrapDropdown` public API or popup ownership.
-- [ ] **Step 10: Re-run focused render/dropdown tests and verify they pass.**
-- [ ] **Step 11: Commit the rendering extraction.**
+- [x] **Step 5: Implement `BootstrapToolStripSurfaceKind` and pure `BootstrapToolStripRenderLogic`.** Move palette/metrics/state calculations out of `BootstrapDropdownRenderer`; use `BootstrapVariantColorResolver`, `ColorUtil`, and `DpiScaler`; no `Control` handles inside pure calculations. Include orientation-aware separator geometry and split-button helper geometry that accepts already-resolved native rectangles rather than calculating layout ownership.
+- [x] **Step 6: Implement `BootstrapToolStripRendererBase : ToolStripRenderer`.** Move common drawing overrides from `BootstrapDropdownRenderer` into the base and add button, split-button, grip, overflow, status sizing-grip, and `OnRenderToolStripStatusLabelBackground` hooks needed by the new family.
+- [x] **Step 7: Implement split-button painting correctly.** In `OnRenderSplitButtonBackground`, inspect `ToolStripSplitButton.ButtonBounds` and `DropDownButtonBounds`; paint main/drop-down portions from their native states, draw the divider, and draw the arrow there. Do not expect `OnRenderArrow` to be invoked separately for the split-button arrow.
+- [x] **Step 8: Implement `BootstrapToolStripRenderer` as the concrete renderer used by the four new controls.** Keep variant mutable internally so the appearance controller can update it without replacing renderer instances.
+- [x] **Step 9: Reduce `BootstrapDropdownRenderer` to a thin adapter over the shared base.** Remove duplicate drawing/palette logic only after the shared tests cover it. Do not change `BootstrapDropdown` public API or popup ownership.
+- [x] **Step 10: Re-run focused render/dropdown tests and verify they pass.**
+- [x] **Step 11: Commit the rendering extraction.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapDropdownRenderer.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapDropdown.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapToolStripRenderLogicTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapDropdownTests.cs
