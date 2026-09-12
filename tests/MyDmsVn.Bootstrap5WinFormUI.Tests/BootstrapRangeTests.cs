@@ -19,6 +19,10 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 public sealed class BootstrapRangeTests
 {
     private const int WmKeyDown = 0x0100;
+    private const int WmMouseMove = 0x0200;
+    private const int WmLButtonDown = 0x0201;
+    private const int WmLButtonUp = 0x0202;
+    private const int MkLButton = 0x0001;
     private const int VkRight = 0x27;
     private BootstrapTheme _originalTheme = null!;
 
@@ -179,6 +183,69 @@ public sealed class BootstrapRangeTests
     }
 
     [Test]
+    public void ThumbPresentationTracksNativeBoundsAndClearsTransientState()
+    {
+        using var host = CreateHostedRange(out var range);
+        var thumb = BootstrapRangeNativeMethods.GetThumbRectangle(range.Handle);
+        var center = new Point(thumb.Left + (thumb.Width / 2), thumb.Top + (thumb.Height / 2));
+
+        SendMouseMessage(range.Handle, WmMouseMove, center, buttonDown: false);
+        Assert.That(range.CurrentVisualState.Hot, Is.True);
+
+        SendMouseMessage(range.Handle, WmLButtonDown, center, buttonDown: true);
+        Assert.That(range.CurrentVisualState.Pressed, Is.True);
+
+        SendMouseMessage(range.Handle, WmLButtonUp, center, buttonDown: false);
+        Assert.That(range.CurrentVisualState.Pressed, Is.False);
+
+        range.RaiseMouseLeaveForTesting();
+        Assert.That(range.CurrentVisualState.Hot, Is.False);
+
+        range.Enabled = false;
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(range.CurrentVisualState.Enabled, Is.False);
+            Assert.That(range.CurrentVisualState.Hot, Is.False);
+            Assert.That(range.CurrentVisualState.Pressed, Is.False);
+        }));
+    }
+
+    [Test]
+    public void NativeHomeEndPageAndArrowKeysMatchPlainTrackBar()
+    {
+        var keys = new[] { Keys.Right, Keys.PageUp, Keys.PageDown, Keys.End, Keys.Home };
+        var native = CaptureNativeKeyMatrix(new TrackBar(), keys);
+        var bootstrap = CaptureNativeKeyMatrix(new BootstrapRange(), keys);
+
+        Assert.That(bootstrap.Values, Is.EqualTo(native.Values));
+        Assert.That(bootstrap.EventSequence, Is.EqualTo(native.EventSequence));
+    }
+
+    [Test]
+    public void NativeThumbDragAndTabFocusRemainAuthoritative()
+    {
+        var nativeValue = CaptureNativeDrag(new TrackBar());
+        var bootstrapValue = CaptureNativeDrag(new BootstrapRange());
+
+        using var host = new Form();
+        using var first = new BootstrapRange { TabIndex = 0 };
+        using var second = new TextBox { TabIndex = 1 };
+        host.Controls.Add(first);
+        host.Controls.Add(second);
+        host.Show();
+        first.Focus();
+        var moved = host.SelectNextControl(first, forward: true, tabStopOnly: true, nested: true, wrap: false);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(bootstrapValue, Is.EqualTo(nativeValue));
+            Assert.That(bootstrapValue, Is.GreaterThan(5));
+            Assert.That(moved, Is.True);
+            Assert.That(second.Focused, Is.True);
+        }));
+    }
+
+    [Test]
     public void DisposalRemovesThemeSubscription()
     {
         var before = GetThemeSubscriberCount();
@@ -225,6 +292,79 @@ public sealed class BootstrapRangeTests
         }
     }
 
+    private static Form CreateHostedRange(out ProbeBootstrapRange range)
+    {
+        var host = new Form
+        {
+            ShowInTaskbar = false,
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(-32000, -32000)
+        };
+        range = new ProbeBootstrapRange { Size = new Size(240, 50), Value = 5 };
+        host.Controls.Add(range);
+        host.Show();
+        _ = range.Handle;
+        range.Refresh();
+        Application.DoEvents();
+        return host;
+    }
+
+    private static NativeKeyMatrix CaptureNativeKeyMatrix(TrackBar trackBar, Keys[] keys)
+    {
+        using var host = new Form();
+        using (trackBar)
+        {
+            trackBar.Minimum = 0;
+            trackBar.Maximum = 100;
+            trackBar.Value = 40;
+            trackBar.SmallChange = 2;
+            trackBar.LargeChange = 10;
+            host.Controls.Add(trackBar);
+            host.Show();
+            trackBar.Focus();
+            var values = new int[keys.Length];
+            var events = new System.Collections.Generic.List<string>();
+            trackBar.Scroll += (_, _) => events.Add("Scroll");
+            trackBar.ValueChanged += (_, _) => events.Add("ValueChanged");
+            for (var index = 0; index < keys.Length; index++)
+            {
+                SendMessage(trackBar.Handle, WmKeyDown, new IntPtr((int)keys[index]), IntPtr.Zero);
+                values[index] = trackBar.Value;
+            }
+
+            return new NativeKeyMatrix(values, events.ToArray());
+        }
+    }
+
+    private static int CaptureNativeDrag(TrackBar trackBar)
+    {
+        using var host = new Form();
+        using (trackBar)
+        {
+            trackBar.Minimum = 0;
+            trackBar.Maximum = 10;
+            trackBar.Value = 5;
+            trackBar.Size = new Size(240, 50);
+            host.Controls.Add(trackBar);
+            host.Show();
+            _ = trackBar.Handle;
+            var thumb = BootstrapRangeNativeMethods.GetThumbRectangle(trackBar.Handle);
+            var start = new Point(thumb.Left + (thumb.Width / 2), thumb.Top + (thumb.Height / 2));
+            var end = new Point(start.X + 60, start.Y);
+            SendMouseMessage(trackBar.Handle, WmLButtonDown, start, buttonDown: true);
+            SendMouseMessage(trackBar.Handle, WmMouseMove, end, buttonDown: true);
+            SendMouseMessage(trackBar.Handle, WmLButtonUp, end, buttonDown: false);
+            Application.DoEvents();
+            return trackBar.Value;
+        }
+    }
+
+    private static void SendMouseMessage(IntPtr handle, int message, Point point, bool buttonDown)
+    {
+        var lParam = new IntPtr((point.Y << 16) | (point.X & 0xFFFF));
+        SendMessage(handle, message, buttonDown ? new IntPtr(MkLButton) : IntPtr.Zero, lParam);
+    }
+
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
@@ -244,6 +384,19 @@ public sealed class BootstrapRangeTests
         internal int ValueChangedCount { get; }
     }
 
+    private readonly struct NativeKeyMatrix
+    {
+        internal NativeKeyMatrix(int[] values, string[] eventSequence)
+        {
+            Values = values;
+            EventSequence = eventSequence;
+        }
+
+        internal int[] Values { get; }
+
+        internal string[] EventSequence { get; }
+    }
+
     private sealed class ProbeBootstrapRange : BootstrapRange
     {
         internal int SuppressedChannelDrawCount { get; private set; }
@@ -251,6 +404,8 @@ public sealed class BootstrapRangeTests
         internal int SuppressedThumbDrawCount { get; private set; }
 
         internal void RecreateHandleForTesting() => RecreateHandle();
+
+        internal void RaiseMouseLeaveForTesting() => OnMouseLeave(EventArgs.Empty);
 
         protected override void WndProc(ref Message m)
         {

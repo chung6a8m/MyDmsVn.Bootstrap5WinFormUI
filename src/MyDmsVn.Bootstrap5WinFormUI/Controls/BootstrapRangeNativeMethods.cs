@@ -25,6 +25,7 @@ internal static class BootstrapRangeNativeMethods
     internal const uint CdisDisabled = 0x0004;
     internal const uint CdisFocus = 0x0010;
     internal const uint CdisHot = 0x0040;
+    private const int TbmGetThumbRect = 0x0419;
 
     internal static bool TryReadCustomDraw(
         IntPtr parameter,
@@ -56,6 +57,25 @@ internal static class BootstrapRangeNativeMethods
                 return BootstrapRangeNativePart.Unknown;
         }
     }
+
+    internal static Rectangle GetThumbRectangle(IntPtr trackBarHandle)
+    {
+        if (trackBarHandle == IntPtr.Zero)
+        {
+            return Rectangle.Empty;
+        }
+
+        var rectangle = default(BootstrapRangeNativeRectangle);
+        SendMessage(trackBarHandle, TbmGetThumbRect, IntPtr.Zero, ref rectangle);
+        return rectangle.ToRectangle();
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(
+        IntPtr hWnd,
+        int message,
+        IntPtr wParam,
+        ref BootstrapRangeNativeRectangle lParam);
 }
 
 [StructLayout(LayoutKind.Sequential)]

@@ -16,6 +16,8 @@ public class BootstrapRange : TrackBar
 {
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private bool _themeSubscribed;
+    private bool _thumbHot;
+    private bool _thumbPressed;
 
     /// <summary>Initializes a new instance of the <see cref="BootstrapRange"/> class.</summary>
     public BootstrapRange()
@@ -45,6 +47,12 @@ public class BootstrapRange : TrackBar
         }
     }
 
+    internal BootstrapRangeVisualState CurrentVisualState => new BootstrapRangeVisualState(
+        Enabled,
+        Focused,
+        _thumbHot,
+        _thumbPressed);
+
     /// <inheritdoc />
     protected override void OnHandleCreated(EventArgs e)
     {
@@ -54,6 +62,85 @@ public class BootstrapRange : TrackBar
             ApplyThemePresentation();
             Invalidate();
         }
+    }
+
+    /// <inheritdoc />
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        ClearTransientState(invalidate: false);
+        base.OnHandleDestroyed(e);
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (IsDisposed || Disposing || !IsHandleCreated)
+        {
+            return;
+        }
+
+        SetThumbHot(BootstrapRangeNativeMethods.GetThumbRectangle(Handle).Contains(e.Location));
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        SetThumbHot(false);
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        var pressedThumb = e.Button == MouseButtons.Left &&
+            IsHandleCreated &&
+            BootstrapRangeNativeMethods.GetThumbRectangle(Handle).Contains(e.Location);
+        base.OnMouseDown(e);
+        SetThumbPressed(pressedThumb);
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        base.OnMouseUp(e);
+        SetThumbPressed(false);
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseCaptureChanged(EventArgs e)
+    {
+        base.OnMouseCaptureChanged(e);
+        if (!Capture)
+        {
+            SetThumbPressed(false);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnGotFocus(EventArgs e)
+    {
+        base.OnGotFocus(e);
+        InvalidateThumb();
+    }
+
+    /// <inheritdoc />
+    protected override void OnLostFocus(EventArgs e)
+    {
+        base.OnLostFocus(e);
+        InvalidateThumb();
+    }
+
+    /// <inheritdoc />
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        base.OnEnabledChanged(e);
+        if (!Enabled)
+        {
+            ClearTransientState(invalidate: false);
+        }
+
+        InvalidateThumb();
     }
 
     /// <inheritdoc />
@@ -84,6 +171,11 @@ public class BootstrapRange : TrackBar
         {
             BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
             _themeSubscribed = false;
+        }
+
+        if (disposing)
+        {
+            ClearTransientState(invalidate: false);
         }
 
         base.Dispose(disposing);
@@ -146,11 +238,7 @@ public class BootstrapRange : TrackBar
         }
 
         var theme = BootstrapThemeManager.CurrentTheme;
-        var visualState = new BootstrapRangeVisualState(
-            Enabled,
-            Focused,
-            hot: false,
-            pressed: false);
+        var visualState = CurrentVisualState;
         var palette = BootstrapRangeRenderLogic.ResolvePalette(theme.Colors, _variant, visualState);
         var geometry = BootstrapRangeRenderLogic.CalculateGeometry(
             part == BootstrapRangeNativePart.Channel ? customDraw.Bounds : Rectangle.Empty,
@@ -206,5 +294,51 @@ public class BootstrapRange : TrackBar
 
         using var thumbBrush = new SolidBrush(palette.ThumbColor);
         graphics.FillEllipse(thumbBrush, geometry.ThumbBounds);
+    }
+
+    private void SetThumbHot(bool value)
+    {
+        if (_thumbHot == value)
+        {
+            return;
+        }
+
+        _thumbHot = value;
+        InvalidateThumb();
+    }
+
+    private void SetThumbPressed(bool value)
+    {
+        if (_thumbPressed == value)
+        {
+            return;
+        }
+
+        _thumbPressed = value;
+        InvalidateThumb();
+    }
+
+    private void ClearTransientState(bool invalidate)
+    {
+        var changed = _thumbHot || _thumbPressed;
+        _thumbHot = false;
+        _thumbPressed = false;
+        if (invalidate && changed)
+        {
+            InvalidateThumb();
+        }
+    }
+
+    private void InvalidateThumb()
+    {
+        if (IsDisposed || Disposing || !IsHandleCreated)
+        {
+            return;
+        }
+
+        var bounds = BootstrapRangeNativeMethods.GetThumbRectangle(Handle);
+        var inflation = DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingXS, DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi);
+        bounds.Inflate(inflation, inflation);
+        Invalidate(Rectangle.Intersect(ClientRectangle, bounds));
     }
 }

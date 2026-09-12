@@ -91,6 +91,35 @@ public sealed class BootstrapRangeRenderLogicTests
     }
 
     [Test]
+    public void HoverAndPressedThumbTreatmentsAreDistinctWithPressedPrecedence()
+    {
+        var theme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+        var normal = BootstrapRangeRenderLogic.ResolvePalette(
+            theme.Colors,
+            BootstrapVariant.Primary,
+            new BootstrapRangeVisualState(true, false, false, false));
+        var hot = BootstrapRangeRenderLogic.ResolvePalette(
+            theme.Colors,
+            BootstrapVariant.Primary,
+            new BootstrapRangeVisualState(true, false, true, false));
+        var pressed = BootstrapRangeRenderLogic.ResolvePalette(
+            theme.Colors,
+            BootstrapVariant.Primary,
+            new BootstrapRangeVisualState(true, false, true, true));
+        var pressedWithoutHot = BootstrapRangeRenderLogic.ResolvePalette(
+            theme.Colors,
+            BootstrapVariant.Primary,
+            new BootstrapRangeVisualState(true, false, false, true));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(hot.ThumbColor, Is.Not.EqualTo(normal.ThumbColor));
+            Assert.That(pressed.ThumbColor, Is.Not.EqualTo(hot.ThumbColor));
+            Assert.That(pressed.ThumbColor, Is.EqualTo(pressedWithoutHot.ThumbColor));
+        }));
+    }
+
+    [Test]
     public void RailGeometryCentersFrameworkThicknessInsideNativeHorizontalRectangle()
     {
         var nativeBounds = new Rectangle(11, 17, 101, 13);

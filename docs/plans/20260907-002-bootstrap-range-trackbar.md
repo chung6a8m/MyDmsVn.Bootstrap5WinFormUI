@@ -366,14 +366,14 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/BootstrapRangeTests.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/BootstrapRangeRenderLogicTests.cs`
 
-- [ ] **Step 1: Add failing tests** for normal, hover, pressed/dragging, focused, and disabled thumb presentation.
-- [ ] **Step 2: Consume only the native custom-draw item-state flags that Task 1 proved reliable on both TFMs.** For states Task 1 recorded as missing or inconsistent, add only the minimal mouse/capture/focus bookkeeping needed to fill those gaps; do not assume `uItemState` provides hot/pressed semantics merely because the flags exist in Win32 definitions.
-- [ ] **Step 3: If explicit hover tracking is needed**, hit-test against the current native thumb rectangle (`TBM_GETTHUMBRECT` or the verified current native part bounds). Do not change `Value`, capture, or native mouse processing.
-- [ ] **Step 4: Clear transient pressed/hot state** on mouse leave, capture loss, disable, handle destruction, and disposal.
-- [ ] **Step 5: Draw focus halo** around the native thumb when focused; keep native Tab/keyboard behavior untouched.
-- [ ] **Step 6: Test arrow keys, Home/End where native supports them, PageUp/PageDown, channel click, thumb drag, Tab focus transfer, and event sequencing.** Assertions should target native values/events, not synthetic framework behavior.
-- [ ] **Step 7: Confirm no `MessageBox`, dialog, timer, `Thread.Sleep`, or polling loop is introduced.**
-- [ ] **Step 8: Commit:** `feat: add BootstrapRange interaction states`
+- [x] **Step 1: Add failing tests** for normal, hover, pressed/dragging, focused, and disabled thumb presentation.
+- [x] **Step 2: Consume only the native custom-draw item-state flags that Task 1 proved reliable on both TFMs.** For states Task 1 recorded as missing or inconsistent, add only the minimal mouse/capture/focus bookkeeping needed to fill those gaps; do not assume `uItemState` provides hot/pressed semantics merely because the flags exist in Win32 definitions.
+- [x] **Step 3: If explicit hover tracking is needed**, hit-test against the current native thumb rectangle (`TBM_GETTHUMBRECT` or the verified current native part bounds). Do not change `Value`, capture, or native mouse processing.
+- [x] **Step 4: Clear transient pressed/hot state** on mouse leave, capture loss, disable, handle destruction, and disposal.
+- [x] **Step 5: Draw focus halo** around the native thumb when focused; keep native Tab/keyboard behavior untouched.
+- [x] **Step 6: Test arrow keys, Home/End where native supports them, PageUp/PageDown, channel click, thumb drag, Tab focus transfer, and event sequencing.** Assertions should target native values/events, not synthetic framework behavior.
+- [x] **Step 7: Confirm no `MessageBox`, dialog, timer, `Thread.Sleep`, or polling loop is introduced.**
+- [x] **Step 8: Commit:** `feat: add BootstrapRange interaction states`
 
 ---
 
