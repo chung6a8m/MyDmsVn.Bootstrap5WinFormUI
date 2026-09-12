@@ -680,20 +680,20 @@ git commit -m "test: harden Bootstrap ToolStrip family"
 
 **Produces:** discoverable demo, documented ownership boundaries, and public API baseline coverage.
 
-- [ ] **Step 1: Write a failing demo contract test.** Require one integrated page that creates all four controls and can be constructed/disposed repeatedly under STA without leaking theme subscriptions. Any test that opens demo menus/drop-downs must use `WinFormsMessageLoopTestHost`.
-- [ ] **Step 2: Implement `ToolStripFamilyDemoForm`.** Demonstrate at minimum:
+- [x] **Step 1: Write a failing demo contract test.** Require one integrated page that creates all four controls and can be constructed/disposed repeatedly under STA without leaking theme subscriptions. Any test that opens demo menus/drop-downs must use `WinFormsMessageLoopTestHost`.
+- [x] **Step 2: Implement `ToolStripFamilyDemoForm`.** Demonstrate at minimum:
   - a `BootstrapMenuStrip` with mnemonics, keyboard shortcut, checked item, disabled item, separator, nested submenu, and a runtime theme/variant-visible state;
   - a `BootstrapToolStrip` with normal button, checked button, drop-down button, split button, vertical/horizontal separator examples where practical, tooltip, native image, and a constrained-width overflow section;
   - a `BootstrapContextMenuStrip` assigned to a visible content panel with checked/disabled/nested items and `Opening` feedback;
   - a `BootstrapStatusStrip` with left label, Spring label, right label, at least one label demonstrating `BorderSides`/`BorderStyle`, drop-down/split command, progress bar, and sizing grip;
   - a small event log showing native click/open/close/source-control behavior without modal dialogs.
-- [ ] **Step 3: Add one integrated-demo navigation entry in `MainForm.ConfigurePages()`.** Suggested title: `Menus / ToolStrips`; description should explicitly mention MenuStrip, ContextMenuStrip, ToolStrip, StatusStrip, shortcuts, overflow, and native behavior.
-- [ ] **Step 4: Add demo tests for repeated construction/disposal, theme switching, and navigation registration.**
-- [ ] **Step 5: Document all four controls in `docs/COMPONENTS.md`.** Include direct native base type, `Variant`, native-authoritative APIs, renderer opt-out behavior, hosted-control limitation, split-button renderer ownership, orientation-aware separators, and StatusStrip border preservation.
-- [ ] **Step 6: Update `docs/ARCHITECTURE.md`.** Record `BootstrapToolStripRendererBase`/appearance controller as shared infrastructure; state that `BootstrapDropdown` and the ToolStrip family intentionally share the same rendering system; and document the distinction between native renderer propagation and framework tracking of already-created/open surfaces for repaint/lifecycle only.
-- [ ] **Step 7: Update README control inventory if it currently lists implemented controls.** Do not duplicate full component documentation there.
-- [ ] **Step 8: Extend `Phase16PublicApiBaselineTests` for the four public classes and `Variant` property, including the `BootstrapContextMenuStrip(IContainer)` constructor.** Internal renderer/helper/test-host types must not leak into the public library API baseline.
-- [ ] **Step 9: Run demo/public API focused tests.**
+- [x] **Step 3: Add one integrated-demo navigation entry in `MainForm.ConfigurePages()`.** Suggested title: `Menus / ToolStrips`; description should explicitly mention MenuStrip, ContextMenuStrip, ToolStrip, StatusStrip, shortcuts, overflow, and native behavior.
+- [x] **Step 4: Add demo tests for repeated construction/disposal, theme switching, and navigation registration.**
+- [x] **Step 5: Document all four controls in `docs/COMPONENTS.md`.** Include direct native base type, `Variant`, native-authoritative APIs, renderer opt-out behavior, hosted-control limitation, split-button renderer ownership, orientation-aware separators, and StatusStrip border preservation.
+- [x] **Step 6: Update `docs/ARCHITECTURE.md`.** Record `BootstrapToolStripRendererBase`/appearance controller as shared infrastructure; state that `BootstrapDropdown` and the ToolStrip family intentionally share the same rendering system; and document the distinction between native renderer propagation and framework tracking of already-created/open surfaces for repaint/lifecycle only.
+- [x] **Step 7: Update README control inventory if it currently lists implemented controls.** Do not duplicate full component documentation there.
+- [x] **Step 8: Extend `Phase16PublicApiBaselineTests` for the four public classes and `Variant` property, including the `BootstrapContextMenuStrip(IContainer)` constructor.** Internal renderer/helper/test-host types must not leak into the public library API baseline.
+- [x] **Step 9: Run demo/public API focused tests.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -703,7 +703,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 ```
 
 - [ ] **Step 10: Manually inspect the demo in Light and Dark themes at 100%, 150%, and 200% Windows scaling.** Verify no clipped checks/arrows/text, split-button divider/arrow correctness, no stale menu after application deactivation, no overflow placement defect, separator orientation correctness, no status Spring or status-label-border regression, and no theme mismatch between owner and opened submenu.
-- [ ] **Step 11: Commit demo/docs/API baseline.**
+- [x] **Step 11: Commit demo/docs/API baseline.**
 
 ```powershell
 git add demo/MyDmsVn.Bootstrap5WinFormUI.Demo/ToolStripFamilyDemoForm.cs demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/ToolStripFamilyDemoFormTests.cs docs/COMPONENTS.md docs/ARCHITECTURE.md README.md tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Release/Phase16PublicApiBaselineTests.cs

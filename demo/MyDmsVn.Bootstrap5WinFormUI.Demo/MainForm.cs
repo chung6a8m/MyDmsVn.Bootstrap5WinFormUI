@@ -282,6 +282,11 @@ public sealed class MainForm : DemoFormBase
             () => new ListViewDemoForm());
 
         AddPage(
+            "Menus / ToolStrips",
+            "MenuStrip, ContextMenuStrip, ToolStrip, and StatusStrip with shortcuts, overflow, and native behavior.",
+            () => new ToolStripFamilyDemoForm());
+
+        AddPage(
             "DataGrid",
             "Bound data, states, large-row performance, and editable product cells using BootstrapSelect through the native editing lifecycle.",
             () => new DemoPageHostForm(

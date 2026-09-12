@@ -1129,6 +1129,31 @@ list.VirtualListSize = 100000;
 
 Manual verification: choose **ListView** in the integrated demo. Exercise all five normal views, Details `FullRowSelect`/`GridLines`/striping, repeated cross-column hover, checks and state images, Ctrl/Shift multi-selection, label editing, groups plus the native List restriction, the 100,000-row virtual example, native keyboard/context-menu/activation behavior, HideSelection, disabled state, runtime Variant and Light/Dark changes, RTL, rapid view changes, disposal, and real Windows 100/125/150/175/200% scaling. In the Details regression scenario, subitem text/images must never disappear during repeated pointer movement.
 
+## Bootstrap ToolStrip family
+
+Responsibility: apply shared Bootstrap-themed, DPI-aware presentation to the native WinForms ToolStrip family without replacing native item, layout, keyboard, popup, merge, overflow, status, or accessibility behavior.
+
+The V1 public surface is intentionally small:
+
+```text
+BootstrapToolStrip : ToolStrip                 Variant
+BootstrapMenuStrip : MenuStrip                 Variant
+BootstrapContextMenuStrip : ContextMenuStrip   Variant
+BootstrapStatusStrip : StatusStrip             Variant
+```
+
+- All four classes derive directly from their native bases. Inherited `Items` and standard `ToolStripItem` types remain authoritative; no Bootstrap item hierarchy or collection adapter is introduced.
+- `Variant` defaults to `Primary` and accents selected, hot, checked, pressed, and open-owner states. Neutral chrome comes from theme surface/text/border tokens; disabled states use disabled/muted tokens.
+- Each control installs a per-control shared Bootstrap renderer. Assigning inherited `Renderer` is an explicit caller opt-out: later theme or variant changes do not reinstall or dispose the caller renderer, and `ToolStripManager.Renderer` is never changed.
+- `BootstrapMenuStrip` retains native Alt/mnemonic activation, shortcuts, cascading drop-downs, right-aligned/RTL items, MDI integration, and `ToolStripManager.Merge`/revert behavior. `BootstrapContextMenuStrip` retains native placement, `SourceControl`, cancelable lifecycle events, `AutoClose`, shortcuts, and nested menus; its `IContainer` constructor delegates to the native constructor.
+- ToolStrip overflow, item autosizing, image scaling, tooltips, horizontal/vertical layout, and grip behavior remain native. Separators honor the native `Vertical` render flag. Split-button painting uses native `ButtonBounds` and `DropDownButtonBounds`, including RTL, and keeps main/drop-down actions separate.
+- `BootstrapStatusStrip` retains native table layout, `ToolStripStatusLabel.Spring`, sizing behavior, interactive items, and hosted `ToolStripProgressBar`. The renderer preserves caller `BorderSides` and `BorderStyle` instead of flattening status-label borders.
+- `ToolStripTextBox`, `ToolStripComboBox`, `ToolStripProgressBar`, caller images, item padding/sizing, and image sizing remain native/caller-owned. V1 does not deeply restyle hosted-control interiors.
+- Runtime theme changes repaint the owner and already-created/open Bootstrap-owned drop-down surfaces. Tracking is event-driven, does not pre-create lazy menus, and is released with item/surface/control lifetime. Framework-created fonts are replaced/disposed by the controller; a caller-assigned font survives later theme changes and disposal.
+- V1 excludes custom popup forms, global keyboard hooks, rounded popup regions/shadows, animated opening, toolbar persistence, ribbon/docking systems, and a process-global Bootstrap renderer mode.
+
+Manual verification: open **Menus / ToolStrips** in the integrated demo and exercise Ctrl+S, access keys, checked/disabled/nested commands, split main/drop-down actions, constrained-width overflow, horizontal/vertical separators, context-menu source/lifecycle logging, status Spring/borders/progress/sizing grip, Light/Dark themes, RTL, and Windows 100/150/200% scaling.
+
 ## Deferred components
 
 Dialog/Modal, Skeleton, and others are not part of the initial foundation contract.
