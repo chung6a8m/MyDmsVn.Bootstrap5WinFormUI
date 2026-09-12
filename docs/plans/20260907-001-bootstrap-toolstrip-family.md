@@ -471,14 +471,14 @@ git commit -m "refactor: share ToolStrip rendering infrastructure"
 
 **Produces:** first public native-backed ToolStrip control and the appearance controller reused by Tasks 3–5.
 
-- [ ] **Step 1: Write failing contract tests for the appearance controller and public control.** Assert direct inheritance, default `Variant.Primary`, a framework custom renderer at construction, native `Items`, and no mutation of `ToolStripManager.Renderer`.
-- [ ] **Step 2: Add failing theme/font ownership tests.** Verify theme changes invalidate and update framework-owned typography; a caller-assigned font survives later theme changes; disposing the control unsubscribes the theme handler and does not dispose the caller font.
-- [ ] **Step 3: Add failing renderer-ownership tests.** Assign a caller renderer after construction, change theme and variant, and verify the framework never reinstalls or disposes the caller renderer.
-- [ ] **Step 4: Add failing ToolStrip behavior tests.** Cover button click, `CheckOnClick`, drop-down button opening, split-button main/drop-down action separation, item enable/disable, tooltip/native image preservation, horizontal/vertical layout, and dynamic item add/remove. Use `WinFormsMessageLoopTestHost` for tests that actually open a drop-down.
-- [ ] **Step 5: Add split-button render assertions.** Render a `ToolStripSplitButton` in LTR and RTL and assert the framework paints a visible divider plus arrow inside the native `DropDownButtonBounds`; verify main and drop-down hot/pressed states can differ without altering native bounds.
-- [ ] **Step 6: Add horizontal/vertical separator render assertions.** A vertical ToolStrip must receive a vertical separator; a horizontal ToolStrip/drop-down must receive a horizontal separator.
-- [ ] **Step 7: Add a native-overflow characterization test.** Use a constrained-width real ToolStrip handle with enough items to force overflow inside `WinFormsMessageLoopTestHost`; verify native overflow creation and item ownership work before any Bootstrap-specific assertion.
-- [ ] **Step 8: Run the focused tests and confirm failure before implementation.**
+- [x] **Step 1: Write failing contract tests for the appearance controller and public control.** Assert direct inheritance, default `Variant.Primary`, a framework custom renderer at construction, native `Items`, and no mutation of `ToolStripManager.Renderer`.
+- [x] **Step 2: Add failing theme/font ownership tests.** Verify theme changes invalidate and update framework-owned typography; a caller-assigned font survives later theme changes; disposing the control unsubscribes the theme handler and does not dispose the caller font.
+- [x] **Step 3: Add failing renderer-ownership tests.** Assign a caller renderer after construction, change theme and variant, and verify the framework never reinstalls or disposes the caller renderer.
+- [x] **Step 4: Add failing ToolStrip behavior tests.** Cover button click, `CheckOnClick`, drop-down button opening, split-button main/drop-down action separation, item enable/disable, tooltip/native image preservation, horizontal/vertical layout, and dynamic item add/remove. Use `WinFormsMessageLoopTestHost` for tests that actually open a drop-down.
+- [x] **Step 5: Add split-button render assertions.** Render a `ToolStripSplitButton` in LTR and RTL and assert the framework paints a visible divider plus arrow inside the native `DropDownButtonBounds`; verify main and drop-down hot/pressed states can differ without altering native bounds.
+- [x] **Step 6: Add horizontal/vertical separator render assertions.** A vertical ToolStrip must receive a vertical separator; a horizontal ToolStrip/drop-down must receive a horizontal separator.
+- [x] **Step 7: Add a native-overflow characterization test.** Use a constrained-width real ToolStrip handle with enough items to force overflow inside `WinFormsMessageLoopTestHost`; verify native overflow creation and item ownership work before any Bootstrap-specific assertion.
+- [x] **Step 8: Run the focused tests and confirm failure before implementation.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -487,12 +487,12 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 9: Implement `BootstrapToolStripAppearanceController`.** Own only the framework renderer, `Variant`, theme subscription, framework font, created/open child-surface tracking needed for repaint/lifecycle, invalidation, and disposal. Observe caller `FontChanged` and renderer replacement without taking ownership of caller objects.
-- [ ] **Step 10: Implement `BootstrapToolStrip : ToolStrip`.** Keep the class thin: construct the appearance controller, forward `Variant`, preserve all inherited behavior, and dispose the controller from `Dispose(bool)`.
-- [ ] **Step 11: Make the shared renderer cover toolbar button/drop-down/split/grip/overflow/separator states using the already-tested pure logic.** Do not change native item layout rectangles.
-- [ ] **Step 12: Verify overflow is still native and the overflow surface receives Bootstrap painting without a custom overflow implementation.**
-- [ ] **Step 13: Re-run the Task 2 tests and Task 1 regression tests.**
-- [ ] **Step 14: Commit `BootstrapToolStrip`.**
+- [x] **Step 9: Implement `BootstrapToolStripAppearanceController`.** Own only the framework renderer, `Variant`, theme subscription, framework font, created/open child-surface tracking needed for repaint/lifecycle, invalidation, and disposal. Observe caller `FontChanged` and renderer replacement without taking ownership of caller objects.
+- [x] **Step 10: Implement `BootstrapToolStrip : ToolStrip`.** Keep the class thin: construct the appearance controller, forward `Variant`, preserve all inherited behavior, and dispose the controller from `Dispose(bool)`.
+- [x] **Step 11: Make the shared renderer cover toolbar button/drop-down/split/grip/overflow/separator states using the already-tested pure logic.** Do not change native item layout rectangles.
+- [x] **Step 12: Verify overflow is still native and the overflow surface receives Bootstrap painting without a custom overflow implementation.**
+- [x] **Step 13: Re-run the Task 2 tests and Task 1 regression tests.**
+- [x] **Step 14: Commit `BootstrapToolStrip`.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapToolStripAppearanceController.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapToolStrip.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapToolStripTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapToolStripInteractionTests.cs
@@ -513,15 +513,15 @@ git commit -m "feat: add BootstrapToolStrip"
 
 **Produces:** Bootstrap-themed native menu bar with nested drop-down continuity.
 
-- [ ] **Step 1: Write failing public contract tests.** Assert direct `MenuStrip` inheritance, default variant, native `Items`, standard `ToolStripMenuItem` compatibility, and custom Bootstrap renderer installation.
-- [ ] **Step 2: Write message-loop-backed interaction tests for mnemonics and shortcuts.** Host the menu in a real `Form` inside `WinFormsMessageLoopTestHost`; verify menu-item click events, Alt/mnemonic activation, `ShortcutKeys`, check state, disabled items, and nested menu click behavior remain native. Do not synthesize these behaviors by calling framework-private methods.
-- [ ] **Step 3: Characterize renderer propagation into first-level and nested native drop-downs.** Open a top-level menu through the message loop, inspect the actual created `ToolStripDropDown`, open a child submenu, and record whether WinForms already uses the owner renderer.
-- [ ] **Step 4: Separately characterize repaint tracking requirements.** With a real first-level and nested drop-down open, change `Variant` and Light/Dark theme and verify the visible popup surfaces repaint without close/reopen. This requirement applies even if native renderer propagation itself needs no custom assignment code.
-- [ ] **Step 5: Lock renderer continuity without conflating it with lifecycle tracking.** Bootstrap-owned dropdowns use the shared renderer/current variant; caller-custom-rendered dropdowns keep their explicit renderer. If native propagation is sufficient, add no renderer-assignment code. Independently retain only the event-driven created/open-surface tracking required for repaint and cleanup.
-- [ ] **Step 6: Add renderer opt-out descendant regression.** Open a submenu once, close it, replace the root `Renderer` with a sentinel caller renderer, mutate theme/variant, and open/navigate the submenu again. Verify the framework does not force its renderer back onto root or descendant surfaces and does not dispose the sentinel.
-- [ ] **Step 7: Write a native MDI/merge characterization and regression test.** Use two `BootstrapMenuStrip` instances with `AllowMerge`, `MergeAction`, and `MergeIndex`; exercise `ToolStripManager.Merge`/revert or the existing WinForms MDI pattern and prove that styling does not alter native item identity or merge order.
-- [ ] **Step 8: Add RTL/right-alignment rendering tests.** Use event/native item bounds and verify no hard-coded LTR arrow/check/split assumptions leak into the shared renderer.
-- [ ] **Step 9: Run failing tests.**
+- [x] **Step 1: Write failing public contract tests.** Assert direct `MenuStrip` inheritance, default variant, native `Items`, standard `ToolStripMenuItem` compatibility, and custom Bootstrap renderer installation.
+- [x] **Step 2: Write message-loop-backed interaction tests for mnemonics and shortcuts.** Host the menu in a real `Form` inside `WinFormsMessageLoopTestHost`; verify menu-item click events, Alt/mnemonic activation, `ShortcutKeys`, check state, disabled items, and nested menu click behavior remain native. Do not synthesize these behaviors by calling framework-private methods.
+- [x] **Step 3: Characterize renderer propagation into first-level and nested native drop-downs.** Open a top-level menu through the message loop, inspect the actual created `ToolStripDropDown`, open a child submenu, and record whether WinForms already uses the owner renderer.
+- [x] **Step 4: Separately characterize repaint tracking requirements.** With a real first-level and nested drop-down open, change `Variant` and Light/Dark theme and verify the visible popup surfaces repaint without close/reopen. This requirement applies even if native renderer propagation itself needs no custom assignment code.
+- [x] **Step 5: Lock renderer continuity without conflating it with lifecycle tracking.** Bootstrap-owned dropdowns use the shared renderer/current variant; caller-custom-rendered dropdowns keep their explicit renderer. If native propagation is sufficient, add no renderer-assignment code. Independently retain only the event-driven created/open-surface tracking required for repaint and cleanup.
+- [x] **Step 6: Add renderer opt-out descendant regression.** Open a submenu once, close it, replace the root `Renderer` with a sentinel caller renderer, mutate theme/variant, and open/navigate the submenu again. Verify the framework does not force its renderer back onto root or descendant surfaces and does not dispose the sentinel.
+- [x] **Step 7: Write a native MDI/merge characterization and regression test.** Use two `BootstrapMenuStrip` instances with `AllowMerge`, `MergeAction`, and `MergeIndex`; exercise `ToolStripManager.Merge`/revert or the existing WinForms MDI pattern and prove that styling does not alter native item identity or merge order.
+- [x] **Step 8: Add RTL/right-alignment rendering tests.** Use event/native item bounds and verify no hard-coded LTR arrow/check/split assumptions leak into the shared renderer.
+- [x] **Step 9: Run failing tests.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -530,10 +530,10 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 10: Implement `BootstrapMenuStrip : MenuStrip` as a thin appearance-controller host.** Do not override keyboard processing or menu activation unless a failing native-compatibility test proves a rendering-only override cannot satisfy the requirement.
-- [ ] **Step 11: Extend only shared infrastructure needed for top-level-menu active state, renderer propagation when native propagation is insufficient, and created/open-surface repaint tracking.** The opened top-level item must remain visibly active while its native dropdown is open.
-- [ ] **Step 12: Re-run MenuStrip, ToolStrip, message-loop-host, and BootstrapDropdown regression tests.**
-- [ ] **Step 13: Commit `BootstrapMenuStrip`.**
+- [x] **Step 10: Implement `BootstrapMenuStrip : MenuStrip` as a thin appearance-controller host.** Do not override keyboard processing or menu activation unless a failing native-compatibility test proves a rendering-only override cannot satisfy the requirement.
+- [x] **Step 11: Extend only shared infrastructure needed for top-level-menu active state, renderer propagation when native propagation is insufficient, and created/open-surface repaint tracking.** The opened top-level item must remain visibly active while its native dropdown is open.
+- [x] **Step 12: Re-run MenuStrip, ToolStrip, message-loop-host, and BootstrapDropdown regression tests.**
+- [x] **Step 13: Commit `BootstrapMenuStrip`.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapMenuStrip.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapToolStripAppearanceController.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapMenuStripTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapMenuStripInteractionTests.cs
