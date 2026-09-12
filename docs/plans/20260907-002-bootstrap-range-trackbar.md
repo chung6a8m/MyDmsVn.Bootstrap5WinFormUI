@@ -404,14 +404,14 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/BootstrapRangeTests.cs`
 - Reference: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Infrastructure/WinFormsTestEnvironment.cs`
 
-- [ ] **Step 1: Verify native accessible role/value behavior** remains TrackBar-derived and updates when `Value` changes.
-- [ ] **Step 2: Verify `AccessibleName`, `AccessibleDescription`, `TabStop`, focus navigation, keyboard changes, and inherited events** work with custom drawing enabled.
-- [ ] **Step 3: Add lifecycle tests** for create/destroy handle, reparent, orientation/RTL property changes that recreate the handle, repeated theme changes, and disposal.
-- [ ] **Step 4: Verify designer-friendly defaults**: `Variant` has correct metadata/default serialization; native properties remain browsable through the inherited TrackBar surface.
-- [ ] **Step 5: Add a stress loop** that changes values/themes and invalidates repeatedly, checking for exceptions and deterministic completion rather than pixel snapshots tied to one Windows version.
-- [ ] **Step 6: Keep GUI tests fail-fast.** Use existing `WinFormsTestEnvironment`, STA fixtures, a real parent HWND for notification-dependent tests, deterministic host disposal, and bounded message synchronization; no automated test may require a user to dismiss a window/dialog.
-- [ ] **Step 7: Run both TFMs with the repository's bounded hang protection.**
-- [ ] **Step 8: Commit:** `test: harden BootstrapRange native behavior`
+- [x] **Step 1: Verify native accessible role/value behavior** remains TrackBar-derived and updates when `Value` changes.
+- [x] **Step 2: Verify `AccessibleName`, `AccessibleDescription`, `TabStop`, focus navigation, keyboard changes, and inherited events** work with custom drawing enabled.
+- [x] **Step 3: Add lifecycle tests** for create/destroy handle, reparent, orientation/RTL property changes that recreate the handle, repeated theme changes, and disposal.
+- [x] **Step 4: Verify designer-friendly defaults**: `Variant` has correct metadata/default serialization; native properties remain browsable through the inherited TrackBar surface.
+- [x] **Step 5: Add a stress loop** that changes values/themes and invalidates repeatedly, checking for exceptions and deterministic completion rather than pixel snapshots tied to one Windows version.
+- [x] **Step 6: Keep GUI tests fail-fast.** Use existing `WinFormsTestEnvironment`, STA fixtures, a real parent HWND for notification-dependent tests, deterministic host disposal, and bounded message synchronization; no automated test may require a user to dismiss a window/dialog.
+- [x] **Step 7: Run both TFMs with the repository's bounded hang protection.**
+- [x] **Step 8: Commit:** `test: harden BootstrapRange native behavior`
 
 ---
 

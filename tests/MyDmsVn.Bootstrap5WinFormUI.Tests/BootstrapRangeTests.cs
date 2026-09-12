@@ -288,6 +288,117 @@ public sealed class BootstrapRangeTests
     }
 
     [Test]
+    public void AccessibilityAndInheritedPropertiesRemainNativeTrackBarContracts()
+    {
+        using var native = new TrackBar { Value = 3, AccessibleName = "Native range", AccessibleDescription = "Native description" };
+        using var range = new BootstrapRange
+        {
+            Value = 3,
+            AccessibleName = "Native range",
+            AccessibleDescription = "Native description",
+            TabStop = true
+        };
+        _ = native.Handle;
+        _ = range.Handle;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(range.AccessibilityObject.Role, Is.EqualTo(native.AccessibilityObject.Role));
+            Assert.That(range.AccessibilityObject.Name, Is.EqualTo(native.AccessibilityObject.Name));
+            Assert.That(range.AccessibilityObject.Description, Is.EqualTo(native.AccessibilityObject.Description));
+            Assert.That(range.AccessibilityObject.Value, Is.EqualTo(native.AccessibilityObject.Value));
+            Assert.That(range.TabStop, Is.True);
+        }));
+
+        native.Value = 8;
+        range.Value = 8;
+        Assert.That(range.AccessibilityObject.Value, Is.EqualTo(native.AccessibilityObject.Value));
+    }
+
+    [Test]
+    public void ReparentHandleRecreationAndLayoutChangesPreserveNativeState()
+    {
+        using var firstHost = new Form();
+        using var secondHost = new Form();
+        using var range = new ProbeBootstrapRange
+        {
+            Minimum = -5,
+            Maximum = 25,
+            Value = 12,
+            SmallChange = 2,
+            LargeChange = 6,
+            TickFrequency = 4
+        };
+        firstHost.Controls.Add(range);
+        firstHost.Show();
+        _ = range.Handle;
+        range.RecreateHandleForTesting();
+        firstHost.Controls.Remove(range);
+        secondHost.Controls.Add(range);
+        secondHost.Show();
+        range.Orientation = Orientation.Vertical;
+        range.RightToLeft = RightToLeft.Yes;
+        range.RightToLeftLayout = true;
+        range.Refresh();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(range.Parent, Is.SameAs(secondHost));
+            Assert.That(range.IsHandleCreated, Is.True);
+            Assert.That(range.Minimum, Is.EqualTo(-5));
+            Assert.That(range.Maximum, Is.EqualTo(25));
+            Assert.That(range.Value, Is.EqualTo(12));
+            Assert.That(range.SmallChange, Is.EqualTo(2));
+            Assert.That(range.LargeChange, Is.EqualTo(6));
+            Assert.That(range.TickFrequency, Is.EqualTo(4));
+        }));
+    }
+
+    [Test]
+    public void DesignerDefaultsKeepVariantMinimalAndNativePropertiesBrowsable()
+    {
+        using var range = new BootstrapRange();
+        var properties = TypeDescriptor.GetProperties(range);
+        var variant = properties[nameof(BootstrapRange.Variant)]!;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(variant.ShouldSerializeValue(range), Is.False);
+            Assert.That(properties[nameof(TrackBar.Minimum)]!.IsBrowsable, Is.True);
+            Assert.That(properties[nameof(TrackBar.Maximum)]!.IsBrowsable, Is.True);
+            Assert.That(properties[nameof(TrackBar.Value)]!.IsBrowsable, Is.True);
+            Assert.That(properties[nameof(TrackBar.TickFrequency)]!.IsBrowsable, Is.True);
+            Assert.That(properties[nameof(TrackBar.Orientation)]!.IsBrowsable, Is.True);
+        }));
+    }
+
+    [Test]
+    public void RepeatedThemeValueAndInvalidationStressCompletesDeterministically()
+    {
+        using var host = CreateHostedRange(out var range);
+        range.Minimum = 0;
+        range.Maximum = 100;
+        for (var index = 0; index < 150; index++)
+        {
+            range.Value = index % 101;
+            range.Variant = (BootstrapVariant)(index % 8);
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(
+                index % 2 == 0 ? BootstrapThemeMode.Light : BootstrapThemeMode.Dark);
+            range.Invalidate();
+            range.Update();
+        }
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(range.Value, Is.EqualTo(48));
+            Assert.That(range.IsDisposed, Is.False);
+            Assert.That(range.SuppressedChannelDrawCount, Is.GreaterThan(0));
+            Assert.That(range.SuppressedThumbDrawCount, Is.GreaterThan(0));
+        }));
+    }
+
+    [Test]
     public void DisposalRemovesThemeSubscription()
     {
         var before = GetThemeSubscriberCount();
