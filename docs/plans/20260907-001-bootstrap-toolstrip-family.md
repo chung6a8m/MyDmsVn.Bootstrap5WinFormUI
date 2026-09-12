@@ -634,19 +634,19 @@ git commit -m "feat: add BootstrapStatusStrip"
 
 **Produces:** cross-control compatibility evidence and regression protection.
 
-- [ ] **Step 1: Add a four-control theme-switch test.** Place all four controls on/under one form inside `WinFormsMessageLoopTestHost`, open a menu/context surface, change Light -> Dark -> Light, and verify each still uses the same native items and current shared palette without closing the open surface.
-- [ ] **Step 2: Add caller-renderer opt-out coverage for every public control.** Assign a sentinel renderer, mutate theme and `Variant`, and verify its reference survives unchanged.
-- [ ] **Step 3: Add descendant opt-out coverage.** Create/open nested surfaces under a Bootstrap renderer, close them, replace the root renderer with a sentinel, then reopen/navigate. Verify no framework renderer is force-reinstalled on root/descendants and no caller renderer is disposed.
-- [ ] **Step 4: Add caller-font ownership coverage for every public control.** Verify no theme switch disposes or replaces a caller font.
-- [ ] **Step 5: Add dynamic-item coverage.** Add/remove/reinsert toolbar and menu items after handle creation; add nested menu items after the first menu opening; ensure no stale drop-down tracking, stale renderer subscriptions, or duplicate event handlers.
-- [ ] **Step 6: Add overflow regression at 96/144/192 logical DPI scenarios.** The test should prove overflow item ownership/order remains native while custom overflow affordances scale from `DpiScaler`.
-- [ ] **Step 7: Add horizontal/vertical separator DPI regression.** At 96/144/192 logical DPI, separator orientation remains correct and inset/stroke scale through shared render logic.
-- [ ] **Step 8: Add split-button DPI/RTL regression.** At representative DPI values and both LTR/RTL, divider and arrow stay inside native `DropDownButtonBounds` and the renderer never invents alternative split rectangles.
-- [ ] **Step 9: Add status-label border regression.** Theme and variant changes must not remove caller `BorderSides`/`BorderStyle`.
-- [ ] **Step 10: Add menu merge/revert regression.** Verify merge does not duplicate framework event subscriptions, does not transfer renderer ownership incorrectly, and reversion restores native item ownership/order.
-- [ ] **Step 11: Add dispose/handle-recreation regression.** Create/dispose/recreate handles, show/hide forms, and verify no `ObjectDisposedException`, static theme-event leak, orphan message-loop work, or stale drop-down reference.
-- [ ] **Step 12: Add RTL screenshots/render assertions where deterministic.** At minimum cover submenu arrows, checks, separators, split buttons, overflow, and status grip without assuming left-side coordinates.
-- [ ] **Step 13: Run the entire family plus dropdown suite.**
+- [x] **Step 1: Add a four-control theme-switch test.** Place all four controls on/under one form inside `WinFormsMessageLoopTestHost`, open a menu/context surface, change Light -> Dark -> Light, and verify each still uses the same native items and current shared palette without closing the open surface.
+- [x] **Step 2: Add caller-renderer opt-out coverage for every public control.** Assign a sentinel renderer, mutate theme and `Variant`, and verify its reference survives unchanged.
+- [x] **Step 3: Add descendant opt-out coverage.** Create/open nested surfaces under a Bootstrap renderer, close them, replace the root renderer with a sentinel, then reopen/navigate. Verify no framework renderer is force-reinstalled on root/descendants and no caller renderer is disposed.
+- [x] **Step 4: Add caller-font ownership coverage for every public control.** Verify no theme switch disposes or replaces a caller font.
+- [x] **Step 5: Add dynamic-item coverage.** Add/remove/reinsert toolbar and menu items after handle creation; add nested menu items after the first menu opening; ensure no stale drop-down tracking, stale renderer subscriptions, or duplicate event handlers.
+- [x] **Step 6: Add overflow regression at 96/144/192 logical DPI scenarios.** The test should prove overflow item ownership/order remains native while custom overflow affordances scale from `DpiScaler`.
+- [x] **Step 7: Add horizontal/vertical separator DPI regression.** At 96/144/192 logical DPI, separator orientation remains correct and inset/stroke scale through shared render logic.
+- [x] **Step 8: Add split-button DPI/RTL regression.** At representative DPI values and both LTR/RTL, divider and arrow stay inside native `DropDownButtonBounds` and the renderer never invents alternative split rectangles.
+- [x] **Step 9: Add status-label border regression.** Theme and variant changes must not remove caller `BorderSides`/`BorderStyle`.
+- [x] **Step 10: Add menu merge/revert regression.** Verify merge does not duplicate framework event subscriptions, does not transfer renderer ownership incorrectly, and reversion restores native item ownership/order.
+- [x] **Step 11: Add dispose/handle-recreation regression.** Create/dispose/recreate handles, show/hide forms, and verify no `ObjectDisposedException`, static theme-event leak, orphan message-loop work, or stale drop-down reference.
+- [x] **Step 12: Add RTL screenshots/render assertions where deterministic.** At minimum cover submenu arrows, checks, separators, split buttons, overflow, and status grip without assuming left-side coordinates.
+- [x] **Step 13: Run the entire family plus dropdown suite.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -655,8 +655,8 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 14: Fix only failures demonstrated by tests and keep fixes in shared infrastructure whenever the behavior is common.**
-- [ ] **Step 15: Commit hardening.**
+- [x] **Step 14: Fix only failures demonstrated by tests and keep fixes in shared infrastructure whenever the behavior is common.**
+- [x] **Step 15: Commit hardening.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapToolStripFamilyRegressionTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapToolStripFamilyDpiTests.cs
