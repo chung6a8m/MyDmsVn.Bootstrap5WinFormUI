@@ -298,13 +298,13 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Finalize: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapRangeNativeMethods.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/BootstrapRangeRenderLogicTests.cs`
 
-- [ ] **Step 1: Write failing pure tests** for theme/variant resolution, disabled state, focus halo, horizontal/vertical geometry, small native rectangles, and DPI scaling.
-- [ ] **Step 2: Implement minimal render-logic types** that transform native part rectangles + state into drawing primitives.
-- [ ] **Step 3: Verify native rectangles are never double-scaled.** Only framework metrics use `DpiScaler`.
-- [ ] **Step 4: Add interop declarations** for the verified notification stages/return flags/part identifiers using pointer-size-correct layouts.
-- [ ] **Step 5: Add tests for parsing/classification** of channel/thumb/tick/unknown custom-draw parts without needing a visible window.
-- [ ] **Step 6: Keep raw constants internal** and centralized; do not scatter P/Invoke values through the control.
-- [ ] **Step 7: Run both TFMs with bounded hang detection because the filter includes the HWND custom-draw fixture:**
+- [x] **Step 1: Write failing pure tests** for theme/variant resolution, disabled state, focus halo, horizontal/vertical geometry, small native rectangles, and DPI scaling.
+- [x] **Step 2: Implement minimal render-logic types** that transform native part rectangles + state into drawing primitives.
+- [x] **Step 3: Verify native rectangles are never double-scaled.** Only framework metrics use `DpiScaler`.
+- [x] **Step 4: Add interop declarations** for the verified notification stages/return flags/part identifiers using pointer-size-correct layouts.
+- [x] **Step 5: Add tests for parsing/classification** of channel/thumb/tick/unknown custom-draw parts without needing a visible window.
+- [x] **Step 6: Keep raw constants internal** and centralized; do not scatter P/Invoke values through the control.
+- [x] **Step 7: Run both TFMs with bounded hang detection because the filter includes the HWND custom-draw fixture:**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -318,7 +318,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   --filter "BootstrapRangeRenderLogicTests|BootstrapRangeNativeCustomDrawTests"
 ```
 
-- [ ] **Step 8: Commit:** `feat: add BootstrapRange render primitives`
+- [x] **Step 8: Commit:** `feat: add BootstrapRange render primitives`
 
 ---
 
