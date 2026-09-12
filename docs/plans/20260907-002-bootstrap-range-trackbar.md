@@ -328,14 +328,14 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Create: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapRange.cs`
 - Create: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/BootstrapRangeTests.cs`
 
-- [ ] **Step 1: Write failing public-contract tests** asserting `BootstrapRange : TrackBar`, default `Variant.Primary`, inherited native range properties, absence of shadow range/value APIs, and synchronous rejection of an undefined `BootstrapVariant` value without mutating the previously valid `Variant`.
-- [ ] **Step 2: Implement `BootstrapRange`** with the single V1 `Variant` property. Validate the incoming enum through `BootstrapVariantColorResolver.Resolve(...)` (or the same established framework validation convention) before assigning the backing field, so invalid values cannot survive until a later custom-draw callback.
-- [ ] **Step 3: Subscribe to theme changes** using the same lifetime pattern as existing controls; theme/variant changes invalidate only.
-- [ ] **Step 4: Handle disposal and handle recreation** without leaked subscriptions or native hooks.
-- [ ] **Step 5: Verify changing `Variant` or theme does not change `Minimum`, `Maximum`, `Value`, `SmallChange`, `LargeChange`, `TickFrequency`, `TickStyle`, or `Orientation`; verify a rejected invalid `Variant` leaves both native state and the previous valid `Variant` unchanged.
-- [ ] **Step 6: Verify caller event subscriptions** to `Scroll` and `ValueChanged` remain native and are not duplicated.
-- [ ] **Step 7: Run focused tests on both TFMs using the repository's required bounded `--blame-hang` options for any handle-based fixture.**
-- [ ] **Step 8: Commit:** `feat: add BootstrapRange native control shell`
+- [x] **Step 1: Write failing public-contract tests** asserting `BootstrapRange : TrackBar`, default `Variant.Primary`, inherited native range properties, absence of shadow range/value APIs, and synchronous rejection of an undefined `BootstrapVariant` value without mutating the previously valid `Variant`.
+- [x] **Step 2: Implement `BootstrapRange`** with the single V1 `Variant` property. Validate the incoming enum through `BootstrapVariantColorResolver.Resolve(...)` (or the same established framework validation convention) before assigning the backing field, so invalid values cannot survive until a later custom-draw callback.
+- [x] **Step 3: Subscribe to theme changes** using the same lifetime pattern as existing controls; theme/variant changes invalidate only.
+- [x] **Step 4: Handle disposal and handle recreation** without leaked subscriptions or native hooks.
+- [x] **Step 5: Verify changing `Variant` or theme does not change `Minimum`, `Maximum`, `Value`, `SmallChange`, `LargeChange`, `TickFrequency`, `TickStyle`, or `Orientation`; verify a rejected invalid `Variant` leaves both native state and the previous valid `Variant` unchanged.
+- [x] **Step 6: Verify caller event subscriptions** to `Scroll` and `ValueChanged` remain native and are not duplicated.
+- [x] **Step 7: Run focused tests on both TFMs using the repository's required bounded `--blame-hang` options for any handle-based fixture.**
+- [x] **Step 8: Commit:** `feat: add BootstrapRange native control shell`
 
 ---
 
