@@ -422,7 +422,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs`
 - Add/modify demo tests under: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/`
 
-- [ ] **Step 1: Add a `RangeDemoForm`** showing at least:
+- [x] **Step 1: Add a `RangeDemoForm`** showing at least:
   - Bootstrap-like horizontal range with `TickStyle.None`;
   - horizontal ticked TrackBar mode;
   - vertical orientation;
@@ -431,11 +431,11 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   - light/dark theme switching;
   - RTL + `RightToLeftLayout`;
   - live `Value`/`Scroll`/`ValueChanged` diagnostics.
-- [ ] **Step 2: Register `Range` in `MainForm.ConfigurePages()`** near the other input controls.
-- [ ] **Step 3: Include keyboard/manual diagnostics** for Tab, arrows, PageUp/PageDown, channel clicks, and thumb drag.
-- [ ] **Step 4: Include DPI-friendly layouts** so 100%, 150%, and 200% manual checks do not clip the thumb/focus halo/ticks.
-- [ ] **Step 5: Add a demo construction/smoke test** that opens/closes the range page through the existing demo-test conventions without modal UI.
-- [ ] **Step 6: Commit:** `demo: showcase BootstrapRange`
+- [x] **Step 2: Register `Range` in `MainForm.ConfigurePages()`** near the other input controls.
+- [x] **Step 3: Include keyboard/manual diagnostics** for Tab, arrows, PageUp/PageDown, channel clicks, and thumb drag.
+- [x] **Step 4: Include DPI-friendly layouts** so 100%, 150%, and 200% manual checks do not clip the thumb/focus halo/ticks.
+- [x] **Step 5: Add a demo construction/smoke test** that opens/closes the range page through the existing demo-test conventions without modal UI.
+- [x] **Step 6: Commit:** `demo: showcase BootstrapRange`
 
 ---
 

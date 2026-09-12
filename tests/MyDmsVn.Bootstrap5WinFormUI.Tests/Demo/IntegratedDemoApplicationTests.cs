@@ -20,6 +20,7 @@ public sealed class IntegratedDemoApplicationTests
         "Inputs",
         "Checks / Radios / Switches",
         "Advanced Inputs",
+        "Range",
         "Select",
         "Input Groups",
         "Cards",
@@ -106,6 +107,18 @@ public sealed class IntegratedDemoApplicationTests
             embeddedForms.Any(child => child.GetType().Name == "AdvancedInputsDemoForm" && !child.TopLevel),
             Is.True,
             "Advanced input stages should share one reusable integrated demo page.");
+    }
+
+    [Test]
+    public void SelectingRangeNavigationEmbedsRangeDemoInMainWindow()
+    {
+        using var form = new MainForm();
+        form.CreateControl();
+        var sidebar = FindControls<BootstrapSidebar>(form).Single();
+        sidebar.SelectedItem = sidebar.Items.Single(item => item.Text == "Range");
+        form.PerformLayout();
+
+        Assert.That(FindControls<Form>(form).Any(child => child.GetType().Name == "RangeDemoForm" && !child.TopLevel), Is.True);
     }
 
     [Test]

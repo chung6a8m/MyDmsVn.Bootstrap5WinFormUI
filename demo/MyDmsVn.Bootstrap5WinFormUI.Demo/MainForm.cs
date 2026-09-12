@@ -228,6 +228,11 @@ public sealed class MainForm : DemoFormBase
             () => new AdvancedInputsDemoForm());
 
         AddPage(
+            "Range",
+            "Native-backed horizontal, vertical, ticked, RTL, disabled, variant, theme, and event diagnostics.",
+            () => new RangeDemoForm());
+
+        AddPage(
             "Select",
             "Select2-style single/multiple selection, grouping, custom values, async providers, paging, retry, keyboard, and accessibility scenarios.",
             () => new BootstrapSelectDemoForm());
