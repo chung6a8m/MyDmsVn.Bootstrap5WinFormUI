@@ -266,14 +266,14 @@ native TrackBar paint
 - Create initially as spike, then keep production declarations in Task 2: `src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapRangeNativeMethods.cs`
 - Reference: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Infrastructure/WinFormsTestEnvironment.cs`
 
-- [ ] **Step 1: Write a failing, structurally valid HWND probe fixture.** Mark the fixture `[Apartment(ApartmentState.STA)]`; create a real `Form` (or equivalent HWND-owning test host), add the derived TrackBar to it, create both parent and child handles, and record reflected notifications while forcing paint. Use `Application.DoEvents()` only at finite, known synchronization points; close/dispose the host deterministically. Do not use an unparented `TrackBar.Handle` as the rendering-gate probe.
-- [ ] **Step 2: Prove `NM_CUSTOMDRAW` reflection** on `net48` and `net8.0-windows`; assert `CDDS_PREPAINT` is observed through the child `WndProc` after the parent notification/reflection path is active.
-- [ ] **Step 3: Return `CDRF_NOTIFYITEMDRAW`** and assert item callbacks expose `TBCD_CHANNEL` and `TBCD_THUMB`; assert `TBCD_TICS` when ticks are enabled.
-- [ ] **Step 4: Prove safe part suppression** by painting a diagnostic channel/thumb and returning `CDRF_SKIPDEFAULT` only for that part while `Value`, keyboard movement, and mouse movement continue to work.
-- [ ] **Step 5: Characterize native item state.** Record `NMCUSTOMDRAW.uItemState` for the thumb under normal, focused, hot/hover, pressed/dragging, and disabled conditions on both TFMs. Assert only states that are demonstrably stable; record missing/inconsistent hot/pressed flags as an implementation constraint rather than treating them as a rendering-gate failure.
-- [ ] **Step 6: Cover horizontal/vertical and tickless/ticked configurations.**
-- [ ] **Step 7: Record the gate result** in test names/comments and stop the plan if the supported path is not reliable on either TFM after validating the STA/parent-HWND host setup.
-- [ ] **Step 8: Run focused tests with bounded hang detection:**
+- [x] **Step 1: Write a failing, structurally valid HWND probe fixture.** Mark the fixture `[Apartment(ApartmentState.STA)]`; create a real `Form` (or equivalent HWND-owning test host), add the derived TrackBar to it, create both parent and child handles, and record reflected notifications while forcing paint. Use `Application.DoEvents()` only at finite, known synchronization points; close/dispose the host deterministically. Do not use an unparented `TrackBar.Handle` as the rendering-gate probe.
+- [x] **Step 2: Prove `NM_CUSTOMDRAW` reflection** on `net48` and `net8.0-windows`; assert `CDDS_PREPAINT` is observed through the child `WndProc` after the parent notification/reflection path is active.
+- [x] **Step 3: Return `CDRF_NOTIFYITEMDRAW`** and assert item callbacks expose `TBCD_CHANNEL` and `TBCD_THUMB`; assert `TBCD_TICS` when ticks are enabled.
+- [x] **Step 4: Prove safe part suppression** by painting a diagnostic channel/thumb and returning `CDRF_SKIPDEFAULT` only for that part while `Value`, keyboard movement, and mouse movement continue to work.
+- [x] **Step 5: Characterize native item state.** Record `NMCUSTOMDRAW.uItemState` for the thumb under normal, focused, hot/hover, pressed/dragging, and disabled conditions on both TFMs. Assert only states that are demonstrably stable; record missing/inconsistent hot/pressed flags as an implementation constraint rather than treating them as a rendering-gate failure.
+- [x] **Step 6: Cover horizontal/vertical and tickless/ticked configurations.**
+- [x] **Step 7: Record the gate result** in test names/comments and stop the plan if the supported path is not reliable on either TFM after validating the STA/parent-HWND host setup.
+- [x] **Step 8: Run focused tests with bounded hang detection:**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -287,7 +287,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   --filter BootstrapRangeNativeCustomDrawTests
 ```
 
-- [ ] **Step 9: Commit:** `test: prove native TrackBar custom draw contract`
+- [x] **Step 9: Commit:** `test: prove native TrackBar custom draw contract`
 
 ---
 
