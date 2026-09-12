@@ -553,12 +553,12 @@ git commit -m "feat: add BootstrapMenuStrip"
 
 **Produces:** Bootstrap-themed context menu with native placement, ownership, event order, and designer container lifetime.
 
-- [ ] **Step 1: Write failing constructor/designer contract tests.** Cover both parameterless construction and `BootstrapContextMenuStrip(IContainer)`; disposing the container must dispose the menu using native component semantics.
-- [ ] **Step 2: Write message-loop-backed tests for `SourceControl`.** Assign one menu to two controls, show it for each owner in turn, and verify native `SourceControl` reports the current source without framework caching.
-- [ ] **Step 3: Write message-loop-backed cancelable lifecycle tests.** Record `Opening`, `Opened`, `Closing`, and `Closed`; verify canceling `Opening` prevents display and canceling `Closing` follows the native contract. The Bootstrap control must not invent extra open/close events.
-- [ ] **Step 4: Write nested menu/check/shortcut tests.** Use images, checked items, disabled items, separators, nested menu items, and access keys; ensure the shared renderer changes presentation only.
-- [ ] **Step 5: Write theme/variant-change-while-open regression.** Open the real context menu through `WinFormsMessageLoopTestHost`, switch `BootstrapThemeManager.CurrentTheme` and `Variant`, force/await repaint, and verify the same active native drop-down resolves the new palette without closing/recreating the menu.
-- [ ] **Step 6: Run tests and verify they fail before the class exists.**
+- [x] **Step 1: Write failing constructor/designer contract tests.** Cover both parameterless construction and `BootstrapContextMenuStrip(IContainer)`; disposing the container must dispose the menu using native component semantics.
+- [x] **Step 2: Write message-loop-backed tests for `SourceControl`.** Assign one menu to two controls, show it for each owner in turn, and verify native `SourceControl` reports the current source without framework caching.
+- [x] **Step 3: Write message-loop-backed cancelable lifecycle tests.** Record `Opening`, `Opened`, `Closing`, and `Closed`; verify canceling `Opening` prevents display and canceling `Closing` follows the native contract. The Bootstrap control must not invent extra open/close events.
+- [x] **Step 4: Write nested menu/check/shortcut tests.** Use images, checked items, disabled items, separators, nested menu items, and access keys; ensure the shared renderer changes presentation only.
+- [x] **Step 5: Write theme/variant-change-while-open regression.** Open the real context menu through `WinFormsMessageLoopTestHost`, switch `BootstrapThemeManager.CurrentTheme` and `Variant`, force/await repaint, and verify the same active native drop-down resolves the new palette without closing/recreating the menu.
+- [x] **Step 6: Run tests and verify they fail before the class exists.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -567,10 +567,10 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 7: Implement `BootstrapContextMenuStrip : ContextMenuStrip`.** Forward the container constructor to `base(container)`, create the appearance controller in both constructors through one initialization path, forward `Variant`, and dispose shared appearance state safely.
-- [ ] **Step 8: Do not add placement, ownership, or keyboard overrides.** Any code beyond theme/renderer lifecycle must be justified by a failing regression test and remain inside shared ToolStrip infrastructure where possible.
-- [ ] **Step 9: Re-run context-menu tests plus MenuStrip/Dropdown/message-loop regressions.**
-- [ ] **Step 10: Commit `BootstrapContextMenuStrip`.**
+- [x] **Step 7: Implement `BootstrapContextMenuStrip : ContextMenuStrip`.** Forward the container constructor to `base(container)`, create the appearance controller in both constructors through one initialization path, forward `Variant`, and dispose shared appearance state safely.
+- [x] **Step 8: Do not add placement, ownership, or keyboard overrides.** Any code beyond theme/renderer lifecycle must be justified by a failing regression test and remain inside shared ToolStrip infrastructure where possible.
+- [x] **Step 9: Re-run context-menu tests plus MenuStrip/Dropdown/message-loop regressions.**
+- [x] **Step 10: Commit `BootstrapContextMenuStrip`.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapContextMenuStrip.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapContextMenuStripTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapContextMenuStripInteractionTests.cs
