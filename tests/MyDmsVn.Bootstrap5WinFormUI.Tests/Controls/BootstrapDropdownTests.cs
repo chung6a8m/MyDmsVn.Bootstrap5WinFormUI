@@ -296,6 +296,58 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void RendererPreservesLegacyImageMarginAndUncheckedRowBackgrounds()
+    {
+        var colors = BootstrapThemeManager.CurrentTheme.Colors;
+        var renderer = new BootstrapDropdownRenderer();
+        using var surface = new ToolStripDropDown();
+        using var imageMargin = new Bitmap(24, 24);
+        using (var graphics = Graphics.FromImage(imageMargin))
+        {
+            InvokeRendererHook(renderer, "OnRenderImageMargin", new ToolStripRenderEventArgs(graphics, surface, new Rectangle(0, 0, 24, 24), Color.Empty));
+        }
+
+        var item = new ToolStripMenuItem("Checked") { Checked = true, Size = new Size(80, 24) };
+        surface.Items.Add(item);
+        using var row = new Bitmap(80, 24);
+        using (var graphics = Graphics.FromImage(row))
+        {
+            InvokeRendererHook(renderer, "OnRenderMenuItemBackground", new ToolStripItemRenderEventArgs(graphics, item));
+        }
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(imageMargin.GetPixel(12, 12).ToArgb(), Is.EqualTo(colors.Surface.ToArgb()));
+            Assert.That(row.GetPixel(40, 12).ToArgb(), Is.EqualTo(colors.Surface.ToArgb()));
+        }));
+    }
+
+    [Test]
+    public void RendererPreservesLegacyArrowProportions()
+    {
+        var renderer = new BootstrapDropdownRenderer();
+        using var item = new ToolStripMenuItem("Child");
+        using var bitmap = new Bitmap(40, 40);
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            InvokeRendererHook(
+                renderer,
+                "OnRenderArrow",
+                new ToolStripArrowRenderEventArgs(graphics, item, new Rectangle(0, 0, 40, 40), Color.Empty, ArrowDirection.Right));
+        }
+
+        var paintedRows = Enumerable.Range(0, bitmap.Height)
+            .Where(y => Enumerable.Range(0, bitmap.Width).Any(x => bitmap.GetPixel(x, y).A != 0))
+            .ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(paintedRows.Min(), Is.LessThan(12));
+            Assert.That(paintedRows.Max(), Is.GreaterThan(28));
+        }));
+    }
+
+    [Test]
     public void RendererMetricsScaleAcrossSupportedDpiMatrixAndRejectInvalidInputs()
     {
         foreach (var dpi in new[] { 96, 120, 144, 168, 192 })
@@ -1393,6 +1445,13 @@ public sealed class BootstrapDropdownTests
         form.Show();
         Application.DoEvents();
         return form;
+    }
+
+    private static void InvokeRendererHook(ToolStripRenderer renderer, string methodName, EventArgs args)
+    {
+        var method = typeof(BootstrapToolStripRendererBase).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null);
+        method!.Invoke(renderer, new object[] { args });
     }
 
     private static void AssertGenericNoOpState(BootstrapDropdown dropdown, BootstrapButton expectedTarget, int factoryCalls)

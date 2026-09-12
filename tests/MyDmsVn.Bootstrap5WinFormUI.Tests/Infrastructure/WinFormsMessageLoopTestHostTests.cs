@@ -61,6 +61,26 @@ public sealed class WinFormsMessageLoopTestHostTests
     }
 
     [Test]
+    public void DisposeRethrowsAnAsynchronousMessageLoopException()
+    {
+        var host = new WinFormsMessageLoopTestHost();
+        using var callbackStarted = new ManualResetEventSlim();
+        var expected = new InvalidOperationException("asynchronous UI failure");
+
+        host.Run(() => SynchronizationContext.Current!.Post(_ =>
+        {
+            callbackStarted.Set();
+            throw expected;
+        }, null));
+
+        Assert.That(callbackStarted.Wait(TimeSpan.FromSeconds(2)), Is.True);
+        Assert.That(SpinWait.SpinUntil(() => !host.IsUiThreadAlive, TimeSpan.FromSeconds(2)), Is.True);
+        var actual = Assert.Throws<InvalidOperationException>((Action)host.Dispose);
+
+        Assert.That(actual, Is.SameAs(expected));
+    }
+
+    [Test]
     public void RunTimesOutInsteadOfWaitingForever()
     {
         using var host = new WinFormsMessageLoopTestHost(TimeSpan.FromMilliseconds(100));

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Tests.Infrastructure;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -84,5 +85,51 @@ public sealed class BootstrapToolStripInteractionTests
             }));
             form.Close();
         });
+    }
+
+    [Test]
+    public void OpenNativeOverflowIsInvalidatedInPlaceWhenAppearanceChanges()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            using var host = new WinFormsMessageLoopTestHost();
+            host.Run(() =>
+            {
+                using var form = new Form { Size = new Size(180, 100) };
+                using var strip = new BootstrapToolStrip { Dock = DockStyle.Top, CanOverflow = true };
+                for (var index = 0; index < 12; index++)
+                {
+                    strip.Items.Add(new ToolStripButton("Item " + index) { Overflow = ToolStripItemOverflow.AsNeeded });
+                }
+
+                form.Controls.Add(strip);
+                form.Show();
+                form.PerformLayout();
+                strip.OverflowButton.ShowDropDown();
+                Application.DoEvents();
+
+                var overflow = strip.OverflowButton.DropDown;
+                var invalidations = 0;
+                overflow.Invalidated += (_, _) => invalidations++;
+                BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+                strip.Variant = BootstrapVariant.Warning;
+                Application.DoEvents();
+
+                Assert.Multiple((Action)(() =>
+                {
+                    Assert.That(strip.OverflowButton.DropDown, Is.SameAs(overflow));
+                    Assert.That(overflow.Visible, Is.True);
+                    Assert.That(invalidations, Is.GreaterThan(0));
+                }));
+
+                strip.OverflowButton.HideDropDown();
+                form.Close();
+            });
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
     }
 }

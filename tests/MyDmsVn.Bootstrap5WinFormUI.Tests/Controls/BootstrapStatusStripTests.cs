@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Linq;
+using System.Reflection;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
@@ -55,5 +56,39 @@ public sealed class BootstrapStatusStripTests
             Assert.That(dots.All(dot => dot.Width == dotSize && dot.Height == dotSize), Is.True);
             Assert.That(dots.All(dot => dot.Right <= 120 && dot.Bottom <= 24), Is.True);
         }));
+    }
+
+    [Test]
+    public void StatusLabelRenderingPreservesRepresentativeBorder3DStyles()
+    {
+        var styles = new[] { Border3DStyle.Flat, Border3DStyle.Raised, Border3DStyle.Sunken, Border3DStyle.Etched };
+        var signatures = styles.Select(RenderStatusBorder).ToArray();
+
+        Assert.That(signatures.Distinct().Count(), Is.EqualTo(styles.Length));
+    }
+
+    private static string RenderStatusBorder(Border3DStyle style)
+    {
+        using var strip = new BootstrapStatusStrip();
+        var label = new ToolStripStatusLabel("Border")
+        {
+            AutoSize = false,
+            Size = new Size(48, 24),
+            BorderSides = ToolStripStatusLabelBorderSides.All,
+            BorderStyle = style
+        };
+        strip.Items.Add(label);
+        using var bitmap = new Bitmap(label.Width, label.Height);
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            var method = typeof(BootstrapToolStripRendererBase).GetMethod(
+                "OnRenderToolStripStatusLabelBackground",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method!.Invoke(strip.Renderer, new object[] { new ToolStripItemRenderEventArgs(graphics, label) });
+        }
+
+        return string.Join(",", Enumerable.Range(0, bitmap.Height)
+            .SelectMany(y => Enumerable.Range(0, bitmap.Width).Select(x => bitmap.GetPixel(x, y).ToArgb())));
     }
 }

@@ -12,6 +12,7 @@ internal sealed class BootstrapToolStripAppearanceController : IDisposable
     private readonly BootstrapToolStripRenderer _renderer;
     private readonly HashSet<ToolStripDropDownItem> _wiredItems = new HashSet<ToolStripDropDownItem>();
     private readonly HashSet<ToolStripDropDown> _trackedDropDowns = new HashSet<ToolStripDropDown>();
+    private ToolStripDropDownItem? _overflowButton;
     private BootstrapVariant _variant = BootstrapVariant.Primary;
     private Font? _themeFont;
     private bool _settingThemeFont;
@@ -26,6 +27,7 @@ internal sealed class BootstrapToolStripAppearanceController : IDisposable
         _owner.FontChanged += OnFontChanged;
         _owner.ItemAdded += OnItemAdded;
         _owner.ItemRemoved += OnItemRemoved;
+        _owner.LayoutCompleted += OnLayoutCompleted;
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         ApplyThemeFont();
         ApplyThemeColors();
@@ -55,9 +57,32 @@ internal sealed class BootstrapToolStripAppearanceController : IDisposable
         _owner.FontChanged -= OnFontChanged;
         _owner.ItemAdded -= OnItemAdded;
         _owner.ItemRemoved -= OnItemRemoved;
+        _owner.LayoutCompleted -= OnLayoutCompleted;
         foreach (var item in new List<ToolStripDropDownItem>(_wiredItems)) UnwireItem(item);
         foreach (var surface in new List<ToolStripDropDown>(_trackedDropDowns)) UntrackDropDown(surface);
         DisposeThemeFont();
+    }
+
+    private void OnLayoutCompleted(object? sender, EventArgs e)
+    {
+        if (_disposed || !_owner.CanOverflow)
+        {
+            return;
+        }
+
+        var overflowButton = _owner.OverflowButton;
+        if (ReferenceEquals(_overflowButton, overflowButton))
+        {
+            return;
+        }
+
+        if (_overflowButton is not null)
+        {
+            UnwireItem(_overflowButton);
+        }
+
+        _overflowButton = overflowButton;
+        WireItem(overflowButton);
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
@@ -131,7 +156,11 @@ internal sealed class BootstrapToolStripAppearanceController : IDisposable
 
     private void OnDropDownItemDisposed(object? sender, EventArgs e)
     {
-        if (sender is ToolStripDropDownItem item) UnwireItem(item);
+        if (sender is ToolStripDropDownItem item)
+        {
+            if (ReferenceEquals(_overflowButton, item)) _overflowButton = null;
+            UnwireItem(item);
+        }
     }
 
     private void TrackDropDown(ToolStripDropDown surface)

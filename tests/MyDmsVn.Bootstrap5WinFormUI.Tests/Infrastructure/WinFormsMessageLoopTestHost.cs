@@ -12,9 +12,12 @@ internal sealed class WinFormsMessageLoopTestHost : IDisposable
     private readonly TimeSpan _timeout;
     private readonly Thread _uiThread;
     private readonly ManualResetEventSlim _ready = new ManualResetEventSlim();
+    private readonly ManualResetEventSlim _loopStopped = new ManualResetEventSlim();
     private Control? _dispatcher;
     private ApplicationContext? _applicationContext;
     private ExceptionDispatchInfo? _startupFailure;
+    private ExceptionDispatchInfo? _loopFailure;
+    private bool _loopFailureObserved;
     private bool _disposed;
 
     public WinFormsMessageLoopTestHost()
@@ -70,32 +73,49 @@ internal sealed class WinFormsMessageLoopTestHost : IDisposable
         }
 
         ThrowIfDisposed();
+        ThrowLoopFailureIfStopped();
         var completion = new ManualResetEventSlim();
         var result = default(T);
         ExceptionDispatchInfo? failure = null;
 
-        _dispatcher!.BeginInvoke((MethodInvoker)(() =>
+        try
         {
-            try
+            _dispatcher!.BeginInvoke((MethodInvoker)(() =>
             {
-                result = action();
-            }
-            catch (Exception exception)
-            {
-                failure = ExceptionDispatchInfo.Capture(exception);
-            }
-            finally
-            {
-                completion.Set();
-            }
-        }));
+                try
+                {
+                    result = action();
+                }
+                catch (Exception exception)
+                {
+                    failure = ExceptionDispatchInfo.Capture(exception);
+                }
+                finally
+                {
+                    completion.Set();
+                }
+            }));
+        }
+        catch (InvalidOperationException)
+        {
+            ThrowLoopFailureIfStopped();
+            throw;
+        }
 
-        if (!completion.Wait(_timeout))
+        var completed = WaitHandle.WaitAny(new[] { completion.WaitHandle, _loopStopped.WaitHandle }, _timeout);
+        if (completed == WaitHandle.WaitTimeout)
         {
             throw new TimeoutException("WinForms UI work did not complete within the configured timeout.");
         }
 
+        if (completed == 1)
+        {
+            ThrowLoopFailureIfStopped();
+            throw new InvalidOperationException("The WinForms message loop stopped before UI work completed.");
+        }
+
         failure?.Throw();
+        ThrowLoopFailureIfStopped();
         return result!;
     }
 
@@ -125,6 +145,8 @@ internal sealed class WinFormsMessageLoopTestHost : IDisposable
         }
 
         _ready.Dispose();
+        _loopStopped.Dispose();
+        ThrowLoopFailureIfUnobserved();
     }
 
     private void RunMessageLoop()
@@ -140,7 +162,12 @@ internal sealed class WinFormsMessageLoopTestHost : IDisposable
         }
         catch (Exception exception)
         {
-            _startupFailure = ExceptionDispatchInfo.Capture(exception);
+            var actualException = exception is System.Reflection.TargetInvocationException { InnerException: not null } targetInvocationException
+                ? targetInvocationException.InnerException!
+                : exception;
+            var failure = ExceptionDispatchInfo.Capture(actualException);
+            _loopFailure = failure;
+            _startupFailure = failure;
             _ready.Set();
         }
         finally
@@ -149,6 +176,7 @@ internal sealed class WinFormsMessageLoopTestHost : IDisposable
             _dispatcher = null;
             _applicationContext?.Dispose();
             _applicationContext = null;
+            _loopStopped.Set();
         }
     }
 
@@ -158,5 +186,24 @@ internal sealed class WinFormsMessageLoopTestHost : IDisposable
         {
             throw new ObjectDisposedException(nameof(WinFormsMessageLoopTestHost));
         }
+    }
+
+    private void ThrowLoopFailureIfStopped()
+    {
+        if (_loopStopped.IsSet)
+        {
+            ThrowLoopFailureIfUnobserved();
+        }
+    }
+
+    private void ThrowLoopFailureIfUnobserved()
+    {
+        if (_loopFailure is null || _loopFailureObserved)
+        {
+            return;
+        }
+
+        _loopFailureObserved = true;
+        _loopFailure.Throw();
     }
 }

@@ -51,7 +51,7 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
 
     protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
     {
-        PaintBounds(e.Graphics, e.AffectedBounds, BootstrapThemeManager.CurrentTheme.Colors.SurfaceSecondary);
+        PaintBounds(e.Graphics, e.AffectedBounds, ResolveImageMarginColor(e.ToolStrip));
     }
 
     protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e) => PaintItemBackground(e);
@@ -112,7 +112,7 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
         if (e.ArrowRectangle.Width <= 0 || e.ArrowRectangle.Height <= 0) return;
         var owner = e.Item?.Owner;
         var palette = ResolvePalette(owner, e.Item?.Enabled ?? true, e.Item?.Selected ?? false, e.Item?.Pressed ?? false, e.Item is not null && IsChecked(e.Item));
-        DrawArrow(e.Graphics, BootstrapToolStripRenderLogic.ResolveArrowPoints(e.ArrowRectangle, e.Direction, ResolveMetrics(owner).ArrowSize), palette.Foreground);
+        DrawArrow(e.Graphics, ResolveArrowGeometry(e.ArrowRectangle, e.Direction, owner), palette.Foreground);
     }
 
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
@@ -162,24 +162,31 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
         PaintItemBackground(e);
         if (e.Item is not ToolStripStatusLabel label || label.BorderSides == ToolStripStatusLabelBorderSides.None) return;
         var bounds = new Rectangle(Point.Empty, label.Size);
-        var border = BootstrapThemeManager.CurrentTheme.Colors.Border;
-        var raised = label.BorderStyle == Border3DStyle.Raised || label.BorderStyle == Border3DStyle.RaisedInner || label.BorderStyle == Border3DStyle.RaisedOuter;
-        foreach (var line in BootstrapToolStripRenderLogic.ResolveStatusBorderLines(bounds, label.BorderSides))
-        {
-            var leading = line.Side == ToolStripStatusLabelBorderSides.Left || line.Side == ToolStripStatusLabelBorderSides.Top;
-            var color = leading == raised ? ControlPaint.Light(border) : ControlPaint.Dark(border);
-            using var pen = new Pen(color);
-            e.Graphics.DrawLine(pen, line.Line.Start, line.Line.End);
-        }
+        ControlPaint.DrawBorder3D(e.Graphics, bounds, label.BorderStyle, ResolveBorderSides(label.BorderSides));
     }
 
     private void PaintItemBackground(ToolStripItemRenderEventArgs e) => PaintBounds(e.Graphics, new Rectangle(Point.Empty, e.Item.Size), ResolvePalette(e.ToolStrip, e.Item.Enabled, e.Item.Selected, e.Item.Pressed, IsChecked(e.Item)).Background);
 
-    private BootstrapDropdownPalette ResolvePalette(ToolStrip? owner, bool enabled, bool selected, bool pressed, bool @checked) =>
+    protected virtual Color ResolveImageMarginColor(ToolStrip? owner) => BootstrapThemeManager.CurrentTheme.Colors.SurfaceSecondary;
+
+    protected virtual BootstrapDropdownPalette ResolvePalette(ToolStrip? owner, bool enabled, bool selected, bool pressed, bool @checked) =>
         BootstrapToolStripRenderLogic.ResolvePalette(BootstrapThemeManager.CurrentTheme.Colors, Variant, GetSurfaceKind(owner), enabled, selected, pressed, @checked);
+
+    protected virtual PointF[] ResolveArrowGeometry(Rectangle bounds, ArrowDirection direction, ToolStrip? owner) =>
+        BootstrapToolStripRenderLogic.ResolveArrowPoints(bounds, direction, ResolveMetrics(owner).ArrowSize);
 
     private static BootstrapDropdownMetrics ResolveMetrics(ToolStrip? toolStrip) => BootstrapToolStripRenderLogic.ResolveMetrics(BootstrapThemeManager.CurrentTheme.Metrics, toolStrip is not null && toolStrip.DeviceDpi > 0 ? toolStrip.DeviceDpi : DpiScaler.DefaultDpi);
     private static bool IsChecked(ToolStripItem item) => item is ToolStripButton { Checked: true } || item is ToolStripMenuItem { Checked: true };
+
+    private static Border3DSide ResolveBorderSides(ToolStripStatusLabelBorderSides sides)
+    {
+        var result = (Border3DSide)0;
+        if ((sides & ToolStripStatusLabelBorderSides.Left) != 0) result |= Border3DSide.Left;
+        if ((sides & ToolStripStatusLabelBorderSides.Top) != 0) result |= Border3DSide.Top;
+        if ((sides & ToolStripStatusLabelBorderSides.Right) != 0) result |= Border3DSide.Right;
+        if ((sides & ToolStripStatusLabelBorderSides.Bottom) != 0) result |= Border3DSide.Bottom;
+        return result;
+    }
 
     private static void PaintBounds(Graphics graphics, Rectangle bounds, Color color)
     {
