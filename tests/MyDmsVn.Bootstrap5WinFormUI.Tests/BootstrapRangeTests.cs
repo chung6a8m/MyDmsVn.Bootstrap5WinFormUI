@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
@@ -133,6 +134,51 @@ public sealed class BootstrapRangeTests
     }
 
     [Test]
+    public void HostedCustomDrawPaintsChannelAndThumbWithoutChangingNativeValue()
+    {
+        using var host = new Form
+        {
+            ShowInTaskbar = false,
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(-32000, -32000)
+        };
+        using var range = new ProbeBootstrapRange
+        {
+            Minimum = 0,
+            Maximum = 100,
+            Value = 40,
+            TickStyle = TickStyle.None,
+            Size = new Size(240, 50)
+        };
+        host.Controls.Add(range);
+        host.Show();
+        _ = range.Handle;
+
+        for (var value = 40; value < 50; value++)
+        {
+            range.Value = value;
+            range.Refresh();
+            Application.DoEvents();
+        }
+
+        var channelCountBeforeRecreation = range.SuppressedChannelDrawCount;
+        var thumbCountBeforeRecreation = range.SuppressedThumbDrawCount;
+        range.RecreateHandleForTesting();
+        range.Refresh();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(range.SuppressedChannelDrawCount, Is.GreaterThan(channelCountBeforeRecreation));
+            Assert.That(range.SuppressedThumbDrawCount, Is.GreaterThan(thumbCountBeforeRecreation));
+            Assert.That(range.IsHandleCreated, Is.True);
+            Assert.That(range.Value, Is.EqualTo(49));
+            Assert.That(range.Minimum, Is.Zero);
+            Assert.That(range.Maximum, Is.EqualTo(100));
+        }));
+    }
+
+    [Test]
     public void DisposalRemovesThemeSubscription()
     {
         var before = GetThemeSubscriberCount();
@@ -196,5 +242,41 @@ public sealed class BootstrapRangeTests
         internal int ScrollCount { get; }
 
         internal int ValueChangedCount { get; }
+    }
+
+    private sealed class ProbeBootstrapRange : BootstrapRange
+    {
+        internal int SuppressedChannelDrawCount { get; private set; }
+
+        internal int SuppressedThumbDrawCount { get; private set; }
+
+        internal void RecreateHandleForTesting() => RecreateHandle();
+
+        protected override void WndProc(ref Message m)
+        {
+            var part = BootstrapRangeNativePart.Unknown;
+            if (m.Msg == BootstrapRangeNativeMethods.WmReflectNotify &&
+                BootstrapRangeNativeMethods.TryReadCustomDraw(m.LParam, Handle, out var draw) &&
+                draw.DrawStage == BootstrapRangeNativeMethods.CddsItemPrePaint)
+            {
+                part = BootstrapRangeNativeMethods.ClassifyPart(draw.ItemSpec);
+            }
+
+            base.WndProc(ref m);
+
+            if (m.Result != new IntPtr(BootstrapRangeNativeMethods.CdrfSkipDefault))
+            {
+                return;
+            }
+
+            if (part == BootstrapRangeNativePart.Channel)
+            {
+                SuppressedChannelDrawCount++;
+            }
+            else if (part == BootstrapRangeNativePart.Thumb)
+            {
+                SuppressedThumbDrawCount++;
+            }
+        }
     }
 }

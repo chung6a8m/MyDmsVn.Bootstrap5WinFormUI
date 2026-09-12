@@ -36,6 +36,30 @@ public sealed class BootstrapRangeRenderLogicTests
         }));
     }
 
+    [TestCase(BootstrapVariant.Primary)]
+    [TestCase(BootstrapVariant.Secondary)]
+    [TestCase(BootstrapVariant.Success)]
+    [TestCase(BootstrapVariant.Danger)]
+    [TestCase(BootstrapVariant.Warning)]
+    [TestCase(BootstrapVariant.Info)]
+    [TestCase(BootstrapVariant.Light)]
+    [TestCase(BootstrapVariant.Dark)]
+    public void DarkPaletteUsesCurrentThemeTokens(BootstrapVariant variant)
+    {
+        var theme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        var palette = BootstrapRangeRenderLogic.ResolvePalette(
+            theme.Colors,
+            variant,
+            new BootstrapRangeVisualState(enabled: true, focused: false, hot: false, pressed: false));
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(palette.BackgroundColor, Is.EqualTo(theme.Colors.Surface));
+            Assert.That(palette.RailColor, Is.EqualTo(theme.Colors.Border));
+            Assert.That(palette.ThumbColor, Is.EqualTo(BootstrapVariantColorResolver.Resolve(theme.Colors, variant)));
+        }));
+    }
+
     [Test]
     public void DisabledPaletteWinsOverInteractionStates()
     {

@@ -347,14 +347,14 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/BootstrapRangeTests.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/BootstrapRangeRenderLogicTests.cs`
 
-- [ ] **Step 1: Write failing render tests** for rail and thumb colors/bounds under light/dark themes and each `BootstrapVariant` used elsewhere in the framework.
-- [ ] **Step 2: In reflected `NM_CUSTOMDRAW` prepaint**, request item-level draw notifications using the verified gate path.
-- [ ] **Step 3: Paint `TBCD_CHANNEL`** as the Bootstrap-like neutral rail inside the native channel rectangle, then suppress only the native channel draw.
-- [ ] **Step 4: Paint `TBCD_THUMB`** as the accent thumb centered within native thumb bounds, then suppress only the native thumb draw.
-- [ ] **Step 5: Leave unknown parts/stages native** and prove no blank/disappearing regions occur during invalidation or handle recreation.
-- [ ] **Step 6: Verify no progress-filled segment is introduced** in V1.
-- [ ] **Step 7: Run repeated invalidation and value-change tests** to catch GDI/HDC lifetime mistakes.
-- [ ] **Step 8: Commit:** `feat: theme BootstrapRange channel and thumb`
+- [x] **Step 1: Write failing render tests** for rail and thumb colors/bounds under light/dark themes and each `BootstrapVariant` used elsewhere in the framework.
+- [x] **Step 2: In reflected `NM_CUSTOMDRAW` prepaint**, request item-level draw notifications using the verified gate path.
+- [x] **Step 3: Paint `TBCD_CHANNEL`** as the Bootstrap-like neutral rail inside the native channel rectangle, then suppress only the native channel draw.
+- [x] **Step 4: Paint `TBCD_THUMB`** as the accent thumb centered within native thumb bounds, then suppress only the native thumb draw.
+- [x] **Step 5: Leave unknown parts/stages native** and prove no blank/disappearing regions occur during invalidation or handle recreation.
+- [x] **Step 6: Verify no progress-filled segment is introduced** in V1.
+- [x] **Step 7: Run repeated invalidation and value-change tests** to catch GDI/HDC lifetime mistakes.
+- [x] **Step 8: Commit:** `feat: theme BootstrapRange channel and thumb`
 
 ---
 
