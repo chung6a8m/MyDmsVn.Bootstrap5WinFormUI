@@ -131,7 +131,7 @@ public sealed class BootstrapToolStripRenderLogicTests
             : new Rectangle(62, 0, 2, 28);
 
         var geometry = BootstrapToolStripRenderLogic.ResolveSplitButtonGeometry(
-            splitterBounds, dropDownBounds, arrowSize: 4);
+            splitterBounds, dropDownBounds, arrowSize: 4, dividerInset: 2);
 
         Assert.Multiple((Action)(() =>
         {
@@ -169,6 +169,7 @@ public sealed class BootstrapToolStripRenderLogicTests
             Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapToolStripRenderLogic.ResolveMetrics(BootstrapThemeMetrics.Default, 0)));
             Assert.Throws<ArgumentNullException>((Action)(() => BootstrapToolStripRenderLogic.ResolvePalette(null!, BootstrapVariant.Primary, BootstrapToolStripSurfaceKind.ToolBar, true, false, false, false)));
             Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapToolStripRenderLogic.ResolvePalette(colors, (BootstrapVariant)999, BootstrapToolStripSurfaceKind.ToolBar, true, false, false, false)));
+            Assert.Throws<ArgumentOutOfRangeException>((Action)(() => BootstrapToolStripRenderLogic.ResolveSplitButtonGeometry(new Rectangle(0, 0, 2, 24), new Rectangle(2, 0, 16, 24), 4, -1)));
         }));
     }
 }

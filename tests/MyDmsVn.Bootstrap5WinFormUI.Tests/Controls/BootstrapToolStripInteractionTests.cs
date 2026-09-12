@@ -239,11 +239,42 @@ public sealed class BootstrapToolStripInteractionTests
         });
     }
 
+    [Test]
+    public void CheckedAndIndeterminateMenuItemsRenderDifferentGlyphs()
+    {
+        using var checkedItem = new ToolStripMenuItem("Checked") { CheckState = CheckState.Checked };
+        using var indeterminateItem = new ToolStripMenuItem("Indeterminate") { CheckState = CheckState.Indeterminate };
+        using var indeterminateImage = new Bitmap(16, 16);
+        using (var imageGraphics = Graphics.FromImage(indeterminateImage))
+        {
+            imageGraphics.Clear(Color.Magenta);
+        }
+
+        using var checkedGlyph = RenderCheckGlyph(new BootstrapToolStripRenderer(), checkedItem, indeterminateImage);
+        using var indeterminateGlyph = RenderCheckGlyph(new BootstrapToolStripRenderer(), indeterminateItem, indeterminateImage);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(RectanglePoints(new Rectangle(Point.Empty, checkedGlyph.Size)).Any(point => checkedGlyph.GetPixel(point.X, point.Y).A != 0), Is.True);
+            Assert.That(RectanglePoints(new Rectangle(Point.Empty, indeterminateGlyph.Size)).Any(point => indeterminateGlyph.GetPixel(point.X, point.Y).A != 0), Is.True);
+            Assert.That(checkedGlyph.GetPixel(8, 8).ToArgb(), Is.Not.EqualTo(Color.Magenta.ToArgb()));
+            Assert.That(indeterminateGlyph.GetPixel(8, 8).ToArgb(), Is.EqualTo(Color.Magenta.ToArgb()));
+        }));
+    }
+
     private static void InvokeRendererHook(ToolStripRenderer renderer, string methodName, EventArgs args)
     {
         var method = typeof(BootstrapToolStripRendererBase).GetMethod(methodName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         Assert.That(method, Is.Not.Null);
         method!.Invoke(renderer, new object[] { args });
+    }
+
+    private static Bitmap RenderCheckGlyph(ToolStripRenderer renderer, ToolStripMenuItem item, Image nativeImage)
+    {
+        var bitmap = new Bitmap(20, 20);
+        using var graphics = Graphics.FromImage(bitmap);
+        renderer.DrawItemCheck(new ToolStripItemImageRenderEventArgs(graphics, item, nativeImage, new Rectangle(2, 2, 16, 16)));
+        return bitmap;
     }
 
     private static System.Collections.Generic.IEnumerable<Point> RectanglePoints(Rectangle rectangle)

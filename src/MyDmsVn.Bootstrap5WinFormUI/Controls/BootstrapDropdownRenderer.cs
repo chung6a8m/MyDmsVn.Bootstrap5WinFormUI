@@ -51,4 +51,6 @@ internal sealed class BootstrapDropdownRenderer : BootstrapToolStripRendererBase
                 return new[] { new PointF(centerX - halfWidth, centerY - halfHeight), new PointF(centerX + halfWidth, centerY), new PointF(centerX - halfWidth, centerY + halfHeight) };
         }
     }
+
+    protected override bool ShouldRenderBootstrapCheckmark(ToolStripMenuItem item) => item.Checked;
 }

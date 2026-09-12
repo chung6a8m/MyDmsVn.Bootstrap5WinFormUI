@@ -25,7 +25,7 @@ internal readonly struct BootstrapDropdownPalette
 
 internal readonly struct BootstrapDropdownMetrics
 {
-    public BootstrapDropdownMetrics(int itemHorizontalPadding, int itemVerticalPadding, int imageSize, int separatorInset, float borderWidth, int arrowSize, int gripDotSize)
+    public BootstrapDropdownMetrics(int itemHorizontalPadding, int itemVerticalPadding, int imageSize, int separatorInset, float borderWidth, int arrowSize, int gripDotSize, int splitDividerInset)
     {
         ItemHorizontalPadding = itemHorizontalPadding;
         ItemVerticalPadding = itemVerticalPadding;
@@ -34,6 +34,7 @@ internal readonly struct BootstrapDropdownMetrics
         BorderWidth = borderWidth;
         ArrowSize = arrowSize;
         GripDotSize = gripDotSize;
+        SplitDividerInset = splitDividerInset;
     }
 
     public int ItemHorizontalPadding { get; }
@@ -43,6 +44,7 @@ internal readonly struct BootstrapDropdownMetrics
     public float BorderWidth { get; }
     public int ArrowSize { get; }
     public int GripDotSize { get; }
+    public int SplitDividerInset { get; }
 }
 
 internal readonly struct BootstrapToolStripLine
@@ -92,6 +94,7 @@ internal static class BootstrapToolStripRenderLogic
             DpiScaler.Scale(metrics.SpacingSM, dpi),
             DpiScaler.Scale((float)metrics.BorderWidth, dpi),
             Math.Max(2, DpiScaler.Scale(metrics.SpacingXS, dpi)),
+            Math.Max(1, DpiScaler.Scale(2, dpi)),
             Math.Max(1, DpiScaler.Scale(2, dpi)));
     }
 
@@ -145,12 +148,14 @@ internal static class BootstrapToolStripRenderLogic
         }
     }
 
-    public static BootstrapToolStripSplitGeometry ResolveSplitButtonGeometry(Rectangle splitterBounds, Rectangle dropDownBounds, int arrowSize)
+    public static BootstrapToolStripSplitGeometry ResolveSplitButtonGeometry(Rectangle splitterBounds, Rectangle dropDownBounds, int arrowSize, int dividerInset)
     {
+        if (dividerInset < 0) throw new ArgumentOutOfRangeException(nameof(dividerInset));
         var dividerX = splitterBounds.Left + (splitterBounds.Width / 2f);
+        var dividerStartY = splitterBounds.Top + dividerInset;
         return new BootstrapToolStripSplitGeometry(
-            new PointF(dividerX, splitterBounds.Top + 2),
-            new PointF(dividerX, Math.Max(splitterBounds.Top + 2, splitterBounds.Bottom - 3)),
+            new PointF(dividerX, dividerStartY),
+            new PointF(dividerX, Math.Max(dividerStartY, splitterBounds.Bottom - 1 - dividerInset)),
             ResolveArrowPoints(dropDownBounds, ArrowDirection.Down, arrowSize));
     }
 

@@ -348,6 +348,30 @@ public sealed class BootstrapDropdownTests
     }
 
     [Test]
+    public void RendererPreservesLegacyCheckmarkForIndeterminateNativeItems()
+    {
+        var renderer = new BootstrapDropdownRenderer();
+        using var item = new ToolStripMenuItem("Indeterminate") { CheckState = CheckState.Indeterminate };
+        using var nativeImage = new Bitmap(16, 16);
+        using (var imageGraphics = Graphics.FromImage(nativeImage))
+        {
+            imageGraphics.Clear(Color.Magenta);
+        }
+
+        using var bitmap = new Bitmap(20, 20);
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            renderer.DrawItemCheck(new ToolStripItemImageRenderEventArgs(graphics, item, nativeImage, new Rectangle(2, 2, 16, 16)));
+        }
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(Enumerable.Range(0, bitmap.Height).Any(y => Enumerable.Range(0, bitmap.Width).Any(x => bitmap.GetPixel(x, y).A != 0)), Is.True);
+            Assert.That(bitmap.GetPixel(8, 8).ToArgb(), Is.Not.EqualTo(Color.Magenta.ToArgb()));
+        }));
+    }
+
+    [Test]
     public void RendererMetricsScaleAcrossSupportedDpiMatrixAndRejectInvalidInputs()
     {
         foreach (var dpi in new[] { 96, 120, 144, 168, 192 })
@@ -360,6 +384,7 @@ public sealed class BootstrapDropdownTests
                 Assert.That(metrics.ImageSize, Is.EqualTo(DpiScaler.Scale(BootstrapThemeMetrics.Default.SpacingLG, dpi)));
                 Assert.That(metrics.SeparatorInset, Is.EqualTo(DpiScaler.Scale(BootstrapThemeMetrics.Default.SpacingSM, dpi)));
                 Assert.That(metrics.BorderWidth, Is.EqualTo(DpiScaler.Scale((float)BootstrapThemeMetrics.Default.BorderWidth, dpi)));
+                Assert.That(metrics.SplitDividerInset, Is.EqualTo(DpiScaler.Scale(2, dpi)));
             }));
         }
 

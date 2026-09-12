@@ -69,7 +69,7 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
         PaintBounds(e.Graphics, splitButton.ButtonBounds, ResolvePalette(e.ToolStrip, splitButton.Enabled, splitButton.ButtonSelected, splitButton.ButtonPressed, false).Background);
         PaintBounds(e.Graphics, splitButton.DropDownButtonBounds, ResolvePalette(e.ToolStrip, splitButton.Enabled, splitButton.DropDownButtonSelected, splitButton.DropDownButtonPressed, false).Background);
         var metrics = ResolveMetrics(e.ToolStrip);
-        var geometry = BootstrapToolStripRenderLogic.ResolveSplitButtonGeometry(splitButton.SplitterBounds, splitButton.DropDownButtonBounds, metrics.ArrowSize);
+        var geometry = BootstrapToolStripRenderLogic.ResolveSplitButtonGeometry(splitButton.SplitterBounds, splitButton.DropDownButtonBounds, metrics.ArrowSize, metrics.SplitDividerInset);
         var palette = ResolvePalette(e.ToolStrip, splitButton.Enabled, splitButton.Selected, splitButton.Pressed, false);
         using var dividerPen = new Pen(palette.Border, Math.Max(1f, metrics.BorderWidth));
         e.Graphics.DrawLine(dividerPen, geometry.DividerStart, geometry.DividerEnd);
@@ -84,7 +84,7 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
 
     protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
     {
-        if (e.Item is not ToolStripMenuItem { Checked: true } || e.ImageRectangle.Width <= 0 || e.ImageRectangle.Height <= 0)
+        if (e.Item is not ToolStripMenuItem menuItem || !ShouldRenderBootstrapCheckmark(menuItem) || e.ImageRectangle.Width <= 0 || e.ImageRectangle.Height <= 0)
         {
             base.OnRenderItemCheck(e);
             return;
@@ -171,6 +171,8 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
 
     protected virtual PointF[] ResolveArrowGeometry(Rectangle bounds, ArrowDirection direction, ToolStrip? owner) =>
         BootstrapToolStripRenderLogic.ResolveArrowPoints(bounds, direction, ResolveMetrics(owner).ArrowSize);
+
+    protected virtual bool ShouldRenderBootstrapCheckmark(ToolStripMenuItem item) => item.CheckState == CheckState.Checked;
 
     private static BootstrapDropdownMetrics ResolveMetrics(ToolStrip? toolStrip) => BootstrapToolStripRenderLogic.ResolveMetrics(BootstrapThemeManager.CurrentTheme.Metrics, toolStrip is not null && toolStrip.DeviceDpi > 0 ? toolStrip.DeviceDpi : DpiScaler.DefaultDpi);
     private static bool IsChecked(ToolStripItem item) => item is ToolStripButton { Checked: true } || item is ToolStripMenuItem { Checked: true };
