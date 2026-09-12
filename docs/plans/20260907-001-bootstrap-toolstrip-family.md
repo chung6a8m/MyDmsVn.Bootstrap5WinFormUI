@@ -732,7 +732,7 @@ git grep -n -E "TODO|TBD|FIXME|NotImplementedException" -- src/MyDmsVn.Bootstrap
 
 Review matches; pre-existing unrelated matches are not failures, but no new required behavior may be left as a placeholder.
 
-- [ ] **Step 4: Run the full repository verification script.**
+- [x] **Step 4: Run the full repository verification script.**
 
 ```powershell
 ./test.ps1
@@ -758,7 +758,7 @@ git diff --stat HEAD~1..HEAD
 
 If implementation is delivered as multiple commits, compare against the implementation branch base instead of `HEAD~1`.
 
-- [ ] **Step 7: Commit any final verified corrections, then rerun the exact verification command affected by those corrections before claiming completion.**
+- [x] **Step 7: Commit any final verified corrections, then rerun the exact verification command affected by those corrections before claiming completion.**
 
 ---
 
