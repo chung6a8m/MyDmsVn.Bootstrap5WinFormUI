@@ -592,13 +592,13 @@ git commit -m "feat: add BootstrapContextMenuStrip"
 
 **Produces:** themed status bar without replacing native table layout, caller-configured status-label borders, or hosted controls.
 
-- [ ] **Step 1: Write failing public contract tests.** Assert direct native inheritance, standard item types, default variant, and Bootstrap renderer.
-- [ ] **Step 2: Write a constrained-width Spring regression.** Add left/right labels plus one `ToolStripStatusLabel { Spring = true }`, resize the containing form, and assert the spring label receives native remaining width rather than a framework-computed width.
-- [ ] **Step 3: Add status-label border compatibility tests.** Create labels covering `BorderSides.None`, one side, multiple sides, and representative `Border3DStyle` values. Render through the Bootstrap renderer and assert requested sides remain present while non-requested sides are not invented. The test must fail if custom `OnRenderToolStripStatusLabelBackground` merely fills the background and drops the native border contract.
-- [ ] **Step 4: Write sizing-grip rendering/behavior tests.** Toggle `SizingGrip`; verify the renderer draws only when enabled and uses DPI-scaled themed geometry. Do not replace native sizing hit behavior.
-- [ ] **Step 5: Add interactive status-item tests.** Exercise a status drop-down button, split button, tooltip, disabled item, and checked/pressed states where supported.
-- [ ] **Step 6: Add hosted progress-bar compatibility.** Insert `ToolStripProgressBar`, change value/style, resize the strip, and prove the Bootstrap renderer does not take over the hosted control's native value/editing/render lifecycle.
-- [ ] **Step 7: Run focused tests and confirm failure before implementation.**
+- [x] **Step 1: Write failing public contract tests.** Assert direct native inheritance, standard item types, default variant, and Bootstrap renderer.
+- [x] **Step 2: Write a constrained-width Spring regression.** Add left/right labels plus one `ToolStripStatusLabel { Spring = true }`, resize the containing form, and assert the spring label receives native remaining width rather than a framework-computed width.
+- [x] **Step 3: Add status-label border compatibility tests.** Create labels covering `BorderSides.None`, one side, multiple sides, and representative `Border3DStyle` values. Render through the Bootstrap renderer and assert requested sides remain present while non-requested sides are not invented. The test must fail if custom `OnRenderToolStripStatusLabelBackground` merely fills the background and drops the native border contract.
+- [x] **Step 4: Write sizing-grip rendering/behavior tests.** Toggle `SizingGrip`; verify the renderer draws only when enabled and uses DPI-scaled themed geometry. Do not replace native sizing hit behavior.
+- [x] **Step 5: Add interactive status-item tests.** Exercise a status drop-down button, split button, tooltip, disabled item, and checked/pressed states where supported.
+- [x] **Step 6: Add hosted progress-bar compatibility.** Insert `ToolStripProgressBar`, change value/style, resize the strip, and prove the Bootstrap renderer does not take over the hosted control's native value/editing/render lifecycle.
+- [x] **Step 7: Run focused tests and confirm failure before implementation.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -607,10 +607,10 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 8: Implement `BootstrapStatusStrip : StatusStrip` as a thin appearance-controller host.** Preserve all native defaults unless a visual-only adjustment is explicitly tested.
-- [ ] **Step 9: Implement status-specific shared renderer hooks.** Paint top border, `OnRenderToolStripStatusLabelBackground`, interactive item states, and sizing grip from shared theme/DPI logic; preserve `ToolStripStatusLabel.BorderSides` and `BorderStyle`; do not compute Spring layout.
-- [ ] **Step 10: Re-run StatusStrip, ToolStrip, MenuStrip, ContextMenuStrip, and BootstrapDropdown focused suites.**
-- [ ] **Step 11: Commit `BootstrapStatusStrip`.**
+- [x] **Step 8: Implement `BootstrapStatusStrip : StatusStrip` as a thin appearance-controller host.** Preserve all native defaults unless a visual-only adjustment is explicitly tested.
+- [x] **Step 9: Implement status-specific shared renderer hooks.** Paint top border, `OnRenderToolStripStatusLabelBackground`, interactive item states, and sizing grip from shared theme/DPI logic; preserve `ToolStripStatusLabel.BorderSides` and `BorderStyle`; do not compute Spring layout.
+- [x] **Step 10: Re-run StatusStrip, ToolStrip, MenuStrip, ContextMenuStrip, and BootstrapDropdown focused suites.**
+- [x] **Step 11: Commit `BootstrapStatusStrip`.**
 
 ```powershell
 git add src/MyDmsVn.Bootstrap5WinFormUI/Controls/BootstrapStatusStrip.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapToolStripRendererBase.cs src/MyDmsVn.Bootstrap5WinFormUI/Controls/Internal/BootstrapToolStripRenderLogic.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapStatusStripTests.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Controls/BootstrapStatusStripInteractionTests.cs

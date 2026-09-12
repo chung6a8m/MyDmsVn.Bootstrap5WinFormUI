@@ -151,13 +151,9 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
         var metrics = ResolveMetrics(e.ToolStrip);
         var rtl = e.ToolStrip.RightToLeft == RightToLeft.Yes;
         using var brush = new SolidBrush(BootstrapThemeManager.CurrentTheme.Colors.MutedText);
-        for (var row = 0; row < 3; row++)
-        for (var column = 0; column <= row; column++)
+        foreach (var dot in BootstrapToolStripRenderLogic.ResolveSizingGripDots(e.ToolStrip.Size, metrics.GripDotSize, rtl))
         {
-            var edge = (row + 1) * metrics.GripDotSize * 2;
-            var x = rtl ? edge : e.ToolStrip.Width - edge;
-            var y = e.ToolStrip.Height - ((column + 1) * metrics.GripDotSize * 2);
-            e.Graphics.FillRectangle(brush, x, y, metrics.GripDotSize, metrics.GripDotSize);
+            e.Graphics.FillRectangle(brush, dot);
         }
     }
 
@@ -168,10 +164,13 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
         var bounds = new Rectangle(Point.Empty, label.Size);
         var border = BootstrapThemeManager.CurrentTheme.Colors.Border;
         var raised = label.BorderStyle == Border3DStyle.Raised || label.BorderStyle == Border3DStyle.RaisedInner || label.BorderStyle == Border3DStyle.RaisedOuter;
-        DrawBorderSide(e.Graphics, label.BorderSides, ToolStripStatusLabelBorderSides.Left, bounds.Left, bounds.Top, bounds.Left, bounds.Bottom - 1, raised ? ControlPaint.Light(border) : ControlPaint.Dark(border));
-        DrawBorderSide(e.Graphics, label.BorderSides, ToolStripStatusLabelBorderSides.Top, bounds.Left, bounds.Top, bounds.Right - 1, bounds.Top, raised ? ControlPaint.Light(border) : ControlPaint.Dark(border));
-        DrawBorderSide(e.Graphics, label.BorderSides, ToolStripStatusLabelBorderSides.Right, bounds.Right - 1, bounds.Top, bounds.Right - 1, bounds.Bottom - 1, raised ? ControlPaint.Dark(border) : ControlPaint.Light(border));
-        DrawBorderSide(e.Graphics, label.BorderSides, ToolStripStatusLabelBorderSides.Bottom, bounds.Left, bounds.Bottom - 1, bounds.Right - 1, bounds.Bottom - 1, raised ? ControlPaint.Dark(border) : ControlPaint.Light(border));
+        foreach (var line in BootstrapToolStripRenderLogic.ResolveStatusBorderLines(bounds, label.BorderSides))
+        {
+            var leading = line.Side == ToolStripStatusLabelBorderSides.Left || line.Side == ToolStripStatusLabelBorderSides.Top;
+            var color = leading == raised ? ControlPaint.Light(border) : ControlPaint.Dark(border);
+            using var pen = new Pen(color);
+            e.Graphics.DrawLine(pen, line.Line.Start, line.Line.End);
+        }
     }
 
     private void PaintItemBackground(ToolStripItemRenderEventArgs e) => PaintBounds(e.Graphics, new Rectangle(Point.Empty, e.Item.Size), ResolvePalette(e.ToolStrip, e.Item.Enabled, e.Item.Selected, e.Item.Pressed, IsChecked(e.Item)).Background);
@@ -196,10 +195,4 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
         finally { graphics.SmoothingMode = old; }
     }
 
-    private static void DrawBorderSide(Graphics graphics, ToolStripStatusLabelBorderSides actual, ToolStripStatusLabelBorderSides requested, int x1, int y1, int x2, int y2, Color color)
-    {
-        if ((actual & requested) == 0) return;
-        using var pen = new Pen(color);
-        graphics.DrawLine(pen, x1, y1, x2, y2);
-    }
 }

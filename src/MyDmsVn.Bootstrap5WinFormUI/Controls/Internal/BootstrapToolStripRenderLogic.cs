@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
@@ -63,6 +64,18 @@ internal readonly struct BootstrapToolStripSplitGeometry
     public PointF DividerStart { get; }
     public PointF DividerEnd { get; }
     public PointF[] ArrowPoints { get; }
+}
+
+internal readonly struct BootstrapToolStripBorderLine
+{
+    public BootstrapToolStripBorderLine(ToolStripStatusLabelBorderSides side, BootstrapToolStripLine line)
+    {
+        Side = side;
+        Line = line;
+    }
+
+    public ToolStripStatusLabelBorderSides Side { get; }
+    public BootstrapToolStripLine Line { get; }
 }
 
 internal static class BootstrapToolStripRenderLogic
@@ -139,5 +152,36 @@ internal static class BootstrapToolStripRenderLogic
             new PointF(dividerX, dropDownBounds.Top + 2),
             new PointF(dividerX, Math.Max(dropDownBounds.Top + 2, dropDownBounds.Bottom - 3)),
             ResolveArrowPoints(dropDownBounds, ArrowDirection.Down, arrowSize));
+    }
+
+    public static IReadOnlyList<BootstrapToolStripBorderLine> ResolveStatusBorderLines(Rectangle bounds, ToolStripStatusLabelBorderSides sides)
+    {
+        var result = new List<BootstrapToolStripBorderLine>(4);
+        AddBorder(result, sides, ToolStripStatusLabelBorderSides.Left, new PointF(bounds.Left, bounds.Top), new PointF(bounds.Left, bounds.Bottom - 1));
+        AddBorder(result, sides, ToolStripStatusLabelBorderSides.Top, new PointF(bounds.Left, bounds.Top), new PointF(bounds.Right - 1, bounds.Top));
+        AddBorder(result, sides, ToolStripStatusLabelBorderSides.Right, new PointF(bounds.Right - 1, bounds.Top), new PointF(bounds.Right - 1, bounds.Bottom - 1));
+        AddBorder(result, sides, ToolStripStatusLabelBorderSides.Bottom, new PointF(bounds.Left, bounds.Bottom - 1), new PointF(bounds.Right - 1, bounds.Bottom - 1));
+        return result;
+    }
+
+    public static IReadOnlyList<Rectangle> ResolveSizingGripDots(Size surfaceSize, int dotSize, bool rightToLeft)
+    {
+        if (dotSize <= 0) throw new ArgumentOutOfRangeException(nameof(dotSize));
+        var result = new List<Rectangle>(6);
+        for (var row = 0; row < 3; row++)
+        for (var column = 0; column <= row; column++)
+        {
+            var edge = (row + 1) * dotSize * 2;
+            var x = rightToLeft ? edge : surfaceSize.Width - edge;
+            var y = surfaceSize.Height - ((column + 1) * dotSize * 2);
+            result.Add(new Rectangle(x, y, dotSize, dotSize));
+        }
+
+        return result;
+    }
+
+    private static void AddBorder(List<BootstrapToolStripBorderLine> result, ToolStripStatusLabelBorderSides actual, ToolStripStatusLabelBorderSides requested, PointF start, PointF end)
+    {
+        if ((actual & requested) != 0) result.Add(new BootstrapToolStripBorderLine(requested, new BootstrapToolStripLine(start, end)));
     }
 }
