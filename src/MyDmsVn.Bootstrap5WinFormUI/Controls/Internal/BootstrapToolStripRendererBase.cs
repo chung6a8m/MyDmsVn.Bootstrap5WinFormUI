@@ -69,7 +69,7 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
         PaintBounds(e.Graphics, splitButton.ButtonBounds, ResolvePalette(e.ToolStrip, splitButton.Enabled, splitButton.ButtonSelected, splitButton.ButtonPressed, false).Background);
         PaintBounds(e.Graphics, splitButton.DropDownButtonBounds, ResolvePalette(e.ToolStrip, splitButton.Enabled, splitButton.DropDownButtonSelected, splitButton.DropDownButtonPressed, false).Background);
         var metrics = ResolveMetrics(e.ToolStrip);
-        var geometry = BootstrapToolStripRenderLogic.ResolveSplitButtonGeometry(splitButton.ButtonBounds, splitButton.DropDownButtonBounds, e.ToolStrip?.RightToLeft == RightToLeft.Yes, metrics.ArrowSize);
+        var geometry = BootstrapToolStripRenderLogic.ResolveSplitButtonGeometry(splitButton.SplitterBounds, splitButton.DropDownButtonBounds, metrics.ArrowSize);
         var palette = ResolvePalette(e.ToolStrip, splitButton.Enabled, splitButton.Selected, splitButton.Pressed, false);
         using var dividerPen = new Pen(palette.Border, Math.Max(1f, metrics.BorderWidth));
         e.Graphics.DrawLine(dividerPen, geometry.DividerStart, geometry.DividerEnd);
@@ -127,12 +127,9 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
     {
         var metrics = ResolveMetrics(e.ToolStrip);
         using var brush = new SolidBrush(BootstrapThemeManager.CurrentTheme.Colors.MutedText);
-        var horizontalStrip = e.ToolStrip.LayoutStyle != ToolStripLayoutStyle.VerticalStackWithOverflow;
-        for (var index = 0; index < 3; index++)
+        foreach (var dot in BootstrapToolStripRenderLogic.ResolveGripDots(e.GripBounds, e.GripDisplayStyle, metrics.GripDotSize))
         {
-            var x = horizontalStrip ? e.GripBounds.Left + (e.GripBounds.Width / 2) : e.GripBounds.Left + index * metrics.GripDotSize * 2;
-            var y = horizontalStrip ? e.GripBounds.Top + index * metrics.GripDotSize * 2 : e.GripBounds.Top + (e.GripBounds.Height / 2);
-            e.Graphics.FillEllipse(brush, x, y, metrics.GripDotSize, metrics.GripDotSize);
+            e.Graphics.FillEllipse(brush, dot);
         }
     }
 
@@ -140,9 +137,9 @@ internal abstract class BootstrapToolStripRendererBase : ToolStripRenderer
     {
         PaintItemBackground(e);
         var metrics = ResolveMetrics(e.ToolStrip);
-        var center = new Point(e.Item.Width / 2, e.Item.Height / 2);
         using var pen = new Pen(ResolvePalette(e.ToolStrip, e.Item.Enabled, e.Item.Selected, e.Item.Pressed, false).Foreground, Math.Max(1f, metrics.BorderWidth));
-        e.Graphics.DrawLines(pen, new[] { new Point(center.X - metrics.ArrowSize, center.Y - metrics.ArrowSize / 2), new Point(center.X, center.Y + metrics.ArrowSize / 2), new Point(center.X + metrics.ArrowSize, center.Y - metrics.ArrowSize / 2) });
+        var orientation = e.ToolStrip?.Orientation ?? Orientation.Horizontal;
+        e.Graphics.DrawLines(pen, BootstrapToolStripRenderLogic.ResolveOverflowAffordance(new Rectangle(Point.Empty, e.Item.Size), orientation, metrics.ArrowSize));
     }
 
     protected override void OnRenderStatusStripSizingGrip(ToolStripRenderEventArgs e)

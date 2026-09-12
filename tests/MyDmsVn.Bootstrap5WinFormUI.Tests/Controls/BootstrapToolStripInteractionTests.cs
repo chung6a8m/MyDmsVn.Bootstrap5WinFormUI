@@ -132,4 +132,126 @@ public sealed class BootstrapToolStripInteractionTests
             BootstrapThemeManager.CurrentTheme = originalTheme;
         }
     }
+
+    [TestCase(ToolStripLayoutStyle.Flow)]
+    [TestCase(ToolStripLayoutStyle.Table)]
+    public void VerticalFlowAndTableLayoutsRenderTheNativeHorizontalGrip(ToolStripLayoutStyle layoutStyle)
+    {
+        using var host = new WinFormsMessageLoopTestHost();
+        host.Run(() =>
+        {
+            using var form = new Form { ClientSize = new Size(240, 180) };
+            using var strip = new BootstrapToolStrip
+            {
+                AutoSize = false,
+                LayoutStyle = layoutStyle,
+                Dock = DockStyle.Left,
+                GripStyle = ToolStripGripStyle.Visible,
+                Width = 72
+            };
+            strip.Items.Add("Item");
+            form.Controls.Add(strip);
+            form.Show();
+            form.PerformLayout();
+
+            using var bitmap = new Bitmap(1, 1);
+            using var graphics = Graphics.FromImage(bitmap);
+            var args = new ToolStripGripRenderEventArgs(graphics, strip);
+            var dots = BootstrapToolStripRenderLogic.ResolveGripDots(new Rectangle(0, 0, 30, 10), args.GripDisplayStyle, dotSize: 2);
+            var painted = dots.Aggregate(Rectangle.Union);
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(strip.Orientation, Is.EqualTo(Orientation.Vertical));
+                Assert.That(args.GripDisplayStyle, Is.EqualTo(ToolStripGripDisplayStyle.Horizontal));
+                Assert.That(painted.Width, Is.GreaterThan(painted.Height));
+            }));
+
+            form.Close();
+        });
+    }
+
+    [Test]
+    public void RealVerticalOverflowRendersARightFacingAffordance()
+    {
+        using var host = new WinFormsMessageLoopTestHost();
+        host.Run(() =>
+        {
+            using var form = new Form { ClientSize = new Size(240, 120) };
+            using var strip = new BootstrapToolStrip { AutoSize = false, Dock = DockStyle.Left, CanOverflow = true, Width = 84 };
+            for (var index = 0; index < 12; index++)
+            {
+                strip.Items.Add(new ToolStripButton("Item " + index) { Overflow = ToolStripItemOverflow.AsNeeded });
+            }
+
+            form.Controls.Add(strip);
+            form.Show();
+            form.PerformLayout();
+            var overflowButton = strip.OverflowButton;
+            Assert.That(strip.Items.Cast<ToolStripItem>().Any(item => item.Placement == ToolStripItemPlacement.Overflow), Is.True);
+
+            using var bitmap = new Bitmap(overflowButton.Width, overflowButton.Height);
+            using var graphics = Graphics.FromImage(bitmap);
+            InvokeRendererHook(strip.Renderer, "OnRenderOverflowButtonBackground", new ToolStripItemRenderEventArgs(graphics, overflowButton));
+            var arrowSize = BootstrapToolStripRenderLogic.ResolveMetrics(BootstrapThemeManager.CurrentTheme.Metrics, strip.DeviceDpi).ArrowSize;
+            var rightTip = new Point((overflowButton.Width / 2) + Math.Max(1, arrowSize / 2), overflowButton.Height / 2);
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(strip.Orientation, Is.EqualTo(Orientation.Vertical));
+                Assert.That(bitmap.GetPixel(rightTip.X, rightTip.Y).ToArgb(), Is.EqualTo(BootstrapThemeManager.CurrentTheme.Colors.Text.ToArgb()));
+            }));
+
+            form.Close();
+        });
+    }
+
+    [Test]
+    public void SplitButtonDividerUsesNativeSplitterBoundsAndItemRightToLeft()
+    {
+        using var host = new WinFormsMessageLoopTestHost();
+        host.Run(() =>
+        {
+            using var form = new Form { ClientSize = new Size(280, 100) };
+            using var strip = new BootstrapToolStrip { Dock = DockStyle.Top, RightToLeft = RightToLeft.No };
+            var split = new ToolStripSplitButton("Split") { RightToLeft = RightToLeft.Yes };
+            split.DropDownItems.Add("Child");
+            strip.Items.Add(split);
+            form.Controls.Add(strip);
+            form.Show();
+            form.PerformLayout();
+
+            using var bitmap = new Bitmap(split.Width, split.Height);
+            using var graphics = Graphics.FromImage(bitmap);
+            InvokeRendererHook(strip.Renderer, "OnRenderSplitButtonBackground", new ToolStripItemRenderEventArgs(graphics, split));
+            var visibleSplitterBounds = Rectangle.Intersect(split.SplitterBounds, new Rectangle(Point.Empty, bitmap.Size));
+            var splitterPainted = RectanglePoints(visibleSplitterBounds)
+                .Any(point => bitmap.GetPixel(point.X, point.Y).A != 0);
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(split.SplitterBounds.IsEmpty, Is.False);
+                Assert.That(split.DropDownButtonBounds.Right, Is.LessThanOrEqualTo(split.SplitterBounds.Left));
+                Assert.That(splitterPainted, Is.True);
+            }));
+
+            form.Close();
+        });
+    }
+
+    private static void InvokeRendererHook(ToolStripRenderer renderer, string methodName, EventArgs args)
+    {
+        var method = typeof(BootstrapToolStripRendererBase).GetMethod(methodName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null);
+        method!.Invoke(renderer, new object[] { args });
+    }
+
+    private static System.Collections.Generic.IEnumerable<Point> RectanglePoints(Rectangle rectangle)
+    {
+        for (var y = rectangle.Top; y < rectangle.Bottom; y++)
+        for (var x = rectangle.Left; x < rectangle.Right; x++)
+        {
+            yield return new Point(x, y);
+        }
+    }
 }

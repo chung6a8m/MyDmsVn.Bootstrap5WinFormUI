@@ -123,15 +123,15 @@ public sealed class BootstrapToolStripRenderLogicTests
     [TestCase(true)]
     public void ResolveSplitButtonGeometryUsesNativeDropDownBounds(bool rightToLeft)
     {
-        var buttonBounds = rightToLeft
-            ? new Rectangle(18, 0, 62, 28)
-            : new Rectangle(0, 0, 62, 28);
         var dropDownBounds = rightToLeft
             ? new Rectangle(0, 0, 18, 28)
-            : new Rectangle(62, 0, 18, 28);
+            : new Rectangle(64, 0, 18, 28);
+        var splitterBounds = rightToLeft
+            ? new Rectangle(18, 0, 2, 28)
+            : new Rectangle(62, 0, 2, 28);
 
         var geometry = BootstrapToolStripRenderLogic.ResolveSplitButtonGeometry(
-            buttonBounds, dropDownBounds, rightToLeft, arrowSize: 4);
+            splitterBounds, dropDownBounds, arrowSize: 4);
 
         Assert.Multiple((Action)(() =>
         {
@@ -139,8 +139,24 @@ public sealed class BootstrapToolStripRenderLogicTests
             Assert.That(dropDownBounds.Contains(Point.Round(geometry.ArrowPoints[1])), Is.True);
             Assert.That(dropDownBounds.Contains(Point.Round(geometry.ArrowPoints[2])), Is.True);
             Assert.That(geometry.DividerStart.X, Is.EqualTo(geometry.DividerEnd.X));
-            Assert.That(geometry.DividerStart.X, Is.EqualTo(rightToLeft ? dropDownBounds.Right - 1 : dropDownBounds.Left));
+            Assert.That(geometry.DividerStart.X, Is.EqualTo(splitterBounds.Left + (splitterBounds.Width / 2f)));
         }));
+    }
+
+    [TestCase(Orientation.Horizontal, ArrowDirection.Down)]
+    [TestCase(Orientation.Vertical, ArrowDirection.Right)]
+    public void ResolveOverflowAffordanceUsesNativeStripOrientation(Orientation orientation, ArrowDirection expectedDirection)
+    {
+        var points = BootstrapToolStripRenderLogic.ResolveOverflowAffordance(new Rectangle(0, 0, 24, 24), orientation, 4);
+
+        if (expectedDirection == ArrowDirection.Right)
+        {
+            Assert.That(points[1].X, Is.GreaterThan(points[0].X));
+        }
+        else
+        {
+            Assert.That(points[1].Y, Is.GreaterThan(points[0].Y));
+        }
     }
 
     [Test]

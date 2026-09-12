@@ -145,13 +145,56 @@ internal static class BootstrapToolStripRenderLogic
         }
     }
 
-    public static BootstrapToolStripSplitGeometry ResolveSplitButtonGeometry(Rectangle buttonBounds, Rectangle dropDownBounds, bool rightToLeft, int arrowSize)
+    public static BootstrapToolStripSplitGeometry ResolveSplitButtonGeometry(Rectangle splitterBounds, Rectangle dropDownBounds, int arrowSize)
     {
-        var dividerX = rightToLeft ? dropDownBounds.Right - 1 : dropDownBounds.Left;
+        var dividerX = splitterBounds.Left + (splitterBounds.Width / 2f);
         return new BootstrapToolStripSplitGeometry(
-            new PointF(dividerX, dropDownBounds.Top + 2),
-            new PointF(dividerX, Math.Max(dropDownBounds.Top + 2, dropDownBounds.Bottom - 3)),
+            new PointF(dividerX, splitterBounds.Top + 2),
+            new PointF(dividerX, Math.Max(splitterBounds.Top + 2, splitterBounds.Bottom - 3)),
             ResolveArrowPoints(dropDownBounds, ArrowDirection.Down, arrowSize));
+    }
+
+    public static Point[] ResolveOverflowAffordance(Rectangle bounds, Orientation orientation, int arrowSize)
+    {
+        if (arrowSize <= 0) throw new ArgumentOutOfRangeException(nameof(arrowSize));
+        var centerX = bounds.Left + (bounds.Width / 2);
+        var centerY = bounds.Top + (bounds.Height / 2);
+        var half = Math.Max(1, arrowSize / 2);
+        if (orientation == Orientation.Vertical)
+        {
+            return new[]
+            {
+                new Point(centerX - half, centerY - arrowSize),
+                new Point(centerX + half, centerY),
+                new Point(centerX - half, centerY + arrowSize)
+            };
+        }
+
+        return new[]
+        {
+            new Point(centerX - arrowSize, centerY - half),
+            new Point(centerX, centerY + half),
+            new Point(centerX + arrowSize, centerY - half)
+        };
+    }
+
+    public static IReadOnlyList<Rectangle> ResolveGripDots(Rectangle bounds, ToolStripGripDisplayStyle displayStyle, int dotSize)
+    {
+        if (dotSize <= 0) throw new ArgumentOutOfRangeException(nameof(dotSize));
+        var result = new List<Rectangle>(3);
+        var vertical = displayStyle == ToolStripGripDisplayStyle.Vertical;
+        for (var index = 0; index < 3; index++)
+        {
+            var x = vertical
+                ? bounds.Left + ((bounds.Width - dotSize) / 2)
+                : bounds.Left + (index * dotSize * 2);
+            var y = vertical
+                ? bounds.Top + (index * dotSize * 2)
+                : bounds.Top + ((bounds.Height - dotSize) / 2);
+            result.Add(new Rectangle(x, y, dotSize, dotSize));
+        }
+
+        return result;
     }
 
     public static IReadOnlyList<BootstrapToolStripBorderLine> ResolveStatusBorderLines(Rectangle bounds, ToolStripStatusLabelBorderSides sides)

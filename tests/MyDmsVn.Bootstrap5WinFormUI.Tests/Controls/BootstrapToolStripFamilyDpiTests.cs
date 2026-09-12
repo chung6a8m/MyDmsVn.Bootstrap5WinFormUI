@@ -38,15 +38,15 @@ public sealed class BootstrapToolStripFamilyDpiTests
     public void SplitDividerAndArrowRemainInsideNativeDropDownBounds(int dpi, bool rightToLeft)
     {
         var arrowSize = BootstrapToolStripRenderLogic.ResolveMetrics(BootstrapThemeMetrics.Default, dpi).ArrowSize;
-        var dropDown = rightToLeft ? new Rectangle(0, 0, 24, 36) : new Rectangle(76, 0, 24, 36);
-        var button = rightToLeft ? new Rectangle(24, 0, 76, 36) : new Rectangle(0, 0, 76, 36);
-        var geometry = BootstrapToolStripRenderLogic.ResolveSplitButtonGeometry(button, dropDown, rightToLeft, arrowSize);
+        var dropDown = rightToLeft ? new Rectangle(0, 0, 24, 36) : new Rectangle(78, 0, 24, 36);
+        var splitter = rightToLeft ? new Rectangle(24, 0, 2, 36) : new Rectangle(76, 0, 2, 36);
+        var geometry = BootstrapToolStripRenderLogic.ResolveSplitButtonGeometry(splitter, dropDown, arrowSize);
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(geometry.ArrowPoints.All(point => dropDown.Contains(Point.Round(point))), Is.True);
-            Assert.That(geometry.DividerStart.X, Is.InRange(dropDown.Left, dropDown.Right - 1));
-            Assert.That(geometry.DividerEnd.Y, Is.LessThan(dropDown.Bottom));
+            Assert.That(geometry.DividerStart.X, Is.InRange(splitter.Left, splitter.Right));
+            Assert.That(geometry.DividerEnd.Y, Is.LessThan(splitter.Bottom));
         }));
     }
 
