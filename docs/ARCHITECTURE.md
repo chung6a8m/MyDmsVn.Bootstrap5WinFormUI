@@ -248,6 +248,10 @@ Pagination intentionally has no direct dependency on `BootstrapDataGridView` or 
 
 ### 6.3 Native command-popup composition
 
+The ToolStrip family uses direct native inheritance: `BootstrapToolStrip : ToolStrip`, `BootstrapMenuStrip : MenuStrip`, `BootstrapContextMenuStrip : ContextMenuStrip`, and `BootstrapStatusStrip : StatusStrip`. Native item collections, layout, overflow, shortcuts, mnemonics, merge, popup ownership, Spring sizing, hosted controls, and accessibility stay authoritative. One internal `BootstrapToolStripRendererBase` plus pure `BootstrapToolStripRenderLogic` provide shared Bootstrap presentation, while one `BootstrapToolStripAppearanceController` per public strip owns the framework renderer, semantic variant, theme font/subscription, invalidation, and deterministic cleanup.
+
+`BootstrapDropdownRenderer` is intentionally a thin adapter over that same renderer base, so component dropdowns and native ToolStrip descendants do not drift into parallel rendering systems. Native renderer propagation and framework lifecycle tracking are distinct: WinForms supplies renderer inheritance where possible; the controller observes only already-created/open drop-downs for repaint and cleanup. It never forces lazy menu creation, mutates `ToolStripManager.Renderer`, replaces popup windows, or reasserts Bootstrap rendering after the caller assigns a renderer.
+
 `BootstrapDropdown` is a non-visual `Component`, not a replacement Button and not a custom popup window. The caller owns `Target : BootstrapButton` and every `BootstrapDropdownItem` model. The component owns the native popup infrastructure and never disposes the target or public item models.
 
 The public `Items` collection is authoritative. Every effective `Show()` destroys the previous native snapshot and rebuilds short-lived `ToolStripMenuItem` / `ToolStripSeparator` instances from current model values. This snapshot-per-open boundary deliberately avoids live collection synchronization and avoids leaking native menu objects into the public API. Mutable `Text`, `Icon`, `Enabled`, `Checked`, and `Tag` values therefore apply coherently on the next opening.

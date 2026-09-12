@@ -341,12 +341,13 @@ public sealed class BootstrapLookupInteractionTests
         lookup.Focus();
         Application.DoEvents();
 
-        SendKeys.SendWait("b");
+        SendCharacterToFocusedControl('b');
         Application.DoEvents();
         Assert.That(lookup.IsDropDownOpen, Is.True);
 
-        SendKeys.SendWait("ra");
-        SendKeys.SendWait("{DOWN}");
+        SendCharacterToFocusedControl('r');
+        SendCharacterToFocusedControl('a');
+        SendKeyToFocusedControl(Keys.Down);
         Application.DoEvents();
 
         Assert.Multiple((Action)(() =>
@@ -1239,6 +1240,14 @@ public sealed class BootstrapLookupInteractionTests
         var focusedHandle = GetFocus();
         Assert.That(focusedHandle, Is.Not.EqualTo(IntPtr.Zero));
         SendMessage(focusedHandle, 0x0102, (IntPtr)value, IntPtr.Zero);
+    }
+
+    private static void SendKeyToFocusedControl(Keys value)
+    {
+        var focusedHandle = GetFocus();
+        Assert.That(focusedHandle, Is.Not.EqualTo(IntPtr.Zero));
+        SendMessage(focusedHandle, 0x0100, (IntPtr)value, IntPtr.Zero);
+        SendMessage(focusedHandle, 0x0101, (IntPtr)value, IntPtr.Zero);
     }
 
     private static System.Collections.Generic.IEnumerable<Control> Descendants(Control root)

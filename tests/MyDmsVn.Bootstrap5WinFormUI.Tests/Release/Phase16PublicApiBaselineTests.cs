@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "8623b04f5c891fdf2d14a01f430f9fd338faa31a80049fe0cda2b84954378815";
+    private const string ApprovedV1Fingerprint = "e4215e2ff2e076d3a303318de4e3c38fdbc47d7b13f7699044b2d246025f718c";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -34,6 +34,40 @@ public sealed class Phase16PublicApiBaselineTests
     public void V1CompatibilityAssemblyVersionIsStable()
     {
         Assert.That(typeof(BootstrapButton).Assembly.GetName().Version, Is.EqualTo(new Version(1, 0, 0, 0)));
+    }
+
+    [Test]
+    public void BootstrapToolStripFamilyExportsOnlyTheReviewedNativeBackedContract()
+    {
+        var assembly = typeof(BootstrapToolStrip).Assembly;
+        var types = new[]
+        {
+            typeof(BootstrapToolStrip),
+            typeof(BootstrapMenuStrip),
+            typeof(BootstrapContextMenuStrip),
+            typeof(BootstrapStatusStrip)
+        };
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(typeof(BootstrapToolStrip).BaseType, Is.EqualTo(typeof(ToolStrip)));
+            Assert.That(typeof(BootstrapMenuStrip).BaseType, Is.EqualTo(typeof(MenuStrip)));
+            Assert.That(typeof(BootstrapContextMenuStrip).BaseType, Is.EqualTo(typeof(ContextMenuStrip)));
+            Assert.That(typeof(BootstrapStatusStrip).BaseType, Is.EqualTo(typeof(StatusStrip)));
+            foreach (var type in types)
+            {
+                Assert.That(GetDeclaredPublicPropertyNames(type), Is.EqualTo(new[] { "Variant" }), type.Name);
+                Assert.That(GetDeclaredPublicMethodNames(type), Is.Empty, type.Name);
+                Assert.That(GetDeclaredPublicEventNames(type), Is.Empty, type.Name);
+                Assert.That(GetDeclaredProtectedMethodNames(type), Is.EqualTo(new[] { "Dispose" }), type.Name);
+            }
+
+            Assert.That(typeof(BootstrapContextMenuStrip).GetConstructor(Type.EmptyTypes), Is.Not.Null);
+            Assert.That(typeof(BootstrapContextMenuStrip).GetConstructor(new[] { typeof(System.ComponentModel.IContainer) }), Is.Not.Null);
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapToolStripRendererBase"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapToolStripAppearanceController"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapToolStripRenderLogic"));
+        }));
     }
 
     [Test]
