@@ -245,6 +245,48 @@ public sealed class BootstrapRangeTests
         }));
     }
 
+    [TestCase(Orientation.Horizontal, TickStyle.None)]
+    [TestCase(Orientation.Horizontal, TickStyle.Both)]
+    [TestCase(Orientation.Vertical, TickStyle.TopLeft)]
+    [TestCase(Orientation.Vertical, TickStyle.BottomRight)]
+    public void RuntimeLayoutChangesPreserveValueAndKeepCustomDrawAlive(Orientation orientation, TickStyle tickStyle)
+    {
+        using var host = CreateHostedRange(out var range);
+        range.Minimum = -10;
+        range.Maximum = 50;
+        range.Value = 17;
+        range.Orientation = orientation;
+        range.TickStyle = tickStyle;
+        range.TickFrequency = 3;
+        range.RightToLeft = RightToLeft.Yes;
+        range.RightToLeftLayout = true;
+        range.ResetSuppressedDrawCounts();
+        range.Refresh();
+        Application.DoEvents();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(range.Value, Is.EqualTo(17));
+            Assert.That(range.Orientation, Is.EqualTo(orientation));
+            Assert.That(range.TickStyle, Is.EqualTo(tickStyle));
+            Assert.That(range.SuppressedChannelDrawCount, Is.GreaterThan(0));
+            Assert.That(range.SuppressedThumbDrawCount, Is.GreaterThan(0));
+            Assert.That(
+                range.SuppressedTickDrawCount,
+                tickStyle == TickStyle.None ? Is.Zero : Is.GreaterThan(0));
+        }));
+    }
+
+    [Test]
+    public void RtlThumbGeometryMatchesNativeTrackBarWithoutFrameworkValueReversal()
+    {
+        var native = CaptureRtlThumbGeometry(new TrackBar());
+        var bootstrap = CaptureRtlThumbGeometry(new BootstrapRange());
+
+        Assert.That(bootstrap.Bounds, Is.EqualTo(native.Bounds));
+        Assert.That(bootstrap.Value, Is.EqualTo(native.Value));
+    }
+
     [Test]
     public void DisposalRemovesThemeSubscription()
     {
@@ -359,6 +401,25 @@ public sealed class BootstrapRangeTests
         }
     }
 
+    private static RtlSnapshot CaptureRtlThumbGeometry(TrackBar trackBar)
+    {
+        using var host = new Form();
+        using (trackBar)
+        {
+            trackBar.Minimum = 0;
+            trackBar.Maximum = 10;
+            trackBar.Value = 2;
+            trackBar.Size = new Size(240, 50);
+            trackBar.RightToLeft = RightToLeft.Yes;
+            trackBar.RightToLeftLayout = true;
+            host.Controls.Add(trackBar);
+            host.Show();
+            _ = trackBar.Handle;
+            Application.DoEvents();
+            return new RtlSnapshot(BootstrapRangeNativeMethods.GetThumbRectangle(trackBar.Handle), trackBar.Value);
+        }
+    }
+
     private static void SendMouseMessage(IntPtr handle, int message, Point point, bool buttonDown)
     {
         var lParam = new IntPtr((point.Y << 16) | (point.X & 0xFFFF));
@@ -397,15 +458,37 @@ public sealed class BootstrapRangeTests
         internal string[] EventSequence { get; }
     }
 
+    private readonly struct RtlSnapshot
+    {
+        internal RtlSnapshot(Rectangle bounds, int value)
+        {
+            Bounds = bounds;
+            Value = value;
+        }
+
+        internal Rectangle Bounds { get; }
+
+        internal int Value { get; }
+    }
+
     private sealed class ProbeBootstrapRange : BootstrapRange
     {
         internal int SuppressedChannelDrawCount { get; private set; }
 
         internal int SuppressedThumbDrawCount { get; private set; }
 
+        internal int SuppressedTickDrawCount { get; private set; }
+
         internal void RecreateHandleForTesting() => RecreateHandle();
 
         internal void RaiseMouseLeaveForTesting() => OnMouseLeave(EventArgs.Empty);
+
+        internal void ResetSuppressedDrawCounts()
+        {
+            SuppressedChannelDrawCount = 0;
+            SuppressedThumbDrawCount = 0;
+            SuppressedTickDrawCount = 0;
+        }
 
         protected override void WndProc(ref Message m)
         {
@@ -431,6 +514,10 @@ public sealed class BootstrapRangeTests
             else if (part == BootstrapRangeNativePart.Thumb)
             {
                 SuppressedThumbDrawCount++;
+            }
+            else if (part == BootstrapRangeNativePart.Ticks)
+            {
+                SuppressedTickDrawCount++;
             }
         }
     }

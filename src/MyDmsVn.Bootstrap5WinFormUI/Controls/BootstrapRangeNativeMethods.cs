@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.InteropServices;
 
@@ -26,6 +27,9 @@ internal static class BootstrapRangeNativeMethods
     internal const uint CdisFocus = 0x0010;
     internal const uint CdisHot = 0x0040;
     private const int TbmGetThumbRect = 0x0419;
+    private const int TbmGetTicPos = 0x040F;
+    private const int TbmGetNumTics = 0x0410;
+    private const int TbmGetChannelRect = 0x041A;
 
     internal static bool TryReadCustomDraw(
         IntPtr parameter,
@@ -69,6 +73,47 @@ internal static class BootstrapRangeNativeMethods
         SendMessage(trackBarHandle, TbmGetThumbRect, IntPtr.Zero, ref rectangle);
         return rectangle.ToRectangle();
     }
+
+    internal static Rectangle GetChannelRectangle(IntPtr trackBarHandle)
+    {
+        if (trackBarHandle == IntPtr.Zero)
+        {
+            return Rectangle.Empty;
+        }
+
+        var rectangle = default(BootstrapRangeNativeRectangle);
+        SendMessage(trackBarHandle, TbmGetChannelRect, IntPtr.Zero, ref rectangle);
+        return rectangle.ToRectangle();
+    }
+
+    internal static int[] GetIntermediateTickPositions(IntPtr trackBarHandle)
+    {
+        if (trackBarHandle == IntPtr.Zero)
+        {
+            return Array.Empty<int>();
+        }
+
+        var nativeTickCount = (int)SendMessage(trackBarHandle, TbmGetNumTics, IntPtr.Zero, IntPtr.Zero).ToInt64();
+        var intermediateCount = Math.Max(0, nativeTickCount - 2);
+        var positions = new List<int>(intermediateCount);
+        for (var index = 0; index < intermediateCount; index++)
+        {
+            var position = SendMessage(trackBarHandle, TbmGetTicPos, new IntPtr(index), IntPtr.Zero).ToInt64();
+            if (position >= 0 && position <= int.MaxValue)
+            {
+                positions.Add((int)position);
+            }
+        }
+
+        return positions.ToArray();
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(
+        IntPtr hWnd,
+        int message,
+        IntPtr wParam,
+        IntPtr lParam);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern IntPtr SendMessage(

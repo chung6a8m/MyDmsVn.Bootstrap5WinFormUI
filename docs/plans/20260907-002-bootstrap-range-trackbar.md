@@ -386,14 +386,14 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/BootstrapRangeTests.cs`
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/BootstrapRangeRenderLogicTests.cs`
 
-- [ ] **Step 1: Write failing tests** for `TickStyle.None`, `TopLeft`, `BottomRight`, `Both`, horizontal/vertical orientation, RTL layout, and 96/144/192 DPI framework metrics.
-- [ ] **Step 2: Implement tick painting only through the verified native path.** Use native physical tick positions; do not build a second logical TrackBar layout engine.
-- [ ] **Step 3: Treat first/last ticks carefully** because Win32's indexed tick-position APIs do not expose them like intermediate ticks; anchor endpoints to native travel/channel geometry rather than extrapolating from value percentages.
-- [ ] **Step 4: Verify `RightToLeftLayout` visually and behaviorally.** Framework painting follows native rectangles and must not reverse `Value` itself.
-- [ ] **Step 5: Handle DPI changes** by refreshing only framework metrics and invalidating; native rectangles remain device-pixel inputs.
-- [ ] **Step 6: Exercise runtime changes** to `Orientation`, `TickStyle`, `TickFrequency`, `RightToLeft`, and `RightToLeftLayout`, including any native handle recreation they trigger.
-- [ ] **Step 7: If custom tick drawing proves unreliable on a supported configuration, document and keep native ticks rather than shipping incorrect tick geometry.**
-- [ ] **Step 8: Commit:** `feat: harden BootstrapRange layout and ticks`
+- [x] **Step 1: Write failing tests** for `TickStyle.None`, `TopLeft`, `BottomRight`, `Both`, horizontal/vertical orientation, RTL layout, and 96/144/192 DPI framework metrics.
+- [x] **Step 2: Implement tick painting only through the verified native path.** Use native physical tick positions; do not build a second logical TrackBar layout engine.
+- [x] **Step 3: Treat first/last ticks carefully** because Win32's indexed tick-position APIs do not expose them like intermediate ticks; anchor endpoints to native travel/channel geometry rather than extrapolating from value percentages.
+- [x] **Step 4: Verify `RightToLeftLayout` visually and behaviorally.** Framework painting follows native rectangles and must not reverse `Value` itself.
+- [x] **Step 5: Handle DPI changes** by refreshing only framework metrics and invalidating; native rectangles remain device-pixel inputs.
+- [x] **Step 6: Exercise runtime changes** to `Orientation`, `TickStyle`, `TickFrequency`, `RightToLeft`, and `RightToLeftLayout`, including any native handle recreation they trigger.
+- [x] **Step 7: If custom tick drawing proves unreliable on a supported configuration, document and keep native ticks rather than shipping incorrect tick geometry.**
+- [x] **Step 8: Commit:** `feat: harden BootstrapRange layout and ticks`
 
 ---
 

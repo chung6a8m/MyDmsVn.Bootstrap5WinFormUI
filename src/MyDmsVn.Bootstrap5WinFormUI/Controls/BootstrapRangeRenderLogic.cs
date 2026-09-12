@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
@@ -164,6 +165,49 @@ internal static class BootstrapRangeRenderLogic
             Math.Max(1f, DpiScaler.Scale((float)metrics.BorderWidth, dpi)));
     }
 
+    internal static IReadOnlyList<RectangleF> CalculateTicks(
+        Rectangle clientBounds,
+        Rectangle nativeChannelBounds,
+        Orientation orientation,
+        TickStyle tickStyle,
+        IReadOnlyList<int> intermediatePositions,
+        BootstrapThemeMetrics metrics,
+        int dpi)
+    {
+        if (intermediatePositions is null)
+        {
+            throw new ArgumentNullException(nameof(intermediatePositions));
+        }
+
+        if (metrics is null)
+        {
+            throw new ArgumentNullException(nameof(metrics));
+        }
+
+        if (tickStyle == TickStyle.None || nativeChannelBounds.IsEmpty || clientBounds.IsEmpty)
+        {
+            return Array.Empty<RectangleF>();
+        }
+
+        var positions = BuildPhysicalTickPositions(nativeChannelBounds, orientation, intermediatePositions);
+        var tickLength = Math.Max(1f, DpiScaler.Scale((float)metrics.SpacingXS, dpi));
+        var tickThickness = Math.Max(1f, DpiScaler.Scale((float)metrics.BorderWidth, dpi));
+        var gap = Math.Max(1f, DpiScaler.Scale((float)metrics.BorderWidth, dpi));
+        var ticks = new List<RectangleF>(positions.Count * (tickStyle == TickStyle.Both ? 2 : 1));
+
+        if (tickStyle == TickStyle.TopLeft || tickStyle == TickStyle.Both)
+        {
+            AddTickSide(ticks, positions, nativeChannelBounds, orientation, topOrLeft: true, tickLength, tickThickness, gap);
+        }
+
+        if (tickStyle == TickStyle.BottomRight || tickStyle == TickStyle.Both)
+        {
+            AddTickSide(ticks, positions, nativeChannelBounds, orientation, topOrLeft: false, tickLength, tickThickness, gap);
+        }
+
+        return ticks;
+    }
+
     private static Rectangle CenterRail(Rectangle nativeBounds, Orientation orientation, int requestedThickness)
     {
         if (nativeBounds.Width <= 0 || nativeBounds.Height <= 0)
@@ -204,5 +248,56 @@ internal static class BootstrapRangeRenderLogic
             nativeBounds.Y + ((nativeBounds.Height - diameter) / 2),
             diameter,
             diameter);
+    }
+
+    private static List<int> BuildPhysicalTickPositions(
+        Rectangle channelBounds,
+        Orientation orientation,
+        IReadOnlyList<int> intermediatePositions)
+    {
+        var start = orientation == Orientation.Horizontal ? channelBounds.Left : channelBounds.Top;
+        var end = orientation == Orientation.Horizontal ? channelBounds.Right - 1 : channelBounds.Bottom - 1;
+        var positions = new List<int>(intermediatePositions.Count + 2) { start };
+        for (var index = 0; index < intermediatePositions.Count; index++)
+        {
+            var position = intermediatePositions[index];
+            if (position > start && position < end && !positions.Contains(position))
+            {
+                positions.Add(position);
+            }
+        }
+
+        positions.Add(end);
+        positions.Sort();
+        return positions;
+    }
+
+    private static void AddTickSide(
+        ICollection<RectangleF> target,
+        IEnumerable<int> positions,
+        Rectangle channelBounds,
+        Orientation orientation,
+        bool topOrLeft,
+        float length,
+        float thickness,
+        float gap)
+    {
+        foreach (var position in positions)
+        {
+            if (orientation == Orientation.Horizontal)
+            {
+                var y = topOrLeft
+                    ? channelBounds.Top - gap - length
+                    : channelBounds.Bottom + gap;
+                target.Add(new RectangleF(position - (thickness / 2f), y, thickness, length));
+            }
+            else
+            {
+                var x = topOrLeft
+                    ? channelBounds.Left - gap - length
+                    : channelBounds.Right + gap;
+                target.Add(new RectangleF(x, position - (thickness / 2f), length, thickness));
+            }
+        }
     }
 }

@@ -220,6 +220,17 @@ public class BootstrapRange : TrackBar
         }
 
         var part = BootstrapRangeNativeMethods.ClassifyPart(customDraw.ItemSpec);
+        if (part == BootstrapRangeNativePart.Ticks)
+        {
+            if (TickStyle == TickStyle.None || !PaintTicks(customDraw))
+            {
+                return false;
+            }
+
+            message.Result = new IntPtr(BootstrapRangeNativeMethods.CdrfSkipDefault);
+            return true;
+        }
+
         if (part != BootstrapRangeNativePart.Channel && part != BootstrapRangeNativePart.Thumb)
         {
             return false;
@@ -227,6 +238,40 @@ public class BootstrapRange : TrackBar
 
         PaintNativePart(customDraw, part);
         message.Result = new IntPtr(BootstrapRangeNativeMethods.CdrfSkipDefault);
+        return true;
+    }
+
+    private bool PaintTicks(BootstrapRangeNativeCustomDraw customDraw)
+    {
+        if (customDraw.DeviceContext == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var channelBounds = BootstrapRangeNativeMethods.GetChannelRectangle(Handle);
+        var positions = BootstrapRangeNativeMethods.GetIntermediateTickPositions(Handle);
+        var theme = BootstrapThemeManager.CurrentTheme;
+        var ticks = BootstrapRangeRenderLogic.CalculateTicks(
+            ClientRectangle,
+            channelBounds,
+            Orientation,
+            TickStyle,
+            positions,
+            theme.Metrics,
+            DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi);
+        if (ticks.Count == 0)
+        {
+            return false;
+        }
+
+        var palette = BootstrapRangeRenderLogic.ResolvePalette(theme.Colors, _variant, CurrentVisualState);
+        using var graphics = Graphics.FromHdc(customDraw.DeviceContext);
+        using var brush = new SolidBrush(palette.TickColor);
+        for (var index = 0; index < ticks.Count; index++)
+        {
+            graphics.FillRectangle(brush, ticks[index]);
+        }
+
         return true;
     }
 

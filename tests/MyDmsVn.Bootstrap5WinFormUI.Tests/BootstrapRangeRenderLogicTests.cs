@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
@@ -203,5 +204,66 @@ public sealed class BootstrapRangeRenderLogicTests
     public void NativePartClassificationKeepsUnknownValuesNative(ulong value, int expected)
     {
         Assert.That(BootstrapRangeNativeMethods.ClassifyPart(new UIntPtr(value)), Is.EqualTo((BootstrapRangeNativePart)expected));
+    }
+
+    [TestCase(TickStyle.None, 0)]
+    [TestCase(TickStyle.TopLeft, 5)]
+    [TestCase(TickStyle.BottomRight, 5)]
+    [TestCase(TickStyle.Both, 10)]
+    public void HorizontalTicksUseNativePhysicalPositionsAndAnchoredEndpoints(TickStyle tickStyle, int expectedCount)
+    {
+        var ticks = BootstrapRangeRenderLogic.CalculateTicks(
+            new Rectangle(0, 0, 140, 60),
+            new Rectangle(10, 20, 100, 4),
+            Orientation.Horizontal,
+            tickStyle,
+            new[] { 30, 60, 90 },
+            BootstrapThemeMetrics.Default,
+            96);
+
+        Assert.That(ticks, Has.Count.EqualTo(expectedCount));
+        if (tickStyle != TickStyle.None)
+        {
+            var physicalCenters = ticks.Take(5).Select(tick => (int)Math.Round(tick.Left + (tick.Width / 2f))).ToArray();
+            Assert.That(physicalCenters, Is.EqualTo(new[] { 10, 30, 60, 90, 109 }));
+        }
+    }
+
+    [TestCase(TickStyle.TopLeft, 5)]
+    [TestCase(TickStyle.BottomRight, 5)]
+    [TestCase(TickStyle.Both, 10)]
+    public void VerticalTicksUseNativePhysicalPositions(TickStyle tickStyle, int expectedCount)
+    {
+        var ticks = BootstrapRangeRenderLogic.CalculateTicks(
+            new Rectangle(0, 0, 60, 140),
+            new Rectangle(20, 10, 4, 100),
+            Orientation.Vertical,
+            tickStyle,
+            new[] { 30, 60, 90 },
+            BootstrapThemeMetrics.Default,
+            96);
+
+        Assert.That(ticks, Has.Count.EqualTo(expectedCount));
+        Assert.That(
+            ticks.Take(5).Select(tick => (int)Math.Round(tick.Top + (tick.Height / 2f))).ToArray(),
+            Is.EqualTo(new[] { 10, 30, 60, 90, 109 }));
+    }
+
+    [TestCase(96, 4f, 1f)]
+    [TestCase(144, 6f, 1.5f)]
+    [TestCase(192, 8f, 2f)]
+    public void TickLengthAndStrokeScaleAtSupportedDpis(int dpi, float expectedLength, float expectedThickness)
+    {
+        var tick = BootstrapRangeRenderLogic.CalculateTicks(
+            new Rectangle(0, 0, 140, 80),
+            new Rectangle(10, 30, 100, 8),
+            Orientation.Horizontal,
+            TickStyle.BottomRight,
+            Array.Empty<int>(),
+            BootstrapThemeMetrics.Default,
+            dpi)[0];
+
+        Assert.That(tick.Height, Is.EqualTo(expectedLength));
+        Assert.That(tick.Width, Is.EqualTo(expectedThickness));
     }
 }

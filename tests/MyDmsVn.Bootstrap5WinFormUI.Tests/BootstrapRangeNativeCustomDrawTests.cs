@@ -100,6 +100,24 @@ public sealed class BootstrapRangeNativeCustomDrawTests
         // still left untouched.
     }
 
+    [Test]
+    public void NativeTickMessagesExposePhysicalIntermediatePositionsAndChannelBounds()
+    {
+        using var host = CreateHost(out var trackBar, Orientation.Horizontal, TickStyle.BottomRight);
+        trackBar.TickFrequency = 2;
+        ForcePaint(host, trackBar);
+
+        var channel = BootstrapRangeNativeMethods.GetChannelRectangle(trackBar.Handle);
+        var positions = BootstrapRangeNativeMethods.GetIntermediateTickPositions(trackBar.Handle);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(channel.IsEmpty, Is.False);
+            Assert.That(positions, Is.Not.Empty);
+            Assert.That(positions.All(position => position >= channel.Left && position < channel.Right), Is.True);
+        }));
+    }
+
     private static Form CreateHost(
         out ProbeTrackBar trackBar,
         Orientation orientation,
