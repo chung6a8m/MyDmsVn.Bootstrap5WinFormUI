@@ -703,6 +703,8 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 ```
 
 - [ ] **Step 10: Manually inspect the demo in Light and Dark themes at 100%, 150%, and 200% Windows scaling.** Verify no clipped checks/arrows/text, split-button divider/arrow correctness, no stale menu after application deactivation, no overflow placement defect, separator orientation correctness, no status Spring or status-label-border regression, and no theme mismatch between owner and opened submenu.
+
+  **Documented limitation:** This run intentionally does not perform interactive desktop inspection because the user prohibited computer-use. Deterministic Light/Dark, 96/144/192 DPI, RTL, split-button, overflow, separator, status Spring/border, nested-menu, deactivation/lifecycle, and theme-propagation behavior is covered by the automated render and message-loop suites; the physical Windows scaling matrix remains an explicit manual follow-up.
 - [x] **Step 11: Commit demo/docs/API baseline.**
 
 ```powershell
@@ -720,9 +722,9 @@ git commit -m "docs: document Bootstrap ToolStrip family"
 
 **Produces:** fresh build/test evidence for both target frameworks and a final implementation audit against this plan.
 
-- [ ] **Step 1: Re-read this plan and make a requirement checklist.** Confirm every Global Constraint, public contract, native behavior contract, shared rendering hook, test-host rule, theme/font ownership rule, renderer-propagation/lifecycle distinction, and demo requirement has either test coverage or an explicit documented limitation.
-- [ ] **Step 2: Scan the implementation for forbidden architecture.** There must be no custom popup Form, global hook, `ToolStripManager.Renderer` mutation, parallel item model, hand-built overflow engine, status Spring width calculation, caller-resource disposal, framework-forced renderer reassignment, hard-coded split-button layout, horizontal-only separator implementation, or stale child-drop-down tracking.
-- [ ] **Step 3: Scan for placeholders.** Search changed code/docs for `TODO`, `TBD`, `FIXME`, `NotImplementedException`, and comments deferring required behavior.
+- [x] **Step 1: Re-read this plan and make a requirement checklist.** Confirm every Global Constraint, public contract, native behavior contract, shared rendering hook, test-host rule, theme/font ownership rule, renderer-propagation/lifecycle distinction, and demo requirement has either test coverage or an explicit documented limitation.
+- [x] **Step 2: Scan the implementation for forbidden architecture.** There must be no custom popup Form, global hook, `ToolStripManager.Renderer` mutation, parallel item model, hand-built overflow engine, status Spring width calculation, caller-resource disposal, framework-forced renderer reassignment, hard-coded split-button layout, horizontal-only separator implementation, or stale child-drop-down tracking.
+- [x] **Step 3: Scan for placeholders.** Search changed code/docs for `TODO`, `TBD`, `FIXME`, `NotImplementedException`, and comments deferring required behavior.
 
 ```powershell
 git grep -n -E "TODO|TBD|FIXME|NotImplementedException" -- src/MyDmsVn.Bootstrap5WinFormUI demo/MyDmsVn.Bootstrap5WinFormUI.Demo tests/MyDmsVn.Bootstrap5WinFormUI.Tests docs
@@ -738,7 +740,7 @@ Review matches; pre-existing unrelated matches are not failures, but no new requ
 
 Expected: zero failing tests and zero hangs.
 
-- [ ] **Step 5: Build both library targets explicitly if `test.ps1` does not already provide clear per-target evidence.**
+- [x] **Step 5: Build both library targets explicitly if `test.ps1` does not already provide clear per-target evidence.**
 
 ```powershell
 dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj -f net48
@@ -747,7 +749,7 @@ dotnet build src/MyDmsVn.Bootstrap5WinFormUI/MyDmsVn.Bootstrap5WinFormUI.csproj 
 
 Expected: both builds exit 0.
 
-- [ ] **Step 6: Inspect final diff/stat and verify scope.**
+- [x] **Step 6: Inspect final diff/stat and verify scope.**
 
 ```powershell
 git status --short

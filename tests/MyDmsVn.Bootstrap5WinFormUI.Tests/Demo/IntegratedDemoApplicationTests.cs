@@ -30,6 +30,7 @@ public sealed class IntegratedDemoApplicationTests
         "Sidebar",
         "TreeView",
         "ListView",
+        "Menus / ToolStrips",
         "DataGrid",
         "Pagination",
         "Navigation / Tabs"
