@@ -373,11 +373,11 @@ Do not claim completion from a focused test run alone.
 
 **Produces:** one reusable test helper that runs real WinForms interaction work on a dedicated STA UI thread with a running message pump, propagates UI exceptions back to NUnit, shuts down deterministically, and has a bounded timeout.
 
-- [ ] **Step 1: Write failing host tests.** Require: work runs on `ApartmentState.STA`; `SynchronizationContext.Current`/message dispatch is available after loop startup; `BeginInvoke` completes; exceptions thrown by UI work are rethrown on the calling test thread with the original exception preserved; disposal terminates the UI thread; and a deliberately non-completing action triggers the host timeout instead of hanging the test process.
-- [ ] **Step 2: Implement the minimal host around a dedicated STA `Thread` plus `Application.Run(ApplicationContext)`.** Signal readiness only after the UI thread has initialized its message loop. Marshal work onto the UI thread with `Control.BeginInvoke`/equivalent WinForms dispatch, capture exceptions with `ExceptionDispatchInfo`, and provide a bounded synchronous `Run(Action)` / `Run<T>(Func<T>)` API suitable for NUnit tests.
-- [ ] **Step 3: Ensure shutdown is deterministic.** `Dispose` must request `ApplicationContext.ExitThread()` on the UI thread, join with a bounded timeout, and fail the test rather than leave an orphan UI thread when shutdown does not complete.
-- [ ] **Step 4: Verify the host does not replace `WinFormsTestEnvironment`.** Global `Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException, threadScope: false)` remains configured by the existing fixture before GUI scenarios.
-- [ ] **Step 5: Run the infrastructure tests with hang protection.**
+- [x] **Step 1: Write failing host tests.** Require: work runs on `ApartmentState.STA`; `SynchronizationContext.Current`/message dispatch is available after loop startup; `BeginInvoke` completes; exceptions thrown by UI work are rethrown on the calling test thread with the original exception preserved; disposal terminates the UI thread; and a deliberately non-completing action triggers the host timeout instead of hanging the test process.
+- [x] **Step 2: Implement the minimal host around a dedicated STA `Thread` plus `Application.Run(ApplicationContext)`.** Signal readiness only after the UI thread has initialized its message loop. Marshal work onto the UI thread with `Control.BeginInvoke`/equivalent WinForms dispatch, capture exceptions with `ExceptionDispatchInfo`, and provide a bounded synchronous `Run(Action)` / `Run<T>(Func<T>)` API suitable for NUnit tests.
+- [x] **Step 3: Ensure shutdown is deterministic.** `Dispose` must request `ApplicationContext.ExitThread()` on the UI thread, join with a bounded timeout, and fail the test rather than leave an orphan UI thread when shutdown does not complete.
+- [x] **Step 4: Verify the host does not replace `WinFormsTestEnvironment`.** Global `Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException, threadScope: false)` remains configured by the existing fixture before GUI scenarios.
+- [x] **Step 5: Run the infrastructure tests with hang protection.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -388,7 +388,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: PASS with no dialog and no orphan process/thread.
 
-- [ ] **Step 6: Commit the test infrastructure.**
+- [x] **Step 6: Commit the test infrastructure.**
 
 ```powershell
 git add tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Infrastructure/WinFormsMessageLoopTestHost.cs tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Infrastructure/WinFormsMessageLoopTestHostTests.cs
