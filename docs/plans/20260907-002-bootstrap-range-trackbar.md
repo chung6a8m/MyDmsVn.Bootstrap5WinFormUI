@@ -446,10 +446,10 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Modify: `README.md` if the current component inventory/API table requires it
 - Modify: `CHANGELOG.md` only if the repository's current unreleased-section convention requires feature entries during implementation
 
-- [ ] **Step 1: Document `BootstrapRange`** as a native-backed `TrackBar` with Bootstrap-aware rendering.
-- [ ] **Step 2: Document the one-property V1 extension (`Variant`)** and explicitly direct users to inherited TrackBar APIs for range, value, orientation, ticks, RTL, and events.
-- [ ] **Step 3: Document the V1 exclusions** most likely to surprise users: integer value semantics, single thumb, no built-in value tooltip/labels, no progress-filled segment.
-- [ ] **Step 4: Document native custom-draw dependency/fallback behavior** if implementation discovered any Windows/common-controls limitations.
+- [x] **Step 1: Document `BootstrapRange`** as a native-backed `TrackBar` with Bootstrap-aware rendering.
+- [x] **Step 2: Document the one-property V1 extension (`Variant`)** and explicitly direct users to inherited TrackBar APIs for range, value, orientation, ticks, RTL, and events.
+- [x] **Step 3: Document the V1 exclusions** most likely to surprise users: integer value semantics, single thumb, no built-in value tooltip/labels, no progress-filled segment.
+- [x] **Step 4: Document native custom-draw dependency/fallback behavior** if implementation discovered any Windows/common-controls limitations.
 - [ ] **Step 5: Run Release build plus the repository full-suite entry point:**
 
 ```powershell
@@ -460,8 +460,10 @@ dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release
 Do not replace the full-suite command with unbounded raw `dotnet test` invocations. If a focused raw test run is needed while diagnosing a failure, include `--blame-hang --blame-hang-timeout 5m` and the relevant TFM/filter.
 
 - [ ] **Step 6: Launch the integrated demo manually** and verify light/dark, horizontal/vertical, ticks, RTL, disabled, focus, mouse drag, channel click, keyboard, and runtime theme switching.
-- [ ] **Step 7: Check repository diff** for accidental generated/binary files and ensure no unrelated public API changes were introduced.
-- [ ] **Step 8: Commit:** `docs: document BootstrapRange`
+- [x] **Step 7: Check repository diff** for accidental generated/binary files and ensure no unrelated public API changes were introduced.
+- [x] **Step 8: Commit:** `docs: document BootstrapRange`
+
+Validation note (2026-09-13): the Release solution build completed with zero warnings and zero errors. `./test.ps1 -HangTimeoutMinutes 5` passed all 1,964 tests on `net48`; on `net8.0-windows`, 1,963 tests passed and the pre-existing `BootstrapListViewReviewRound6RegressionTests.RealGroupHeadersUseReadableThemeColorsAfterRuntimeSwitch` visual-host test failed because its native collapse-affordance desktop click was not accepted. The same isolated test fails unchanged on the clean source worktree, while every other `net8.0-windows` test passes. Step 5 remains open until that external full-suite gate is green. Step 6 remains open because this run explicitly prohibited computer-use, so no automated claim is made for the manual visual/interaction matrix.
 
 ---
 
@@ -469,26 +471,26 @@ Do not replace the full-suite command with unbounded raw `dotnet test` invocatio
 
 Implementation is complete only when all of the following are true:
 
-- [ ] `BootstrapRange` derives directly from `System.Windows.Forms.TrackBar`.
-- [ ] The public V1 extension is intentionally minimal: `Variant` plus inherited TrackBar API.
-- [ ] Undefined `BootstrapVariant` values are rejected synchronously before state mutation, and the previous valid `Variant` remains unchanged after the exception.
-- [ ] `Minimum`, `Maximum`, `Value`, `SmallChange`, `LargeChange`, `TickFrequency`, `TickStyle`, `Orientation`, `RightToLeft`, and `RightToLeftLayout` remain native contracts.
-- [ ] `Scroll` and `ValueChanged` remain native events with no framework duplication/synthesis.
-- [ ] Horizontal and vertical controls render a Bootstrap-like neutral rail and accent thumb.
-- [ ] Light/dark theme and supported variants update at runtime without changing value/range state.
-- [ ] Focus, hover/pressed where reliably detectable, and disabled states are visually distinct.
-- [ ] Native thumb hit target, capture, keyboard behavior, Tab navigation, and accessibility are preserved.
-- [ ] Ticks remain correct for supported `TickStyle`/`TickFrequency`; if a safe custom tick path is unavailable in a documented configuration, native ticks are preserved rather than replaced with incorrect geometry.
-- [ ] RTL layout follows native `RightToLeft`/`RightToLeftLayout` behavior.
-- [ ] Framework metrics scale at 96/144/192 DPI without double-scaling native rectangles.
-- [ ] No custom value/selection/accessibility engine is introduced.
-- [ ] No new external package is added.
-- [ ] No HDC/GDI resource leak is introduced by custom drawing.
-- [ ] Notification-dependent HWND tests run on STA under a real parent HWND, use bounded synchronization, and dispose their host deterministically.
-- [ ] Automated HWND tests use the repository WinForms test environment and cannot hang on modal UI.
-- [ ] Focused raw GUI test commands use bounded `--blame-hang` protection, and the full suite runs via `./test.ps1`.
+- [x] `BootstrapRange` derives directly from `System.Windows.Forms.TrackBar`.
+- [x] The public V1 extension is intentionally minimal: `Variant` plus inherited TrackBar API.
+- [x] Undefined `BootstrapVariant` values are rejected synchronously before state mutation, and the previous valid `Variant` remains unchanged after the exception.
+- [x] `Minimum`, `Maximum`, `Value`, `SmallChange`, `LargeChange`, `TickFrequency`, `TickStyle`, `Orientation`, `RightToLeft`, and `RightToLeftLayout` remain native contracts.
+- [x] `Scroll` and `ValueChanged` remain native events with no framework duplication/synthesis.
+- [x] Horizontal and vertical controls render a Bootstrap-like neutral rail and accent thumb.
+- [x] Light/dark theme and supported variants update at runtime without changing value/range state.
+- [x] Focus, hover/pressed where reliably detectable, and disabled states are visually distinct.
+- [x] Native thumb hit target, capture, keyboard behavior, Tab navigation, and accessibility are preserved.
+- [x] Ticks remain correct for supported `TickStyle`/`TickFrequency`; if a safe custom tick path is unavailable in a documented configuration, native ticks are preserved rather than replaced with incorrect geometry.
+- [x] RTL layout follows native `RightToLeft`/`RightToLeftLayout` behavior.
+- [x] Framework metrics scale at 96/144/192 DPI without double-scaling native rectangles.
+- [x] No custom value/selection/accessibility engine is introduced.
+- [x] No new external package is added.
+- [x] No HDC/GDI resource leak is introduced by custom drawing.
+- [x] Notification-dependent HWND tests run on STA under a real parent HWND, use bounded synchronization, and dispose their host deterministically.
+- [x] Automated HWND tests use the repository WinForms test environment and cannot hang on modal UI.
+- [x] Focused raw GUI test commands use bounded `--blame-hang` protection, and the full suite runs via `./test.ps1`.
 - [ ] Build and tests pass on both `net48` and `net8.0-windows`.
-- [ ] Integrated demo includes range scenarios and manual interaction diagnostics.
+- [x] Integrated demo includes range scenarios and manual interaction diagnostics.
 
 ---
 
@@ -514,11 +516,11 @@ Implementation is complete only when all of the following are true:
 
 ## Definition of Done
 
-- [ ] Rendering decision gate passed on both target frameworks using a structurally valid STA + parent-HWND probe, or implementation stopped with a documented architectural decision.
-- [ ] Task 1 records which `NMCUSTOMDRAW.uItemState` flags are reliable for normal/focused/hot/pressed/disabled presentation on both TFMs.
+- [x] Rendering decision gate passed on both target frameworks using a structurally valid STA + parent-HWND probe, or implementation stopped with a documented architectural decision.
+- [x] Task 1 records which `NMCUSTOMDRAW.uItemState` flags are reliable for normal/focused/hot/pressed/disabled presentation on both TFMs.
 - [ ] Tasks 1–9 completed in order with focused tests kept green.
-- [ ] Public API reviewed against the V1 contract and exclusions, including synchronous invalid-`Variant` rejection without state mutation.
-- [ ] Native behavior regression suite passes for value, events, keyboard, mouse, orientation, ticks, RTL, focus, accessibility, handle recreation, and disposal.
+- [x] Public API reviewed against the V1 contract and exclusions, including synchronous invalid-`Variant` rejection without state mutation.
+- [x] Native behavior regression suite passes for value, events, keyboard, mouse, orientation, ticks, RTL, focus, accessibility, handle recreation, and disposal.
 - [ ] Release build succeeds and `./test.ps1 -HangTimeoutMinutes 5` passes for `net48` and `net8.0-windows`; any focused raw GUI test runs used during development include bounded `--blame-hang` protection.
 - [ ] Demo verified manually in light/dark at common DPI scales.
-- [ ] Documentation reflects actual implemented behavior, including any discovered native custom-draw limitations.
+- [x] Documentation reflects actual implemented behavior, including any discovered native custom-draw limitations.

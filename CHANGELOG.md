@@ -6,6 +6,8 @@ All notable release-facing changes to this project are documented here.
 
 ### Added
 
+- `BootstrapRange`, a direct native WinForms `TrackBar` subclass with one semantic `Variant` extension, Bootstrap-themed custom-drawn rail/thumb/ticks, theme/DPI-aware focus and interaction states, and native range, value, orientation, RTL, keyboard, mouse, event, accessibility, and lifecycle behavior.
+- Integrated **Range** demo and dual-target pure/STA coverage for all variants, horizontal/vertical and tick configurations, native value/event/input behavior, RTL, theme/DPI, handle recreation, accessibility, and deterministic disposal.
 - `BootstrapTreeView`, a direct native WinForms `TreeView` subclass with Bootstrap-themed `OwnerDrawAll` presentation, semantic selected-node `Variant`, theme/DPI-aware lines, expanders, checkboxes, native images/state images, and caller-owned `ItemHeight` handoff while retaining native nodes, selection, label editing, keyboard, hit testing, drag/drop, and accessibility semantics.
 - Integrated **TreeView** demo and dual-target automated/manual coverage for variants, deep hierarchies, `FullRowSelect`/`ShowLines`, native image/state-image/check-box geometry, `DrawNode` observability, keyboard/focus, label editing, HotTracking, ItemDrag/AllowDrop, RTL, scrolling, theme/DPI, handle recreation, and disposal.
 - `BootstrapCheckBox`, `BootstrapRadioButton`, and `BootstrapSwitch` as direct native WinForms subclasses with Bootstrap-inspired normal form-check rendering, semantic Variant/ValidationState accents, actual-CheckState mixed presentation, native RadioButton grouping/AutoCheck behavior, DPI/RTL-aware layout, runtime theme/font lifecycle, and complete native fallback for Appearance/image modes.
@@ -47,6 +49,7 @@ All notable release-facing changes to this project are documented here.
 
 ### Changed
 
+- Reviewed the additive `BootstrapRange` public/protected reflection surface and synchronized the approved v1 API fingerprint to `78ba3b8becd0e9cad99540b8bf1d7950eba9b1ad28d152f9eff44d642bc8737d`; native custom-draw interop and range render/state/geometry helpers remain non-public, and `AssemblyVersion` remains `1.0.0.0`.
 - Reviewed the native-backed `BootstrapTreeView` public/protected reflection surface and synchronized the approved v1 API fingerprint to `9ef403b3a664a924b5cd5c1ba86e616f176c96ca81a23a17e4628cc7a5b1d0a0`. The feature exports no TreeView helper/model/renderer contract: `BootstrapTreeViewRenderLogic`, TreeView visual-state/palette types, and `Controls.Internal` layout geometry remain non-public; `AssemblyVersion` remains `1.0.0.0`.
 - Reviewed the additive BootstrapLookup public family and updated the approved v1 API fingerprint to `710217615c5f348340c04d2a4927c3ef601a375bddb1cb02f8cd51057b5b8db5`; lookup cell, editing control, adapter, search engine, popup, footer, and TextBox integration hooks remain internal.
 

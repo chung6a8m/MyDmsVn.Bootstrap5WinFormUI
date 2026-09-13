@@ -236,7 +236,11 @@ public class BootstrapRange : TrackBar
             return false;
         }
 
-        PaintNativePart(customDraw, part);
+        if (!PaintNativePart(customDraw, part))
+        {
+            return false;
+        }
+
         message.Result = new IntPtr(BootstrapRangeNativeMethods.CdrfSkipDefault);
         return true;
     }
@@ -275,11 +279,11 @@ public class BootstrapRange : TrackBar
         return true;
     }
 
-    private void PaintNativePart(BootstrapRangeNativeCustomDraw customDraw, BootstrapRangeNativePart part)
+    private bool PaintNativePart(BootstrapRangeNativeCustomDraw customDraw, BootstrapRangeNativePart part)
     {
         if (customDraw.DeviceContext == IntPtr.Zero || customDraw.Bounds.IsEmpty)
         {
-            return;
+            return false;
         }
 
         var theme = BootstrapThemeManager.CurrentTheme;
@@ -303,6 +307,8 @@ public class BootstrapRange : TrackBar
         {
             PaintThumb(graphics, geometry, palette);
         }
+
+        return true;
     }
 
     private static void PaintRail(Graphics graphics, BootstrapRangeGeometry geometry, BootstrapRangePalette palette)
