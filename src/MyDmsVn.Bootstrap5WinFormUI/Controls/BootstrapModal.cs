@@ -201,6 +201,14 @@ public class BootstrapModal : Form
     }
 
     /// <inheritdoc />
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        UpdateShellMetrics(e.DeviceDpiNew);
+        if (Visible) ResolveBoundsForShow(e.DeviceDpiNew);
+    }
+
+    /// <inheritdoc />
     protected override void OnSizeChanged(EventArgs e)
     {
         base.OnSizeChanged(e);
@@ -277,9 +285,9 @@ public class BootstrapModal : Form
         _backdropWindow?.ApplyVisualState(state);
     }
 
-    private void UpdateShellMetrics()
+    private void UpdateShellMetrics(int? targetDpi = null)
     {
-        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var dpi = targetDpi.GetValueOrDefault(DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi);
         var metrics = BootstrapModalLayoutLogic.ResolveMetrics(BootstrapThemeManager.CurrentTheme.Metrics, BorderRadius, dpi);
         _surface.ApplyMetrics(metrics);
         _header.ApplyMetrics(metrics);
@@ -287,13 +295,21 @@ public class BootstrapModal : Form
         PerformLayout();
     }
 
-    private void ResolveBoundsForShow()
+    private void ResolveBoundsForShow(int? targetDpi = null)
     {
-        var screen = Owner is null ? Screen.FromControl(this) : Screen.FromControl(Owner);
+        var ownerContext = BootstrapModalOwnerContext.Resolve(this);
+        var hasNativeOwner = MyDmsVn.Bootstrap5WinFormUI.Compatibility.BootstrapModalNativeWindow.IsUsable(ownerContext.OwnerHandle);
+        var screen = ownerContext.ManagedOwner is not null
+            ? Screen.FromControl(ownerContext.ManagedOwner)
+            : hasNativeOwner
+                ? Screen.FromHandle(ownerContext.OwnerHandle)
+                : Screen.FromControl(this);
         var working = screen.WorkingArea;
-        var ownerBounds = Owner is null ? working : Owner.Bounds;
+        var ownerBounds = ownerContext.OwnerBounds.Width > 0 && ownerContext.OwnerBounds.Height > 0
+            ? ownerContext.OwnerBounds
+            : working;
         var chromeHeight = _surface.ResolveChromeAndContentHeight();
-        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var dpi = targetDpi.GetValueOrDefault(DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi);
         var resolved = BootstrapModalLayoutLogic.ResolveDialogSize(ModalSize, Size, chromeHeight, MinimumSize, MaximumSize, working.Size, dpi);
         Bounds = BootstrapModalLayoutLogic.CenterAndClamp(resolved, ownerBounds, working);
     }

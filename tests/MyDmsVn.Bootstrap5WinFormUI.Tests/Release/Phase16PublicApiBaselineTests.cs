@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "083d66dd9c48507697f4d579b0fdb5cffda552481278cc863b9fb01558117fbd";
+    private const string ApprovedV1Fingerprint = "6aeaf8195bb3fc76ff2f1f7c03b8f202e65f6e13e00399f58f9345cf51000dc8";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()

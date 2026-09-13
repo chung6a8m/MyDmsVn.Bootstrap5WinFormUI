@@ -147,6 +147,42 @@ public sealed class BootstrapModalBackdropTests
     }
 
     [Test]
+    public void ArbitraryIWin32WindowOwnerCentersModalAgainstNativeOwnerBounds()
+    {
+        using var host = new WinFormsMessageLoopTestHost();
+        var centered = host.Run(() =>
+        {
+            var working = Screen.PrimaryScreen!.WorkingArea;
+            using var owner = new Form
+            {
+                Bounds = new System.Drawing.Rectangle(
+                    working.Left + working.Width / 5,
+                    working.Top + working.Height / 5,
+                    360,
+                    260)
+            };
+            using var modal = new BootstrapModal
+            {
+                ModalSize = BootstrapModalSize.Custom,
+                Size = new System.Drawing.Size(240, 160),
+                BackdropMode = BootstrapModalBackdropMode.None
+            };
+            owner.Show();
+            var wrapper = new OwnerWindow(owner.Handle);
+            var result = false;
+            ModalTestHost.ShowAndDrive(modal, wrapper, dialog =>
+            {
+                result = dialog.Left == owner.Left + (owner.Width - dialog.Width) / 2 &&
+                         dialog.Top == owner.Top + (owner.Height - dialog.Height) / 2;
+                dialog.DialogResult = DialogResult.Cancel;
+            });
+            return result;
+        });
+
+        Assert.That(centered, Is.True);
+    }
+
+    [Test]
     public void ParameterlessShowDialogResolvesTheNativeActiveOwnerWhenWindowsProvidesOne()
     {
         using var host = new WinFormsMessageLoopTestHost();
