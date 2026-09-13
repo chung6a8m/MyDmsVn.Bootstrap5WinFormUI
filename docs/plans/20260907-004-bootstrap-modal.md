@@ -8,6 +8,8 @@
 
 **Tech Stack:** C#, WinForms, `net48;net8.0-windows`, existing `BootstrapThemeManager`, `BootstrapTheme`, `BootstrapVariant`/theme tokens, `DpiScaler`, shared Rendering primitives, existing Animation infrastructure (`BootstrapAnimation`, `AnimationOwnerLifecycle`, frame scheduler), NUnit, integrated demo application.
 
+**Execution status (2026-09-13):** Core implementation, automated modal coverage, integrated demo, public API review, documentation, formatting of changed C# files, Release build, and the full 2,025-test suite are complete on both TFMs. The TFM runs were performed sequentially (`net48`, then `net8.0-windows`). Physical DPI, Alt+Tab/task-switcher, and interactive owner lifecycle checks remain in the manual matrix because this execution explicitly excluded computer-use.
+
 ---
 
 ## Global Constraints
@@ -683,19 +685,19 @@ No test may depend on a human clicking the modal.
 - Modify: `demo/MyDmsVn.Bootstrap5WinFormUI.Demo/MainForm.cs`
 - Create or modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Demo/ModalDemoTests.cs`
 
-- [ ] Add a **Modal** page to integrated demo navigation.
-- [ ] Demonstrate Default, Small, Large, ExtraLarge, and `Custom` sizing; make it visible that `Custom` honors caller/native requested size while presets own preferred width.
-- [ ] Demonstrate dismissible, static, and no-backdrop modes.
-- [ ] Demonstrate `AcceptButton`/`CancelButton` and show returned `DialogResult` visibly in the demo.
-- [ ] Demonstrate header close/backdrop/Escape dismissal returning the native-equivalent cancel result, and separately demonstrate caller `Close()` only in a diagnostic scenario so the semantic distinction remains visible.
-- [ ] Demonstrate `CloseOnEscape = false`.
-- [ ] Demonstrate long scrollable body content with fixed reachable footer.
-- [ ] Demonstrate `InitialFocusControl`, Tab/Shift+Tab, Enter, Escape, Alt, and Alt+Tab behavior.
-- [ ] Demonstrate runtime Light/Dark and Reduced motion using the existing global demo controls.
-- [ ] Demonstrate dynamic content/footer changes while open.
-- [ ] Add a diagnostic scenario near monitor edge / constrained owner size to inspect clamping.
-- [ ] Add diagnostics for owner discovery when practical: normal managed owner and parameterless show; arbitrary native `IWin32Window` remains primarily automated-test coverage if demo plumbing would add noise.
-- [ ] Add RTL scenario.
+- [x] Add a **Modal** page to integrated demo navigation.
+- [x] Demonstrate Default, Small, Large, ExtraLarge, and `Custom` sizing; make it visible that `Custom` honors caller/native requested size while presets own preferred width.
+- [x] Demonstrate dismissible, static, and no-backdrop modes.
+- [x] Demonstrate `AcceptButton`/`CancelButton` and show returned `DialogResult` visibly in the demo.
+- [x] Demonstrate header close/backdrop/Escape dismissal returning the native-equivalent cancel result, and separately demonstrate caller `Close()` only in a diagnostic scenario so the semantic distinction remains visible.
+- [x] Demonstrate `CloseOnEscape = false`.
+- [x] Demonstrate long scrollable body content with fixed reachable footer.
+- [x] Demonstrate `InitialFocusControl`, Tab/Shift+Tab, Enter, Escape, Alt, and Alt+Tab behavior.
+- [x] Demonstrate runtime Light/Dark and Reduced motion using the existing global demo controls.
+- [x] Demonstrate dynamic content/footer changes while open.
+- [x] Add a diagnostic scenario near monitor edge / constrained owner size to inspect clamping.
+- [x] Add diagnostics for owner discovery when practical: normal managed owner and parameterless show; arbitrary native `IWin32Window` remains primarily automated-test coverage if demo plumbing would add noise.
+- [x] Add RTL scenario.
 - [ ] Manual-test on supported Windows scaling: 100%, 125%, 150%, 175%, 200%.
 - [ ] Manual-test owner move/resize, minimize/restore where applicable, Alt+Tab to another application, and closing the owner.
 - [ ] Confirm backdrop is enabled/clickable while modal is active, owner remains natively disabled, and no hidden backdrop remains in task switcher/taskbar after closing every demo scenario.
@@ -711,22 +713,22 @@ No test may depend on a human clicking the modal.
 - Modify: `CHANGELOG.md` when implementation is release-ready
 - Modify: `docs/TESTING.md` if `ModalTestHost` becomes shared test infrastructure
 
-- [ ] Add the finalized `BootstrapModal` responsibility/public contract to `docs/COMPONENTS.md` using the exact shipped names.
-- [ ] Document that native `Form`, inherited `ShowDialog`, `DialogResult`, `AcceptButton`, `CancelButton`, `Close()`, and `FormClosing` remain authoritative.
-- [ ] Document the distinction between framework modal dismissal (header/backdrop/Escape) and inherited caller `Close()`.
-- [ ] Document that owner discovery is internal/post-native-ownership and that the framework does not shadow `ShowDialog` or expose a duplicate owner API.
-- [ ] Document V1 backdrop modes and the post-modal-disable-snapshot backdrop architecture; do not describe the backdrop as the mechanism that disables the owner.
-- [ ] Document `ModalSize` precedence: preset modes own preferred width; `Custom` delegates requested size to inherited `Size`/`ClientSize` subject to safety clamping.
-- [ ] Document focus behavior, reduced motion, DPI, RTL behavior, and supported owner forms.
-- [ ] Document V1 exclusions: nested Bootstrap modals, fullscreen, draggable/resizable custom chrome, DWM effects, MDI-special behavior, and modeless contract.
-- [ ] If `ModalTestHost` is generally useful, document the mandatory deterministic-action + timeout rule in `docs/TESTING.md` and reuse it for future dialog tests.
-- [ ] Run formatting/style checks required by the repository.
-- [ ] Run `dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release`.
-- [ ] Run the full test project for `net8.0-windows` with the repository hang-timeout settings.
-- [ ] Run the full test project for `net48` with the repository hang-timeout settings.
-- [ ] Verify no test-runner child process or modal dialog remains after the suite.
+- [x] Add the finalized `BootstrapModal` responsibility/public contract to `docs/COMPONENTS.md` using the exact shipped names.
+- [x] Document that native `Form`, inherited `ShowDialog`, `DialogResult`, `AcceptButton`, `CancelButton`, `Close()`, and `FormClosing` remain authoritative.
+- [x] Document the distinction between framework modal dismissal (header/backdrop/Escape) and inherited caller `Close()`.
+- [x] Document that owner discovery is internal/post-native-ownership and that the framework does not shadow `ShowDialog` or expose a duplicate owner API.
+- [x] Document V1 backdrop modes and the post-modal-disable-snapshot backdrop architecture; do not describe the backdrop as the mechanism that disables the owner.
+- [x] Document `ModalSize` precedence: preset modes own preferred width; `Custom` delegates requested size to inherited `Size`/`ClientSize` subject to safety clamping.
+- [x] Document focus behavior, reduced motion, DPI, RTL behavior, and supported owner forms.
+- [x] Document V1 exclusions: nested Bootstrap modals, fullscreen, draggable/resizable custom chrome, DWM effects, MDI-special behavior, and modeless contract.
+- [x] If `ModalTestHost` is generally useful, document the mandatory deterministic-action + timeout rule in `docs/TESTING.md` and reuse it for future dialog tests.
+- [x] Run formatting/style checks required by the repository.
+- [x] Run `dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release`.
+- [x] Run the full test project for `net8.0-windows` with the repository hang-timeout settings.
+- [x] Run the full test project for `net48` with the repository hang-timeout settings.
+- [x] Verify no test-runner child process or modal dialog remains after the suite.
 - [ ] Run the integrated demo and complete the manual verification matrix.
-- [ ] Review the final public API for duplicate/native aliases and remove any API not justified by tests/demo scenarios.
+- [x] Review the final public API for duplicate/native aliases and remove any API not justified by tests/demo scenarios.
 - [ ] Commit, e.g. `docs: document BootstrapModal contract`.
 
 ---

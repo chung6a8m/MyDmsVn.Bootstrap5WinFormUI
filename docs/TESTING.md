@@ -779,6 +779,10 @@ Repeat the sequence in Light and Dark themes and at a non-100% Windows DPI setti
 
 Automated tests cover standalone state separation, Vietnamese normalization and aggregate ranking, exact-match ambiguity, every unmatched policy, debounce cancellation, logical `ResultsChanged`, highlight-only navigation, popup mouse/keyboard behavior, transient validation layering, theme/source disposal, and 1k/5k/10k deterministic search. DataGridView tests use the real internal editing control and verify raw-value formatting, dirty notification, contextual events, native Tab skipping, validation blocking, BindingSource currency, native new rows, and A-to-B editor reconfiguration without stale source or event paths.
 
+### Modal message-loop tests
+
+Modal integration tests use `ModalTestHost` from an STA `WinFormsMessageLoopTestHost`. Every call registers deterministic work before entering inherited `ShowDialog`, executes that work from the modal `Shown` queue, and has a bounded watchdog that exits the nested loop and reports `TimeoutException`. Scheduled exceptions are captured, the dialog is exited, and the original exception is rethrown to NUnit. Tests must never call `ShowDialog` without a prearranged close/dismiss action, must not show a modal error UI, and must keep the raw `dotnet test` hang watchdog enabled.
+
 Manual Windows verification adds Light/Dark switching, 96/120/144/168/192 DPI, real IME input, F4/Alt+Down, application Alt+Tab presentation-only close, monitor-edge placement, footer workflows, repeated popup disposal, and repeated cross-column edit cycles while observing USER/GDI resources. See `docs/BOOTSTRAP_LOOKUP_BOX.md`.
 
 ### Anchored overlay activation and BootstrapSelect navigation regression matrix
