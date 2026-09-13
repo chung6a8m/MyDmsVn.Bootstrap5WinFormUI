@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -56,6 +57,29 @@ public sealed class BootstrapModalTests
     }
 
     [Test]
+    public void DerivedCancellationAfterBaseAllowsSecondFrameworkDismissal()
+    {
+        using var host = new WinFormsMessageLoopTestHost(TimeSpan.FromSeconds(2));
+
+        var state = host.Run(() =>
+        {
+            using var owner = new Form();
+            using var modal = new CancelAfterBaseModal();
+            var close = (Button)modal.Controls.Find("BootstrapModalClose", true).Single();
+            modal.RetryDismiss = close.PerformClick;
+            owner.Show();
+            var result = ModalTestHost.ShowAndDrive(
+                modal,
+                owner,
+                _ => close.PerformClick(),
+                TimeSpan.FromSeconds(1));
+            return (result, modal.ClosingCount, modal.FrameworkDismissPending);
+        });
+
+        Assert.That(state, Is.EqualTo((DialogResult.Cancel, 2, false)));
+    }
+
+    [Test]
     public void NativeDialogResultButtonRemainsAuthoritative()
     {
         using var host = new WinFormsMessageLoopTestHost();
@@ -72,6 +96,27 @@ public sealed class BootstrapModalTests
         });
 
         Assert.That(result, Is.EqualTo(DialogResult.OK));
+    }
+
+    [Test]
+    public void PresetHeightIsMeasuredAgainstResolvedWidth()
+    {
+        using var host = new WinFormsMessageLoopTestHost();
+
+        var sizes = host.Run(() =>
+        {
+            using var owner = new Form();
+            owner.Show();
+            return (
+                small: ShowWidthSensitivePreset(owner, BootstrapModalSize.Small),
+                large: ShowWidthSensitivePreset(owner, BootstrapModalSize.Large));
+        });
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(sizes.small, Is.EqualTo(new Size(300, 414)));
+            Assert.That(sizes.large, Is.EqualTo(new Size(800, 214)));
+        }));
     }
 
     [Test]
@@ -99,5 +144,48 @@ public sealed class BootstrapModalTests
         });
 
         Assert.That(states, Is.EqualTo((true, true)));
+    }
+
+    private static Size ShowWidthSensitivePreset(Form owner, BootstrapModalSize modalSize)
+    {
+        using var modal = new BootstrapModal
+        {
+            ModalSize = modalSize,
+            BackdropMode = BootstrapModalBackdropMode.None
+        };
+        using var content = new WidthSensitiveContent { AutoSize = true, Dock = DockStyle.Top };
+        modal.BodyPanel.Controls.Add(content);
+        Size resolvedSize = Size.Empty;
+        ModalTestHost.ShowAndDrive(modal, owner, dialog =>
+        {
+            resolvedSize = dialog.Size;
+            dialog.DialogResult = DialogResult.Cancel;
+        });
+        return resolvedSize;
+    }
+
+    private sealed class CancelAfterBaseModal : BootstrapModal
+    {
+        public int ClosingCount { get; private set; }
+        public Action? RetryDismiss { get; set; }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            base.OnFormClosing(e);
+            ClosingCount++;
+            if (ClosingCount != 1) return;
+
+            e.Cancel = true;
+            BeginInvoke((MethodInvoker)(() => RetryDismiss?.Invoke()));
+        }
+    }
+
+    private sealed class WidthSensitiveContent : Control
+    {
+        public override Size GetPreferredSize(Size proposedSize)
+        {
+            var width = proposedSize.Width > 0 ? proposedSize.Width : Parent?.ClientSize.Width ?? 1;
+            return new Size(Math.Max(1, width), width < 500 ? 300 : 100);
+        }
     }
 }

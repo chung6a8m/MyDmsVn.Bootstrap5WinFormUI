@@ -249,7 +249,13 @@ public class BootstrapModal : Form
 
     internal void RequestDismiss()
     {
-        if (_frameworkDismissPending || IsDisposed) return;
+        if (IsDisposed) return;
+        if (_frameworkDismissPending)
+        {
+            if (DialogResult != DialogResult.None) return;
+            _frameworkDismissPending = false;
+        }
+
         _frameworkDismissPending = true;
         if (DialogResult == DialogResult.None) DialogResult = DialogResult.Cancel;
     }
@@ -308,8 +314,13 @@ public class BootstrapModal : Form
         var ownerBounds = ownerContext.OwnerBounds.Width > 0 && ownerContext.OwnerBounds.Height > 0
             ? ownerContext.OwnerBounds
             : working;
-        var chromeHeight = _surface.ResolveChromeAndContentHeight();
         var dpi = targetDpi.GetValueOrDefault(DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi);
+        var targetWidth = BootstrapModalLayoutLogic.ResolveDialogSize(ModalSize, Size, 1, MinimumSize, MaximumSize, working.Size, dpi).Width;
+        var measurementSize = new Size(targetWidth, Math.Min(Math.Max(1, Height), working.Height));
+        var measurementBounds = BootstrapModalLayoutLogic.CenterAndClamp(measurementSize, ownerBounds, working);
+        MyDmsVn.Bootstrap5WinFormUI.Compatibility.BootstrapModalNativeWindow.ApplyResolvedBounds(this, measurementBounds);
+        PerformLayout();
+        var chromeHeight = _surface.ResolveChromeAndContentHeight();
         var resolved = BootstrapModalLayoutLogic.ResolveDialogSize(ModalSize, Size, chromeHeight, MinimumSize, MaximumSize, working.Size, dpi);
         var resolvedBounds = BootstrapModalLayoutLogic.CenterAndClamp(resolved, ownerBounds, working);
         MyDmsVn.Bootstrap5WinFormUI.Compatibility.BootstrapModalNativeWindow.ApplyResolvedBounds(this, resolvedBounds);
