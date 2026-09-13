@@ -15,6 +15,7 @@ internal enum BootstrapRangeNativePart
 
 internal static class BootstrapRangeNativeMethods
 {
+    internal const int MaximumCustomDrawTickCount = 2048;
     internal const int WmReflectNotify = 0x204E;
     internal const int NmCustomDraw = -12;
     internal const uint CddsPrePaint = 0x00000001;
@@ -86,27 +87,38 @@ internal static class BootstrapRangeNativeMethods
         return rectangle.ToRectangle();
     }
 
-    internal static int[] GetIntermediateTickPositions(IntPtr trackBarHandle)
+    internal static bool TryGetIntermediateTickPositions(IntPtr trackBarHandle, out int[] positions)
     {
+        positions = Array.Empty<int>();
         if (trackBarHandle == IntPtr.Zero)
         {
-            return Array.Empty<int>();
+            return false;
         }
 
-        var nativeTickCount = (int)SendMessage(trackBarHandle, TbmGetNumTics, IntPtr.Zero, IntPtr.Zero).ToInt64();
+        var nativeTickCountValue = SendMessage(trackBarHandle, TbmGetNumTics, IntPtr.Zero, IntPtr.Zero).ToInt64();
+        if (!IsCustomTickCountSupported(nativeTickCountValue))
+        {
+            return false;
+        }
+
+        var nativeTickCount = (int)nativeTickCountValue;
         var intermediateCount = Math.Max(0, nativeTickCount - 2);
-        var positions = new List<int>(intermediateCount);
+        var validPositions = new List<int>(intermediateCount);
         for (var index = 0; index < intermediateCount; index++)
         {
             var position = SendMessage(trackBarHandle, TbmGetTicPos, new IntPtr(index), IntPtr.Zero).ToInt64();
             if (position >= 0 && position <= int.MaxValue)
             {
-                positions.Add((int)position);
+                validPositions.Add((int)position);
             }
         }
 
-        return positions.ToArray();
+        positions = validPositions.ToArray();
+        return true;
     }
+
+    internal static bool IsCustomTickCountSupported(long nativeTickCount) =>
+        nativeTickCount >= 0 && nativeTickCount <= MaximumCustomDrawTickCount;
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern IntPtr SendMessage(

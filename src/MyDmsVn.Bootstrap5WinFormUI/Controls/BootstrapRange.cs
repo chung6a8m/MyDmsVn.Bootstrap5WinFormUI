@@ -18,6 +18,8 @@ public class BootstrapRange : TrackBar
     private bool _themeSubscribed;
     private bool _thumbHot;
     private bool _thumbPressed;
+    private bool _pointerInside;
+    private Point _lastPointerLocation;
 
     /// <summary>Initializes a new instance of the <see cref="BootstrapRange"/> class.</summary>
     public BootstrapRange()
@@ -80,19 +82,21 @@ public class BootstrapRange : TrackBar
             return;
         }
 
-        SetThumbHot(BootstrapRangeNativeMethods.GetThumbRectangle(Handle).Contains(e.Location));
+        UpdatePointerLocation(e.Location);
     }
 
     /// <inheritdoc />
     protected override void OnMouseLeave(EventArgs e)
     {
         base.OnMouseLeave(e);
+        _pointerInside = false;
         SetThumbHot(false);
     }
 
     /// <inheritdoc />
     protected override void OnMouseDown(MouseEventArgs e)
     {
+        UpdatePointerLocation(e.Location);
         var pressedThumb = e.Button == MouseButtons.Left &&
             IsHandleCreated &&
             BootstrapRangeNativeMethods.GetThumbRectangle(Handle).Contains(e.Location);
@@ -104,6 +108,7 @@ public class BootstrapRange : TrackBar
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e);
+        UpdatePointerLocation(e.Location);
         SetThumbPressed(false);
     }
 
@@ -252,8 +257,12 @@ public class BootstrapRange : TrackBar
             return false;
         }
 
+        if (!BootstrapRangeNativeMethods.TryGetIntermediateTickPositions(Handle, out var positions))
+        {
+            return false;
+        }
+
         var channelBounds = BootstrapRangeNativeMethods.GetChannelRectangle(Handle);
-        var positions = BootstrapRangeNativeMethods.GetIntermediateTickPositions(Handle);
         var theme = BootstrapThemeManager.CurrentTheme;
         var ticks = BootstrapRangeRenderLogic.CalculateTicks(
             ClientRectangle,
@@ -287,6 +296,11 @@ public class BootstrapRange : TrackBar
         }
 
         var theme = BootstrapThemeManager.CurrentTheme;
+        if (part == BootstrapRangeNativePart.Thumb)
+        {
+            SynchronizeThumbHot(customDraw.Bounds);
+        }
+
         var visualState = CurrentVisualState;
         var palette = BootstrapRangeRenderLogic.ResolvePalette(theme.Colors, _variant, visualState);
         var geometry = BootstrapRangeRenderLogic.CalculateGeometry(
@@ -358,6 +372,21 @@ public class BootstrapRange : TrackBar
         InvalidateThumb();
     }
 
+    private void UpdatePointerLocation(Point location)
+    {
+        _lastPointerLocation = location;
+        _pointerInside = ClientRectangle.Contains(location);
+        SetThumbHot(
+            Enabled &&
+            _pointerInside &&
+            BootstrapRangeNativeMethods.GetThumbRectangle(Handle).Contains(location));
+    }
+
+    private void SynchronizeThumbHot(Rectangle thumbBounds)
+    {
+        _thumbHot = Enabled && _pointerInside && thumbBounds.Contains(_lastPointerLocation);
+    }
+
     private void SetThumbPressed(bool value)
     {
         if (_thumbPressed == value)
@@ -374,6 +403,8 @@ public class BootstrapRange : TrackBar
         var changed = _thumbHot || _thumbPressed;
         _thumbHot = false;
         _thumbPressed = false;
+        _pointerInside = false;
+        _lastPointerLocation = Point.Empty;
         if (invalidate && changed)
         {
             InvalidateThumb();

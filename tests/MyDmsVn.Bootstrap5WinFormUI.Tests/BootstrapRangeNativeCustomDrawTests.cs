@@ -108,11 +108,12 @@ public sealed class BootstrapRangeNativeCustomDrawTests
         ForcePaint(host, trackBar);
 
         var channel = BootstrapRangeNativeMethods.GetChannelRectangle(trackBar.Handle);
-        var positions = BootstrapRangeNativeMethods.GetIntermediateTickPositions(trackBar.Handle);
+        var available = BootstrapRangeNativeMethods.TryGetIntermediateTickPositions(trackBar.Handle, out var positions);
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(channel.IsEmpty, Is.False);
+            Assert.That(available, Is.True);
             Assert.That(positions, Is.Not.Empty);
             Assert.That(positions.All(position => position >= channel.Left && position < channel.Right), Is.True);
         }));

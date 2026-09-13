@@ -211,6 +211,37 @@ public sealed class BootstrapRangeTests
     }
 
     [Test]
+    public void ThumbHoverIsRecomputedWhenValueMovesUnderAStationaryPointer()
+    {
+        using var host = CreateHostedRange(out var range);
+        range.Minimum = 0;
+        range.Maximum = 100;
+        range.Value = range.Maximum;
+        range.Refresh();
+        Application.DoEvents();
+        var destinationThumb = BootstrapRangeNativeMethods.GetThumbRectangle(range.Handle);
+        var stationaryPointer = new Point(
+            destinationThumb.Left + (destinationThumb.Width / 2),
+            destinationThumb.Top + (destinationThumb.Height / 2));
+
+        range.Value = range.Minimum;
+        range.Refresh();
+        Application.DoEvents();
+        range.RaiseMouseMoveForTesting(stationaryPointer);
+        Assert.That(range.CurrentVisualState.Hot, Is.False);
+
+        range.Value = range.Maximum;
+        range.Refresh();
+        Application.DoEvents();
+        Assert.That(range.CurrentVisualState.Hot, Is.True);
+
+        range.Value = range.Minimum;
+        range.Refresh();
+        Application.DoEvents();
+        Assert.That(range.CurrentVisualState.Hot, Is.False);
+    }
+
+    [Test]
     public void NativeHomeEndPageAndArrowKeysMatchPlainTrackBar()
     {
         var keys = new[] { Keys.Right, Keys.PageUp, Keys.PageDown, Keys.End, Keys.Home };
@@ -274,6 +305,23 @@ public sealed class BootstrapRangeTests
             Assert.That(
                 range.SuppressedTickDrawCount,
                 tickStyle == TickStyle.None ? Is.Zero : Is.GreaterThan(0));
+        }));
+    }
+
+    [Test]
+    public void PathologicalNativeTickCountFallsBackBeforePerTickEnumeration()
+    {
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(
+                BootstrapRangeNativeMethods.IsCustomTickCountSupported(
+                    BootstrapRangeNativeMethods.MaximumCustomDrawTickCount),
+                Is.True);
+            Assert.That(
+                BootstrapRangeNativeMethods.IsCustomTickCountSupported(
+                    (long)BootstrapRangeNativeMethods.MaximumCustomDrawTickCount + 1L),
+                Is.False,
+                "Large native tick sets must be rejected before the per-position message loop.");
         }));
     }
 
@@ -593,6 +641,9 @@ public sealed class BootstrapRangeTests
         internal void RecreateHandleForTesting() => RecreateHandle();
 
         internal void RaiseMouseLeaveForTesting() => OnMouseLeave(EventArgs.Empty);
+
+        internal void RaiseMouseMoveForTesting(Point location) =>
+            OnMouseMove(new MouseEventArgs(MouseButtons.None, 0, location.X, location.Y, 0));
 
         internal void ResetSuppressedDrawCounts()
         {
