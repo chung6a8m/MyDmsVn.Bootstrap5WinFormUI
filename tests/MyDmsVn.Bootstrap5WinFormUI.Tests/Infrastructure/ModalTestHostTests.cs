@@ -42,6 +42,22 @@ public sealed class ModalTestHostTests
     }
 
     [Test]
+    public void ShowAndDrivePropagatesCallerShownException()
+    {
+        using var host = new WinFormsMessageLoopTestHost();
+        var expected = new InvalidOperationException("caller Shown failure");
+
+        var actual = Assert.Throws<InvalidOperationException>((Action)(() => host.Run(() =>
+        {
+            using var modal = new Form();
+            modal.Shown += (_, _) => throw expected;
+            return ModalTestHost.ShowAndDrive(modal, _ => modal.DialogResult = DialogResult.OK);
+        })));
+
+        Assert.That(actual, Is.SameAs(expected));
+    }
+
+    [Test]
     public void ShowAndDriveSupportsCanceledFirstExitAndSecondExit()
     {
         using var host = new WinFormsMessageLoopTestHost();

@@ -7,7 +7,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
 internal readonly struct BootstrapModalMetrics
 {
-    public BootstrapModalMetrics(int borderWidth, int radius, int headerHeight, int footerHeight, int padding, int gap, int closeTargetSize)
+    public BootstrapModalMetrics(int borderWidth, int radius, int headerHeight, int footerHeight, int padding, int gap, int closeTargetSize, int emptyBodyHeight)
     {
         BorderWidth = borderWidth;
         Radius = radius;
@@ -16,6 +16,7 @@ internal readonly struct BootstrapModalMetrics
         Padding = padding;
         Gap = gap;
         CloseTargetSize = closeTargetSize;
+        EmptyBodyHeight = emptyBodyHeight;
     }
 
     public int BorderWidth { get; }
@@ -25,6 +26,7 @@ internal readonly struct BootstrapModalMetrics
     public int Padding { get; }
     public int Gap { get; }
     public int CloseTargetSize { get; }
+    public int EmptyBodyHeight { get; }
 }
 
 internal static class BootstrapModalLayoutLogic
@@ -94,7 +96,8 @@ internal static class BootstrapModalLayoutLogic
             DpiScaler.Scale(56, dpi),
             DpiScaler.Scale(theme.SpacingLG, dpi),
             DpiScaler.Scale(theme.SpacingSM, dpi),
-            DpiScaler.Scale(theme.ControlHeight, dpi));
+            DpiScaler.Scale(theme.ControlHeight, dpi),
+            DpiScaler.Scale(160, dpi));
     }
 
     private static int ApplyCallerConstraints(int value, int minimum, int maximum)

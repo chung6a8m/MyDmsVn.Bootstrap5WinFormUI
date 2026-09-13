@@ -65,7 +65,7 @@ internal sealed class BootstrapModalSurface : Panel
     {
         UpdateFooterVisibility();
         var footer = FooterPanel.Visible ? _metrics.FooterHeight : 0;
-        var preferredBody = BodyPanel.Controls.Count == 0 ? 160 : BodyPanel.GetPreferredSize(new Size(Width, 0)).Height + _metrics.Padding * 2;
+        var preferredBody = BodyPanel.Controls.Count == 0 ? _metrics.EmptyBodyHeight : BodyPanel.GetPreferredSize(new Size(Width, 0)).Height + _metrics.Padding * 2;
         return _metrics.HeaderHeight + footer + preferredBody + _metrics.BorderWidth * 2;
     }
 

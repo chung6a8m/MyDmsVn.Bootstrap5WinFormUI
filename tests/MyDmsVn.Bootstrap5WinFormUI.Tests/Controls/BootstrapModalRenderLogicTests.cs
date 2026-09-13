@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Threading;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
@@ -22,6 +23,18 @@ public sealed class BootstrapModalRenderLogicTests
             Assert.That(metrics.FooterHeight, Is.EqualTo(footer));
             Assert.That(metrics.CloseTargetSize, Is.EqualTo(closeTarget));
         }));
+    }
+
+    [TestCase(96, 210)]
+    [TestCase(192, 420)]
+    [Apartment(ApartmentState.STA)]
+    public void EmptyBodyHeightScalesWithDpi(int dpi, int expectedHeight)
+    {
+        using var header = new BootstrapModalHeader();
+        using var surface = new BootstrapModalSurface(header);
+        surface.ApplyMetrics(BootstrapModalLayoutLogic.ResolveMetrics(BootstrapThemeMetrics.Default, -1, dpi));
+
+        Assert.That(surface.ResolveChromeAndContentHeight(), Is.EqualTo(expectedHeight));
     }
 
     [TestCase(BootstrapThemeMode.Light)]
