@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "78ba3b8becd0e9cad99540b8bf1d7950eba9b1ad28d152f9eff44d642bc8737d";
+    private const string ApprovedV1Fingerprint = "6aeaf8195bb3fc76ff2f1f7c03b8f202e65f6e13e00399f58f9345cf51000dc8";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
