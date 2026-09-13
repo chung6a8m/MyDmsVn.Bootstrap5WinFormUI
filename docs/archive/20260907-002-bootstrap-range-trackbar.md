@@ -463,7 +463,7 @@ Do not replace the full-suite command with unbounded raw `dotnet test` invocatio
 - [x] **Step 7: Check repository diff** for accidental generated/binary files and ensure no unrelated public API changes were introduced.
 - [x] **Step 8: Commit:** `docs: document BootstrapRange`
 
-Validation note (2026-09-13): the final Release solution build completed with zero warnings and zero errors. After the review fixes, `./test.ps1 -HangTimeoutMinutes 5` ran the targets sequentially and passed all 1,966 tests on `net48`, followed by all 1,966 tests on `net8.0-windows`. The integrated demo manual matrix was accepted by the user without computer-use automation.
+Validation note (2026-09-13): the final Release solution build completed with zero warnings and zero errors. After review rounds 1 and 2, `./test.ps1 -HangTimeoutMinutes 5` ran the targets sequentially and passed all 1,968 tests on `net48`, followed by all 1,968 tests on `net8.0-windows`. The integrated demo manual matrix was accepted by the user without computer-use automation.
 
 ---
 

@@ -242,6 +242,29 @@ public sealed class BootstrapRangeTests
     }
 
     [Test]
+    public void ThumbHoverPointerSnapshotSurvivesNativeHandleRecreation()
+    {
+        using var host = CreateHostedRange(out var range);
+        range.Minimum = 0;
+        range.Maximum = 100;
+        range.Value = range.Maximum;
+        range.Refresh();
+        Application.DoEvents();
+        var thumb = BootstrapRangeNativeMethods.GetThumbRectangle(range.Handle);
+        var stationaryPointer = new Point(
+            thumb.Left + (thumb.Width / 2),
+            thumb.Top + (thumb.Height / 2));
+        range.RaiseMouseMoveForTesting(stationaryPointer);
+        Assert.That(range.CurrentVisualState.Hot, Is.True);
+
+        range.RecreateHandleForTesting();
+        range.Refresh();
+        Application.DoEvents();
+
+        Assert.That(range.CurrentVisualState.Hot, Is.True);
+    }
+
+    [Test]
     public void NativeHomeEndPageAndArrowKeysMatchPlainTrackBar()
     {
         var keys = new[] { Keys.Right, Keys.PageUp, Keys.PageDown, Keys.End, Keys.Home };

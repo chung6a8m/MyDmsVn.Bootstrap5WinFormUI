@@ -119,6 +119,38 @@ public sealed class BootstrapRangeNativeCustomDrawTests
         }));
     }
 
+    [Test]
+    public void HeaderOnlyNonCustomDrawNotificationIsRejectedBeforeReadingLargerPayload()
+    {
+        var expectedWindow = new IntPtr(1234);
+        var header = new BootstrapRangeNativeNotifyHeader
+        {
+            WindowFrom = expectedWindow,
+            Code = -16 // NM_RELEASEDCAPTURE carries only NMHDR.
+        };
+        var pointer = Marshal.AllocHGlobal(Marshal.SizeOf<BootstrapRangeNativeNotifyHeader>());
+        try
+        {
+            Marshal.StructureToPtr(header, pointer, fDeleteOld: false);
+
+            var parsed = BootstrapRangeNativeMethods.TryReadCustomDraw(
+                pointer,
+                expectedWindow,
+                out var customDraw);
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(parsed, Is.False);
+                Assert.That(customDraw.DrawStage, Is.Zero);
+                Assert.That(customDraw.DeviceContext, Is.EqualTo(IntPtr.Zero));
+            }));
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(pointer);
+        }
+    }
+
     private static Form CreateHost(
         out ProbeTrackBar trackBar,
         Orientation orientation,

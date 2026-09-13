@@ -69,7 +69,7 @@ public class BootstrapRange : TrackBar
     /// <inheritdoc />
     protected override void OnHandleDestroyed(EventArgs e)
     {
-        ClearTransientState(invalidate: false);
+        ClearTransientState(invalidate: false, clearPointerSnapshot: false);
         base.OnHandleDestroyed(e);
     }
 
@@ -398,13 +398,17 @@ public class BootstrapRange : TrackBar
         InvalidateThumb();
     }
 
-    private void ClearTransientState(bool invalidate)
+    private void ClearTransientState(bool invalidate, bool clearPointerSnapshot = true)
     {
         var changed = _thumbHot || _thumbPressed;
         _thumbHot = false;
         _thumbPressed = false;
-        _pointerInside = false;
-        _lastPointerLocation = Point.Empty;
+        if (clearPointerSnapshot)
+        {
+            _pointerInside = false;
+            _lastPointerLocation = Point.Empty;
+        }
+
         if (invalidate && changed)
         {
             InvalidateThumb();

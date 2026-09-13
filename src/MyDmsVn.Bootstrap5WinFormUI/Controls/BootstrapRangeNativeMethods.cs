@@ -43,9 +43,15 @@ internal static class BootstrapRangeNativeMethods
             return false;
         }
 
+        var header = Marshal.PtrToStructure<BootstrapRangeNativeNotifyHeader>(parameter);
+        if (header.Code != NmCustomDraw ||
+            (expectedWindow != IntPtr.Zero && header.WindowFrom != expectedWindow))
+        {
+            return false;
+        }
+
         customDraw = Marshal.PtrToStructure<BootstrapRangeNativeCustomDraw>(parameter);
-        return customDraw.Header.Code == NmCustomDraw &&
-               (expectedWindow == IntPtr.Zero || customDraw.Header.WindowFrom == expectedWindow);
+        return true;
     }
 
     internal static BootstrapRangeNativePart ClassifyPart(UIntPtr itemSpec)
