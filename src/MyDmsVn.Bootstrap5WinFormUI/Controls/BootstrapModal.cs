@@ -311,7 +311,8 @@ public class BootstrapModal : Form
         var chromeHeight = _surface.ResolveChromeAndContentHeight();
         var dpi = targetDpi.GetValueOrDefault(DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi);
         var resolved = BootstrapModalLayoutLogic.ResolveDialogSize(ModalSize, Size, chromeHeight, MinimumSize, MaximumSize, working.Size, dpi);
-        Bounds = BootstrapModalLayoutLogic.CenterAndClamp(resolved, ownerBounds, working);
+        var resolvedBounds = BootstrapModalLayoutLogic.CenterAndClamp(resolved, ownerBounds, working);
+        MyDmsVn.Bootstrap5WinFormUI.Compatibility.BootstrapModalNativeWindow.ApplyResolvedBounds(this, resolvedBounds);
     }
 
     private void EnsureBackdrop()

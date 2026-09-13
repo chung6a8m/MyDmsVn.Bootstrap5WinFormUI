@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Compatibility;
 
@@ -14,6 +15,21 @@ internal static class BootstrapModalNativeWindow
     }
 
     public static bool IsUsable(IntPtr windowHandle) => windowHandle != IntPtr.Zero && IsWindow(windowHandle);
+
+    public static void ApplyResolvedBounds(Form window, Rectangle bounds)
+    {
+        if (window is null) throw new ArgumentNullException(nameof(window));
+        if (bounds.Width <= 0 || bounds.Height <= 0) throw new ArgumentOutOfRangeException(nameof(bounds));
+
+        var minimum = window.MinimumSize;
+        var conflictsWithMinimum = minimum.Width > bounds.Width || minimum.Height > bounds.Height;
+        if (conflictsWithMinimum && window.IsHandleCreated && BootstrapOverlayWindowBounds.TrySetBounds(window.Handle, bounds))
+            return;
+
+        window.Bounds = bounds;
+        if (window.Bounds != bounds && window.IsHandleCreated)
+            BootstrapOverlayWindowBounds.TrySetBounds(window.Handle, bounds);
+    }
 
     public static bool TryGetBounds(IntPtr windowHandle, out Rectangle bounds)
     {

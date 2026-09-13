@@ -8,7 +8,7 @@
 
 **Tech Stack:** C#, WinForms, `net48;net8.0-windows`, existing `BootstrapThemeManager`, `BootstrapTheme`, `BootstrapVariant`/theme tokens, `DpiScaler`, shared Rendering primitives, existing Animation infrastructure (`BootstrapAnimation`, `AnimationOwnerLifecycle`, frame scheduler), NUnit, integrated demo application.
 
-**Execution status (2026-09-13): Complete.** Core implementation, automated modal coverage, integrated demo, public API review, documentation, formatting of changed C# files, Release build, and the full 2,027-test suite are complete on both TFMs. The TFM runs were performed sequentially (`net48`, then `net8.0-windows`). The user completed the physical DPI, Alt+Tab/task-switcher, and interactive owner lifecycle matrix and reported all demo scenarios successful. Review-round regression coverage verifies native-HWND owner centering and top-level per-monitor DPI reflow.
+**Execution status (2026-09-13): Complete.** Core implementation, automated modal coverage, integrated demo, public API review, documentation, formatting of changed C# files, Release build, and the full 2,028-test suite are complete on both TFMs. The TFM runs were performed sequentially (`net48`, then `net8.0-windows`). The user completed the physical DPI, Alt+Tab/task-switcher, and interactive owner lifecycle matrix and reported all demo scenarios successful. Review-round regression coverage verifies native-HWND owner centering, top-level per-monitor DPI reflow, and handle-backed safety clamping when inherited `MinimumSize` cannot fit the working area.
 
 ---
 

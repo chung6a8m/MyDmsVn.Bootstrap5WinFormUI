@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Compatibility;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Tests.Infrastructure;
 using NUnit.Framework;
@@ -124,4 +126,36 @@ public sealed class BootstrapModalHardeningTests
 
         Assert.That(modal.Region, Is.Not.Null);
     }
+
+    [Test]
+    public void ImpossibleMinimumSizeCannotOverrideVisibleWorkingAreaClamp()
+    {
+        using var host = new WinFormsMessageLoopTestHost();
+        var state = host.Run(() =>
+        {
+            var working = Screen.PrimaryScreen!.WorkingArea;
+            var requestedMinimum = new Size(800, 600);
+            using var modal = new BootstrapModal
+            {
+                MinimumSize = requestedMinimum,
+                BackdropMode = BootstrapModalBackdropMode.None
+            };
+            modal.Show();
+            var target = new Rectangle(working.Left + 20, working.Top + 20, 640, 480);
+
+            BootstrapModalNativeWindow.ApplyResolvedBounds(modal, target);
+            BootstrapModalNativeWindow.TryGetBounds(modal.Handle, out var actualBounds);
+            var result = (actualBounds, managedBounds: modal.Bounds, modal.MinimumSize, target);
+            modal.Close();
+            return result;
+        });
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(state.actualBounds, Is.EqualTo(state.target));
+            Assert.That(state.managedBounds, Is.EqualTo(state.target));
+            Assert.That(state.MinimumSize, Is.EqualTo(new Size(800, 600)));
+        }));
+    }
+
 }
