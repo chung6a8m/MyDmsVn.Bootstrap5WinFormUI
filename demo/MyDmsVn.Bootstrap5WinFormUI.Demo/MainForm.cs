@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -231,6 +231,11 @@ public sealed class MainForm : DemoFormBase
             "Range",
             "Native-backed horizontal, vertical, ticked, RTL, disabled, variant, theme, and event diagnostics.",
             () => new RangeDemoForm());
+
+        AddPage(
+            "Modal",
+            "Native modal semantics with Bootstrap sizing, backdrop modes, keyboard/focus, theme, DPI, RTL, and reduced-motion scenarios.",
+            () => new ModalDemoForm());
 
         AddPage(
             "Select",
