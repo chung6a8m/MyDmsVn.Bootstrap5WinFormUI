@@ -8,7 +8,7 @@
 
 **Tech Stack:** C#, WinForms, `net48;net8.0-windows`, existing `BootstrapThemeManager`, `BootstrapTheme`, `BootstrapVariant`/theme tokens, `DpiScaler`, shared Rendering primitives, existing Animation infrastructure (`BootstrapAnimation`, `AnimationOwnerLifecycle`, frame scheduler), NUnit, integrated demo application.
 
-**Execution status (2026-09-13):** Core implementation, automated modal coverage, integrated demo, public API review, documentation, formatting of changed C# files, Release build, and the full 2,025-test suite are complete on both TFMs. The TFM runs were performed sequentially (`net48`, then `net8.0-windows`). Physical DPI, Alt+Tab/task-switcher, and interactive owner lifecycle checks remain in the manual matrix because this execution explicitly excluded computer-use.
+**Execution status (2026-09-13): Complete.** Core implementation, automated modal coverage, integrated demo, public API review, documentation, formatting of changed C# files, Release build, and the full 2,025-test suite are complete on both TFMs. The TFM runs were performed sequentially (`net48`, then `net8.0-windows`). The user completed the physical DPI, Alt+Tab/task-switcher, and interactive owner lifecycle matrix and reported all demo scenarios successful.
 
 ---
 
@@ -698,10 +698,10 @@ No test may depend on a human clicking the modal.
 - [x] Add a diagnostic scenario near monitor edge / constrained owner size to inspect clamping.
 - [x] Add diagnostics for owner discovery when practical: normal managed owner and parameterless show; arbitrary native `IWin32Window` remains primarily automated-test coverage if demo plumbing would add noise.
 - [x] Add RTL scenario.
-- [ ] Manual-test on supported Windows scaling: 100%, 125%, 150%, 175%, 200%.
-- [ ] Manual-test owner move/resize, minimize/restore where applicable, Alt+Tab to another application, and closing the owner.
-- [ ] Confirm backdrop is enabled/clickable while modal is active, owner remains natively disabled, and no hidden backdrop remains in task switcher/taskbar after closing every demo scenario.
-- [ ] Commit, e.g. `demo: add BootstrapModal scenarios`.
+- [x] Manual-test on supported Windows scaling: 100%, 125%, 150%, 175%, 200%.
+- [x] Manual-test owner move/resize, minimize/restore where applicable, Alt+Tab to another application, and closing the owner.
+- [x] Confirm backdrop is enabled/clickable while modal is active, owner remains natively disabled, and no hidden backdrop remains in task switcher/taskbar after closing every demo scenario.
+- [x] Commit, e.g. `demo: add BootstrapModal scenarios`.
 
 ---
 
@@ -727,9 +727,9 @@ No test may depend on a human clicking the modal.
 - [x] Run the full test project for `net8.0-windows` with the repository hang-timeout settings.
 - [x] Run the full test project for `net48` with the repository hang-timeout settings.
 - [x] Verify no test-runner child process or modal dialog remains after the suite.
-- [ ] Run the integrated demo and complete the manual verification matrix.
+- [x] Run the integrated demo and complete the manual verification matrix.
 - [x] Review the final public API for duplicate/native aliases and remove any API not justified by tests/demo scenarios.
-- [ ] Commit, e.g. `docs: document BootstrapModal contract`.
+- [x] Commit, e.g. `docs: document BootstrapModal contract`.
 
 ---
 

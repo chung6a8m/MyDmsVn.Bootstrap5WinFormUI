@@ -10,6 +10,7 @@ These files are preserved for design history, audits, and understanding earlier 
 - [20260828-002-bootstrap-component-expansion-roadmap.md](20260828-002-bootstrap-component-expansion-roadmap.md) — earlier component-expansion roadmap used before the active queue was consolidated.
 - [20260910-001-integrated-demo-typography-profiles.md](20260910-001-integrated-demo-typography-profiles.md) — completed Integrated Demo typography-profile implementation plan.
 - [20260907-002-bootstrap-range-trackbar.md](20260907-002-bootstrap-range-trackbar.md) — completed native-backed `BootstrapRange` / TrackBar implementation plan.
+- [20260907-004-bootstrap-modal.md](20260907-004-bootstrap-modal.md) — completed native-backed `BootstrapModal` implementation plan.
 
 Current unfinished work is tracked only in [../ROADMAP.md](../ROADMAP.md).
 
