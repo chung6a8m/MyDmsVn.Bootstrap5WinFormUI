@@ -144,9 +144,8 @@ internal static class BootstrapRangeRenderLogic
         var thumbInset = Math.Max(1, DpiScaler.Scale(metrics.BorderWidth, dpi));
         var thumbBounds = CenterSquare(nativeThumbBounds, thumbInset);
         var focusThickness = Math.Max(1f, DpiScaler.Scale((float)metrics.FocusBorderWidth, dpi));
-        var focusGap = Math.Max(1, DpiScaler.Scale(metrics.BorderWidth, dpi));
         var focusInflation = drawFocusHalo
-            ? focusGap + (int)Math.Ceiling(focusThickness / 2f)
+            ? CalculateFocusInflation(metrics, dpi)
             : 0;
         var focusBounds = thumbBounds;
         if (focusInflation > 0 && !thumbBounds.IsEmpty)
@@ -163,6 +162,18 @@ internal static class BootstrapRangeRenderLogic
                 : railBounds.Width / 2f,
             focusThickness,
             Math.Max(1f, DpiScaler.Scale((float)metrics.BorderWidth, dpi)));
+    }
+
+    internal static int CalculateFocusInflation(BootstrapThemeMetrics metrics, int dpi)
+    {
+        if (metrics is null)
+        {
+            throw new ArgumentNullException(nameof(metrics));
+        }
+
+        var focusGap = Math.Max(1, DpiScaler.Scale(metrics.BorderWidth, dpi));
+        var focusThickness = Math.Max(1f, DpiScaler.Scale((float)metrics.FocusBorderWidth, dpi));
+        return focusGap + (int)Math.Ceiling(focusThickness / 2f);
     }
 
     internal static IReadOnlyList<RectangleF> CalculateTicks(

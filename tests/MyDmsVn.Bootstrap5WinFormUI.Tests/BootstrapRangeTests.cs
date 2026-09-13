@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
@@ -262,6 +263,50 @@ public sealed class BootstrapRangeTests
         Application.DoEvents();
 
         Assert.That(range.CurrentVisualState.Hot, Is.True);
+    }
+
+    [Test]
+    public void FocusTransitionInvalidatesCustomThemeHaloExtent()
+    {
+        var currentTheme = BootstrapThemeManager.CurrentTheme;
+        var metrics = new BootstrapThemeMetrics(
+            controlHeightSmall: 28,
+            controlHeight: 32,
+            controlHeightLarge: 38,
+            radiusSmall: 4,
+            radius: 6,
+            radiusLarge: 8,
+            borderWidth: 4,
+            focusBorderWidth: 10,
+            spacingXS: 0,
+            spacingSM: 8,
+            spacingMD: 12,
+            spacingLG: 16,
+            spacingXL: 24);
+        BootstrapThemeManager.CurrentTheme = new BootstrapTheme(
+            currentTheme.Mode,
+            currentTheme.Colors,
+            metrics,
+            currentTheme.Typography,
+            currentTheme.ReducedMotion);
+        using var host = CreateHostedRange(out var range);
+        var nativeThumb = BootstrapRangeNativeMethods.GetThumbRectangle(range.Handle);
+        var geometry = BootstrapRangeRenderLogic.CalculateGeometry(
+            Rectangle.Empty,
+            nativeThumb,
+            range.Orientation,
+            metrics,
+            range.DeviceDpi,
+            drawFocusHalo: true);
+        var expectedInvalidation = Rectangle.Intersect(range.ClientRectangle, geometry.FocusHaloBounds);
+        range.InvalidatedRects.Clear();
+
+        range.RaiseGotFocusForTesting();
+
+        Assert.That(
+            range.InvalidatedRects.Any(rectangle => rectangle.Contains(expectedInvalidation)),
+            Is.True,
+            "Focus repaint must cover the same halo extent used by range geometry.");
     }
 
     [Test]
@@ -661,12 +706,22 @@ public sealed class BootstrapRangeTests
 
         internal int SuppressedTickDrawCount { get; private set; }
 
+        internal List<Rectangle> InvalidatedRects { get; } = new List<Rectangle>();
+
         internal void RecreateHandleForTesting() => RecreateHandle();
 
         internal void RaiseMouseLeaveForTesting() => OnMouseLeave(EventArgs.Empty);
 
         internal void RaiseMouseMoveForTesting(Point location) =>
             OnMouseMove(new MouseEventArgs(MouseButtons.None, 0, location.X, location.Y, 0));
+
+        internal void RaiseGotFocusForTesting() => OnGotFocus(EventArgs.Empty);
+
+        protected override void OnInvalidated(InvalidateEventArgs e)
+        {
+            InvalidatedRects.Add(e.InvalidRect);
+            base.OnInvalidated(e);
+        }
 
         internal void ResetSuppressedDrawCounts()
         {

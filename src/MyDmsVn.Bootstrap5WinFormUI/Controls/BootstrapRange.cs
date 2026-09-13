@@ -423,7 +423,10 @@ public class BootstrapRange : TrackBar
         }
 
         var bounds = BootstrapRangeNativeMethods.GetThumbRectangle(Handle);
-        var inflation = DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.SpacingXS, DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi);
+        var theme = BootstrapThemeManager.CurrentTheme;
+        var inflation = BootstrapRangeRenderLogic.CalculateFocusInflation(
+            theme.Metrics,
+            DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi);
         bounds.Inflate(inflation, inflation);
         Invalidate(Rectangle.Intersect(ClientRectangle, bounds));
     }
