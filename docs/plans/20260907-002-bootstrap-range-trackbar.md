@@ -459,11 +459,11 @@ dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release
 
 Do not replace the full-suite command with unbounded raw `dotnet test` invocations. If a focused raw test run is needed while diagnosing a failure, include `--blame-hang --blame-hang-timeout 5m` and the relevant TFM/filter.
 
-- [ ] **Step 6: Launch the integrated demo manually** and verify light/dark, horizontal/vertical, ticks, RTL, disabled, focus, mouse drag, channel click, keyboard, and runtime theme switching.
+- [x] **Step 6: Launch the integrated demo manually** and verify light/dark, horizontal/vertical, ticks, RTL, disabled, focus, mouse drag, channel click, keyboard, and runtime theme switching.
 - [x] **Step 7: Check repository diff** for accidental generated/binary files and ensure no unrelated public API changes were introduced.
 - [x] **Step 8: Commit:** `docs: document BootstrapRange`
 
-Validation note (2026-09-13): the Release solution build completed with zero warnings and zero errors. `./test.ps1 -HangTimeoutMinutes 5` passed all 1,964 tests on `net48`; on `net8.0-windows`, 1,963 tests passed and the pre-existing `BootstrapListViewReviewRound6RegressionTests.RealGroupHeadersUseReadableThemeColorsAfterRuntimeSwitch` visual-host test failed because its native collapse-affordance desktop click was not accepted. The same isolated test fails unchanged on the clean source worktree, while every other `net8.0-windows` test passes. Step 5 remains open until that external full-suite gate is green. Step 6 remains open because this run explicitly prohibited computer-use, so no automated claim is made for the manual visual/interaction matrix.
+Validation note (2026-09-13): the Release solution build completed with zero warnings and zero errors. `./test.ps1 -HangTimeoutMinutes 5` passed all 1,964 tests on `net48`; on `net8.0-windows`, 1,963 tests passed and the pre-existing `BootstrapListViewReviewRound6RegressionTests.RealGroupHeadersUseReadableThemeColorsAfterRuntimeSwitch` visual-host test failed because its native collapse-affordance desktop click was not accepted. The same isolated test fails unchanged on the clean source worktree, while every other `net8.0-windows` test passes. Step 5 remains open until that external full-suite gate is green. The integrated demo manual matrix was accepted by the user without computer-use automation.
 
 ---
 
@@ -522,5 +522,5 @@ Implementation is complete only when all of the following are true:
 - [x] Public API reviewed against the V1 contract and exclusions, including synchronous invalid-`Variant` rejection without state mutation.
 - [x] Native behavior regression suite passes for value, events, keyboard, mouse, orientation, ticks, RTL, focus, accessibility, handle recreation, and disposal.
 - [ ] Release build succeeds and `./test.ps1 -HangTimeoutMinutes 5` passes for `net48` and `net8.0-windows`; any focused raw GUI test runs used during development include bounded `--blame-hang` protection.
-- [ ] Demo verified manually in light/dark at common DPI scales.
+- [x] Demo verified manually in light/dark at common DPI scales.
 - [x] Documentation reflects actual implemented behavior, including any discovered native custom-draw limitations.
