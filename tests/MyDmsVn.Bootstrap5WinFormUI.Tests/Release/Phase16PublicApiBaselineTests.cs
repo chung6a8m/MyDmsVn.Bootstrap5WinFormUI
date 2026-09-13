@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "e4215e2ff2e076d3a303318de4e3c38fdbc47d7b13f7699044b2d246025f718c";
+    private const string ApprovedV1Fingerprint = "78ba3b8becd0e9cad99540b8bf1d7950eba9b1ad28d152f9eff44d642bc8737d";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -67,6 +67,37 @@ public sealed class Phase16PublicApiBaselineTests
             Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapToolStripRendererBase"));
             Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapToolStripAppearanceController"));
             Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapToolStripRenderLogic"));
+        }));
+    }
+
+    [Test]
+    public void BootstrapRangeExportsOnlyTheReviewedNativeBackedContract()
+    {
+        var assembly = typeof(BootstrapRange).Assembly;
+        var expectedProtectedMethods = new[]
+        {
+            "Dispose", "OnDpiChangedAfterParent", "OnEnabledChanged", "OnGotFocus", "OnHandleCreated",
+            "OnHandleDestroyed", "OnLostFocus", "OnMouseCaptureChanged", "OnMouseDown", "OnMouseLeave",
+            "OnMouseMove", "OnMouseUp", "WndProc"
+        };
+        var internalTypes = new[]
+        {
+            "BootstrapRangeNativeMethods", "BootstrapRangeNativePart", "BootstrapRangeNativeCustomDraw",
+            "BootstrapRangeRenderLogic", "BootstrapRangeVisualState", "BootstrapRangePalette", "BootstrapRangeGeometry"
+        };
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(typeof(BootstrapRange).BaseType, Is.EqualTo(typeof(TrackBar)));
+            Assert.That(typeof(BootstrapRange).GetConstructor(Type.EmptyTypes), Is.Not.Null);
+            Assert.That(GetDeclaredPublicPropertyNames(typeof(BootstrapRange)), Is.EqualTo(new[] { "Variant" }));
+            Assert.That(GetDeclaredPublicMethodNames(typeof(BootstrapRange)), Is.Empty);
+            Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapRange)), Is.Empty);
+            Assert.That(GetDeclaredProtectedMethodNames(typeof(BootstrapRange)), Is.EqualTo(expectedProtectedMethods));
+            foreach (var name in internalTypes)
+            {
+                Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain(name), name);
+            }
         }));
     }
 

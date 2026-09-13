@@ -1023,6 +1023,43 @@ Behavior:
 
 Manual verification: use the calendar demo scenarios for empty/default, single, range preview/completion, multiple toggle, constrained safe-domain boundaries, leap February, Monday/Sunday culture week starts, keyboard-only navigation, repeated open/close, Light/Dark, disabled/validation states, and 100/125/150/175/200% real Windows scaling. Confirm that `BootstrapDatePicker` remains the separate native `DateTimePicker` wrapper with OS-owned calendar behavior.
 
+## BootstrapRange
+
+Responsibility: provide a Bootstrap-aware range input while preserving the native WinForms `TrackBar` as the value, input, accessibility, layout, and lifecycle authority.
+
+Public surface:
+
+```text
+BootstrapRange : TrackBar
+BootstrapRange.Variant
+```
+
+Behavior:
+
+- `BootstrapRange` derives directly from `TrackBar`. `Minimum`, `Maximum`, `Value`, `SmallChange`, `LargeChange`, `Orientation`, `TickStyle`, `TickFrequency`, `RightToLeft`, `RightToLeftLayout`, `Scroll`, and `ValueChanged` are inherited unchanged; assigning an undefined `Variant` throws before the previous value is mutated.
+- The control uses reflected native `NM_CUSTOMDRAW` notifications, verified under real parent HWNDs on both supported target frameworks, to replace only the channel, thumb, and supported tick parts. It validates the notification's `NMHDR` type/source before reading the larger custom-draw payload, because the reflected-notify path also carries header-only notifications. Unknown parts and stages use native default painting. A missing HDC, empty part bounds, unavailable channel geometry, unavailable safe tick positions, or a native tick count above the bounded 2,048-tick custom-draw budget falls back to native painting for that part.
+- Framework rail thickness, focus halo, tick thickness, and other visual metrics are DPI-scaled. Rectangles and tick positions supplied by the native control are already physical and are never scaled again. Horizontal, vertical, RTL, and `RightToLeftLayout` direction therefore follow native geometry rather than a second value-to-pixel engine.
+- The native custom-draw state flags observed for this control were not reliable enough across the supported runtime/common-controls combinations to own focus/hot/pressed state. The implementation uses normal WinForms focus state plus minimal native-thumb hit-test/capture bookkeeping for hover and pressed presentation. It re-evaluates the last in-control pointer position against current native thumb geometry immediately before thumb painting. Handle destruction clears hot/pressed while retaining the pointer snapshot for recreation; mouse leave, disable, and disposal clear the snapshot, and capture loss clears pressed state.
+- V1 retains integer values and one native thumb. It does not provide dual-thumb ranges, built-in value tooltips or labels, a progress-filled segment, a custom selection/accessibility engine, or a public drawing contract.
+
+Usage:
+
+```csharp
+var range = new BootstrapRange
+{
+    Minimum = 0,
+    Maximum = 100,
+    Value = 35,
+    TickFrequency = 10,
+    TickStyle = TickStyle.BottomRight,
+    Variant = BootstrapVariant.Primary
+};
+
+range.ValueChanged += (_, _) => valueLabel.Text = range.Value.ToString();
+```
+
+Manual verification: open **Range** in the integrated demo and check all variants, Light/Dark switching, horizontal/vertical tracks, tickless and ticked modes, RTL with `RightToLeftLayout`, disabled/focus/hover/pressed states, mouse drag, channel click, Tab/arrows/PageUp/PageDown, and Windows 100/150/200% scaling.
+
 ## BootstrapTreeView
 
 Responsibility: apply Bootstrap-themed presentation to native WinForms `TreeView` while leaving the native tree, selection, expansion, checking, label editing, keyboard/focus, hit testing, drag/drop, scrolling, and accessibility contracts authoritative.
