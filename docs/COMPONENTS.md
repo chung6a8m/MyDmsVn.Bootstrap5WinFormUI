@@ -1166,6 +1166,78 @@ list.VirtualListSize = 100000;
 
 Manual verification: choose **ListView** in the integrated demo. Exercise all five normal views, Details `FullRowSelect`/`GridLines`/striping, repeated cross-column hover, checks and state images, Ctrl/Shift multi-selection, label editing, groups plus the native List restriction, the 100,000-row virtual example, native keyboard/context-menu/activation behavior, HideSelection, disabled state, runtime Variant and Light/Dark changes, RTL, rapid view changes, disposal, and real Windows 100/125/150/175/200% scaling. In the Details regression scenario, subitem text/images must never disappear during repeated pointer movement.
 
+## BootstrapListGroup
+
+Responsibility: compose a short, mostly static set of text, navigation, command, summary, or rich-content rows while preserving ordinary WinForms child-control ownership.
+
+Choose the control by ownership model:
+
+| Need | Control |
+|---|---|
+| A few composed settings, commands, status rows, or arbitrary child controls | `BootstrapListGroup` |
+| Native list views, columns, images, selection, checks, groups, or virtualization | `BootstrapListView` |
+| Hierarchical expand/collapse data | `BootstrapTreeView` |
+| Tabular business data, editing, sorting, and large-data workflows | `BootstrapDataGridView` |
+
+Public surface and defaults:
+
+```text
+BootstrapListGroup : Panel
+  Orientation = Vertical
+  Flush = false
+  BorderRadius = -1               (-1 uses the current theme radius)
+  Items                            read-only snapshot
+  ItemClick
+  AddItem(string), AddItem(item), RemoveItem(item), ClearItems()
+
+BootstrapListGroupItem : Panel
+  Active = false
+  Actionable = false
+  Variant = null                   (neutral; non-null uses BootstrapVariant)
+  UseThemeFont = true
+
+BootstrapListGroupItemEventArgs.Item
+```
+
+Behavior:
+
+- Direct `BootstrapListGroupItem` children in current `Controls` child-index order are authoritative for `Items`, connected layout, corner roles, and keyboard navigation. `Items` is rebuilt as a snapshot, so `Controls.SetChildIndex`, `BringToFront`, `SendToBack`, removal, reparenting, and re-addition need no parallel collection synchronization.
+- `Active` is explicit presentation state. Clicking or keyboard-activating an item never changes `Active`, and the group does not expose `SelectedIndex`, `SelectedItem`, or a selection mode. The application owns navigation/active-state policy.
+- `Actionable = true` enables both `TabStop` and the actual WinForms `ControlStyles.Selectable` contract. Enabled actionable rows can receive focus; Enter activates immediately, Space uses press/release semantics, and normal `Click` plus one parent `ItemClick` are raised. Disabled and non-actionable rows cannot activate.
+- With the item itself focused, Up/Down navigate vertical groups, Left/Right navigate horizontal groups, and Home/End move to the first/last eligible direct item. Hidden, disabled, and non-actionable rows are skipped. Tab/Shift+Tab remain normal WinForms traversal and may leave the group. Focus movement never changes `Active`.
+- Rich content is ordinary child composition. `Label`, `BootstrapBadge`, and exact standard layout-panel background surfaces forward a valid primary click to an actionable row so decorative content is not a dead zone. Buttons, links, checks/radios/switches, text-entry controls, selectors, list/grid/tree controls, and unknown/custom controls preserve their own semantics and do not activate the row automatically. Dynamic descendant subscriptions are removed on child removal and disposal.
+- Vertical connected items overlap one DPI-scaled border to avoid double seams. The first/last visible items receive the group radius; middle connected corners stay square. Hidden items consume no space and do not affect corner roles. `BorderRadius` is group-only; a standalone item uses the theme radius.
+- Vertical `Flush` removes outer rounding and side borders while retaining separators. Horizontal `Flush` is intentionally a V1 visual no-op: the property remains `true`, does not throw, and becomes meaningful again after returning to vertical orientation.
+- `Variant = null` uses neutral theme surface/text/border tokens. Every non-null shared semantic variant, plus active, disabled, hover, pressed, and focus states, resolves through shared theme/contrast infrastructure. Theme changes update live without resetting public state; geometry, padding, borders, and radius use shared DPI scaling.
+- The group exposes a list role. Presentational items expose a list-item role; actionable items expose a button role and default `AccessibleName` from `Text` unless the caller supplies one.
+- V1 intentionally excludes data binding, virtualization, columns, filtering, sorting, hierarchy, checked items, drag/drop policy, automatic selection, animation, responsive breakpoint APIs, and a bespoke rich-content model.
+
+Example:
+
+```csharp
+var group = new BootstrapListGroup
+{
+    Dock = DockStyle.Top
+};
+
+var profile = group.AddItem("Profile");
+profile.Actionable = true;
+profile.Active = true;
+
+var security = group.AddItem("Security");
+security.Actionable = true;
+
+var notifications = group.AddItem("Notifications");
+notifications.Actionable = true;
+
+group.ItemClick += (_, e) =>
+{
+    // Application owns navigation and Active-state policy.
+};
+```
+
+Manual verification: choose **List Group** in the integrated demo. At Windows 100/125/150/200% scaling, inspect connected borders/corners, hidden/reordered items, vertical flush, horizontal layout, all variants, live Light/Dark switching, Tab entry/exit, arrow/Home/End navigation, Enter/Space activation, decorative Label/Badge forwarding, embedded Button isolation, and explicit active/disabled state.
+
 ## Bootstrap ToolStrip family
 
 Responsibility: apply shared Bootstrap-themed, DPI-aware presentation to the native WinForms ToolStrip family without replacing native item, layout, keyboard, popup, merge, overflow, status, or accessibility behavior.
