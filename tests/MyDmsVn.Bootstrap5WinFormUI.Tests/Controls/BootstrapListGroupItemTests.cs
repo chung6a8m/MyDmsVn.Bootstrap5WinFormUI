@@ -249,6 +249,50 @@ public sealed class BootstrapListGroupItemTests
         Assert.That(item.AccessibleName, Is.EqualTo("Custom"));
     }
 
+    [Test]
+    public void ThemeSwitchPreservesAllPublicListGroupStateAndGroupDisposalUnsubscribes()
+    {
+        var original = BootstrapThemeManager.CurrentTheme;
+        var baseline = GetThemeSubscriptionCount();
+        var group = new BootstrapListGroup
+        {
+            Flush = true,
+            Orientation = Orientation.Horizontal,
+            BorderRadius = 9
+        };
+        var item = new BootstrapListGroupItem
+        {
+            Active = true,
+            Actionable = true,
+            Variant = BootstrapVariant.Warning,
+            Enabled = false
+        };
+        group.Controls.Add(item);
+        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baseline + 2));
+
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(group.Flush, Is.True);
+                Assert.That(group.Orientation, Is.EqualTo(Orientation.Horizontal));
+                Assert.That(group.BorderRadius, Is.EqualTo(9));
+                Assert.That(item.Active, Is.True);
+                Assert.That(item.Actionable, Is.True);
+                Assert.That(item.Variant, Is.EqualTo(BootstrapVariant.Warning));
+                Assert.That(item.Enabled, Is.False);
+            }));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = original;
+            group.Dispose();
+        }
+
+        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baseline));
+    }
+
     private static int GetThemeSubscriptionCount()
     {
         var field = typeof(BootstrapThemeManager).GetField("ThemeChanged", BindingFlags.Static | BindingFlags.NonPublic);

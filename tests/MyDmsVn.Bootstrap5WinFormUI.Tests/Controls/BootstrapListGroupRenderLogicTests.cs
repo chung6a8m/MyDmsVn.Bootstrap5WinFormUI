@@ -95,4 +95,24 @@ public sealed class BootstrapListGroupRenderLogicTests
             BootstrapListGroupRenderLogic.GetPreferredSize(new Size(-1, -2), new Size(-3, -4), new Padding(4)),
             Is.EqualTo(new Size(8, 8)));
     }
+
+    [Test]
+    public void InteractiveStatePalettesRetainReadableTextAndIndependentFocusToken()
+    {
+        foreach (var mode in new[] { BootstrapThemeMode.Light, BootstrapThemeMode.Dark })
+        {
+            var colors = BootstrapThemeColors.CreateDefault(mode);
+            foreach (var state in new[]
+            {
+                BootstrapListGroupVisualState.Active,
+                BootstrapListGroupVisualState.Pressed,
+                BootstrapListGroupVisualState.Hover
+            })
+            {
+                var palette = BootstrapListGroupRenderLogic.ResolvePalette(colors, BootstrapVariant.Danger, state);
+                Assert.That(ColorUtil.GetContrastRatio(palette.Foreground, palette.Surface), Is.GreaterThanOrEqualTo(4.5d), state.ToString());
+                Assert.That(palette.Focus, Is.EqualTo(colors.Focus));
+            }
+        }
+    }
 }

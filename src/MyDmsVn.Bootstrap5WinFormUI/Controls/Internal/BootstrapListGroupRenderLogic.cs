@@ -112,7 +112,11 @@ internal static class BootstrapListGroupRenderLogic
                 break;
         }
 
-        var foreground = ColorUtil.GetContrastingTextColor(surface, colors.Light, colors.Dark);
+        var themeForeground = ColorUtil.GetContrastingTextColor(surface, colors.Light, colors.Dark);
+        var strictForeground = ColorUtil.GetContrastingTextColor(surface, Color.White, Color.Black);
+        var foreground = ColorUtil.GetContrastRatio(themeForeground, surface) >= 4.5d
+            ? themeForeground
+            : strictForeground;
         return new BootstrapListGroupPalette(surface, border, foreground, colors.Focus);
     }
 
