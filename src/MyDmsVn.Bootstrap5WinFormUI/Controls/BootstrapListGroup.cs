@@ -3,6 +3,9 @@ using System.ComponentModel;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
@@ -14,6 +17,8 @@ public class BootstrapListGroup : Panel
     private Orientation _orientation = Orientation.Vertical;
     private bool _flush;
     private int _borderRadius = -1;
+    private bool _performingLayout;
+    private bool _themeSubscribed;
 
     /// <summary>Initializes a vertical, auto-sized list group.</summary>
     public BootstrapListGroup()
@@ -25,6 +30,8 @@ public class BootstrapListGroup : Panel
         AccessibleRole = AccessibleRole.List;
         AccessibleDescription = "Bootstrap-inspired list group.";
         Size = new Size(320, 48);
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
+        _themeSubscribed = true;
     }
 
     /// <summary>Gets or sets the direction in which items are arranged.</summary>
@@ -40,7 +47,14 @@ public class BootstrapListGroup : Panel
                 throw new InvalidEnumArgumentException(nameof(value), (int)value, typeof(Orientation));
             }
 
+            if (_orientation == value)
+            {
+                return;
+            }
+
             _orientation = value;
+            PerformLayout();
+            Invalidate(true);
         }
     }
 
@@ -50,7 +64,17 @@ public class BootstrapListGroup : Panel
     public bool Flush
     {
         get => _flush;
-        set => _flush = value;
+        set
+        {
+            if (_flush == value)
+            {
+                return;
+            }
+
+            _flush = value;
+            PerformLayout();
+            Invalidate(true);
+        }
     }
 
     /// <summary>Gets or sets the outer logical corner radius, or -1 for the theme radius.</summary>
@@ -66,7 +90,14 @@ public class BootstrapListGroup : Panel
                 throw new ArgumentOutOfRangeException(nameof(value), value, "Border radius must be -1 or non-negative.");
             }
 
+            if (_borderRadius == value)
+            {
+                return;
+            }
+
             _borderRadius = value;
+            PerformLayout();
+            Invalidate(true);
         }
     }
 
@@ -127,13 +158,63 @@ public class BootstrapListGroup : Panel
     }
 
     /// <inheritdoc />
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        var visible = GetVisibleItems();
+        if (visible.Count == 0)
+        {
+            return new Size(Padding.Horizontal, Padding.Vertical);
+        }
+
+        var overlap = GetSeamOverlap();
+        var width = 0;
+        var height = 0;
+        foreach (var item in visible)
+        {
+            var preferred = item.GetPreferredSize(Size.Empty);
+            if (_orientation == Orientation.Vertical)
+            {
+                width = Math.Max(width, preferred.Width);
+                height += Math.Max(0, preferred.Height);
+            }
+            else
+            {
+                width += Math.Max(0, preferred.Width);
+                height = Math.Max(height, preferred.Height);
+            }
+        }
+
+        if (visible.Count > 1)
+        {
+            if (_orientation == Orientation.Vertical)
+            {
+                height -= overlap * (visible.Count - 1);
+            }
+            else
+            {
+                width -= overlap * (visible.Count - 1);
+            }
+        }
+
+        return new Size(Math.Max(0, width) + Padding.Horizontal, Math.Max(0, height) + Padding.Vertical);
+    }
+
+    /// <inheritdoc />
     protected override void OnControlAdded(ControlEventArgs e)
     {
         base.OnControlAdded(e);
         if (e.Control is BootstrapListGroupItem item && _subscribedItems.Add(item))
         {
             item.Click += OnItemClick;
+            item.SizeChanged += OnItemLayoutRelevantChanged;
+            item.VisibleChanged += OnItemLayoutRelevantChanged;
+            item.TextChanged += OnItemLayoutRelevantChanged;
+            item.FontChanged += OnItemLayoutRelevantChanged;
+            item.PaddingChanged += OnItemLayoutRelevantChanged;
         }
+
+
+        PerformLayout();
     }
 
     /// <inheritdoc />
@@ -142,9 +223,43 @@ public class BootstrapListGroup : Panel
         if (e.Control is BootstrapListGroupItem item && _subscribedItems.Remove(item))
         {
             item.Click -= OnItemClick;
+            item.SizeChanged -= OnItemLayoutRelevantChanged;
+            item.VisibleChanged -= OnItemLayoutRelevantChanged;
+            item.TextChanged -= OnItemLayoutRelevantChanged;
+            item.FontChanged -= OnItemLayoutRelevantChanged;
+            item.PaddingChanged -= OnItemLayoutRelevantChanged;
         }
 
         base.OnControlRemoved(e);
+        PerformLayout();
+    }
+
+    /// <inheritdoc />
+    protected override void OnLayout(LayoutEventArgs levent)
+    {
+        base.OnLayout(levent);
+        if (_performingLayout || IsDisposed)
+        {
+            return;
+        }
+
+        _performingLayout = true;
+        try
+        {
+            LayoutItems();
+        }
+        finally
+        {
+            _performingLayout = false;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+        base.OnDpiChangedAfterParent(e);
+        PerformLayout();
+        Invalidate(true);
     }
 
     /// <inheritdoc />
@@ -155,9 +270,19 @@ public class BootstrapListGroup : Panel
             foreach (var item in _subscribedItems)
             {
                 item.Click -= OnItemClick;
+                item.SizeChanged -= OnItemLayoutRelevantChanged;
+                item.VisibleChanged -= OnItemLayoutRelevantChanged;
+                item.TextChanged -= OnItemLayoutRelevantChanged;
+                item.FontChanged -= OnItemLayoutRelevantChanged;
+                item.PaddingChanged -= OnItemLayoutRelevantChanged;
             }
 
             _subscribedItems.Clear();
+            if (_themeSubscribed)
+            {
+                BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+                _themeSubscribed = false;
+            }
         }
 
         base.Dispose(disposing);
@@ -180,6 +305,87 @@ public class BootstrapListGroup : Panel
         }
 
         return result;
+    }
+
+    private List<BootstrapListGroupItem> GetVisibleItems()
+    {
+        var result = new List<BootstrapListGroupItem>();
+        foreach (var item in GetItemsSnapshot())
+        {
+            if (item.Visible)
+            {
+                result.Add(item);
+            }
+        }
+
+        return result;
+    }
+
+    private void LayoutItems()
+    {
+        var visible = GetVisibleItems();
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var radius = BootstrapListGroupRenderLogic.ResolveRadius(BootstrapThemeManager.CurrentTheme.Metrics, _borderRadius, dpi);
+        var overlap = GetSeamOverlap();
+        var x = Padding.Left;
+        var y = Padding.Top;
+        var availableWidth = Math.Max(0, ClientSize.Width - Padding.Horizontal);
+
+        for (var index = 0; index < visible.Count; index++)
+        {
+            var item = visible[index];
+            var preferred = item.GetPreferredSize(Size.Empty);
+            var corners = BootstrapListGroupRenderLogic.GetCornerRadius(_orientation, index, visible.Count, _flush, radius);
+            item.ApplyConnectedGeometry(corners, _orientation == Orientation.Vertical && _flush);
+            if (_orientation == Orientation.Vertical)
+            {
+                item.Bounds = new Rectangle(x, y, availableWidth, Math.Max(0, preferred.Height));
+                y += Math.Max(0, item.Height - (index < visible.Count - 1 ? overlap : 0));
+            }
+            else
+            {
+                item.Bounds = new Rectangle(x, y, Math.Max(0, preferred.Width), Math.Max(0, preferred.Height));
+                x += Math.Max(0, item.Width - (index < visible.Count - 1 ? overlap : 0));
+            }
+        }
+
+        if (AutoSize)
+        {
+            var preferred = GetPreferredSize(Size.Empty);
+            if (_orientation == Orientation.Vertical)
+            {
+                if (Height != preferred.Height) Height = preferred.Height;
+            }
+            else if (Size != preferred)
+            {
+                Size = preferred;
+            }
+        }
+    }
+
+    private int GetSeamOverlap()
+    {
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        return BootstrapListGroupRenderLogic.GetSeamOverlap(BootstrapThemeManager.CurrentTheme.Metrics, dpi);
+    }
+
+    private void OnItemLayoutRelevantChanged(object? sender, EventArgs e)
+    {
+        if (!_performingLayout)
+        {
+            PerformLayout();
+        }
+    }
+
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        PerformLayout();
+        Invalidate(true);
     }
 
     private void OnItemClick(object? sender, EventArgs e)

@@ -128,6 +128,10 @@ public class BootstrapListGroupItem : Panel
         Invalidate();
     }
 
+    internal CornerRadius ConnectedCorners => _connectedCorners ?? CornerRadius.Empty;
+
+    internal bool FlushVerticalGeometry => _flushVertical;
+
     /// <inheritdoc />
     protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); PerformLayout(); Invalidate(); }
 

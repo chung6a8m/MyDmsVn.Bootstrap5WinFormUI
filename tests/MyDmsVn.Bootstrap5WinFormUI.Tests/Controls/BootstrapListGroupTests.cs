@@ -1,9 +1,11 @@
 using System;
 using System.ComponentModel;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -120,6 +122,90 @@ public sealed class BootstrapListGroupTests
         Assert.That(count, Is.EqualTo(1));
     }
 
+    [Test]
+    public void VerticalLayoutUsesFreshVisibleControlOrderAndStableSeamOverlap()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Size = new Size(240, 200),
+            Padding = new Padding(4),
+            BorderRadius = 8
+        };
+        using var first = new FixedPreferredItem(100, 40);
+        using var hidden = new FixedPreferredItem(100, 50) { Visible = false };
+        using var last = new FixedPreferredItem(100, 30);
+        group.Controls.Add(first);
+        group.Controls.Add(hidden);
+        group.Controls.Add(last);
+
+        group.PerformLayout();
+        var firstPass = new[] { first.Bounds, last.Bounds };
+        group.PerformLayout();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(first.Bounds, Is.EqualTo(firstPass[0]));
+            Assert.That(last.Bounds, Is.EqualTo(firstPass[1]));
+            Assert.That(first.Left, Is.EqualTo(group.Padding.Left));
+            Assert.That(first.Width, Is.EqualTo(group.ClientSize.Width - group.Padding.Horizontal));
+            Assert.That(last.Top, Is.LessThan(first.Bottom));
+            Assert.That(hidden.Bounds, Is.Not.EqualTo(first.Bounds));
+            Assert.That(first.ConnectedCorners, Is.EqualTo(new CornerRadius(8, 8, 0, 0)));
+            Assert.That(last.ConnectedCorners, Is.EqualTo(new CornerRadius(0, 0, 8, 8)));
+        }));
+
+        group.Controls.SetChildIndex(last, 0);
+        group.PerformLayout();
+        Assert.That(last.Top, Is.EqualTo(group.Padding.Top));
+        Assert.That(group.Items[0], Is.SameAs(last));
+        Assert.That(last.ConnectedCorners, Is.EqualTo(new CornerRadius(8, 8, 0, 0)));
+    }
+
+    [Test]
+    public void HorizontalLayoutPreservesPreferredWidthsAndFlushIsNoOp()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Orientation = Orientation.Horizontal,
+            Flush = true,
+            BorderRadius = 7,
+            Size = new Size(300, 100)
+        };
+        using var first = new FixedPreferredItem(80, 30);
+        using var second = new FixedPreferredItem(120, 40);
+        group.Controls.Add(first);
+        group.Controls.Add(second);
+        group.PerformLayout();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(first.Width, Is.EqualTo(80));
+            Assert.That(second.Width, Is.EqualTo(120));
+            Assert.That(second.Left, Is.LessThan(first.Right));
+            Assert.That(group.Flush, Is.True);
+            Assert.That(group.BorderRadius, Is.EqualTo(7));
+            Assert.That(first.ConnectedCorners, Is.EqualTo(new CornerRadius(7, 0, 0, 7)));
+            Assert.That(second.ConnectedCorners, Is.EqualTo(new CornerRadius(0, 7, 7, 0)));
+        }));
+    }
+
+    [Test]
+    public void AutoSizeAggregatesPreferredItemsWithoutNegativeBounds()
+    {
+        using var group = new BootstrapListGroup { Width = 220, Padding = new Padding(3) };
+        using var first = new FixedPreferredItem(100, 30);
+        using var second = new FixedPreferredItem(120, 40);
+        group.Controls.Add(first);
+        group.Controls.Add(second);
+        group.PerformLayout();
+
+        Assert.That(group.Height, Is.GreaterThan(0));
+        Assert.That(group.Items.All(item => item.Left >= 0 && item.Top >= 0 && item.Width >= 0 && item.Height >= 0), Is.True);
+        Assert.That(group.GetPreferredSize(Size.Empty).Height, Is.EqualTo(group.Height));
+    }
+
     private static void AssertItemsMatchControls(BootstrapListGroup group)
     {
         var expected = group.Controls.Cast<Control>().OfType<BootstrapListGroupItem>().ToArray();
@@ -129,5 +215,14 @@ public sealed class BootstrapListGroupTests
     private sealed class ClickProbeItem : BootstrapListGroupItem
     {
         public void RaiseClick() => OnClick(EventArgs.Empty);
+    }
+
+    private sealed class FixedPreferredItem : BootstrapListGroupItem
+    {
+        private readonly Size _preferred;
+
+        public FixedPreferredItem(int width, int height) => _preferred = new Size(width, height);
+
+        public override Size GetPreferredSize(Size proposedSize) => _preferred;
     }
 }
