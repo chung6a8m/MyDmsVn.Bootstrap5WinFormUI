@@ -292,6 +292,11 @@ public sealed class MainForm : DemoFormBase
             () => new ListViewDemoForm());
 
         AddPage(
+            "List Group",
+            "Short static/actionable composition with explicit active state, rich content, variants, connected layout, keyboard navigation, flush, and horizontal presentation.",
+            () => new ListGroupDemoForm());
+
+        AddPage(
             "Menus / ToolStrips",
             "MenuStrip, ContextMenuStrip, ToolStrip, and StatusStrip with shortcuts, overflow, and native behavior.",
             () => new ToolStripFamilyDemoForm());
