@@ -152,6 +152,103 @@ public sealed class BootstrapListGroupItemTests
         Assert.That(typeof(BootstrapListGroupItem).GetProperty("BorderRadius", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly), Is.Null);
     }
 
+    [Test]
+    public void DirectMouseEnterAndSpaceActivateExactlyOnceWithoutChangingActive()
+    {
+        using var item = new InteractionProbeItem { Actionable = true, Size = new Size(160, 40) };
+        var clicks = 0;
+        item.Click += (_, _) => clicks++;
+
+        item.RaiseMouseClick();
+        item.RaiseKeyDown(Keys.Enter);
+        item.RaiseKeyDown(Keys.Space);
+        item.RaiseKeyUp(Keys.Space);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(clicks, Is.EqualTo(3));
+            Assert.That(item.Active, Is.False);
+        }));
+    }
+
+    [Test]
+    public void DisabledOrNonActionableItemsDoNotActivate()
+    {
+        using var item = new InteractionProbeItem { Size = new Size(160, 40) };
+        var clicks = 0;
+        item.Click += (_, _) => clicks++;
+        item.RaiseMouseClick();
+        item.RaiseKeyDown(Keys.Enter);
+        item.Actionable = true;
+        item.Enabled = false;
+        item.RaiseMouseClick();
+        item.RaiseKeyDown(Keys.Enter);
+
+        Assert.That(clicks, Is.Zero);
+    }
+
+    [Test]
+    public void DecorativeDescendantsForwardButInteractiveAndUnknownControlsDoNot()
+    {
+        using var group = new BootstrapListGroup();
+        using var item = new BootstrapListGroupItem { Actionable = true };
+        using var label = new MouseProbeLabel();
+        using var badge = new MouseProbeBadge();
+        using var button = new Button();
+        using var unknown = new UnknownMouseProbe();
+        item.Controls.Add(label);
+        item.Controls.Add(badge);
+        item.Controls.Add(button);
+        item.Controls.Add(unknown);
+        group.Controls.Add(item);
+        var itemClicks = 0;
+        var groupClicks = 0;
+        item.Click += (_, _) => itemClicks++;
+        group.ItemClick += (_, _) => groupClicks++;
+
+        label.RaiseMouseClick();
+        badge.RaiseMouseClick();
+        button.PerformClick();
+        unknown.RaiseMouseClick();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(itemClicks, Is.EqualTo(2));
+            Assert.That(groupClicks, Is.EqualTo(2));
+        }));
+    }
+
+    [Test]
+    public void DynamicDecorativeDescendantsAreUnsubscribedOnRemoval()
+    {
+        using var item = new BootstrapListGroupItem { Actionable = true };
+        using var panel = new Panel();
+        using var label = new MouseProbeLabel();
+        item.Controls.Add(panel);
+        panel.Controls.Add(label);
+        var clicks = 0;
+        item.Click += (_, _) => clicks++;
+        label.RaiseMouseClick();
+        panel.Controls.Remove(label);
+        label.RaiseMouseClick();
+
+        Assert.That(clicks, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void AccessibleDefaultsTrackTextAndActionableRole()
+    {
+        using var item = new BootstrapListGroupItem { Text = "Profile" };
+        Assert.That(item.AccessibleName, Is.EqualTo("Profile"));
+        Assert.That(item.AccessibleRole, Is.EqualTo(AccessibleRole.ListItem));
+
+        item.Actionable = true;
+        Assert.That(item.AccessibleRole, Is.EqualTo(AccessibleRole.PushButton));
+        item.AccessibleName = "Custom";
+        item.Text = "Security";
+        Assert.That(item.AccessibleName, Is.EqualTo("Custom"));
+    }
+
     private static int GetThemeSubscriptionCount()
     {
         var field = typeof(BootstrapThemeManager).GetField("ThemeChanged", BindingFlags.Static | BindingFlags.NonPublic);
@@ -164,5 +261,45 @@ public sealed class BootstrapListGroupItemTests
         public bool HasSelectableStyle => GetStyle(ControlStyles.Selectable);
 
         public bool HasStyle(ControlStyles style) => GetStyle(style);
+    }
+
+    private sealed class InteractionProbeItem : BootstrapListGroupItem
+    {
+        public void RaiseMouseClick()
+        {
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0));
+            OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0));
+        }
+
+        public void RaiseKeyDown(Keys key) => OnKeyDown(new KeyEventArgs(key));
+
+        public void RaiseKeyUp(Keys key) => OnKeyUp(new KeyEventArgs(key));
+    }
+
+    private sealed class MouseProbeLabel : Label
+    {
+        public void RaiseMouseClick()
+        {
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
+            OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
+        }
+    }
+
+    private sealed class MouseProbeBadge : BootstrapBadge
+    {
+        public void RaiseMouseClick()
+        {
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
+            OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
+        }
+    }
+
+    private sealed class UnknownMouseProbe : Control
+    {
+        public void RaiseMouseClick()
+        {
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
+            OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
+        }
     }
 }

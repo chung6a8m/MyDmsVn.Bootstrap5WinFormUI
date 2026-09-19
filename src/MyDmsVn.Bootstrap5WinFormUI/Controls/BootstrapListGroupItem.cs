@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -23,6 +24,12 @@ public class BootstrapListGroupItem : Panel
     private Font? _themeFont;
     private CornerRadius? _connectedCorners;
     private bool _flushVertical;
+    private bool _hovered;
+    private bool _pressed;
+    private bool _spacePressed;
+    private Control? _forwardingPressedControl;
+    private readonly HashSet<Control> _trackedDescendants = new HashSet<Control>();
+    private string? _automaticAccessibleName;
 
     /// <summary>Initializes a neutral, presentational list-group item.</summary>
     public BootstrapListGroupItem()
@@ -66,6 +73,11 @@ public class BootstrapListGroupItem : Panel
             _actionable = value;
             SetStyle(ControlStyles.Selectable, value);
             TabStop = value;
+            AccessibleRole = value ? AccessibleRole.PushButton : AccessibleRole.ListItem;
+            if (!value)
+            {
+                ClearPressedState();
+            }
             UpdateStyles();
             Invalidate();
         }
@@ -133,7 +145,17 @@ public class BootstrapListGroupItem : Panel
     internal bool FlushVerticalGeometry => _flushVertical;
 
     /// <inheritdoc />
-    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); PerformLayout(); Invalidate(); }
+    protected override void OnTextChanged(EventArgs e)
+    {
+        base.OnTextChanged(e);
+        if (string.IsNullOrEmpty(AccessibleName) || AccessibleName == _automaticAccessibleName)
+        {
+            _automaticAccessibleName = Text;
+            AccessibleName = Text;
+        }
+        PerformLayout();
+        Invalidate();
+    }
 
     /// <inheritdoc />
     protected override void OnFontChanged(EventArgs e)
@@ -151,6 +173,130 @@ public class BootstrapListGroupItem : Panel
     protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
 
     /// <inheritdoc />
+    protected override void OnControlAdded(ControlEventArgs e)
+    {
+        base.OnControlAdded(e);
+        if (e.Control is Control control) TrackDescendant(control);
+    }
+
+    /// <inheritdoc />
+    protected override void OnControlRemoved(ControlEventArgs e)
+    {
+        if (e.Control is Control control) UntrackDescendant(control);
+        base.OnControlRemoved(e);
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseEnter(EventArgs e)
+    {
+        base.OnMouseEnter(e);
+        if (_actionable && Enabled) { _hovered = true; Invalidate(); }
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        _hovered = false;
+        if (!_pressed) Invalidate();
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button == MouseButtons.Left && _actionable && Enabled && ClientRectangle.Contains(e.Location))
+        {
+            Focus();
+            _pressed = true;
+            Capture = true;
+            Invalidate();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        var activate = _pressed && e.Button == MouseButtons.Left && ClientRectangle.Contains(e.Location);
+        _pressed = false;
+        Capture = false;
+        base.OnMouseUp(e);
+        Invalidate();
+        if (activate) ActivateItem();
+    }
+
+    /// <inheritdoc />
+    protected override void OnMouseCaptureChanged(EventArgs e)
+    {
+        base.OnMouseCaptureChanged(e);
+        if (!Capture && _pressed) { _pressed = false; Invalidate(); }
+    }
+
+    /// <inheritdoc />
+    protected override void OnLostFocus(EventArgs e)
+    {
+        ClearPressedState();
+        base.OnLostFocus(e);
+        Invalidate();
+    }
+
+    /// <inheritdoc />
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+
+    /// <inheritdoc />
+    protected override bool IsInputKey(Keys keyData)
+    {
+        var key = keyData & Keys.KeyCode;
+        if (key == Keys.Up || key == Keys.Down || key == Keys.Left || key == Keys.Right || key == Keys.Home || key == Keys.End)
+            return true;
+        return base.IsInputKey(keyData);
+    }
+
+    /// <inheritdoc />
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (!_actionable || !Enabled) return;
+        if (e.KeyCode == Keys.Enter)
+        {
+            ActivateItem();
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        }
+        else if (e.KeyCode == Keys.Space && !_spacePressed)
+        {
+            _spacePressed = true;
+            _pressed = true;
+            Invalidate();
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        if (e.KeyCode == Keys.Space && _spacePressed)
+        {
+            _spacePressed = false;
+            _pressed = false;
+            Invalidate();
+            ActivateItem();
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (Focused && Parent is BootstrapListGroup group && group.NavigateFrom(this, keyData))
+            return true;
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    /// <inheritdoc />
     protected override void OnDpiChangedAfterParent(EventArgs e) { base.OnDpiChangedAfterParent(e); PerformLayout(); Invalidate(); }
 
     /// <inheritdoc />
@@ -160,7 +306,7 @@ public class BootstrapListGroupItem : Panel
         if (ClientSize.Width <= 0 || ClientSize.Height <= 0) return;
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        var state = BootstrapListGroupRenderLogic.ResolveState(Enabled, _active, _actionable, false, false);
+        var state = BootstrapListGroupRenderLogic.ResolveState(Enabled, _active, _actionable, _pressed, _hovered);
         var palette = BootstrapListGroupRenderLogic.ResolvePalette(theme.Colors, _variant, state);
         var radius = BootstrapListGroupRenderLogic.ResolveRadius(theme.Metrics, -1, dpi);
         var corners = _connectedCorners ?? new CornerRadius(radius);
@@ -205,6 +351,7 @@ public class BootstrapListGroupItem : Panel
     {
         if (disposing)
         {
+            foreach (var descendant in new List<Control>(_trackedDescendants)) UntrackDescendant(descendant);
             if (_themeSubscribed) { BootstrapThemeManager.ThemeChanged -= OnThemeChanged; _themeSubscribed = false; }
             DisposeThemeFont();
         }
@@ -233,4 +380,79 @@ public class BootstrapListGroupItem : Panel
     }
 
     private void DisposeThemeFont() { var font = _themeFont; _themeFont = null; font?.Dispose(); }
+
+    private void ActivateItem()
+    {
+        if (_actionable && Enabled) OnClick(EventArgs.Empty);
+    }
+
+    private void ClearPressedState()
+    {
+        _pressed = false;
+        _spacePressed = false;
+        _forwardingPressedControl = null;
+        if (Capture) Capture = false;
+    }
+
+    private void TrackDescendant(Control control)
+    {
+        if (!_trackedDescendants.Add(control)) return;
+        control.ControlAdded += OnDescendantControlAdded;
+        control.ControlRemoved += OnDescendantControlRemoved;
+        if (IsDecorativeForwardingSurface(control))
+        {
+            control.MouseDown += OnDecorativeMouseDown;
+            control.MouseUp += OnDecorativeMouseUp;
+            control.MouseLeave += OnDecorativeMouseLeave;
+        }
+        foreach (Control child in control.Controls) TrackDescendant(child);
+    }
+
+    private void UntrackDescendant(Control control)
+    {
+        foreach (Control child in control.Controls) UntrackDescendant(child);
+        if (!_trackedDescendants.Remove(control)) return;
+        control.ControlAdded -= OnDescendantControlAdded;
+        control.ControlRemoved -= OnDescendantControlRemoved;
+        control.MouseDown -= OnDecorativeMouseDown;
+        control.MouseUp -= OnDecorativeMouseUp;
+        control.MouseLeave -= OnDecorativeMouseLeave;
+        if (ReferenceEquals(_forwardingPressedControl, control)) _forwardingPressedControl = null;
+    }
+
+    private static bool IsDecorativeForwardingSurface(Control control)
+    {
+        if (control is Label || control is BootstrapBadge) return true;
+        var type = control.GetType();
+        return type == typeof(Panel) || type == typeof(FlowLayoutPanel) || type == typeof(TableLayoutPanel);
+    }
+
+    private void OnDescendantControlAdded(object? sender, ControlEventArgs e)
+    {
+        if (e.Control is Control control) TrackDescendant(control);
+    }
+
+    private void OnDescendantControlRemoved(object? sender, ControlEventArgs e)
+    {
+        if (e.Control is Control control) UntrackDescendant(control);
+    }
+
+    private void OnDecorativeMouseDown(object? sender, MouseEventArgs e)
+    {
+        if (sender is Control control && e.Button == MouseButtons.Left && _actionable && Enabled && control.ClientRectangle.Contains(e.Location))
+            _forwardingPressedControl = control;
+    }
+
+    private void OnDecorativeMouseUp(object? sender, MouseEventArgs e)
+    {
+        var activate = sender is Control control && ReferenceEquals(control, _forwardingPressedControl) &&
+            e.Button == MouseButtons.Left && control.ClientRectangle.Contains(e.Location);
+        _forwardingPressedControl = null;
+        if (activate) ActivateItem();
+    }
+
+    private void OnDecorativeMouseLeave(object? sender, EventArgs e)
+    {
+        if (ReferenceEquals(sender, _forwardingPressedControl)) _forwardingPressedControl = null;
+    }
 }

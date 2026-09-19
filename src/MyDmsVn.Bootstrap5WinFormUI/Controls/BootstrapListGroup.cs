@@ -307,6 +307,51 @@ public class BootstrapListGroup : Panel
         return result;
     }
 
+    internal bool NavigateFrom(BootstrapListGroupItem source, Keys keyData)
+    {
+        if (source is null || !source.Focused)
+        {
+            return false;
+        }
+
+        var key = keyData & Keys.KeyCode;
+        var validDirectional = _orientation == Orientation.Vertical
+            ? key == Keys.Up || key == Keys.Down
+            : key == Keys.Left || key == Keys.Right;
+        if (!validDirectional && key != Keys.Home && key != Keys.End)
+        {
+            return false;
+        }
+
+        var eligible = new List<BootstrapListGroupItem>();
+        foreach (var item in GetItemsSnapshot())
+        {
+            if (item.Visible && item.Enabled && item.Actionable && item.CanSelect)
+            {
+                eligible.Add(item);
+            }
+        }
+
+        var current = eligible.IndexOf(source);
+        if (current < 0 || eligible.Count == 0)
+        {
+            return false;
+        }
+
+        int targetIndex;
+        if (key == Keys.Home) targetIndex = 0;
+        else if (key == Keys.End) targetIndex = eligible.Count - 1;
+        else if (key == Keys.Down || key == Keys.Right) targetIndex = Math.Min(eligible.Count - 1, current + 1);
+        else targetIndex = Math.Max(0, current - 1);
+        if (targetIndex == current)
+        {
+            return true;
+        }
+
+        eligible[targetIndex].Focus();
+        return true;
+    }
+
     private List<BootstrapListGroupItem> GetVisibleItems()
     {
         var result = new List<BootstrapListGroupItem>();

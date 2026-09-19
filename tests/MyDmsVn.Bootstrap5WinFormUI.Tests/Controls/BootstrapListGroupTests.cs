@@ -206,6 +206,38 @@ public sealed class BootstrapListGroupTests
         Assert.That(group.GetPreferredSize(Size.Empty).Height, Is.EqualTo(group.Height));
     }
 
+    [Test]
+    public void NavigationUsesCurrentControlOrderAndSkipsIneligibleItems()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var group = new BootstrapListGroup { AutoSize = false, Size = new Size(220, 180) };
+        using var first = new BootstrapListGroupItem { Actionable = true };
+        using var skipped = new BootstrapListGroupItem { Actionable = true, Enabled = false };
+        using var last = new BootstrapListGroupItem { Actionable = true };
+        group.Controls.Add(first);
+        group.Controls.Add(skipped);
+        group.Controls.Add(last);
+        form.Controls.Add(group);
+        form.Show();
+
+        Assert.That(first.Focus(), Is.True);
+        Assert.That(group.NavigateFrom(first, Keys.Down), Is.True);
+        Assert.That(last.Focused, Is.True);
+        group.Controls.SetChildIndex(last, 0);
+        Assert.That(group.NavigateFrom(last, Keys.Home), Is.True);
+        Assert.That(last.Focused, Is.True);
+        Assert.That(group.NavigateFrom(last, Keys.End), Is.True);
+        Assert.That(first.Focused, Is.True);
+
+        group.Orientation = Orientation.Horizontal;
+        Assert.That(last.Focus(), Is.True);
+        Assert.That(group.NavigateFrom(last, Keys.Right), Is.True);
+        Assert.That(first.Focused, Is.True);
+        Assert.That(group.NavigateFrom(first, Keys.Tab), Is.False);
+        Assert.That(first.Active, Is.False);
+        Assert.That(last.Active, Is.False);
+    }
+
     private static void AssertItemsMatchControls(BootstrapListGroup group)
     {
         var expected = group.Controls.Cast<Control>().OfType<BootstrapListGroupItem>().ToArray();
