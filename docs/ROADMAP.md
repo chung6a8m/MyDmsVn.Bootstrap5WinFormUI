@@ -8,13 +8,11 @@ Do not preload every plan into an agent context. Read `AGENTS.md`, `AI_CONTEXT.m
 
 1. [Bootstrap ToolStrip Family](./plans/20260907-001-bootstrap-toolstrip-family.md)
    - Add native-backed `BootstrapToolStrip`, `BootstrapMenuStrip`, `BootstrapContextMenuStrip`, and `BootstrapStatusStrip` with a shared Bootstrap renderer and no parallel menu/layout engine.
-2. [BootstrapModal](./plans/20260907-004-bootstrap-modal.md)
-   - Add a native `Form`-based Bootstrap modal that keeps `ShowDialog` semantics authoritative and layers theme, backdrop, sizing, placement, and reduced-motion transitions on top.
-3. [BootstrapListGroup](./plans/20260907-005-bootstrap-list-group.md)
+2. [BootstrapListGroup](./plans/20260907-005-bootstrap-list-group.md)
    - Add a lightweight composition control for short static/actionable lists without duplicating `BootstrapListView` or large-data responsibilities.
-4. [BootstrapBreadcrumb](./plans/20260907-006-bootstrap-breadcrumb.md)
+3. [BootstrapBreadcrumb](./plans/20260907-006-bootstrap-breadcrumb.md)
    - Add an ordered hierarchy/navigation trail built from native links/labels with deterministic wrapping, RTL layout, and native keyboard/accessibility behavior.
-5. [BootstrapPlaceholder / Skeleton](./plans/20260907-007-bootstrap-placeholder-skeleton.md)
+4. [BootstrapPlaceholder / Skeleton](./plans/20260907-007-bootstrap-placeholder-skeleton.md)
    - Add the owner-painted `BootstrapPlaceholder` primitive with Bootstrap-compatible sizing and Glow/Wave animation; Skeleton remains normal WinForms composition rather than a second framework.
 
 ## Execution rules

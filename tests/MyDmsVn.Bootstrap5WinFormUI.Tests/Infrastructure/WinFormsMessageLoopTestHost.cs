@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows.Forms;
@@ -153,6 +153,7 @@ internal sealed class WinFormsMessageLoopTestHost : IDisposable
     {
         try
         {
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException, threadScope: true);
             SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
             _dispatcher = new Control();
             _ = _dispatcher.Handle;

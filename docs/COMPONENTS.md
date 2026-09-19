@@ -1191,8 +1191,36 @@ BootstrapStatusStrip : StatusStrip             Variant
 
 Manual verification: open **Menus / ToolStrips** in the integrated demo and exercise Ctrl+S, access keys, checked/disabled/nested commands, split main/drop-down actions, constrained-width overflow, horizontal/vertical separators, context-menu source/lifecycle logging, status Spring/borders/progress/sizing grip, Light/Dark themes, RTL, and Windows 100/150/200% scaling.
 
+## BootstrapModal
+
+Responsibility: add Bootstrap-inspired modal presentation while keeping the native WinForms `Form` modal loop, ownership, result, validation, focus, keyboard, closing, and reuse semantics authoritative.
+
+Public surface:
+
+```text
+BootstrapModal : Form
+BootstrapModal.ModalSize             Small | Default | Large | ExtraLarge | Custom
+BootstrapModal.BackdropMode          None | Dismissible | Static
+BootstrapModal.CloseOnEscape
+BootstrapModal.ShowCloseButton
+BootstrapModal.BorderRadius
+BootstrapModal.InitialFocusControl
+BootstrapModal.BodyPanel
+BootstrapModal.FooterPanel
+```
+
+- Inherited `ShowDialog()` / `ShowDialog(IWin32Window)`, `DialogResult`, `AcceptButton`, `CancelButton`, `Close()`, `FormClosing`, `Size`, `ClientSize`, `MinimumSize`, and `MaximumSize` remain native APIs. The framework declares no duplicate owner, result, close, or show method.
+- Header close, a dismissible backdrop, and Escape without a native `CancelButton` converge on one framework dismiss request. That request uses native `DialogResult.Cancel`, raises the normal closing lifecycle once, and stays open when the consumer cancels `FormClosing`. Caller `Close()` remains an independent native path.
+- The internal owner is resolved only after native modal ownership exists. A usable inherited managed `Owner` is preferred; otherwise the current native owner HWND is queried without private-field reflection or caching beyond the active modal lifetime. Managed `Form`, arbitrary `IWin32Window`, and parameterless `ShowDialog()` are supported.
+- `None` creates no backdrop. `Dismissible` requests framework dismissal on click; `Static` does not. The taskbar-hidden, non-activating, non-global-topmost backdrop is created from the proven `OnShown` post-modal-disable-snapshot point. Native `ShowDialog`—not the backdrop—disables and restores the owner. Managed owner movement/resizing updates backdrop geometry without polling.
+- Small/Default/Large/ExtraLarge own DPI-scaled preferred widths of 300/500/800/1140 logical pixels. `Custom` keeps the caller's inherited `Size`/`ClientSize` request. Minimum/maximum constraints apply when physically possible, while final working-area clamping keeps header/footer reachable and constrains the scrollable body.
+- Initial focus prefers a valid `InitialFocusControl`, then a valid inherited `ActiveControl`, then native select-next navigation. Native Tab/Shift+Tab and Enter behavior is unchanged. A native `CancelButton` owns Escape before the framework fallback.
+- Runtime Light/Dark changes repaint the shell and backdrop. Framework metrics and radius use `DpiScaler`; RTL mirrors the title/close/action flow. Accessible name falls back to inherited `Text`, and the backdrop is a non-command tool window.
+- Opening uses the shared finite animation and resolves immediately under reduced motion. Framework dismissal is intentionally immediate in V1 because delaying it would complicate native cancellable close/result semantics; caller/native close paths are never intercepted for animation.
+- Modeless `Show()` receives only the visual Form shell and creates no backdrop; modeless behavior is not a V1 contract. Nested Bootstrap modals, fullscreen variants, draggable/resizable custom chrome, DWM effects, MDI-special behavior, custom message loops, global input hooks, and async result wrappers are excluded.
+
+Manual verification: open **Modal** in the integrated demo and exercise every size/backdrop mode, native OK/Cancel results, header/backdrop/Escape dismissal, `CloseOnEscape = false`, long body scrolling, initial focus, Tab/Shift+Tab, Enter, Alt/Alt+Tab, runtime Light/Dark and reduced motion, RTL, owner movement/resize/close, monitor-edge clamping, and Windows 100/125/150/175/200% scaling. Confirm the owner is natively disabled while open, the backdrop stays clickable, unrelated applications can cover both windows, and no backdrop remains in the taskbar/task switcher or `Application.OpenForms` after exit.
+
 ## Deferred components
 
-Dialog/Modal, Skeleton, and others are not part of the initial foundation contract.
-
-Before adding one, document which existing foundation pieces it reuses.
+Skeleton and other unimplemented components are not part of the initial foundation contract.

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -21,6 +21,7 @@ public sealed class IntegratedDemoApplicationTests
         "Checks / Radios / Switches",
         "Advanced Inputs",
         "Range",
+        "Modal",
         "Select",
         "Input Groups",
         "Cards",
@@ -119,6 +120,18 @@ public sealed class IntegratedDemoApplicationTests
         form.PerformLayout();
 
         Assert.That(FindControls<Form>(form).Any(child => child.GetType().Name == "RangeDemoForm" && !child.TopLevel), Is.True);
+    }
+
+    [Test]
+    public void SelectingModalNavigationEmbedsModalDemoInMainWindow()
+    {
+        using var form = new MainForm();
+        form.CreateControl();
+        var sidebar = FindControls<BootstrapSidebar>(form).Single();
+        sidebar.SelectedItem = sidebar.Items.Single(item => item.Text == "Modal");
+        form.PerformLayout();
+
+        Assert.That(FindControls<Form>(form).Any(child => child.GetType().Name == "ModalDemoForm" && !child.TopLevel), Is.True);
     }
 
     [Test]
