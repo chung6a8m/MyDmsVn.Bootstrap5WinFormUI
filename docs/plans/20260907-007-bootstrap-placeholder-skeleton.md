@@ -567,7 +567,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Consumes only values, `Size`, theme token objects, `DpiScaler`, and existing `BootstrapVariantColorResolver`; no live Control/Graphics/animation dependency.
 - This task owns **all** intrinsic sizing and virtual-DPI assertions deferred from Task 1.
 
-- [ ] **Step 1: Write failing sizing tests** for 100 logical px at 96/144/192 DPI, proposed-width capping, 0.6/0.8/1.0/1.2 Font.Height multipliers, minimum height 1, and invalid font height/size/DPI.
+- [x] **Step 1: Write failing sizing tests** for 100 logical px at 96/144/192 DPI, proposed-width capping, 0.6/0.8/1.0/1.2 Font.Height multipliers, minimum height 1, and invalid font height/size/DPI.
 
 ```csharp
 [TestCase(BootstrapPlaceholderSize.ExtraSmall, 0.6)]
@@ -588,23 +588,23 @@ public void PreferredHeightMatchesBootstrapEmScale(
 }
 ```
 
-- [ ] **Step 2: Write failing base-color tests** for all semantic variants, opaque custom-color precedence, disabled token precedence, null palette rejection, and semi-transparent custom-color rejection.
-- [ ] **Step 3: Write failing Glow tests** at progress 0/.25/.5/.75/1 with expected opacity .5/.35/.2/.35/.5, clamp tests for finite out-of-range values, and NaN/infinity rejection.
-- [ ] **Step 4: Write failing Wave tests** proving progress 0 returns `0.5` at visible positions, progress `0.5` reaches approximately `0.4` at `x=0.5`, points outside the trough return `0.5`, symmetry around the center holds, effective opacity always stays in `[0.4,0.5]`, finite bounds clamp, and non-finite inputs throw.
-- [ ] **Step 5: Add an explicit Bootstrap fidelity test** proving Wave center is derived as `OpacityMax * WaveMaskMin == 0.5 * 0.8 == 0.4`; add a regression assertion that Wave never returns Glow's direct `0.2` minimum.
-- [ ] **Step 6: Write failing alpha tests** for 0.5 => alpha 128, 0.4 => alpha 102, 0.2 => alpha 51, exact RGB preservation, finite clamp, and non-finite rejection.
-- [ ] **Step 7: Write failing radius tests** for 0, explicit logical radii at multiple DPI values, `-1` resolving `theme.Metrics.Radius`, and invalid values/null metrics.
-- [ ] **Step 8: Run pure helper tests; verify RED.**
+- [x] **Step 2: Write failing base-color tests** for all semantic variants, opaque custom-color precedence, disabled token precedence, null palette rejection, and semi-transparent custom-color rejection.
+- [x] **Step 3: Write failing Glow tests** at progress 0/.25/.5/.75/1 with expected opacity .5/.35/.2/.35/.5, clamp tests for finite out-of-range values, and NaN/infinity rejection.
+- [x] **Step 4: Write failing Wave tests** proving progress 0 returns `0.5` at visible positions, progress `0.5` reaches approximately `0.4` at `x=0.5`, points outside the trough return `0.5`, symmetry around the center holds, effective opacity always stays in `[0.4,0.5]`, finite bounds clamp, and non-finite inputs throw.
+- [x] **Step 5: Add an explicit Bootstrap fidelity test** proving Wave center is derived as `OpacityMax * WaveMaskMin == 0.5 * 0.8 == 0.4`; add a regression assertion that Wave never returns Glow's direct `0.2` minimum.
+- [x] **Step 6: Write failing alpha tests** for 0.5 => alpha 128, 0.4 => alpha 102, 0.2 => alpha 51, exact RGB preservation, finite clamp, and non-finite rejection.
+- [x] **Step 7: Write failing radius tests** for 0, explicit logical radii at multiple DPI values, `-1` resolving `theme.Metrics.Radius`, and invalid values/null metrics.
+- [x] **Step 8: Run pure helper tests; verify RED.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter BootstrapPlaceholderRenderLogicTests
 ```
 
-- [ ] **Step 9: Implement the minimal pure helper exactly as specified.** Do not use framework APIs unavailable to `net48`; keep formulas identical on both targets.
-- [ ] **Step 10: Wire `BootstrapPlaceholder.GetPreferredSize` and private `ApplyPreferredSize()` to the helper.** When `AutoSize=true`, relevant size/font/DPI/property changes may adopt `GetPreferredSize(Size.Empty)`; when false, bounds remain caller-owned.
-- [ ] **Step 11: Add/finish public-control AutoSize tests** proving `PlaceholderSize` changes intrinsic height, 100-logical-pixel width is used, and `AutoSize=false` preserves explicit bounds.
-- [ ] **Step 12: Rerun Placeholder + helper fixtures on both target frameworks; verify GREEN.**
-- [ ] **Step 13: Commit** `feat: add placeholder render logic`.
+- [x] **Step 9: Implement the minimal pure helper exactly as specified.** Do not use framework APIs unavailable to `net48`; keep formulas identical on both targets.
+- [x] **Step 10: Wire `BootstrapPlaceholder.GetPreferredSize` and private `ApplyPreferredSize()` to the helper.** When `AutoSize=true`, relevant size/font/DPI/property changes may adopt `GetPreferredSize(Size.Empty)`; when false, bounds remain caller-owned.
+- [x] **Step 11: Add/finish public-control AutoSize tests** proving `PlaceholderSize` changes intrinsic height, 100-logical-pixel width is used, and `AutoSize=false` preserves explicit bounds.
+- [x] **Step 12: Rerun Placeholder + helper fixtures on both target frameworks; verify GREEN.**
+- [x] **Step 13: Commit** `feat: add placeholder render logic`.
 
 ### Task 3: Add static painting, rounded geometry, and live theme/font/DPI adaptation
 

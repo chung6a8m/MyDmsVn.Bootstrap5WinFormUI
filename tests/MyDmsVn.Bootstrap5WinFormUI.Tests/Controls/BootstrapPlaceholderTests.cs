@@ -109,4 +109,27 @@ public sealed class BootstrapPlaceholderTests
         placeholder.AnimationDuration = TimeSpan.FromSeconds(3);
         Assert.That(placeholder.Size, Is.EqualTo(expected));
     }
+
+    [Test]
+    public void AutoSizeUsesIntrinsicWidthAndPlaceholderSizeHeight()
+    {
+        using var placeholder = new BootstrapPlaceholder();
+
+        var defaultSize = placeholder.GetPreferredSize(Size.Empty);
+        placeholder.PlaceholderSize = BootstrapPlaceholderSize.ExtraSmall;
+        var extraSmallSize = placeholder.GetPreferredSize(Size.Empty);
+        placeholder.PlaceholderSize = BootstrapPlaceholderSize.Large;
+        var largeSize = placeholder.GetPreferredSize(Size.Empty);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(defaultSize.Width, Is.EqualTo(100));
+            Assert.That(extraSmallSize.Width, Is.EqualTo(100));
+            Assert.That(largeSize.Width, Is.EqualTo(100));
+            Assert.That(extraSmallSize.Height, Is.EqualTo((int)Math.Ceiling(placeholder.Font.Height * 0.6)));
+            Assert.That(largeSize.Height, Is.EqualTo((int)Math.Ceiling(placeholder.Font.Height * 1.2)));
+            Assert.That(largeSize.Height, Is.GreaterThan(defaultSize.Height));
+            Assert.That(placeholder.Size, Is.EqualTo(largeSize));
+        }));
+    }
 }

@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -43,6 +44,7 @@ public class BootstrapPlaceholder : Control
         Cursor = Cursors.WaitCursor;
 
         ApplyThemeFont();
+        ApplyPreferredSize();
     }
 
     /// <summary>
@@ -62,6 +64,7 @@ public class BootstrapPlaceholder : Control
             }
 
             _placeholderSize = value;
+            ApplyPreferredSize();
             Invalidate();
         }
     }
@@ -181,7 +184,15 @@ public class BootstrapPlaceholder : Control
     /// <inheritdoc />
     public override Size GetPreferredSize(Size proposedSize)
     {
-        return base.GetPreferredSize(proposedSize);
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        return BootstrapPlaceholderRenderLogic.GetPreferredSize(Font.Height, _placeholderSize, dpi, proposedSize);
+    }
+
+    /// <inheritdoc />
+    protected override void OnAutoSizeChanged(EventArgs e)
+    {
+        base.OnAutoSizeChanged(e);
+        ApplyPreferredSize();
     }
 
     /// <inheritdoc />
@@ -194,6 +205,15 @@ public class BootstrapPlaceholder : Control
             DisposeThemeFont();
         }
 
+        ApplyPreferredSize();
+        Invalidate();
+    }
+
+    /// <inheritdoc />
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+        base.OnDpiChangedAfterParent(e);
+        ApplyPreferredSize();
         Invalidate();
     }
 
@@ -244,6 +264,20 @@ public class BootstrapPlaceholder : Control
         var font = _themeFont;
         _themeFont = null;
         font?.Dispose();
+    }
+
+    private void ApplyPreferredSize()
+    {
+        if (!AutoSize || IsDisposed)
+        {
+            return;
+        }
+
+        var preferredSize = GetPreferredSize(Size.Empty);
+        if (Size != preferredSize)
+        {
+            Size = preferredSize;
+        }
     }
 
     private static void ValidatePlaceholderSize(BootstrapPlaceholderSize value)
