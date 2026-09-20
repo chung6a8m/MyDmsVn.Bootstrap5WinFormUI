@@ -207,6 +207,40 @@ public sealed class BootstrapListGroupTests
     }
 
     [Test]
+    public void AutoSizeGroupContainsItemWithInheritedMinimumSize()
+    {
+        using var group = new BootstrapListGroup { Width = 220 };
+        using var item = new BootstrapListGroupItem
+        {
+            AutoSize = true,
+            MinimumSize = new Size(0, 100),
+            Text = "Short"
+        };
+        group.Controls.Add(item);
+        group.PerformLayout();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(item.Height, Is.EqualTo(100));
+            Assert.That(group.ClientSize.Height, Is.GreaterThanOrEqualTo(item.Bottom + group.Padding.Bottom));
+            Assert.That(group.GetPreferredSize(Size.Empty).Height, Is.EqualTo(100));
+        }));
+    }
+
+    [Test]
+    public void ItemPreferredSizeHonorsInheritedMaximumSize()
+    {
+        using var item = new BootstrapListGroupItem
+        {
+            AutoSize = true,
+            MaximumSize = new Size(120, 0),
+            Text = "A long list-group item whose measured content is wider than its maximum"
+        };
+
+        Assert.That(item.GetPreferredSize(Size.Empty).Width, Is.EqualTo(120));
+    }
+
+    [Test]
     public void VerticalLayoutPreservesExplicitItemHeightWhenAutoSizeIsDisabled()
     {
         using var group = new BootstrapListGroup
@@ -249,6 +283,30 @@ public sealed class BootstrapListGroupTests
         group.PerformLayout();
 
         Assert.That(item.Size, Is.EqualTo(new Size(180, 96)));
+    }
+
+    [Test]
+    public void SingleAxisExplicitHeightDoesNotCaptureVerticalLayoutWidth()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Size = new Size(240, 200)
+        };
+        using var item = new BootstrapListGroupItem { Text = "Short" };
+        var contentPreferredWidth = item.GetPreferredSize(Size.Empty).Width;
+        group.Controls.Add(item);
+        group.PerformLayout();
+        Assert.That(item.Width, Is.EqualTo(group.ClientSize.Width));
+
+        item.Height = 96;
+        group.Orientation = Orientation.Horizontal;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(item.Width, Is.EqualTo(contentPreferredWidth));
+            Assert.That(item.Height, Is.EqualTo(96));
+        }));
     }
 
     [Test]

@@ -32,6 +32,7 @@ public class BootstrapListGroupItem : Panel
     private readonly HashSet<Control> _trackedDescendants = new HashSet<Control>();
     private string? _automaticAccessibleName;
     private Size _explicitMinimumSize;
+    private Size _lastObservedSize;
     private bool _trackExplicitSize;
     private bool _applyingGroupLayoutBounds;
 
@@ -56,6 +57,7 @@ public class BootstrapListGroupItem : Panel
         _themeSubscribed = true;
         ApplyThemeFont();
         UpdateResolvedForeground();
+        _lastObservedSize = Size;
         _trackExplicitSize = true;
         Layout += OnItemLayout;
         AutoSizeChanged += OnItemAutoSizeChanged;
@@ -153,11 +155,24 @@ public class BootstrapListGroupItem : Panel
             contentSize.Height = Math.Max(contentSize.Height, GetVerticalContentExtent(child, preferred));
         }
         var contentPreferred = BootstrapListGroupRenderLogic.GetPreferredSize(textSize, contentSize, padding);
-        return AutoSize
+        var resolvedPreferred = AutoSize
             ? contentPreferred
             : new Size(
                 Math.Max(contentPreferred.Width, _explicitMinimumSize.Width),
                 Math.Max(contentPreferred.Height, _explicitMinimumSize.Height));
+        resolvedPreferred.Width = Math.Max(resolvedPreferred.Width, MinimumSize.Width);
+        resolvedPreferred.Height = Math.Max(resolvedPreferred.Height, MinimumSize.Height);
+        if (MaximumSize.Width > 0)
+        {
+            resolvedPreferred.Width = Math.Min(resolvedPreferred.Width, MaximumSize.Width);
+        }
+
+        if (MaximumSize.Height > 0)
+        {
+            resolvedPreferred.Height = Math.Min(resolvedPreferred.Height, MaximumSize.Height);
+        }
+
+        return resolvedPreferred;
     }
 
     internal void ApplyGroupLayoutBounds(Rectangle bounds)
@@ -669,15 +684,21 @@ public class BootstrapListGroupItem : Panel
             _explicitMinimumSize = Size;
         }
 
+        _lastObservedSize = Size;
         RequestOwningLayout();
     }
 
     private void OnItemSizeChanged(object? sender, EventArgs e)
     {
+        var currentSize = Size;
         if (_trackExplicitSize && !AutoSize && !_applyingGroupLayoutBounds)
         {
-            _explicitMinimumSize = Size;
+            _explicitMinimumSize = new Size(
+                currentSize.Width != _lastObservedSize.Width ? currentSize.Width : _explicitMinimumSize.Width,
+                currentSize.Height != _lastObservedSize.Height ? currentSize.Height : _explicitMinimumSize.Height);
         }
+
+        _lastObservedSize = currentSize;
     }
 
     private void OnDescendantLayout(object? sender, LayoutEventArgs e)
