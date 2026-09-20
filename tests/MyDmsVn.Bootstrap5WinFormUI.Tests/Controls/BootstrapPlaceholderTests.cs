@@ -1,8 +1,10 @@
 using System;
 using System.Drawing;
+using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -12,6 +14,24 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapPlaceholderTests
 {
+    private BootstrapTheme? _originalTheme;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _originalTheme = BootstrapThemeManager.CurrentTheme;
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (_originalTheme is not null)
+        {
+            BootstrapThemeManager.CurrentTheme = _originalTheme;
+        }
+    }
+
     [Test]
     public void EnumValuesMatchBootstrapPlaceholderContract()
     {
@@ -131,5 +151,165 @@ public sealed class BootstrapPlaceholderTests
             Assert.That(largeSize.Height, Is.GreaterThan(defaultSize.Height));
             Assert.That(placeholder.Size, Is.EqualTo(largeSize));
         }));
+    }
+
+    [Test]
+    public void CallerAssignedFontSurvivesThemeChangesAndPlaceholderDisposal()
+    {
+        using var callerFont = new Font("Segoe UI", 10f, FontStyle.Italic);
+        var placeholder = new BootstrapPlaceholder
+        {
+            Font = callerFont
+        };
+
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        Assert.That(placeholder.Font, Is.SameAs(callerFont));
+
+        placeholder.Dispose();
+
+        using var bitmap = new Bitmap(24, 24);
+        using var graphics = Graphics.FromImage(bitmap);
+        Assert.DoesNotThrow((Action)(() => graphics.MeasureString("x", callerFont)));
+    }
+
+    [Test]
+    public void ThemeOwnedFontAndPreferredSizeFollowRuntimeBodyTypography()
+    {
+        using var placeholder = new BootstrapPlaceholder();
+        var originalFont = placeholder.Font;
+        var originalSize = placeholder.Size;
+        var typography = CreateTypography(new BootstrapFontToken("Segoe UI", 15f, FontStyle.Bold));
+
+        BootstrapThemeManager.CurrentTheme = new BootstrapTheme(
+            BootstrapThemeMode.Dark,
+            BootstrapThemeColors.CreateDefault(BootstrapThemeMode.Dark),
+            BootstrapThemeMetrics.Default,
+            typography);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(placeholder.Font, Is.Not.SameAs(originalFont));
+            Assert.That(placeholder.Font.SizeInPoints, Is.EqualTo(15f).Within(0.1f));
+            Assert.That(placeholder.Font.Style, Is.EqualTo(FontStyle.Bold));
+            Assert.That(placeholder.Size.Height, Is.GreaterThan(originalSize.Height));
+        }));
+    }
+
+    [Test]
+    public void ThemeAndDpiRefreshPreservePresentationPropertiesAndExplicitBounds()
+    {
+        using var placeholder = new DpiProbePlaceholder
+        {
+            AutoSize = false,
+            Size = new Size(213, 37),
+            Variant = BootstrapVariant.Success,
+            CustomColor = Color.MediumPurple
+        };
+        var expectedBounds = placeholder.Bounds;
+
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+        placeholder.SimulateDpiChangedAfterParent();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(placeholder.Bounds, Is.EqualTo(expectedBounds));
+            Assert.That(placeholder.Variant, Is.EqualTo(BootstrapVariant.Success));
+            Assert.That(placeholder.CustomColor, Is.EqualTo(Color.MediumPurple));
+        }));
+    }
+
+    [Test]
+    public void StaticPaintHandlesRadiusColorAndEnabledCombinations()
+    {
+        var cases = new[]
+        {
+            new PaintCase(0, true, BootstrapVariant.Secondary, Color.Empty),
+            new PaintCase(-1, true, BootstrapVariant.Primary, Color.Empty),
+            new PaintCase(999, true, BootstrapVariant.Success, Color.Empty),
+            new PaintCase(8, false, BootstrapVariant.Danger, Color.Empty),
+            new PaintCase(4, true, BootstrapVariant.Warning, Color.CornflowerBlue)
+        };
+
+        foreach (var item in cases)
+        {
+            using var placeholder = new PaintProbePlaceholder
+            {
+                AutoSize = false,
+                Size = new Size(31, 17),
+                BorderRadius = item.BorderRadius,
+                Enabled = item.Enabled,
+                Variant = item.Variant,
+                CustomColor = item.CustomColor
+            };
+            using var bitmap = new Bitmap(placeholder.Width, placeholder.Height);
+            using var graphics = Graphics.FromImage(bitmap);
+
+            Assert.DoesNotThrow((Action)(() => placeholder.Render(graphics)));
+            Assert.That(bitmap.GetPixel(placeholder.Width / 2, placeholder.Height / 2).A, Is.GreaterThan(0));
+        }
+    }
+
+    [Test]
+    public void ConstructionAndDisposalPairThemeSubscription()
+    {
+        var baseline = GetThemeSubscriptionCount();
+        var placeholder = new BootstrapPlaceholder();
+
+        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baseline + 1));
+
+        placeholder.Dispose();
+
+        Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baseline));
+    }
+
+    private static BootstrapThemeTypography CreateTypography(BootstrapFontToken body)
+    {
+        var defaults = BootstrapThemeTypography.Default;
+        return new BootstrapThemeTypography(
+            body,
+            defaults.BodySmall,
+            defaults.Label,
+            defaults.HeadingSmall,
+            defaults.HeadingMedium);
+    }
+
+    private static int GetThemeSubscriptionCount()
+    {
+        var eventField = typeof(BootstrapThemeManager).GetField("ThemeChanged", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(eventField, Is.Not.Null);
+        var handler = eventField!.GetValue(null) as Delegate;
+        return handler?.GetInvocationList().Length ?? 0;
+    }
+
+    private sealed class DpiProbePlaceholder : BootstrapPlaceholder
+    {
+        public void SimulateDpiChangedAfterParent()
+        {
+            OnDpiChangedAfterParent(EventArgs.Empty);
+        }
+    }
+
+    private sealed class PaintProbePlaceholder : BootstrapPlaceholder
+    {
+        public void Render(Graphics graphics)
+        {
+            OnPaint(new PaintEventArgs(graphics, ClientRectangle));
+        }
+    }
+
+    private readonly struct PaintCase
+    {
+        public PaintCase(int borderRadius, bool enabled, BootstrapVariant variant, Color customColor)
+        {
+            BorderRadius = borderRadius;
+            Enabled = enabled;
+            Variant = variant;
+            CustomColor = customColor;
+        }
+
+        public int BorderRadius { get; }
+        public bool Enabled { get; }
+        public BootstrapVariant Variant { get; }
+        public Color CustomColor { get; }
     }
 }

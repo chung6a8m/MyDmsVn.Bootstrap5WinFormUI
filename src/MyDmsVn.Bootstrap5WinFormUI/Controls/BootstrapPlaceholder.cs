@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -19,6 +20,7 @@ public class BootstrapPlaceholder : Control
     private Color _customColor = Color.Empty;
     private int _borderRadius;
     private TimeSpan _animationDuration = TimeSpan.FromSeconds(2);
+    private bool _themeSubscribed;
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
     private Font? _themeFont;
@@ -43,6 +45,8 @@ public class BootstrapPlaceholder : Control
         AccessibleRole = AccessibleRole.None;
         Cursor = Cursors.WaitCursor;
 
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
+        _themeSubscribed = true;
         ApplyThemeFont();
         ApplyPreferredSize();
     }
@@ -218,14 +222,78 @@ public class BootstrapPlaceholder : Control
     }
 
     /// <inheritdoc />
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        base.OnEnabledChanged(e);
+        Invalidate();
+    }
+
+    /// <inheritdoc />
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        if (ClientSize.Width <= 0 || ClientSize.Height <= 0)
+        {
+            return;
+        }
+
+        var theme = BootstrapThemeManager.CurrentTheme;
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var baseColor = BootstrapPlaceholderRenderLogic.ResolveBaseColor(theme.Colors, _variant, _customColor, Enabled);
+        var fillColor = BootstrapPlaceholderRenderLogic.ApplyOpacity(baseColor, BootstrapPlaceholderRenderLogic.OpacityMax);
+        var radius = BootstrapPlaceholderRenderLogic.GetRadius(theme.Metrics, _borderRadius, dpi);
+
+        using var brush = new SolidBrush(fillColor);
+        if (radius <= 0f)
+        {
+            e.Graphics.FillRectangle(brush, ClientRectangle);
+            return;
+        }
+
+        var previousSmoothing = e.Graphics.SmoothingMode;
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        try
+        {
+            using var path = RoundedPath.Create(ClientRectangle, new CornerRadius(radius));
+            e.Graphics.FillPath(brush, path);
+        }
+        finally
+        {
+            e.Graphics.SmoothingMode = previousSmoothing;
+        }
+    }
+
+    /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
+            if (_themeSubscribed)
+            {
+                BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+                _themeSubscribed = false;
+            }
+
             DisposeThemeFont();
         }
 
         base.Dispose(disposing);
+    }
+
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        if (_useThemeFont)
+        {
+            ApplyThemeFont();
+        }
+
+        ApplyPreferredSize();
+        Invalidate();
     }
 
     private void ApplyThemeFont()

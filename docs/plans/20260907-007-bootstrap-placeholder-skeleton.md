@@ -616,19 +616,19 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Consumes `BootstrapPlaceholderRenderLogic`, `BootstrapThemeManager`, `DpiScaler`, `CornerRadius`, and `RoundedPath`.
 - Produces no new public properties/events/methods.
 
-- [ ] **Step 1: Add failing tests** proving caller-assigned Font survives subsequent Light/Dark theme changes and is not disposed by Placeholder, while an untouched Placeholder follows current theme Body typography.
-- [ ] **Step 2: Add failing tests** proving theme-owned preferred size updates after a theme typography change, custom color/variant values survive theme change, and explicit bounds survive theme/DPI changes when `AutoSize=false`.
-- [ ] **Step 3: Add a failing paint smoke test** that renders the static `Animation=None` state into a small bitmap for square radius, theme radius, oversized radius, enabled/disabled, semantic and custom color without exception. Do not assert fragile full-image golden pixels.
-- [ ] **Step 4: Run focused UI tests with hang protection and verify RED.**
+- [x] **Step 1: Add failing tests** proving caller-assigned Font survives subsequent Light/Dark theme changes and is not disposed by Placeholder, while an untouched Placeholder follows current theme Body typography.
+- [x] **Step 2: Add failing tests** proving theme-owned preferred size updates after a theme typography change, custom color/variant values survive theme change, and explicit bounds survive theme/DPI changes when `AutoSize=false`.
+- [x] **Step 3: Add a failing paint smoke test** that renders the static `Animation=None` state into a small bitmap for square radius, theme radius, oversized radius, enabled/disabled, semantic and custom color without exception. Do not assert fragile full-image golden pixels.
+- [x] **Step 4: Run focused UI tests with hang protection and verify RED.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter BootstrapPlaceholderTests --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 5: Implement `OnPaint` for static state** using `ResolveBaseColor`, `ApplyOpacity(baseColor, OpacityMax)`, and `RoundedPath`. Keep all brushes/paths local `using` resources and restore `SmoothingMode` after rounded painting.
-- [ ] **Step 6: Implement theme subscription and Body-font ownership lifecycle** using the same value-equal Font ownership safeguard already used by themed controls. Add `OnFontChanged`, `OnAutoSizeChanged`, `OnEnabledChanged`, `OnDpiChangedAfterParent`, theme handler, and deterministic `Dispose(bool)` cleanup.
-- [ ] **Step 7: Run focused tests on both targets; verify GREEN.**
-- [ ] **Step 8: Commit** `feat: render themed placeholders`.
+- [x] **Step 5: Implement `OnPaint` for static state** using `ResolveBaseColor`, `ApplyOpacity(baseColor, OpacityMax)`, and `RoundedPath`. Keep all brushes/paths local `using` resources and restore `SmoothingMode` after rounded painting.
+- [x] **Step 6: Implement theme subscription and Body-font ownership lifecycle** using the same value-equal Font ownership safeguard already used by themed controls. Add `OnFontChanged`, `OnAutoSizeChanged`, `OnEnabledChanged`, `OnDpiChangedAfterParent`, theme handler, and deterministic `Dispose(bool)` cleanup.
+- [x] **Step 7: Run focused tests on both targets; verify GREEN.**
+- [x] **Step 8: Commit** `feat: render themed placeholders`.
 
 ### Task 4: Add Glow/Wave animation through BootstrapLoopAnimation only
 
