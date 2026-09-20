@@ -1,6 +1,6 @@
 # BootstrapListGroup Implementation Plan
 
-> **Status:** Proposed
+> **Status:** Completed (2026-09-20)
 > **Date:** 2026-09-07
 > **Scope:** Add a lightweight Bootstrap-inspired List Group composition control for WinForms without turning it into a second `ListView`.
 
@@ -1038,32 +1038,32 @@ In particular, focus/message-loop tests added for actionable item selectability 
 
 `BootstrapListGroup` is complete when all of the following are true:
 
-- [ ] `BootstrapListGroup` and `BootstrapListGroupItem` are public, documented controls.
-- [ ] Normal WinForms child ownership is preserved.
-- [ ] `Controls` child-index order is the source of truth for `Items`, layout, geometry, and navigation.
-- [ ] `Items` remains correct after add/remove/reparent and `Controls.SetChildIndex` reorder.
-- [ ] Vertical connected layout is stable.
-- [ ] Horizontal connected layout is stable.
-- [ ] Vertical `Flush` is supported and horizontal `Flush` behavior is explicitly documented/tested.
-- [ ] Group `BorderRadius` is the sole public radius override; no ambiguous item/group radius precedence exists.
-- [ ] The contextual-variant API is designer-safe and decided in Task 1 before downstream implementation.
-- [ ] Neutral and contextual semantic variants use shared theme infrastructure.
-- [ ] Active, disabled, hover, pressed, and focus states have deterministic precedence.
-- [ ] `Actionable` synchronizes both `TabStop` and actual WinForms selectability.
-- [ ] Actionable items can truly receive focus and support mouse, Enter, Space, and spatial keyboard navigation.
-- [ ] Tab navigation is not trapped.
-- [ ] Item activation never automatically changes `Active`.
-- [ ] Arbitrary rich content can be composed with normal child controls.
-- [ ] `BootstrapBadge` and `Label` can be embedded without creating dead click zones on actionable rows.
-- [ ] Interactive child controls retain their own semantics and do not spuriously activate the parent item.
-- [ ] Forwarded/direct activation raises item `Click` and parent `ItemClick` exactly once.
-- [ ] Theme switching updates the control live.
-- [ ] DPI scaling works across supported scale factors.
-- [ ] Theme/event/child-forwarding subscriptions are disposed correctly.
-- [ ] `net48` and `net8.0-windows` compatibility is preserved.
-- [ ] Demo covers basic, active/disabled, actionable/selectability, reorder, contextual, rich-content forwarding, interactive-child isolation, flush, horizontal, keyboard, and theme scenarios.
-- [ ] `docs/COMPONENTS.md` documents usage and control-selection boundaries.
-- [ ] Targeted tests, full tests, and full build pass.
+- [x] `BootstrapListGroup` and `BootstrapListGroupItem` are public, documented controls.
+- [x] Normal WinForms child ownership is preserved.
+- [x] `Controls` child-index order is the source of truth for `Items`, layout, geometry, and navigation.
+- [x] `Items` remains correct after add/remove/reparent and `Controls.SetChildIndex` reorder.
+- [x] Vertical connected layout is stable.
+- [x] Horizontal connected layout is stable.
+- [x] Vertical `Flush` is supported and horizontal `Flush` behavior is explicitly documented/tested.
+- [x] Group `BorderRadius` is the sole public radius override; no ambiguous item/group radius precedence exists.
+- [x] The contextual-variant API is designer-safe and decided in Task 1 before downstream implementation.
+- [x] Neutral and contextual semantic variants use shared theme infrastructure.
+- [x] Active, disabled, hover, pressed, and focus states have deterministic precedence.
+- [x] `Actionable` synchronizes both `TabStop` and actual WinForms selectability.
+- [x] Actionable items can truly receive focus and support mouse, Enter, Space, and spatial keyboard navigation.
+- [x] Tab navigation is not trapped.
+- [x] Item activation never automatically changes `Active`.
+- [x] Arbitrary rich content can be composed with normal child controls.
+- [x] `BootstrapBadge` and `Label` can be embedded without creating dead click zones on actionable rows.
+- [x] Interactive child controls retain their own semantics and do not spuriously activate the parent item.
+- [x] Forwarded/direct activation raises item `Click` and parent `ItemClick` exactly once.
+- [x] Theme switching updates the control live.
+- [x] DPI scaling works across supported scale factors.
+- [x] Theme/event/child-forwarding subscriptions are disposed correctly.
+- [x] `net48` and `net8.0-windows` compatibility is preserved.
+- [x] Demo covers basic, active/disabled, actionable/selectability, reorder, contextual, rich-content forwarding, interactive-child isolation, flush, horizontal, keyboard, and theme scenarios.
+- [x] `docs/COMPONENTS.md` documents usage and control-selection boundaries.
+- [x] Targeted tests, full tests, and full build pass.
 
 ## Implementation order
 
