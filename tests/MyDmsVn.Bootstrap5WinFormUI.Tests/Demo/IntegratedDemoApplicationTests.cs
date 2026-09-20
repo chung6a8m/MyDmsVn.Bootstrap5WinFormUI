@@ -29,6 +29,7 @@ public sealed class IntegratedDemoApplicationTests
         "Collapse / Accordion",
         "Loading / Spinner",
         "Progress",
+        "Breadcrumb",
         "Sidebar",
         "TreeView",
         "ListView",

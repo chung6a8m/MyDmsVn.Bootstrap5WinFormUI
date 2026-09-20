@@ -711,13 +711,13 @@ Use this only for links created from valid non-empty item text; add no product t
 - Demo uses only public Breadcrumb API.
 - Any trail mutation after `ItemClicked` is demo/application code, never hidden control behavior.
 
-- [ ] **Step 1: Write a failing demo smoke test** that constructs `BreadcrumbDemoForm`, finds multiple Breadcrumb examples, and verifies `MainForm` integrated navigation contains Breadcrumb.
-- [ ] **Step 2: Implement demo scenarios:** one current item; `Home / Library / Data`; deep/long hierarchy; `>` divider; empty divider; constrained wrapping with `MaximumSize = new Size(320, 0)`; RTL with `<`; disabled Breadcrumb; live non-empty item Text mutation; and output label showing clicked index/text/tag.
-- [ ] **Step 3: Add one interactive scenario whose Form-level `ItemClicked` handler trims/replaces `Items` to simulate navigation.** Comment demo code to make caller ownership explicit.
-- [ ] **Step 4: Add Breadcrumb to `MainForm` near other navigation controls with concise description of hierarchy links/current item/divider/wrap/RTL/native keyboard behavior.**
-- [ ] **Step 5: Build demo for `net8.0-windows`; verify zero compile errors.**
-- [ ] **Step 6: Run `BreadcrumbDemoFormTests` with hang protection; verify GREEN.**
-- [ ] **Step 7: Commit** `demo: add BootstrapBreadcrumb scenarios`.
+- [x] **Step 1: Write a failing demo smoke test** that constructs `BreadcrumbDemoForm`, finds multiple Breadcrumb examples, and verifies `MainForm` integrated navigation contains Breadcrumb.
+- [x] **Step 2: Implement demo scenarios:** one current item; `Home / Library / Data`; deep/long hierarchy; `>` divider; empty divider; constrained wrapping with `MaximumSize = new Size(320, 0)`; RTL with `<`; disabled Breadcrumb; live non-empty item Text mutation; and output label showing clicked index/text/tag.
+- [x] **Step 3: Add one interactive scenario whose Form-level `ItemClicked` handler trims/replaces `Items` to simulate navigation.** Comment demo code to make caller ownership explicit.
+- [x] **Step 4: Add Breadcrumb to `MainForm` near other navigation controls with concise description of hierarchy links/current item/divider/wrap/RTL/native keyboard behavior.**
+- [x] **Step 5: Build demo for `net8.0-windows`; verify zero compile errors.**
+- [x] **Step 6: Run `BreadcrumbDemoFormTests` with hang protection; verify GREEN.**
+- [x] **Step 7: Commit** `demo: add BootstrapBreadcrumb scenarios`.
 
 ### Task 6: Finalize docs and deliberately approve the API addition
 

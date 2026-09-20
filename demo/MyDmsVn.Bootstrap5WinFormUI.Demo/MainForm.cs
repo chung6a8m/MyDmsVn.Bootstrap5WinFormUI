@@ -277,6 +277,11 @@ public sealed class MainForm : DemoFormBase
             () => new ProgressDemoForm());
 
         AddPage(
+            "Breadcrumb",
+            "Hierarchy ancestors as native links, a current item, configurable dividers, width-constrained wrapping, RTL flow, and native keyboard behavior.",
+            () => new BreadcrumbDemoForm());
+
+        AddPage(
             "Sidebar",
             "Expanded/collapsed navigation, selection, icons, badges, disabled items, nested sections, and keyboard use.",
             () => new SidebarDemoForm());
