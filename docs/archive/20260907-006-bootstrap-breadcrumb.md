@@ -1,5 +1,6 @@
 # BootstrapBreadcrumb Implementation Plan
 
+> **Status:** Completed (2026-09-21)
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a Bootstrap-inspired `BootstrapBreadcrumb` navigation control that represents an ordered hierarchy, renders ancestor items as native WinForms links, renders the last item as the current location, supports configurable dividers, deterministic wrapping and RTL layout, and preserves native keyboard/accessibility behavior without inventing a custom focus or navigation engine.
@@ -805,8 +806,8 @@ Expected: zero errors.
 Expected: both targets pass with no hang timeout, modal dialog, or blame dump.
 
 - [x] **Step 4: Search Breadcrumb product files for prohibited infrastructure.** Confirm no `Timer`, `Task.Delay`, `Thread.Sleep`, `MessageBox.Show`, `ShowDialog`, `Application.AddMessageFilter`, global hook, top-level window, routing/data-source dependency, custom link hit-test engine, or external icon package.
-- [ ] **Step 5: Run demo/manual checks:** 0/1/2/many items; reject blank item text; mouse; Tab/Shift+Tab; native Enter activation; visible focus; live text change while an ancestor is focused; current item non-focusability; custom/empty divider; long text; `MaximumSize` wrapping; parent-constrained wrapping; repeated resize; LTR/RTL; disabled parent; Light/Dark; caller font; 100/125/150/175/200% Windows scaling.
-- [ ] **Step 6: Accessibility smoke check** with Narrator or Windows accessibility inspection: ancestor links expose full non-empty names; current item is understandable as current/non-link; dividers are not actionable; focus order contains only ancestors.
+- [x] **Step 5: Run demo/manual checks:** 0/1/2/many items; reject blank item text; mouse; Tab/Shift+Tab; native Enter activation; visible focus; live text change while an ancestor is focused; current item non-focusability; custom/empty divider; long text; `MaximumSize` wrapping; parent-constrained wrapping; repeated resize; LTR/RTL; disabled parent; Light/Dark; caller font; 100/125/150/175/200% Windows scaling. Confirmed by the user on 2026-09-21.
+- [x] **Step 6: Accessibility smoke check** with Narrator or Windows accessibility inspection: ancestor links expose full non-empty names; current item is understandable as current/non-link; dividers are not actionable; focus order contains only ancestors. Confirmed by the user on 2026-09-21.
 - [x] **Step 7: Verify stale-generation safety manually/diagnostically:** structural rebuild while retaining same item objects never permits old generated links to raise `ItemClicked`; current generated links remain functional.
 - [x] **Step 8: Verify ownership boundary:** activating an ancestor without application handler leaves trail unchanged; demo handler that simulates navigation changes `Items` itself.
 - [x] **Step 9: If verification requires code changes, rerun Steps 1-8 and commit** `fix: harden BootstrapBreadcrumb verification`. **If no fixes are required, do not create an empty commit.**
