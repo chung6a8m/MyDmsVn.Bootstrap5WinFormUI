@@ -384,12 +384,12 @@ public class BootstrapListGroup : Panel
             item.ApplyConnectedGeometry(corners, _orientation == Orientation.Vertical && _flush);
             if (_orientation == Orientation.Vertical)
             {
-                item.Bounds = new Rectangle(x, y, availableWidth, Math.Max(0, preferred.Height));
+                item.ApplyGroupLayoutBounds(new Rectangle(x, y, availableWidth, Math.Max(0, preferred.Height)));
                 y += Math.Max(0, item.Height - (index < visible.Count - 1 ? overlap : 0));
             }
             else
             {
-                item.Bounds = new Rectangle(x, y, Math.Max(0, preferred.Width), Math.Max(0, preferred.Height));
+                item.ApplyGroupLayoutBounds(new Rectangle(x, y, Math.Max(0, preferred.Width), Math.Max(0, preferred.Height)));
                 x += Math.Max(0, item.Width - (index < visible.Count - 1 ? overlap : 0));
             }
         }

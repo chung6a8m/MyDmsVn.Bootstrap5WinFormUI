@@ -207,6 +207,51 @@ public sealed class BootstrapListGroupTests
     }
 
     [Test]
+    public void VerticalLayoutPreservesExplicitItemHeightWhenAutoSizeIsDisabled()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Size = new Size(240, 200)
+        };
+        using var item = new BootstrapListGroupItem
+        {
+            AutoSize = false,
+            Size = new Size(180, 96),
+            Text = "Short"
+        };
+        group.Controls.Add(item);
+        group.PerformLayout();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(item.Width, Is.EqualTo(group.ClientSize.Width));
+            Assert.That(item.Height, Is.EqualTo(96));
+        }));
+    }
+
+    [Test]
+    public void HorizontalLayoutPreservesExplicitItemSizeWhenAutoSizeIsDisabled()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Orientation = Orientation.Horizontal,
+            Size = new Size(480, 160)
+        };
+        using var item = new BootstrapListGroupItem
+        {
+            AutoSize = false,
+            Size = new Size(180, 96),
+            Text = "Short"
+        };
+        group.Controls.Add(item);
+        group.PerformLayout();
+
+        Assert.That(item.Size, Is.EqualTo(new Size(180, 96)));
+    }
+
+    [Test]
     public void RichChildRuntimeGeometryChangesRelayoutTheOwningGroup()
     {
         using var group = new BootstrapListGroup
@@ -266,6 +311,66 @@ public sealed class BootstrapListGroupTests
         child.Text = "A much longer rich-content label that requires additional horizontal space";
 
         Assert.That(item.Width, Is.GreaterThan(baselineItemWidth));
+    }
+
+    [Test]
+    public void RichChildAnchorChangesRelayoutTheOwningGroup()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Orientation = Orientation.Horizontal,
+            Size = new Size(480, 120)
+        };
+        using var item = new BootstrapListGroupItem();
+        using var child = new Label
+        {
+            AutoSize = false,
+            Bounds = new Rectangle(100, 8, 20, 20),
+            Text = "Rich content"
+        };
+        item.Controls.Add(child);
+        group.Controls.Add(item);
+        group.PerformLayout();
+        var leftAnchoredWidth = item.Width;
+
+        child.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+
+        Assert.That(item.Width, Is.LessThan(leftAnchoredWidth));
+    }
+
+    [Test]
+    public void RichChildDockChangesRelayoutWithoutIncidentalBoundsEvents()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Orientation = Orientation.Horizontal,
+            Size = new Size(480, 120)
+        };
+        using var item = new BootstrapListGroupItem();
+        using var child = new Label
+        {
+            AutoSize = false,
+            Bounds = new Rectangle(100, 8, 20, 20),
+            Text = "Rich content"
+        };
+        item.Controls.Add(child);
+        group.Controls.Add(item);
+        group.PerformLayout();
+        var undockedWidth = item.Width;
+
+        item.SuspendLayout();
+        try
+        {
+            child.Dock = DockStyle.Right;
+
+            Assert.That(item.Width, Is.LessThan(undockedWidth));
+        }
+        finally
+        {
+            item.ResumeLayout(false);
+        }
     }
 
     [Test]

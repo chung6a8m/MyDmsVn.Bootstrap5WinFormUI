@@ -31,6 +31,9 @@ public class BootstrapListGroupItem : Panel
     private Control? _forwardingPressedControl;
     private readonly HashSet<Control> _trackedDescendants = new HashSet<Control>();
     private string? _automaticAccessibleName;
+    private Size _explicitMinimumSize;
+    private bool _trackExplicitSize;
+    private bool _applyingGroupLayoutBounds;
 
     /// <summary>Initializes a neutral, presentational list-group item.</summary>
     public BootstrapListGroupItem()
@@ -53,6 +56,10 @@ public class BootstrapListGroupItem : Panel
         _themeSubscribed = true;
         ApplyThemeFont();
         UpdateResolvedForeground();
+        _trackExplicitSize = true;
+        Layout += OnItemLayout;
+        AutoSizeChanged += OnItemAutoSizeChanged;
+        SizeChanged += OnItemSizeChanged;
     }
 
     /// <summary>Gets or sets the application-owned active presentation state.</summary>
@@ -145,7 +152,25 @@ public class BootstrapListGroupItem : Panel
             contentSize.Width = Math.Max(contentSize.Width, GetHorizontalContentExtent(child, preferred));
             contentSize.Height = Math.Max(contentSize.Height, GetVerticalContentExtent(child, preferred));
         }
-        return BootstrapListGroupRenderLogic.GetPreferredSize(textSize, contentSize, padding);
+        var contentPreferred = BootstrapListGroupRenderLogic.GetPreferredSize(textSize, contentSize, padding);
+        return AutoSize
+            ? contentPreferred
+            : new Size(
+                Math.Max(contentPreferred.Width, _explicitMinimumSize.Width),
+                Math.Max(contentPreferred.Height, _explicitMinimumSize.Height));
+    }
+
+    internal void ApplyGroupLayoutBounds(Rectangle bounds)
+    {
+        _applyingGroupLayoutBounds = true;
+        try
+        {
+            Bounds = bounds;
+        }
+        finally
+        {
+            _applyingGroupLayoutBounds = false;
+        }
     }
 
     internal void ApplyConnectedGeometry(CornerRadius corners, bool flushVertical)
@@ -388,6 +413,9 @@ public class BootstrapListGroupItem : Panel
     {
         if (disposing)
         {
+            Layout -= OnItemLayout;
+            AutoSizeChanged -= OnItemAutoSizeChanged;
+            SizeChanged -= OnItemSizeChanged;
             foreach (var descendant in new List<Control>(_trackedDescendants)) UntrackDescendant(descendant);
             if (_themeSubscribed) { BootstrapThemeManager.ThemeChanged -= OnThemeChanged; _themeSubscribed = false; }
             DisposeThemeFont();
@@ -545,12 +573,14 @@ public class BootstrapListGroupItem : Panel
         if (!_trackedDescendants.Add(control)) return;
         control.ControlAdded += OnDescendantControlAdded;
         control.ControlRemoved += OnDescendantControlRemoved;
+        control.Layout += OnDescendantLayout;
         control.LocationChanged += OnDescendantPreferredSizeChanged;
         control.SizeChanged += OnDescendantPreferredSizeChanged;
         control.VisibleChanged += OnDescendantPreferredSizeChanged;
         control.TextChanged += OnDescendantPreferredSizeChanged;
         control.FontChanged += OnDescendantPreferredSizeChanged;
         control.PaddingChanged += OnDescendantPreferredSizeChanged;
+        control.DockChanged += OnDescendantPreferredSizeChanged;
         if (IsDecorativeForwardingSurface(control))
         {
             control.MouseEnter += OnDecorativeMouseEnter;
@@ -567,12 +597,14 @@ public class BootstrapListGroupItem : Panel
         if (!_trackedDescendants.Remove(control)) return;
         control.ControlAdded -= OnDescendantControlAdded;
         control.ControlRemoved -= OnDescendantControlRemoved;
+        control.Layout -= OnDescendantLayout;
         control.LocationChanged -= OnDescendantPreferredSizeChanged;
         control.SizeChanged -= OnDescendantPreferredSizeChanged;
         control.VisibleChanged -= OnDescendantPreferredSizeChanged;
         control.TextChanged -= OnDescendantPreferredSizeChanged;
         control.FontChanged -= OnDescendantPreferredSizeChanged;
         control.PaddingChanged -= OnDescendantPreferredSizeChanged;
+        control.DockChanged -= OnDescendantPreferredSizeChanged;
         control.MouseEnter -= OnDecorativeMouseEnter;
         control.MouseDown -= OnDecorativeMouseDown;
         control.MouseUp -= OnDecorativeMouseUp;
@@ -621,6 +653,46 @@ public class BootstrapListGroupItem : Panel
     }
 
     private void OnDescendantPreferredSizeChanged(object? sender, EventArgs e) => RequestOwningLayout();
+
+    private void OnItemLayout(object? sender, LayoutEventArgs e)
+    {
+        if (IsAnchorOrDockLayout(e))
+        {
+            RequestOwningLayout();
+        }
+    }
+
+    private void OnItemAutoSizeChanged(object? sender, EventArgs e)
+    {
+        if (_trackExplicitSize && !AutoSize && !_applyingGroupLayoutBounds)
+        {
+            _explicitMinimumSize = Size;
+        }
+
+        RequestOwningLayout();
+    }
+
+    private void OnItemSizeChanged(object? sender, EventArgs e)
+    {
+        if (_trackExplicitSize && !AutoSize && !_applyingGroupLayoutBounds)
+        {
+            _explicitMinimumSize = Size;
+        }
+    }
+
+    private void OnDescendantLayout(object? sender, LayoutEventArgs e)
+    {
+        if (IsAnchorOrDockLayout(e))
+        {
+            RequestOwningLayout();
+        }
+    }
+
+    private static bool IsAnchorOrDockLayout(LayoutEventArgs e)
+    {
+        return e.AffectedControl is not null &&
+            (e.AffectedProperty == nameof(Control.Anchor) || e.AffectedProperty == nameof(Control.Dock));
+    }
 
     private void RequestOwningLayout()
     {
