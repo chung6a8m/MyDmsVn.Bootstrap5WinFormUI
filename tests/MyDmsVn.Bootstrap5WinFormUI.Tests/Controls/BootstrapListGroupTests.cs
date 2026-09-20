@@ -242,6 +242,60 @@ public sealed class BootstrapListGroupTests
     }
 
     [Test]
+    public void DockedRichChildHasStableBoundsAcrossRepeatedLayoutPasses()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Size = new Size(240, 200)
+        };
+        using var item = new BootstrapListGroupItem();
+        var child = new Label
+        {
+            AutoSize = false,
+            Dock = DockStyle.Fill,
+            Text = "Docked rich content"
+        };
+        item.Controls.Add(child);
+        group.Controls.Add(item);
+        group.PerformLayout();
+        var stableBounds = item.Bounds;
+
+        for (var pass = 0; pass < 5; pass++)
+        {
+            group.PerformLayout();
+            Assert.That(item.Bounds, Is.EqualTo(stableBounds));
+        }
+    }
+
+    [Test]
+    public void StretchAnchoredRichChildHasStableBoundsAcrossRepeatedLayoutPasses()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Size = new Size(240, 200)
+        };
+        using var item = new BootstrapListGroupItem();
+        var child = new Label
+        {
+            Anchor = AnchorStyles.Top | AnchorStyles.Bottom,
+            Bounds = new Rectangle(8, 6, 100, 20),
+            Text = "Stretch anchored content"
+        };
+        item.Controls.Add(child);
+        group.Controls.Add(item);
+        group.PerformLayout();
+        var stableBounds = item.Bounds;
+
+        for (var pass = 0; pass < 5; pass++)
+        {
+            group.PerformLayout();
+            Assert.That(item.Bounds, Is.EqualTo(stableBounds));
+        }
+    }
+
+    [Test]
     public void NavigationUsesCurrentControlOrderAndSkipsIneligibleItems()
     {
         using var form = new Form { ShowInTaskbar = false };

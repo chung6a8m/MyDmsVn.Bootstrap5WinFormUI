@@ -51,6 +51,7 @@ public class BootstrapListGroupItem : Panel
         BootstrapThemeManager.ThemeChanged += OnThemeChanged;
         _themeSubscribed = true;
         ApplyThemeFont();
+        UpdateResolvedForeground();
     }
 
     /// <summary>Gets or sets the application-owned active presentation state.</summary>
@@ -59,7 +60,17 @@ public class BootstrapListGroupItem : Panel
     public bool Active
     {
         get => _active;
-        set { if (_active != value) { _active = value; Invalidate(); } }
+        set
+        {
+            if (_active == value)
+            {
+                return;
+            }
+
+            _active = value;
+            UpdateResolvedForeground();
+            Invalidate();
+        }
     }
 
     /// <summary>Gets or sets whether the item itself is a selectable activation target.</summary>
@@ -80,6 +91,7 @@ public class BootstrapListGroupItem : Panel
                 ClearPressedState();
             }
             UpdateStyles();
+            UpdateResolvedForeground();
             Invalidate();
         }
     }
@@ -96,6 +108,7 @@ public class BootstrapListGroupItem : Panel
                 throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported Bootstrap variant.");
             if (_variant == value) return;
             _variant = value;
+            UpdateResolvedForeground();
             Invalidate();
         }
     }
@@ -127,8 +140,9 @@ public class BootstrapListGroupItem : Panel
         foreach (Control child in Controls)
         {
             if (!child.Visible) continue;
-            contentSize.Width = Math.Max(contentSize.Width, child.Right);
-            contentSize.Height = Math.Max(contentSize.Height, child.Bottom);
+            var preferred = child.GetPreferredSize(Size.Empty);
+            contentSize.Width = Math.Max(contentSize.Width, GetHorizontalContentExtent(child, preferred));
+            contentSize.Height = Math.Max(contentSize.Height, GetVerticalContentExtent(child, preferred));
         }
         return BootstrapListGroupRenderLogic.GetPreferredSize(textSize, contentSize, padding);
     }
@@ -171,7 +185,12 @@ public class BootstrapListGroupItem : Panel
     protected override void OnPaddingChanged(EventArgs e) { base.OnPaddingChanged(e); PerformLayout(); Invalidate(); }
 
     /// <inheritdoc />
-    protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        base.OnEnabledChanged(e);
+        UpdateResolvedForeground();
+        Invalidate();
+    }
 
     /// <inheritdoc />
     protected override void OnControlAdded(ControlEventArgs e)
@@ -193,7 +212,12 @@ public class BootstrapListGroupItem : Panel
     protected override void OnMouseEnter(EventArgs e)
     {
         base.OnMouseEnter(e);
-        if (_actionable && Enabled) { _hovered = true; Invalidate(); }
+        if (_actionable && Enabled)
+        {
+            _hovered = true;
+            UpdateResolvedForeground();
+            Invalidate();
+        }
     }
 
     /// <inheritdoc />
@@ -201,6 +225,7 @@ public class BootstrapListGroupItem : Panel
     {
         base.OnMouseLeave(e);
         _hovered = false;
+        UpdateResolvedForeground();
         if (!_pressed) Invalidate();
     }
 
@@ -213,6 +238,7 @@ public class BootstrapListGroupItem : Panel
             Focus();
             _pressed = true;
             Capture = true;
+            UpdateResolvedForeground();
             Invalidate();
         }
     }
@@ -224,6 +250,7 @@ public class BootstrapListGroupItem : Panel
         _pressed = false;
         Capture = false;
         base.OnMouseUp(e);
+        UpdateResolvedForeground();
         Invalidate();
         if (activate) ActivateItem();
     }
@@ -232,7 +259,12 @@ public class BootstrapListGroupItem : Panel
     protected override void OnMouseCaptureChanged(EventArgs e)
     {
         base.OnMouseCaptureChanged(e);
-        if (!Capture && _pressed) { _pressed = false; Invalidate(); }
+        if (!Capture && _pressed)
+        {
+            _pressed = false;
+            UpdateResolvedForeground();
+            Invalidate();
+        }
     }
 
     /// <inheritdoc />
@@ -270,6 +302,7 @@ public class BootstrapListGroupItem : Panel
         {
             _spacePressed = true;
             _pressed = true;
+            UpdateResolvedForeground();
             Invalidate();
             e.Handled = true;
             e.SuppressKeyPress = true;
@@ -284,6 +317,7 @@ public class BootstrapListGroupItem : Panel
         {
             _spacePressed = false;
             _pressed = false;
+            UpdateResolvedForeground();
             Invalidate();
             ActivateItem();
             e.Handled = true;
@@ -309,8 +343,7 @@ public class BootstrapListGroupItem : Panel
         if (ClientSize.Width <= 0 || ClientSize.Height <= 0) return;
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
-        var state = BootstrapListGroupRenderLogic.ResolveState(Enabled, _active, _actionable, _pressed, _hovered);
-        var palette = BootstrapListGroupRenderLogic.ResolvePalette(theme.Colors, _variant, state);
+        var palette = ResolveCurrentPalette(theme.Colors);
         var radius = BootstrapListGroupRenderLogic.ResolveRadius(theme.Metrics, -1, dpi);
         var corners = _connectedCorners ?? new CornerRadius(radius);
         var borderWidth = Math.Max(1, DpiScaler.Scale(theme.Metrics.BorderWidth, dpi));
@@ -365,6 +398,7 @@ public class BootstrapListGroupItem : Panel
     {
         if (IsDisposed) return;
         if (_useThemeFont) ApplyThemeFont();
+        UpdateResolvedForeground();
         PerformLayout();
         Invalidate();
     }
@@ -414,10 +448,85 @@ public class BootstrapListGroupItem : Panel
 
     private void ClearPressedState()
     {
+        var stateChanged = _pressed || _spacePressed;
         _pressed = false;
         _spacePressed = false;
         _forwardingPressedControl = null;
         if (Capture) Capture = false;
+        if (stateChanged)
+        {
+            UpdateResolvedForeground();
+        }
+    }
+
+    private BootstrapListGroupPalette ResolveCurrentPalette(BootstrapThemeColors colors)
+    {
+        var state = BootstrapListGroupRenderLogic.ResolveState(Enabled, _active, _actionable, _pressed, _hovered);
+        return BootstrapListGroupRenderLogic.ResolvePalette(colors, _variant, state);
+    }
+
+    private void UpdateResolvedForeground()
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        var foreground = ResolveCurrentPalette(BootstrapThemeManager.CurrentTheme.Colors).Foreground;
+        if (ForeColor != foreground)
+        {
+            ForeColor = foreground;
+        }
+    }
+
+    private static int GetHorizontalContentExtent(Control child, Size preferred)
+    {
+        switch (child.Dock)
+        {
+            case DockStyle.Fill:
+            case DockStyle.Top:
+            case DockStyle.Bottom:
+                return Math.Max(0, preferred.Width);
+            case DockStyle.Left:
+            case DockStyle.Right:
+                return Math.Max(0, child.Width);
+        }
+
+        var anchoredLeft = (child.Anchor & AnchorStyles.Left) == AnchorStyles.Left;
+        var anchoredRight = (child.Anchor & AnchorStyles.Right) == AnchorStyles.Right;
+        if (anchoredLeft && anchoredRight)
+        {
+            return Math.Max(0, child.Left) + Math.Max(0, preferred.Width);
+        }
+
+        return anchoredRight
+            ? Math.Max(0, child.Width)
+            : Math.Max(0, child.Right);
+    }
+
+    private static int GetVerticalContentExtent(Control child, Size preferred)
+    {
+        switch (child.Dock)
+        {
+            case DockStyle.Fill:
+            case DockStyle.Left:
+            case DockStyle.Right:
+                return Math.Max(0, preferred.Height);
+            case DockStyle.Top:
+            case DockStyle.Bottom:
+                return Math.Max(0, child.Height);
+        }
+
+        var anchoredTop = (child.Anchor & AnchorStyles.Top) == AnchorStyles.Top;
+        var anchoredBottom = (child.Anchor & AnchorStyles.Bottom) == AnchorStyles.Bottom;
+        if (anchoredTop && anchoredBottom)
+        {
+            return Math.Max(0, child.Top) + Math.Max(0, preferred.Height);
+        }
+
+        return anchoredBottom
+            ? Math.Max(0, child.Height)
+            : Math.Max(0, child.Bottom);
     }
 
     private void TrackDescendant(Control control)

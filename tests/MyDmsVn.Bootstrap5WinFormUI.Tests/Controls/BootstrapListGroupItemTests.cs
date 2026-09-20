@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Controls.Internal;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
@@ -363,6 +364,59 @@ public sealed class BootstrapListGroupItemTests
         }
 
         Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baseline));
+    }
+
+    [Test]
+    public void PlainRichContentInheritsResolvedForegroundWithoutOverridingExplicitColor()
+    {
+        var original = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            var darkTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+            BootstrapThemeManager.CurrentTheme = darkTheme;
+            using var item = new BootstrapListGroupItem();
+            var inheritedLabel = new Label();
+            var explicitLabel = new Label { ForeColor = Color.Magenta };
+            item.Controls.Add(inheritedLabel);
+            item.Controls.Add(explicitLabel);
+            var neutralForeground = BootstrapListGroupRenderLogic.ResolvePalette(
+                darkTheme.Colors,
+                null,
+                BootstrapListGroupVisualState.Neutral).Foreground;
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(item.ForeColor, Is.EqualTo(neutralForeground));
+                Assert.That(inheritedLabel.ForeColor, Is.EqualTo(neutralForeground));
+                Assert.That(explicitLabel.ForeColor, Is.EqualTo(Color.Magenta));
+            }));
+
+            var lightTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+            BootstrapThemeManager.CurrentTheme = lightTheme;
+            var lightNeutralForeground = BootstrapListGroupRenderLogic.ResolvePalette(
+                lightTheme.Colors,
+                null,
+                BootstrapListGroupVisualState.Neutral).Foreground;
+            Assert.That(inheritedLabel.ForeColor, Is.EqualTo(lightNeutralForeground));
+
+            item.Active = true;
+            var activeForeground = BootstrapListGroupRenderLogic.ResolvePalette(
+                lightTheme.Colors,
+                null,
+                BootstrapListGroupVisualState.Active).Foreground;
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(item.ForeColor, Is.EqualTo(activeForeground));
+                Assert.That(inheritedLabel.ForeColor, Is.EqualTo(activeForeground));
+                Assert.That(activeForeground, Is.Not.EqualTo(lightNeutralForeground));
+                Assert.That(explicitLabel.ForeColor, Is.EqualTo(Color.Magenta));
+            }));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = original;
+        }
     }
 
     private static int GetThemeSubscriptionCount()
