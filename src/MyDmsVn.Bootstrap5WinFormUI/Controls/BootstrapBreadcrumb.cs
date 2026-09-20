@@ -27,6 +27,7 @@ public class BootstrapBreadcrumb : Panel
     private bool _performingBreadcrumbLayout;
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
+    private bool _themeSubscribed;
     private Font? _themeFont;
 
     /// <summary>Initializes a designer-safe empty breadcrumb using the current application theme.</summary>
@@ -46,6 +47,8 @@ public class BootstrapBreadcrumb : Panel
             RebuildGeneratedChildren,
             UpdateGeneratedItemText);
         ApplyThemeFont();
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
+        _themeSubscribed = true;
     }
 
     /// <summary>Gets the caller-owned logical items in root-to-current order.</summary>
@@ -226,6 +229,13 @@ public class BootstrapBreadcrumb : Panel
     {
         if (disposing)
         {
+            if (_themeSubscribed)
+            {
+                BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+                _themeSubscribed = false;
+            }
+
+            Items.DetachOwner();
             DisposeGeneratedChildren();
             DisposeThemeFont();
         }
@@ -259,6 +269,7 @@ public class BootstrapBreadcrumb : Panel
                 {
                     var link = CreateAncestorLink(item);
                     _activeLinks.Add(link, item);
+                    link.LinkClicked += OnGeneratedLinkClicked;
                     itemControl = link;
                 }
                 else
@@ -283,6 +294,11 @@ public class BootstrapBreadcrumb : Panel
 
     private void DisposeGeneratedChildren()
     {
+        foreach (var link in _activeLinks.Keys)
+        {
+            link.LinkClicked -= OnGeneratedLinkClicked;
+        }
+
         _activeLinks.Clear();
         _itemControls.Clear();
         _dividerControls.Clear();
@@ -412,6 +428,11 @@ public class BootstrapBreadcrumb : Panel
     private BootstrapBreadcrumbLayoutMetrics ResolveLayoutMetrics()
     {
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        return ResolveLayoutMetrics(dpi);
+    }
+
+    private static BootstrapBreadcrumbLayoutMetrics ResolveLayoutMetrics(int dpi)
+    {
         var themeMetrics = BootstrapThemeManager.CurrentTheme.Metrics;
         return new BootstrapBreadcrumbLayoutMetrics(
             DpiScaler.Scale(themeMetrics.SpacingSM, dpi),
@@ -447,6 +468,40 @@ public class BootstrapBreadcrumb : Panel
     private void RaiseItemClicked(BootstrapBreadcrumbItem item, int index)
     {
         ItemClicked?.Invoke(this, new BootstrapBreadcrumbItemClickedEventArgs(item, index));
+    }
+
+    private void OnGeneratedLinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
+    {
+        if (sender is not LinkLabel link ||
+            !_activeLinks.TryGetValue(link, out var item))
+        {
+            return;
+        }
+
+        var index = Items.IndexOf(item);
+        if (index < 0 || index >= Items.Count - 1)
+        {
+            return;
+        }
+
+        RaiseItemClicked(item, index);
+    }
+
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        if (_useThemeFont)
+        {
+            ApplyThemeFont();
+        }
+
+        ApplyChildColors();
+        PerformLayout();
+        Invalidate();
     }
 
     private void ApplyThemeFont()

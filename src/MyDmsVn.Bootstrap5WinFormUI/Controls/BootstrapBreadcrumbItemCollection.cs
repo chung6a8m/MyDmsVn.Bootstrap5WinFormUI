@@ -8,8 +8,8 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 /// </summary>
 public sealed class BootstrapBreadcrumbItemCollection : Collection<BootstrapBreadcrumbItem>
 {
-    private readonly Action _structureChanged;
-    private readonly Action<BootstrapBreadcrumbItem> _itemTextChanged;
+    private Action? _structureChanged;
+    private Action<BootstrapBreadcrumbItem>? _itemTextChanged;
 
     internal BootstrapBreadcrumbItemCollection(
         Action structureChanged,
@@ -26,8 +26,12 @@ public sealed class BootstrapBreadcrumbItemCollection : Collection<BootstrapBrea
         ThrowIfDuplicate(item, ignoredIndex: -1);
 
         base.InsertItem(index, item);
-        item.TextChangedForOwner += OnItemTextChanged;
-        _structureChanged();
+        if (_itemTextChanged is not null)
+        {
+            item.TextChangedForOwner += OnItemTextChanged;
+        }
+
+        _structureChanged?.Invoke();
     }
 
     /// <inheritdoc />
@@ -43,8 +47,12 @@ public sealed class BootstrapBreadcrumbItemCollection : Collection<BootstrapBrea
         ThrowIfDuplicate(item, index);
         base.SetItem(index, item);
         previous.TextChangedForOwner -= OnItemTextChanged;
-        item.TextChangedForOwner += OnItemTextChanged;
-        _structureChanged();
+        if (_itemTextChanged is not null)
+        {
+            item.TextChangedForOwner += OnItemTextChanged;
+        }
+
+        _structureChanged?.Invoke();
     }
 
     /// <inheritdoc />
@@ -53,7 +61,7 @@ public sealed class BootstrapBreadcrumbItemCollection : Collection<BootstrapBrea
         var removed = this[index];
         base.RemoveItem(index);
         removed.TextChangedForOwner -= OnItemTextChanged;
-        _structureChanged();
+        _structureChanged?.Invoke();
     }
 
     /// <inheritdoc />
@@ -73,7 +81,18 @@ public sealed class BootstrapBreadcrumbItemCollection : Collection<BootstrapBrea
             item.TextChangedForOwner -= OnItemTextChanged;
         }
 
-        _structureChanged();
+        _structureChanged?.Invoke();
+    }
+
+    internal void DetachOwner()
+    {
+        foreach (var item in this)
+        {
+            item.TextChangedForOwner -= OnItemTextChanged;
+        }
+
+        _structureChanged = null;
+        _itemTextChanged = null;
     }
 
     private static void ValidateItem(BootstrapBreadcrumbItem item)
@@ -101,7 +120,7 @@ public sealed class BootstrapBreadcrumbItemCollection : Collection<BootstrapBrea
     {
         if (sender is BootstrapBreadcrumbItem item)
         {
-            _itemTextChanged(item);
+            _itemTextChanged?.Invoke(item);
         }
     }
 }

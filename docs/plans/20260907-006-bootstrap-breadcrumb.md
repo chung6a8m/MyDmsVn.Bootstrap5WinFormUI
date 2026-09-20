@@ -667,7 +667,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Breadcrumb has exactly one theme subscription and at most one framework-owned font.
 - No timer, animation, custom focus engine, message filter, or custom accessibility tree.
 
-- [ ] **Step 1: Add deterministic LinkClicked test helper inside test file** using reflection to invoke protected `LinkLabel.OnLinkClicked` rather than `SendKeys` or sleeps:
+- [x] **Step 1: Add deterministic LinkClicked test helper inside test file** using reflection to invoke protected `LinkLabel.OnLinkClicked` rather than `SendKeys` or sleeps:
 
 ```csharp
 private static void Activate(LinkLabel link)
@@ -685,20 +685,20 @@ private static void Activate(LinkLabel link)
 
 Use this only for links created from valid non-empty item text; add no product test hook.
 
-- [ ] **Step 2: Add failing ItemClicked tests** for first/middle links: exactly one event, correct item/index, unchanged Items/final item, and no current/divider activation path.
-- [ ] **Step 3: Add a reentrancy test** whose handler clears/replaces `Items`; event args remain stable and resulting child tree matches caller mutation with no duplicate event.
-- [ ] **Step 4: Add critical stale-generation regression test:** create `Home / Library / Data`, capture old `Home` LinkLabel, structurally rebuild while keeping same `Home` item as a current ancestor, verify old link is disposed/detached, invoke its former protected activation path, and assert `ItemClicked` remains zero. Then activate new current-generation Home link and assert one event.
-- [ ] **Step 5: Add hosted STA focus/tab tests** proving only ancestor links are tabbable, text mutation preserves focused link instance/focus, and parent `Enabled=false` prevents effective native interaction without mutating item data.
-- [ ] **Step 6: Add accessibility tests** for full ancestor names, current `"Current page."` description, container Grouping/Name/Description, divider `AccessibleRole.None`, and empty divider accessible name/description.
-- [ ] **Step 7: Add divider/RTL tests** for `Divider=">"`, `Divider=""`, `RightToLeftDivider="<"`, mirrored geometry, and logical event indices under RTL.
-- [ ] **Step 8: Add width-constrained wrap tests** using both `GetPreferredSize(new Size(width, 0))` and `MaximumSize = new Size(width, 0)`. Assert each non-first divider/following item share same row in LTR and RTL and preferred height matches runtime row packing at same width.
-- [ ] **Step 9: Add `[NonParallelizable]` theme tests**: Light -> Dark updates link/current/divider colors without changing item order, Tag references, current-generation child instances, or multiplying handlers.
-- [ ] **Step 10: Add font ownership tests**: framework theme font is replaceable/disposable by control; caller-assigned Font remains assigned and undisposed through theme changes and final control disposal.
-- [ ] **Step 11: Add DPI metric tests** for 96/120/144/168/192 using exact `SpacingSM`/`SpacingXS` mappings, plus handle-backed smoke test that larger DPI increases gaps without changing event/index semantics.
-- [ ] **Step 12: Add lifecycle stress test** with at least 100 structural/text/divider/RTL/wrap/theme-affecting changes, then dispose and assert current generated children are disposed, active maps are empty, link handlers are detached, and later theme notifications cause no callback.
-- [ ] **Step 13: Run focused Breadcrumb UI tests with `--blame-hang` on both targets; verify RED before missing hardening and GREEN after implementation.**
-- [ ] **Step 14: Implement theme/font/DPI/RTL/accessibility/lifecycle behavior exactly as specified.** Structural rebuild detaches old link handlers before disposal; text mutation never rebuilds; theme mutation updates existing children; subscribe once/unsubscribe in `Dispose(bool)`.
-- [ ] **Step 15: Commit** `test: harden BootstrapBreadcrumb behavior`.
+- [x] **Step 2: Add failing ItemClicked tests** for first/middle links: exactly one event, correct item/index, unchanged Items/final item, and no current/divider activation path.
+- [x] **Step 3: Add a reentrancy test** whose handler clears/replaces `Items`; event args remain stable and resulting child tree matches caller mutation with no duplicate event.
+- [x] **Step 4: Add critical stale-generation regression test:** create `Home / Library / Data`, capture old `Home` LinkLabel, structurally rebuild while keeping same `Home` item as a current ancestor, verify old link is disposed/detached, invoke its former protected activation path, and assert `ItemClicked` remains zero. Then activate new current-generation Home link and assert one event.
+- [x] **Step 5: Add hosted STA focus/tab tests** proving only ancestor links are tabbable, text mutation preserves focused link instance/focus, and parent `Enabled=false` prevents effective native interaction without mutating item data.
+- [x] **Step 6: Add accessibility tests** for full ancestor names, current `"Current page."` description, container Grouping/Name/Description, divider `AccessibleRole.None`, and empty divider accessible name/description.
+- [x] **Step 7: Add divider/RTL tests** for `Divider=">"`, `Divider=""`, `RightToLeftDivider="<"`, mirrored geometry, and logical event indices under RTL.
+- [x] **Step 8: Add width-constrained wrap tests** using both `GetPreferredSize(new Size(width, 0))` and `MaximumSize = new Size(width, 0)`. Assert each non-first divider/following item share same row in LTR and RTL and preferred height matches runtime row packing at same width.
+- [x] **Step 9: Add `[NonParallelizable]` theme tests**: Light -> Dark updates link/current/divider colors without changing item order, Tag references, current-generation child instances, or multiplying handlers.
+- [x] **Step 10: Add font ownership tests**: framework theme font is replaceable/disposable by control; caller-assigned Font remains assigned and undisposed through theme changes and final control disposal.
+- [x] **Step 11: Add DPI metric tests** for 96/120/144/168/192 using exact `SpacingSM`/`SpacingXS` mappings, plus handle-backed smoke test that larger DPI increases gaps without changing event/index semantics.
+- [x] **Step 12: Add lifecycle stress test** with at least 100 structural/text/divider/RTL/wrap/theme-affecting changes, then dispose and assert current generated children are disposed, active maps are empty, link handlers are detached, and later theme notifications cause no callback.
+- [x] **Step 13: Run focused Breadcrumb UI tests with `--blame-hang` on both targets; verify RED before missing hardening and GREEN after implementation.**
+- [x] **Step 14: Implement theme/font/DPI/RTL/accessibility/lifecycle behavior exactly as specified.** Structural rebuild detaches old link handlers before disposal; text mutation never rebuilds; theme mutation updates existing children; subscribe once/unsubscribe in `Dispose(bool)`.
+- [x] **Step 15: Commit** `test: harden BootstrapBreadcrumb behavior`.
 
 ### Task 5: Add an integrated Breadcrumb demo
 
