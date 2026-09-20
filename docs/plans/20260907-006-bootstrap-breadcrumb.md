@@ -584,21 +584,21 @@ public void TextRejectsValuesThatCannotFormANativeAncestorLink()
 - Produces exactly internal layout types/signatures above.
 - Consumes only primitive values, `Size`, `Rectangle`, and `IReadOnlyList<T>`.
 
-- [ ] **Step 1: Write failing validation/empty tests** for null segments, negative metrics/sizes, empty measurement, empty arrangement, and unbounded measurement when `maximumWidth <= 0`.
-- [ ] **Step 2: Write failing one-row tests.** For item sizes `40x20`, `50x20`, `30x20`, divider size `8x20`, `DividerGap=8`, `RowGap=4`, verify width `40 + (8+16+50) + (8+16+30) = 188`.
-- [ ] **Step 3: Write failing empty-divider tests** proving zero divider width still leaves `16` pixels between adjacent items at `DividerGap=8`.
-- [ ] **Step 4: Write failing wrap tests** where first two segments fit but third does not; third divider/item must share row 2 and measured height must equal arranged row heights plus `RowGap`.
-- [ ] **Step 5: Write failing oversized-segment tests** proving an item wider than available row is placed alone without infinite loop or negative geometry.
-- [ ] **Step 6: Write failing RTL parity tests** proving measured size matches LTR and x-coordinate placement mirrors inside same rectangle while result order stays logical-item order.
-- [ ] **Step 7: Run and verify RED:**
+- [x] **Step 1: Write failing validation/empty tests** for null segments, negative metrics/sizes, empty measurement, empty arrangement, and unbounded measurement when `maximumWidth <= 0`.
+- [x] **Step 2: Write failing one-row tests.** For item sizes `40x20`, `50x20`, `30x20`, divider size `8x20`, `DividerGap=8`, `RowGap=4`, verify width `40 + (8+16+50) + (8+16+30) = 168`.
+- [x] **Step 3: Write failing empty-divider tests** proving zero divider width still leaves `16` pixels between adjacent items at `DividerGap=8`.
+- [x] **Step 4: Write failing wrap tests** where first two segments fit but third does not; third divider/item must share row 2 and measured height must equal arranged row heights plus `RowGap`.
+- [x] **Step 5: Write failing oversized-segment tests** proving an item wider than available row is placed alone without infinite loop or negative geometry.
+- [x] **Step 6: Write failing RTL parity tests** proving measured size matches LTR and x-coordinate placement mirrors inside same rectangle while result order stays logical-item order.
+- [x] **Step 7: Run and verify RED:**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter BootstrapBreadcrumbLayoutLogicTests
 ```
 
-- [ ] **Step 8: Implement minimal pure row-packing algorithm, sharing pack decisions between `Measure` and `Arrange`.** Do not use `Math.Clamp`.
-- [ ] **Step 9: Run layout tests on both targets; verify GREEN.**
-- [ ] **Step 10: Commit** `feat: add breadcrumb layout logic`.
+- [x] **Step 8: Implement minimal pure row-packing algorithm, sharing pack decisions between `Measure` and `Arrange`.** Do not use `Math.Clamp`.
+- [x] **Step 9: Run layout tests on both targets; verify GREEN.**
+- [x] **Step 10: Commit** `feat: add breadcrumb layout logic`.
 
 ### Task 3: Add BootstrapBreadcrumb composition, generation maps, and width-aware preferred sizing
 
