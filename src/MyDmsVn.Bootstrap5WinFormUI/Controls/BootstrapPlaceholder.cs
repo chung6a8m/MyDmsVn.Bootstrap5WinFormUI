@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using MyDmsVn.Bootstrap5WinFormUI.Animation;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -24,6 +25,7 @@ public class BootstrapPlaceholder : Control
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
     private Font? _themeFont;
+    private BootstrapLoopAnimation? _animationLoop;
 
     /// <summary>
     /// Initializes a designer-safe placeholder using the current theme's body typography.
@@ -90,6 +92,7 @@ public class BootstrapPlaceholder : Control
             }
 
             _animation = value;
+            RecreateAnimationLoop();
             Invalidate();
         }
     }
@@ -181,6 +184,7 @@ public class BootstrapPlaceholder : Control
             }
 
             _animationDuration = value;
+            RecreateAnimationLoop();
             Invalidate();
         }
     }
@@ -190,6 +194,25 @@ public class BootstrapPlaceholder : Control
     {
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
         return BootstrapPlaceholderRenderLogic.GetPreferredSize(Font.Height, _placeholderSize, dpi, proposedSize);
+    }
+
+    /// <inheritdoc />
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        ApplyPreferredSize();
+        ReconcileAnimationLoop();
+    }
+
+    /// <inheritdoc />
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        if (_animationLoop is not null && _animationLoop.IsRunning)
+        {
+            _animationLoop.Stop();
+        }
+
+        base.OnHandleDestroyed(e);
     }
 
     /// <inheritdoc />
@@ -240,10 +263,10 @@ public class BootstrapPlaceholder : Control
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
         var baseColor = BootstrapPlaceholderRenderLogic.ResolveBaseColor(theme.Colors, _variant, _customColor, Enabled);
-        var fillColor = BootstrapPlaceholderRenderLogic.ApplyOpacity(baseColor, BootstrapPlaceholderRenderLogic.OpacityMax);
         var radius = BootstrapPlaceholderRenderLogic.GetRadius(theme.Metrics, _borderRadius, dpi);
+        var progress = _animationLoop?.Progress ?? 0.0;
 
-        using var brush = new SolidBrush(fillColor);
+        using var brush = CreateFillBrush(baseColor, progress);
         if (radius <= 0f)
         {
             e.Graphics.FillRectangle(brush, ClientRectangle);
@@ -275,6 +298,7 @@ public class BootstrapPlaceholder : Control
             }
 
             DisposeThemeFont();
+            DisposeAnimationLoop();
         }
 
         base.Dispose(disposing);
@@ -293,7 +317,93 @@ public class BootstrapPlaceholder : Control
         }
 
         ApplyPreferredSize();
+        RecreateAnimationLoop();
         Invalidate();
+    }
+
+    private Brush CreateFillBrush(Color baseColor, double progress)
+    {
+        if (_animation == BootstrapPlaceholderAnimation.Wave)
+        {
+            var positions = new[] { 0f, 0.125f, 0.25f, 0.375f, 0.5f, 0.625f, 0.75f, 0.875f, 1f };
+            var colors = new Color[positions.Length];
+            for (var index = 0; index < positions.Length; index++)
+            {
+                var sampleOpacity = BootstrapPlaceholderRenderLogic.GetWaveOpacity(positions[index], progress);
+                colors[index] = BootstrapPlaceholderRenderLogic.ApplyOpacity(baseColor, sampleOpacity);
+            }
+
+            var blend = new ColorBlend(positions.Length)
+            {
+                Positions = positions,
+                Colors = colors
+            };
+            var brush = new LinearGradientBrush(
+                ClientRectangle,
+                Color.Transparent,
+                Color.Transparent,
+                BootstrapPlaceholderRenderLogic.WaveAngleDegrees);
+            brush.InterpolationColors = blend;
+            return brush;
+        }
+
+        var opacity = _animation == BootstrapPlaceholderAnimation.Glow
+            ? BootstrapPlaceholderRenderLogic.GetGlowOpacity(progress)
+            : BootstrapPlaceholderRenderLogic.OpacityMax;
+        return new SolidBrush(BootstrapPlaceholderRenderLogic.ApplyOpacity(baseColor, opacity));
+    }
+
+    private void OnAnimationProgressChanged(object? sender, EventArgs e)
+    {
+        if (!IsDisposed)
+        {
+            Invalidate();
+        }
+    }
+
+    private void ReconcileAnimationLoop()
+    {
+        if (_animation == BootstrapPlaceholderAnimation.None)
+        {
+            DisposeAnimationLoop();
+            return;
+        }
+
+        if (!IsHandleCreated || IsInDesignMode())
+        {
+            return;
+        }
+
+        if (_animationLoop is null)
+        {
+            _animationLoop = new BootstrapLoopAnimation(_animationDuration, BootstrapEasing.Linear, this);
+            _animationLoop.ProgressChanged += OnAnimationProgressChanged;
+        }
+
+        _animationLoop.Start();
+    }
+
+    private void RecreateAnimationLoop()
+    {
+        DisposeAnimationLoop();
+        ReconcileAnimationLoop();
+    }
+
+    private void DisposeAnimationLoop()
+    {
+        if (_animationLoop is null)
+        {
+            return;
+        }
+
+        _animationLoop.ProgressChanged -= OnAnimationProgressChanged;
+        _animationLoop.Dispose();
+        _animationLoop = null;
+    }
+
+    private bool IsInDesignMode()
+    {
+        return DesignMode || LicenseManager.UsageMode == LicenseUsageMode.Designtime;
     }
 
     private void ApplyThemeFont()

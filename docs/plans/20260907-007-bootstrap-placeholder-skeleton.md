@@ -642,24 +642,24 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Maintains exactly one private loop instance at most; no new public runtime-control API.
 - Handle recreation must preserve the existing loop object and resume captured progress via `Stop()`/`Start()` semantics.
 
-- [ ] **Step 1: Add failing behavior tests** that None is a stable static presentation, switching to Glow/Wave preserves every other public property, changing duration validates and preserves animation kind, and switching back to None remains usable across handle recreation.
-- [ ] **Step 2: Add a failing handle-recreation lifecycle test.** Create an animated control and handle, obtain the private `_animationLoop` only through test reflection (do not add product API), advance/observe non-zero progress, destroy/recreate the handle, and assert the same loop instance is retained and resumes from captured progress rather than being replaced/reset solely by handle recreation.
-- [ ] **Step 3: Add failing theme/reduced-motion tests** around public observable behavior: construct under ReducedMotion, create a handle, force multiple paints, and verify no exception/size churn/property mutation; repeat after toggling theme ReducedMotion at runtime. Rely on existing `BootstrapLoopAnimation` tests for scheduler internals.
-- [ ] **Step 4: Add failing Wave paint smoke tests** for tiny (`1x1`, `2x2`), normal, very wide, very tall, square, rounded, Light/Dark, enabled/disabled, and custom-color controls. Add targeted alpha/sample assertions only against the pure helper; do not use brittle anti-aliasing screenshots.
-- [ ] **Step 5: Add a failing public-surface contract test.** Assert declared public properties are exactly `Animation`, `AnimationDuration`, `BorderRadius`, `CustomColor`, `PlaceholderSize`, and `Variant`; the only declared public method is `GetPreferredSize`; declared public events are empty; exported Placeholder-related types are exactly the control plus the two enums; no exported type contains `BootstrapSkeleton` or `PlaceholderRenderLogic`.
-- [ ] **Step 6: Run focused tests and verify RED.**
+- [x] **Step 1: Add failing behavior tests** that None is a stable static presentation, switching to Glow/Wave preserves every other public property, changing duration validates and preserves animation kind, and switching back to None remains usable across handle recreation.
+- [x] **Step 2: Add a failing handle-recreation lifecycle test.** Create an animated control and handle, obtain the private `_animationLoop` only through test reflection (do not add product API), advance/observe non-zero progress, destroy/recreate the handle, and assert the same loop instance is retained and resumes from captured progress rather than being replaced/reset solely by handle recreation.
+- [x] **Step 3: Add failing theme/reduced-motion tests** around public observable behavior: construct under ReducedMotion, create a handle, force multiple paints, and verify no exception/size churn/property mutation; repeat after toggling theme ReducedMotion at runtime. Rely on existing `BootstrapLoopAnimation` tests for scheduler internals.
+- [x] **Step 4: Add failing Wave paint smoke tests** for tiny (`1x1`, `2x2`), normal, very wide, very tall, square, rounded, Light/Dark, enabled/disabled, and custom-color controls. Add targeted alpha/sample assertions only against the pure helper; do not use brittle anti-aliasing screenshots.
+- [x] **Step 5: Add a failing public-surface contract test.** Assert declared public properties are exactly `Animation`, `AnimationDuration`, `BorderRadius`, `CustomColor`, `PlaceholderSize`, and `Variant`; the only declared public method is `GetPreferredSize`; declared public events are empty; exported Placeholder-related types are exactly the control plus the two enums; no exported type contains `BootstrapSkeleton` or `PlaceholderRenderLogic`.
+- [x] **Step 6: Run focused tests and verify RED.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "BootstrapPlaceholder" --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 7: Implement loop reconciliation** exactly as defined in **Animation Lifecycle Contract**. Subscribe one `ProgressChanged` handler per loop and always detach before dispose/replacement.
-- [ ] **Step 8: Implement handle recreation as pause/resume, not restart.** `OnHandleDestroyed` calls `Stop()` when applicable and leaves the loop allocated; `OnHandleCreated` calls reconciliation/`Start()`, which resumes captured progress according to existing `BootstrapLoopAnimation` semantics.
-- [ ] **Step 9: Implement Wave painting** with exactly nine `ColorBlend` samples and one `LinearGradientBrush` at `130f`. Each color's alpha comes from effective Wave opacity `[0.4,0.5]`; Glow still uses `[0.2,0.5]`. Do not cache Brushes or create Bitmaps.
-- [ ] **Step 10: Review declared protected surface.** Expected Placeholder-specific protected overrides are limited to lifecycle/render needs: `Dispose`, `OnAutoSizeChanged`, `OnDpiChangedAfterParent`, `OnEnabledChanged`, `OnFontChanged`, `OnHandleCreated`, `OnHandleDestroyed`, and `OnPaint`. If implementation introduces another protected override, either remove it or document/test why it is required before API baseline approval.
-- [ ] **Step 11: Run all Placeholder fixtures on `net8.0-windows` and `net48`; verify GREEN.**
-- [ ] **Step 12: Search product files and confirm no `Timer`, `Task.Delay`, `Thread`, `Application.Idle`, `MessageBox.Show`, or `ShowDialog` was introduced.**
-- [ ] **Step 13: Commit** `feat: animate BootstrapPlaceholder`.
+- [x] **Step 7: Implement loop reconciliation** exactly as defined in **Animation Lifecycle Contract**. Subscribe one `ProgressChanged` handler per loop and always detach before dispose/replacement.
+- [x] **Step 8: Implement handle recreation as pause/resume, not restart.** `OnHandleDestroyed` calls `Stop()` when applicable and leaves the loop allocated; `OnHandleCreated` calls reconciliation/`Start()`, which resumes captured progress according to existing `BootstrapLoopAnimation` semantics.
+- [x] **Step 9: Implement Wave painting** with exactly nine `ColorBlend` samples and one `LinearGradientBrush` at `130f`. Each color's alpha comes from effective Wave opacity `[0.4,0.5]`; Glow still uses `[0.2,0.5]`. Do not cache Brushes or create Bitmaps.
+- [x] **Step 10: Review declared protected surface.** Expected Placeholder-specific protected overrides are limited to lifecycle/render needs: `Dispose`, `OnAutoSizeChanged`, `OnDpiChangedAfterParent`, `OnEnabledChanged`, `OnFontChanged`, `OnHandleCreated`, `OnHandleDestroyed`, and `OnPaint`. If implementation introduces another protected override, either remove it or document/test why it is required before API baseline approval.
+- [x] **Step 11: Run all Placeholder fixtures on `net8.0-windows` and `net48`; verify GREEN.**
+- [x] **Step 12: Search product files and confirm no `Timer`, `Task.Delay`, `Thread`, `Application.Idle`, `MessageBox.Show`, or `ShowDialog` was introduced.**
+- [x] **Step 13: Commit** `feat: animate BootstrapPlaceholder`.
 
 ### Task 5: Add integrated Placeholder/Skeleton demo and application-owned content swap
 

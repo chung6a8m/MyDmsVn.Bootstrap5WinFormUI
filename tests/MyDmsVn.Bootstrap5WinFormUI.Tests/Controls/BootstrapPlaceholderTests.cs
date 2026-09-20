@@ -1,9 +1,11 @@
 using System;
 using System.Drawing;
 using System.Reflection;
+using System.Diagnostics;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Animation;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
@@ -262,6 +264,134 @@ public sealed class BootstrapPlaceholderTests
         Assert.That(GetThemeSubscriptionCount(), Is.EqualTo(baseline));
     }
 
+    [Test]
+    public void NoneOwnsNoLoopAndAnimationChangesPreserveOtherPublicState()
+    {
+        using var placeholder = new LifecycleProbePlaceholder
+        {
+            AutoSize = false,
+            Size = new Size(222, 33),
+            PlaceholderSize = BootstrapPlaceholderSize.Small,
+            Variant = BootstrapVariant.Success,
+            CustomColor = Color.MediumPurple,
+            BorderRadius = 7,
+            AnimationDuration = TimeSpan.FromSeconds(5)
+        };
+        placeholder.EnsureHandle();
+
+        Assert.That(GetAnimationLoop(placeholder), Is.Null);
+
+        placeholder.Animation = BootstrapPlaceholderAnimation.Glow;
+        placeholder.Animation = BootstrapPlaceholderAnimation.Wave;
+
+        Assert.Multiple((Action)delegate
+        {
+            Assert.That(placeholder.Size, Is.EqualTo(new Size(222, 33)));
+            Assert.That(placeholder.PlaceholderSize, Is.EqualTo(BootstrapPlaceholderSize.Small));
+            Assert.That(placeholder.Variant, Is.EqualTo(BootstrapVariant.Success));
+            Assert.That(placeholder.CustomColor, Is.EqualTo(Color.MediumPurple));
+            Assert.That(placeholder.BorderRadius, Is.EqualTo(7));
+            Assert.That(placeholder.AnimationDuration, Is.EqualTo(TimeSpan.FromSeconds(5)));
+        });
+
+        placeholder.AnimationDuration = TimeSpan.FromSeconds(7);
+        Assert.That(placeholder.Animation, Is.EqualTo(BootstrapPlaceholderAnimation.Wave));
+
+        placeholder.Animation = BootstrapPlaceholderAnimation.None;
+        Assert.That(GetAnimationLoop(placeholder), Is.Null);
+        Assert.DoesNotThrow((Action)placeholder.RecreateHandleForTest);
+        Assert.That(GetAnimationLoop(placeholder), Is.Null);
+    }
+
+    [Test]
+    public void HandleRecreationRetainsLoopAndResumesCapturedProgress()
+    {
+        using var placeholder = new LifecycleProbePlaceholder
+        {
+            AnimationDuration = TimeSpan.FromSeconds(5),
+            Animation = BootstrapPlaceholderAnimation.Glow
+        };
+        placeholder.EnsureHandle();
+        var loop = GetAnimationLoop(placeholder);
+        Assert.That(loop, Is.Not.Null);
+        Assert.That(PumpUntil(() => loop!.Progress > 0.01, TimeSpan.FromSeconds(2)), Is.True);
+        var progressBeforeRecreation = loop!.Progress;
+
+        placeholder.RecreateHandleForTest();
+        var loopAfterRecreation = GetAnimationLoop(placeholder);
+
+        Assert.Multiple((Action)delegate
+        {
+            Assert.That(loopAfterRecreation, Is.SameAs(loop));
+            Assert.That(loopAfterRecreation!.Progress, Is.GreaterThan(0.0));
+        });
+        Assert.That(PumpUntil(() => loopAfterRecreation!.Progress > progressBeforeRecreation, TimeSpan.FromSeconds(2)), Is.True);
+    }
+
+    [Test]
+    public void ReducedMotionKeepsAnimationSelectionAndStableGeometryAcrossThemeChanges()
+    {
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light, reducedMotion: true);
+        using var placeholder = new LifecycleProbePlaceholder
+        {
+            Animation = BootstrapPlaceholderAnimation.Wave
+        };
+        placeholder.EnsureHandle();
+        var expectedSize = placeholder.Size;
+
+        Assert.DoesNotThrow((Action)(() => placeholder.PaintSeveralFrames(3)));
+        Assert.Multiple((Action)delegate
+        {
+            Assert.That(placeholder.Animation, Is.EqualTo(BootstrapPlaceholderAnimation.Wave));
+            Assert.That(placeholder.Size, Is.EqualTo(expectedSize));
+        });
+
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark, reducedMotion: false);
+        Assert.DoesNotThrow((Action)(() => placeholder.PaintSeveralFrames(3)));
+        BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark, reducedMotion: true);
+        Assert.DoesNotThrow((Action)(() => placeholder.PaintSeveralFrames(3)));
+        Assert.Multiple((Action)delegate
+        {
+            Assert.That(placeholder.Animation, Is.EqualTo(BootstrapPlaceholderAnimation.Wave));
+            Assert.That(placeholder.Size, Is.EqualTo(expectedSize));
+        });
+    }
+
+    [Test]
+    public void WavePaintHandlesExtremeGeometryThemeAndColorCombinations()
+    {
+        var sizes = new[]
+        {
+            new Size(1, 1),
+            new Size(2, 2),
+            new Size(40, 18),
+            new Size(400, 8),
+            new Size(8, 400)
+        };
+
+        foreach (var mode in new[] { BootstrapThemeMode.Light, BootstrapThemeMode.Dark })
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode, reducedMotion: true);
+            foreach (var size in sizes)
+            {
+                foreach (var radius in new[] { 0, -1, 999 })
+                {
+                    using var placeholder = new LifecycleProbePlaceholder
+                    {
+                        AutoSize = false,
+                        Size = size,
+                        BorderRadius = radius,
+                        Animation = BootstrapPlaceholderAnimation.Wave,
+                        Enabled = radius != -1,
+                        CustomColor = radius == 999 ? Color.CornflowerBlue : Color.Empty
+                    };
+                    placeholder.EnsureHandle();
+                    Assert.DoesNotThrow((Action)(() => placeholder.PaintSeveralFrames(1)));
+                }
+            }
+        }
+    }
+
     private static BootstrapThemeTypography CreateTypography(BootstrapFontToken body)
     {
         var defaults = BootstrapThemeTypography.Default;
@@ -281,6 +411,31 @@ public sealed class BootstrapPlaceholderTests
         return handler?.GetInvocationList().Length ?? 0;
     }
 
+    private static BootstrapLoopAnimation? GetAnimationLoop(BootstrapPlaceholder placeholder)
+    {
+        var field = typeof(BootstrapPlaceholder).GetField("_animationLoop", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null);
+        return (BootstrapLoopAnimation?)field!.GetValue(placeholder);
+    }
+
+    private static bool PumpUntil(Func<bool> condition, TimeSpan timeout)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < timeout)
+        {
+            Application.DoEvents();
+            if (condition())
+            {
+                return true;
+            }
+
+            Thread.Sleep(10);
+        }
+
+        Application.DoEvents();
+        return condition();
+    }
+
     private sealed class DpiProbePlaceholder : BootstrapPlaceholder
     {
         public void SimulateDpiChangedAfterParent()
@@ -294,6 +449,29 @@ public sealed class BootstrapPlaceholderTests
         public void Render(Graphics graphics)
         {
             OnPaint(new PaintEventArgs(graphics, ClientRectangle));
+        }
+    }
+
+    private sealed class LifecycleProbePlaceholder : BootstrapPlaceholder
+    {
+        public void EnsureHandle()
+        {
+            _ = Handle;
+        }
+
+        public void RecreateHandleForTest()
+        {
+            RecreateHandle();
+        }
+
+        public void PaintSeveralFrames(int count)
+        {
+            using var bitmap = new Bitmap(Math.Max(1, Width), Math.Max(1, Height));
+            using var graphics = Graphics.FromImage(bitmap);
+            for (var index = 0; index < count; index++)
+            {
+                OnPaint(new PaintEventArgs(graphics, ClientRectangle));
+            }
         }
     }
 
