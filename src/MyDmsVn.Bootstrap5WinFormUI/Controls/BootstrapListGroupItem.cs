@@ -41,6 +41,7 @@ public class BootstrapListGroupItem : Panel
             ControlStyles.ResizeRedraw |
             ControlStyles.SupportsTransparentBackColor,
             true);
+        SetStyle(ControlStyles.StandardClick, false);
         SetStyle(ControlStyles.Selectable, false);
         TabStop = false;
         AccessibleRole = AccessibleRole.ListItem;
@@ -177,6 +178,7 @@ public class BootstrapListGroupItem : Panel
     {
         base.OnControlAdded(e);
         if (e.Control is Control control) TrackDescendant(control);
+        RequestOwningLayout();
     }
 
     /// <inheritdoc />
@@ -184,6 +186,7 @@ public class BootstrapListGroupItem : Panel
     {
         if (e.Control is Control control) UntrackDescendant(control);
         base.OnControlRemoved(e);
+        RequestOwningLayout();
     }
 
     /// <inheritdoc />
@@ -379,7 +382,30 @@ public class BootstrapListGroupItem : Panel
         previous?.Dispose();
     }
 
-    private void DisposeThemeFont() { var font = _themeFont; _themeFont = null; font?.Dispose(); }
+    private void DisposeThemeFont()
+    {
+        var font = _themeFont;
+        _themeFont = null;
+        if (font is null)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(Font, font))
+        {
+            _settingThemeFont = true;
+            try
+            {
+                Font = null!;
+            }
+            finally
+            {
+                _settingThemeFont = false;
+            }
+        }
+
+        font.Dispose();
+    }
 
     private void ActivateItem()
     {
@@ -399,6 +425,9 @@ public class BootstrapListGroupItem : Panel
         if (!_trackedDescendants.Add(control)) return;
         control.ControlAdded += OnDescendantControlAdded;
         control.ControlRemoved += OnDescendantControlRemoved;
+        control.LocationChanged += OnDescendantPreferredSizeChanged;
+        control.SizeChanged += OnDescendantPreferredSizeChanged;
+        control.VisibleChanged += OnDescendantPreferredSizeChanged;
         if (IsDecorativeForwardingSurface(control))
         {
             control.MouseDown += OnDecorativeMouseDown;
@@ -414,6 +443,9 @@ public class BootstrapListGroupItem : Panel
         if (!_trackedDescendants.Remove(control)) return;
         control.ControlAdded -= OnDescendantControlAdded;
         control.ControlRemoved -= OnDescendantControlRemoved;
+        control.LocationChanged -= OnDescendantPreferredSizeChanged;
+        control.SizeChanged -= OnDescendantPreferredSizeChanged;
+        control.VisibleChanged -= OnDescendantPreferredSizeChanged;
         control.MouseDown -= OnDecorativeMouseDown;
         control.MouseUp -= OnDecorativeMouseUp;
         control.MouseLeave -= OnDecorativeMouseLeave;
@@ -422,19 +454,31 @@ public class BootstrapListGroupItem : Panel
 
     private static bool IsDecorativeForwardingSurface(Control control)
     {
-        if (control is Label || control is BootstrapBadge) return true;
         var type = control.GetType();
-        return type == typeof(Panel) || type == typeof(FlowLayoutPanel) || type == typeof(TableLayoutPanel);
+        return type == typeof(Label) ||
+            type == typeof(BootstrapBadge) ||
+            type == typeof(Panel) ||
+            type == typeof(FlowLayoutPanel) ||
+            type == typeof(TableLayoutPanel);
     }
 
     private void OnDescendantControlAdded(object? sender, ControlEventArgs e)
     {
         if (e.Control is Control control) TrackDescendant(control);
+        RequestOwningLayout();
     }
 
     private void OnDescendantControlRemoved(object? sender, ControlEventArgs e)
     {
         if (e.Control is Control control) UntrackDescendant(control);
+        RequestOwningLayout();
+    }
+
+    private void OnDescendantPreferredSizeChanged(object? sender, EventArgs e) => RequestOwningLayout();
+
+    private void RequestOwningLayout()
+    {
+        Parent?.PerformLayout(this, nameof(PreferredSize));
     }
 
     private void OnDecorativeMouseDown(object? sender, MouseEventArgs e)

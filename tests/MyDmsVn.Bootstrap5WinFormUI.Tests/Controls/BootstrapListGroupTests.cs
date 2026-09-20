@@ -207,6 +207,41 @@ public sealed class BootstrapListGroupTests
     }
 
     [Test]
+    public void RichChildRuntimeGeometryChangesRelayoutTheOwningGroup()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Size = new Size(240, 200)
+        };
+        using var item = new BootstrapListGroupItem();
+        using var child = new Label { Bounds = new Rectangle(8, 6, 80, 20) };
+        group.Controls.Add(item);
+        group.PerformLayout();
+        var baselineHeight = item.Height;
+
+        item.Controls.Add(child);
+        var addedHeight = item.Height;
+        child.Height = 72;
+        var grownHeight = item.Height;
+        child.Visible = false;
+        var hiddenHeight = item.Height;
+        child.Visible = true;
+        var restoredHeight = item.Height;
+        item.Controls.Remove(child);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(addedHeight, Is.GreaterThanOrEqualTo(child.Top + 20));
+            Assert.That(grownHeight, Is.GreaterThanOrEqualTo(child.Top + 72));
+            Assert.That(grownHeight, Is.GreaterThan(addedHeight));
+            Assert.That(hiddenHeight, Is.EqualTo(baselineHeight));
+            Assert.That(restoredHeight, Is.EqualTo(grownHeight));
+            Assert.That(item.Height, Is.EqualTo(baselineHeight));
+        }));
+    }
+
+    [Test]
     public void NavigationUsesCurrentControlOrderAndSkipsIneligibleItems()
     {
         using var form = new Form { ShowInTaskbar = false };

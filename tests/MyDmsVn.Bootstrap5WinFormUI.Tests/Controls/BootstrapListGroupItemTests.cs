@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -14,6 +15,10 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 [NonParallelizable]
 public sealed class BootstrapListGroupItemTests
 {
+    private const int WmLButtonDown = 0x0201;
+    private const int WmLButtonUp = 0x0202;
+    private const int MkLButton = 0x0001;
+
     [Test]
     public void DefaultsArePresentationalAndNeutral()
     {
@@ -143,6 +148,21 @@ public sealed class BootstrapListGroupItemTests
     }
 
     [Test]
+    public void DisablingThemeFontDetachesTheOwnedFontBeforeDisposal()
+    {
+        using var item = new BootstrapListGroupItem { Text = "Profile" };
+        var ownedThemeFont = item.Font;
+
+        item.UseThemeFont = false;
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(item.Font, Is.Not.SameAs(ownedThemeFont));
+            Assert.DoesNotThrow((Action)(() => _ = item.GetPreferredSize(Size.Empty)));
+        }));
+    }
+
+    [Test]
     public void TinyItemPaintsWithoutInvalidGeometryAndExposesNoRadiusProperty()
     {
         using var item = new BootstrapListGroupItem { Size = new Size(1, 1) };
@@ -188,27 +208,76 @@ public sealed class BootstrapListGroupItemTests
     }
 
     [Test]
-    public void DecorativeDescendantsForwardButInteractiveAndUnknownControlsDoNot()
+    public void NativeMouseActivationFiresExactlyOnceOnlyForActionableItems()
     {
+        using var form = new Form { ShowInTaskbar = false };
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Size = new Size(180, 100)
+        };
+        using var actionable = new BootstrapListGroupItem
+        {
+            Actionable = true,
+            Bounds = new Rectangle(0, 0, 160, 40)
+        };
+        using var presentational = new BootstrapListGroupItem
+        {
+            Bounds = new Rectangle(0, 50, 160, 40)
+        };
+        group.Controls.Add(actionable);
+        group.Controls.Add(presentational);
+        form.Controls.Add(group);
+        var actionableClicks = 0;
+        var presentationalClicks = 0;
+        var groupClicks = 0;
+        actionable.Click += (_, _) => actionableClicks++;
+        presentational.Click += (_, _) => presentationalClicks++;
+        group.ItemClick += (_, _) => groupClicks++;
+        form.Show();
+
+        SendNativeClick(actionable);
+        SendNativeClick(presentational);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(actionableClicks, Is.EqualTo(1));
+            Assert.That(presentationalClicks, Is.Zero);
+            Assert.That(groupClicks, Is.EqualTo(1));
+        }));
+    }
+
+    [Test]
+    public void ExactDecorativeTypesForwardButInteractiveAndUnknownControlsDoNot()
+    {
+        using var form = new Form { ShowInTaskbar = false };
         using var group = new BootstrapListGroup();
         using var item = new BootstrapListGroupItem { Actionable = true };
-        using var label = new MouseProbeLabel();
-        using var badge = new MouseProbeBadge();
-        using var button = new Button();
-        using var unknown = new UnknownMouseProbe();
+        var label = new Label { Size = new Size(40, 20) };
+        var badge = new BootstrapBadge { Text = "New", Size = new Size(40, 20) };
+        var button = new Button();
+        var link = new LinkLabelProbe();
+        var customLabel = new CustomLabelProbe();
+        var unknown = new UnknownMouseProbe();
         item.Controls.Add(label);
         item.Controls.Add(badge);
         item.Controls.Add(button);
+        item.Controls.Add(link);
+        item.Controls.Add(customLabel);
         item.Controls.Add(unknown);
         group.Controls.Add(item);
+        form.Controls.Add(group);
         var itemClicks = 0;
         var groupClicks = 0;
         item.Click += (_, _) => itemClicks++;
         group.ItemClick += (_, _) => groupClicks++;
+        form.Show();
 
-        label.RaiseMouseClick();
-        badge.RaiseMouseClick();
+        SendNativeClick(label);
+        SendNativeClick(badge);
         button.PerformClick();
+        link.RaiseMouseClick();
+        customLabel.RaiseMouseClick();
         unknown.RaiseMouseClick();
 
         Assert.Multiple((Action)(() =>
@@ -221,16 +290,19 @@ public sealed class BootstrapListGroupItemTests
     [Test]
     public void DynamicDecorativeDescendantsAreUnsubscribedOnRemoval()
     {
+        using var form = new Form { ShowInTaskbar = false };
         using var item = new BootstrapListGroupItem { Actionable = true };
         using var panel = new Panel();
-        using var label = new MouseProbeLabel();
+        using var label = new Label { Size = new Size(40, 20) };
+        form.Controls.Add(item);
         item.Controls.Add(panel);
         panel.Controls.Add(label);
         var clicks = 0;
         item.Click += (_, _) => clicks++;
-        label.RaiseMouseClick();
+        form.Show();
+        SendNativeClick(label);
         panel.Controls.Remove(label);
-        label.RaiseMouseClick();
+        SendNativeClick(label);
 
         Assert.That(clicks, Is.EqualTo(1));
     }
@@ -320,7 +392,7 @@ public sealed class BootstrapListGroupItemTests
         public void RaiseKeyUp(Keys key) => OnKeyUp(new KeyEventArgs(key));
     }
 
-    private sealed class MouseProbeLabel : Label
+    private sealed class CustomLabelProbe : Label
     {
         public void RaiseMouseClick()
         {
@@ -329,7 +401,7 @@ public sealed class BootstrapListGroupItemTests
         }
     }
 
-    private sealed class MouseProbeBadge : BootstrapBadge
+    private sealed class LinkLabelProbe : LinkLabel
     {
         public void RaiseMouseClick()
         {
@@ -346,4 +418,14 @@ public sealed class BootstrapListGroupItemTests
             OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
         }
     }
+
+    private static void SendNativeClick(Control control)
+    {
+        var coordinates = new IntPtr(4 | (4 << 16));
+        SendMessage(control.Handle, WmLButtonDown, new IntPtr(MkLButton), coordinates);
+        SendMessage(control.Handle, WmLButtonUp, IntPtr.Zero, coordinates);
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
 }
