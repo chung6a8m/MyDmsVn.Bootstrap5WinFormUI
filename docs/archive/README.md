@@ -12,6 +12,7 @@ These files are preserved for design history, audits, and understanding earlier 
 - [20260907-002-bootstrap-range-trackbar.md](20260907-002-bootstrap-range-trackbar.md) — completed native-backed `BootstrapRange` / TrackBar implementation plan.
 - [20260907-004-bootstrap-modal.md](20260907-004-bootstrap-modal.md) — completed native-backed `BootstrapModal` implementation plan.
 - [20260907-005-bootstrap-list-group.md](20260907-005-bootstrap-list-group.md) — completed lightweight `BootstrapListGroup` composition-control implementation plan.
+- [20260907-006-bootstrap-breadcrumb.md](20260907-006-bootstrap-breadcrumb.md) — completed native-link-backed `BootstrapBreadcrumb` implementation plan.
 
 Current unfinished work is tracked only in [../ROADMAP.md](../ROADMAP.md).
 

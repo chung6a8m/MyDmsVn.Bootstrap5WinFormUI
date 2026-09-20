@@ -1,5 +1,6 @@
 # BootstrapBreadcrumb Implementation Plan
 
+> **Status:** Completed (2026-09-21)
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a Bootstrap-inspired `BootstrapBreadcrumb` navigation control that represents an ordered hierarchy, renders ancestor items as native WinForms links, renders the last item as the current location, supports configurable dividers, deterministic wrapping and RTL layout, and preserves native keyboard/accessibility behavior without inventing a custom focus or navigation engine.
@@ -548,7 +549,7 @@ Validation/geometry rules:
 - Collection declared protected surface is exactly `InsertItem`, `SetItem`, `RemoveItem`, and `ClearItems`.
 - Item visual notification is internal event `TextChangedForOwner`.
 
-- [ ] **Step 1: Write failing item tests** for parameterless default `Text="Item"`, string constructor, null/empty/whitespace rejection, preservation of non-empty caller whitespace, null `Tag`, no duplicate text-change event for equal values, exactly one event for an effective text change, and zero text-change events when only `Tag` changes.
+- [x] **Step 1: Write failing item tests** for parameterless default `Text="Item"`, string constructor, null/empty/whitespace rejection, preservation of non-empty caller whitespace, null `Tag`, no duplicate text-change event for equal values, exactly one event for an effective text change, and zero text-change events when only `Tag` changes.
 
 ```csharp
 [Test]
@@ -566,13 +567,13 @@ public void TextRejectsValuesThatCannotFormANativeAncestorLink()
 }
 ```
 
-- [ ] **Step 2: Write failing collection tests** for Add/Insert/Set/Remove/Clear exactly-once structural notification, null rejection, duplicate-reference rejection, failed-mutation rollback, text-change forwarding through `itemTextChanged` only, callback detachment after removal/replacement/clear, and no disposal of item/Tag objects.
-- [ ] **Step 3: Write a failing protected-surface contract test** asserting `BootstrapBreadcrumbItemCollection` declares exactly protected `InsertItem`, `SetItem`, `RemoveItem`, `ClearItems` and no public constructor/mutation aliases beyond inherited collection APIs.
-- [ ] **Step 4: Write failing event-args tests** for item/index preservation plus null/negative validation through internal construction.
-- [ ] **Step 5: Run item/collection tests on `net8.0-windows`; verify RED because types do not exist.**
-- [ ] **Step 6: Implement minimal three public types and exact internal wiring above.** Validate replacement/duplicate rules before changing subscriptions or collection state.
-- [ ] **Step 7: Run item/collection tests for `net8.0-windows` and `net48`; verify GREEN.**
-- [ ] **Step 8: Commit** `feat: add breadcrumb item model`.
+- [x] **Step 2: Write failing collection tests** for Add/Insert/Set/Remove/Clear exactly-once structural notification, null rejection, duplicate-reference rejection, failed-mutation rollback, text-change forwarding through `itemTextChanged` only, callback detachment after removal/replacement/clear, and no disposal of item/Tag objects.
+- [x] **Step 3: Write a failing protected-surface contract test** asserting `BootstrapBreadcrumbItemCollection` declares exactly protected `InsertItem`, `SetItem`, `RemoveItem`, `ClearItems` and no public constructor/mutation aliases beyond inherited collection APIs.
+- [x] **Step 4: Write failing event-args tests** for item/index preservation plus null/negative validation through internal construction.
+- [x] **Step 5: Run item/collection tests on `net8.0-windows`; verify RED because types do not exist.**
+- [x] **Step 6: Implement minimal three public types and exact internal wiring above.** Validate replacement/duplicate rules before changing subscriptions or collection state.
+- [x] **Step 7: Run item/collection tests for `net8.0-windows` and `net48`; verify GREEN.**
+- [x] **Step 8: Commit** `feat: add breadcrumb item model`.
 
 ### Task 2: Implement deterministic wrap and RTL layout logic
 
@@ -584,21 +585,21 @@ public void TextRejectsValuesThatCannotFormANativeAncestorLink()
 - Produces exactly internal layout types/signatures above.
 - Consumes only primitive values, `Size`, `Rectangle`, and `IReadOnlyList<T>`.
 
-- [ ] **Step 1: Write failing validation/empty tests** for null segments, negative metrics/sizes, empty measurement, empty arrangement, and unbounded measurement when `maximumWidth <= 0`.
-- [ ] **Step 2: Write failing one-row tests.** For item sizes `40x20`, `50x20`, `30x20`, divider size `8x20`, `DividerGap=8`, `RowGap=4`, verify width `40 + (8+16+50) + (8+16+30) = 188`.
-- [ ] **Step 3: Write failing empty-divider tests** proving zero divider width still leaves `16` pixels between adjacent items at `DividerGap=8`.
-- [ ] **Step 4: Write failing wrap tests** where first two segments fit but third does not; third divider/item must share row 2 and measured height must equal arranged row heights plus `RowGap`.
-- [ ] **Step 5: Write failing oversized-segment tests** proving an item wider than available row is placed alone without infinite loop or negative geometry.
-- [ ] **Step 6: Write failing RTL parity tests** proving measured size matches LTR and x-coordinate placement mirrors inside same rectangle while result order stays logical-item order.
-- [ ] **Step 7: Run and verify RED:**
+- [x] **Step 1: Write failing validation/empty tests** for null segments, negative metrics/sizes, empty measurement, empty arrangement, and unbounded measurement when `maximumWidth <= 0`.
+- [x] **Step 2: Write failing one-row tests.** For item sizes `40x20`, `50x20`, `30x20`, divider size `8x20`, `DividerGap=8`, `RowGap=4`, verify width `40 + (8+16+50) + (8+16+30) = 168`.
+- [x] **Step 3: Write failing empty-divider tests** proving zero divider width still leaves `16` pixels between adjacent items at `DividerGap=8`.
+- [x] **Step 4: Write failing wrap tests** where first two segments fit but third does not; third divider/item must share row 2 and measured height must equal arranged row heights plus `RowGap`.
+- [x] **Step 5: Write failing oversized-segment tests** proving an item wider than available row is placed alone without infinite loop or negative geometry.
+- [x] **Step 6: Write failing RTL parity tests** proving measured size matches LTR and x-coordinate placement mirrors inside same rectangle while result order stays logical-item order.
+- [x] **Step 7: Run and verify RED:**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter BootstrapBreadcrumbLayoutLogicTests
 ```
 
-- [ ] **Step 8: Implement minimal pure row-packing algorithm, sharing pack decisions between `Measure` and `Arrange`.** Do not use `Math.Clamp`.
-- [ ] **Step 9: Run layout tests on both targets; verify GREEN.**
-- [ ] **Step 10: Commit** `feat: add breadcrumb layout logic`.
+- [x] **Step 8: Implement minimal pure row-packing algorithm, sharing pack decisions between `Measure` and `Arrange`.** Do not use `Math.Clamp`.
+- [x] **Step 9: Run layout tests on both targets; verify GREEN.**
+- [x] **Step 10: Commit** `feat: add breadcrumb layout logic`.
 
 ### Task 3: Add BootstrapBreadcrumb composition, generation maps, and width-aware preferred sizing
 
@@ -613,8 +614,8 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Owns/disposes every generated native child.
 - Owns `_activeLinks` and `_itemControls` as current-generation implementation details.
 
-- [ ] **Step 1: Write failing default/metadata tests** for all default state values, `[DefaultEvent(nameof(ItemClicked))]`, `Items` content serialization, `GetPreferredSize`, public type/member shape, and absence of prohibited routing/style APIs.
-- [ ] **Step 2: Write failing composition tests** for 0/1/2/3 valid items. Three items must create two LinkLabels, one current Label, and two divider Labels in semantic order.
+- [x] **Step 1: Write failing default/metadata tests** for all default state values, `[DefaultEvent(nameof(ItemClicked))]`, `Items` content serialization, `GetPreferredSize`, public type/member shape, and absence of prohibited routing/style APIs.
+- [x] **Step 2: Write failing composition tests** for 0/1/2/3 valid items. Three items must create two LinkLabels, one current Label, and two divider Labels in semantic order.
 
 ```csharp
 [Test]
@@ -637,12 +638,12 @@ public void ThreeItemsCreateTwoLinksAndOneCurrentItem()
 }
 ```
 
-- [ ] **Step 3: Write failing generated-child property tests** for exact LinkLabel/current/divider configuration from **Generated Child Contract**, including full-text link area and accessible names.
-- [ ] **Step 4: Write failing structural mutation tests** proving Add/Insert/Set/Remove/Clear rebuild as required and old framework-owned children are disposed after handlers/maps are detached/cleared.
-- [ ] **Step 5: Write failing text-mutation identity tests**: capture an ancestor LinkLabel and current Label, mutate their item `Text`, and assert same control instances remain, their `Text`/`AccessibleName` update, focus on an ancestor link is preserved, and preferred size/layout refreshes.
-- [ ] **Step 6: Write failing Tag-only tests** proving changing `Tag` preserves generated child instances and does not call layout/rebuild-visible behavior.
-- [ ] **Step 7: Write failing preferred-size width-contract tests**: positive `proposedSize.Width` wraps and increases preferred height; `MaximumSize.Width` is used when proposed width is zero; no proposed/max width measures one row; direct `Width` alone is not asserted as a wrapping API while AutoSize/GrowAndShrink is enabled.
-- [ ] **Step 8: Run focused tests with hang protection; verify RED:**
+- [x] **Step 3: Write failing generated-child property tests** for exact LinkLabel/current/divider configuration from **Generated Child Contract**, including full-text link area and accessible names.
+- [x] **Step 4: Write failing structural mutation tests** proving Add/Insert/Set/Remove/Clear rebuild as required and old framework-owned children are disposed after handlers/maps are detached/cleared.
+- [x] **Step 5: Write failing text-mutation identity tests**: capture an ancestor LinkLabel and current Label, mutate their item `Text`, and assert same control instances remain, their `Text`/`AccessibleName` update, focus on an ancestor link is preserved, and preferred size/layout refreshes.
+- [x] **Step 6: Write failing Tag-only tests** proving changing `Tag` preserves generated child instances and does not call layout/rebuild-visible behavior.
+- [x] **Step 7: Write failing preferred-size width-contract tests**: positive `proposedSize.Width` wraps and increases preferred height; `MaximumSize.Width` is used when proposed width is zero; no proposed/max width measures one row; direct `Width` alone is not asserted as a wrapping API while AutoSize/GrowAndShrink is enabled.
+- [x] **Step 8: Run focused tests with hang protection; verify RED:**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -651,9 +652,9 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   --filter "FullyQualifiedName~BootstrapBreadcrumb"
 ```
 
-- [ ] **Step 9: Implement constructor, collection callbacks, generation rebuild, text-in-place update, exact child configuration, `GetPreferredSize`, and `OnLayout`.** Apply caller-owned outer `Padding`; use positive proposed width then `MaximumSize.Width` for preferred-size wrapping.
-- [ ] **Step 10: Run focused tests on both targets; verify GREEN.**
-- [ ] **Step 11: Commit** `feat: add BootstrapBreadcrumb composition`.
+- [x] **Step 9: Implement constructor, collection callbacks, generation rebuild, text-in-place update, exact child configuration, `GetPreferredSize`, and `OnLayout`.** Apply caller-owned outer `Padding`; use positive proposed width then `MaximumSize.Width` for preferred-size wrapping.
+- [x] **Step 10: Run focused tests on both targets; verify GREEN.**
+- [x] **Step 11: Commit** `feat: add BootstrapBreadcrumb composition`.
 
 ### Task 4: Preserve activation, accessibility, theme/font, DPI, wrapping, RTL, and lifecycle
 
@@ -667,7 +668,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Breadcrumb has exactly one theme subscription and at most one framework-owned font.
 - No timer, animation, custom focus engine, message filter, or custom accessibility tree.
 
-- [ ] **Step 1: Add deterministic LinkClicked test helper inside test file** using reflection to invoke protected `LinkLabel.OnLinkClicked` rather than `SendKeys` or sleeps:
+- [x] **Step 1: Add deterministic LinkClicked test helper inside test file** using reflection to invoke protected `LinkLabel.OnLinkClicked` rather than `SendKeys` or sleeps:
 
 ```csharp
 private static void Activate(LinkLabel link)
@@ -685,20 +686,20 @@ private static void Activate(LinkLabel link)
 
 Use this only for links created from valid non-empty item text; add no product test hook.
 
-- [ ] **Step 2: Add failing ItemClicked tests** for first/middle links: exactly one event, correct item/index, unchanged Items/final item, and no current/divider activation path.
-- [ ] **Step 3: Add a reentrancy test** whose handler clears/replaces `Items`; event args remain stable and resulting child tree matches caller mutation with no duplicate event.
-- [ ] **Step 4: Add critical stale-generation regression test:** create `Home / Library / Data`, capture old `Home` LinkLabel, structurally rebuild while keeping same `Home` item as a current ancestor, verify old link is disposed/detached, invoke its former protected activation path, and assert `ItemClicked` remains zero. Then activate new current-generation Home link and assert one event.
-- [ ] **Step 5: Add hosted STA focus/tab tests** proving only ancestor links are tabbable, text mutation preserves focused link instance/focus, and parent `Enabled=false` prevents effective native interaction without mutating item data.
-- [ ] **Step 6: Add accessibility tests** for full ancestor names, current `"Current page."` description, container Grouping/Name/Description, divider `AccessibleRole.None`, and empty divider accessible name/description.
-- [ ] **Step 7: Add divider/RTL tests** for `Divider=">"`, `Divider=""`, `RightToLeftDivider="<"`, mirrored geometry, and logical event indices under RTL.
-- [ ] **Step 8: Add width-constrained wrap tests** using both `GetPreferredSize(new Size(width, 0))` and `MaximumSize = new Size(width, 0)`. Assert each non-first divider/following item share same row in LTR and RTL and preferred height matches runtime row packing at same width.
-- [ ] **Step 9: Add `[NonParallelizable]` theme tests**: Light -> Dark updates link/current/divider colors without changing item order, Tag references, current-generation child instances, or multiplying handlers.
-- [ ] **Step 10: Add font ownership tests**: framework theme font is replaceable/disposable by control; caller-assigned Font remains assigned and undisposed through theme changes and final control disposal.
-- [ ] **Step 11: Add DPI metric tests** for 96/120/144/168/192 using exact `SpacingSM`/`SpacingXS` mappings, plus handle-backed smoke test that larger DPI increases gaps without changing event/index semantics.
-- [ ] **Step 12: Add lifecycle stress test** with at least 100 structural/text/divider/RTL/wrap/theme-affecting changes, then dispose and assert current generated children are disposed, active maps are empty, link handlers are detached, and later theme notifications cause no callback.
-- [ ] **Step 13: Run focused Breadcrumb UI tests with `--blame-hang` on both targets; verify RED before missing hardening and GREEN after implementation.**
-- [ ] **Step 14: Implement theme/font/DPI/RTL/accessibility/lifecycle behavior exactly as specified.** Structural rebuild detaches old link handlers before disposal; text mutation never rebuilds; theme mutation updates existing children; subscribe once/unsubscribe in `Dispose(bool)`.
-- [ ] **Step 15: Commit** `test: harden BootstrapBreadcrumb behavior`.
+- [x] **Step 2: Add failing ItemClicked tests** for first/middle links: exactly one event, correct item/index, unchanged Items/final item, and no current/divider activation path.
+- [x] **Step 3: Add a reentrancy test** whose handler clears/replaces `Items`; event args remain stable and resulting child tree matches caller mutation with no duplicate event.
+- [x] **Step 4: Add critical stale-generation regression test:** create `Home / Library / Data`, capture old `Home` LinkLabel, structurally rebuild while keeping same `Home` item as a current ancestor, verify old link is disposed/detached, invoke its former protected activation path, and assert `ItemClicked` remains zero. Then activate new current-generation Home link and assert one event.
+- [x] **Step 5: Add hosted STA focus/tab tests** proving only ancestor links are tabbable, text mutation preserves focused link instance/focus, and parent `Enabled=false` prevents effective native interaction without mutating item data.
+- [x] **Step 6: Add accessibility tests** for full ancestor names, current `"Current page."` description, container Grouping/Name/Description, divider `AccessibleRole.None`, and empty divider accessible name/description.
+- [x] **Step 7: Add divider/RTL tests** for `Divider=">"`, `Divider=""`, `RightToLeftDivider="<"`, mirrored geometry, and logical event indices under RTL.
+- [x] **Step 8: Add width-constrained wrap tests** using both `GetPreferredSize(new Size(width, 0))` and `MaximumSize = new Size(width, 0)`. Assert each non-first divider/following item share same row in LTR and RTL and preferred height matches runtime row packing at same width.
+- [x] **Step 9: Add `[NonParallelizable]` theme tests**: Light -> Dark updates link/current/divider colors without changing item order, Tag references, current-generation child instances, or multiplying handlers.
+- [x] **Step 10: Add font ownership tests**: framework theme font is replaceable/disposable by control; caller-assigned Font remains assigned and undisposed through theme changes and final control disposal.
+- [x] **Step 11: Add DPI metric tests** for 96/120/144/168/192 using exact `SpacingSM`/`SpacingXS` mappings, plus handle-backed smoke test that larger DPI increases gaps without changing event/index semantics.
+- [x] **Step 12: Add lifecycle stress test** with at least 100 structural/text/divider/RTL/wrap/theme-affecting changes, then dispose and assert current generated children are disposed, active maps are empty, link handlers are detached, and later theme notifications cause no callback.
+- [x] **Step 13: Run focused Breadcrumb UI tests with `--blame-hang` on both targets; verify RED before missing hardening and GREEN after implementation.**
+- [x] **Step 14: Implement theme/font/DPI/RTL/accessibility/lifecycle behavior exactly as specified.** Structural rebuild detaches old link handlers before disposal; text mutation never rebuilds; theme mutation updates existing children; subscribe once/unsubscribe in `Dispose(bool)`.
+- [x] **Step 15: Commit** `test: harden BootstrapBreadcrumb behavior`.
 
 ### Task 5: Add an integrated Breadcrumb demo
 
@@ -711,13 +712,13 @@ Use this only for links created from valid non-empty item text; add no product t
 - Demo uses only public Breadcrumb API.
 - Any trail mutation after `ItemClicked` is demo/application code, never hidden control behavior.
 
-- [ ] **Step 1: Write a failing demo smoke test** that constructs `BreadcrumbDemoForm`, finds multiple Breadcrumb examples, and verifies `MainForm` integrated navigation contains Breadcrumb.
-- [ ] **Step 2: Implement demo scenarios:** one current item; `Home / Library / Data`; deep/long hierarchy; `>` divider; empty divider; constrained wrapping with `MaximumSize = new Size(320, 0)`; RTL with `<`; disabled Breadcrumb; live non-empty item Text mutation; and output label showing clicked index/text/tag.
-- [ ] **Step 3: Add one interactive scenario whose Form-level `ItemClicked` handler trims/replaces `Items` to simulate navigation.** Comment demo code to make caller ownership explicit.
-- [ ] **Step 4: Add Breadcrumb to `MainForm` near other navigation controls with concise description of hierarchy links/current item/divider/wrap/RTL/native keyboard behavior.**
-- [ ] **Step 5: Build demo for `net8.0-windows`; verify zero compile errors.**
-- [ ] **Step 6: Run `BreadcrumbDemoFormTests` with hang protection; verify GREEN.**
-- [ ] **Step 7: Commit** `demo: add BootstrapBreadcrumb scenarios`.
+- [x] **Step 1: Write a failing demo smoke test** that constructs `BreadcrumbDemoForm`, finds multiple Breadcrumb examples, and verifies `MainForm` integrated navigation contains Breadcrumb.
+- [x] **Step 2: Implement demo scenarios:** one current item; `Home / Library / Data`; deep/long hierarchy; `>` divider; empty divider; constrained wrapping with `MaximumSize = new Size(320, 0)`; RTL with `<`; disabled Breadcrumb; live non-empty item Text mutation; and output label showing clicked index/text/tag.
+- [x] **Step 3: Add one interactive scenario whose Form-level `ItemClicked` handler trims/replaces `Items` to simulate navigation.** Comment demo code to make caller ownership explicit.
+- [x] **Step 4: Add Breadcrumb to `MainForm` near other navigation controls with concise description of hierarchy links/current item/divider/wrap/RTL/native keyboard behavior.**
+- [x] **Step 5: Build demo for `net8.0-windows`; verify zero compile errors.**
+- [x] **Step 6: Run `BreadcrumbDemoFormTests` with hang protection; verify GREEN.**
+- [x] **Step 7: Commit** `demo: add BootstrapBreadcrumb scenarios`.
 
 ### Task 6: Finalize docs and deliberately approve the API addition
 
@@ -731,12 +732,12 @@ Use this only for links created from valid non-empty item text; add no product t
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Release/Phase16PublicApiBaselineTests.cs`
 - Modify: `docs/PUBLIC_API_BASELINE.md`
 
-- [ ] **Step 1: Update `docs/COMPONENTS.md`** with exact Breadcrumb public types/defaults, non-empty item invariant, last-item-current rule, native LinkLabel composition, width-constrained wrap contract, RTL, current-generation activation guard, text-in-place mutation, `ItemClicked` ownership boundary, accessibility semantics, and excluded scope.
-- [ ] **Step 2: Update `docs/ARCHITECTURE.md`** with `Breadcrumb -> native LinkLabel/Label + Theme/DPI + pure layout helper`; explicitly exclude routing/history/page hosting and note structural rebuild vs text-in-place update.
-- [ ] **Step 3: Update `docs/TESTING.md`** with pure layout/item tests, stale-generation regression, STA activation/accessibility/RTL/wrap/theme/font/lifecycle tests, manual real-DPI checks, and existing bounded test policy.
-- [ ] **Step 4: Update `README.md` and `docs/PACKAGE_README.md`** without claiming built-in routing/navigation history.
-- [ ] **Step 5: Add Breadcrumb under `## [Unreleased]` in `CHANGELOG.md`; do not rewrite historical releases.**
-- [ ] **Step 6: Add a dedicated public-contract test before changing global fingerprint.** Assert:
+- [x] **Step 1: Update `docs/COMPONENTS.md`** with exact Breadcrumb public types/defaults, non-empty item invariant, last-item-current rule, native LinkLabel composition, width-constrained wrap contract, RTL, current-generation activation guard, text-in-place mutation, `ItemClicked` ownership boundary, accessibility semantics, and excluded scope.
+- [x] **Step 2: Update `docs/ARCHITECTURE.md`** with `Breadcrumb -> native LinkLabel/Label + Theme/DPI + pure layout helper`; explicitly exclude routing/history/page hosting and note structural rebuild vs text-in-place update.
+- [x] **Step 3: Update `docs/TESTING.md`** with pure layout/item tests, stale-generation regression, STA activation/accessibility/RTL/wrap/theme/font/lifecycle tests, manual real-DPI checks, and existing bounded test policy.
+- [x] **Step 4: Update `README.md` and `docs/PACKAGE_README.md`** without claiming built-in routing/navigation history.
+- [x] **Step 5: Add Breadcrumb under `## [Unreleased]` in `CHANGELOG.md`; do not rewrite historical releases.**
+- [x] **Step 6: Add a dedicated public-contract test before changing global fingerprint.** Assert:
 
 ```text
 BootstrapBreadcrumb declared public properties: Divider, Items, RightToLeftDivider, WrapContents
@@ -749,7 +750,7 @@ BootstrapBreadcrumbItemClickedEventArgs declared public properties: Index, Item
 
 Also assert no current-generation map/layout/internal notification type is exported.
 
-- [ ] **Step 7: Run API baseline before changing its hash:**
+- [x] **Step 7: Run API baseline before changing its hash:**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -760,7 +761,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: FAIL and print deterministic actual exported fingerprint.
 
-- [ ] **Step 8: Review exported surface line-by-line.** Intentional new public types only:
+- [x] **Step 8: Review exported surface line-by-line.** Intentional new public types only:
 
 ```text
 MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapBreadcrumb : System.Windows.Forms.Panel
@@ -771,16 +772,16 @@ MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapBreadcrumbItemClickedEventArgs
 
 For `BootstrapBreadcrumbItemCollection`, explicitly verify fingerprint includes exactly four intended protected overrides `ClearItems`, `InsertItem`, `RemoveItem`, `SetItem`. Internal layout types/events/callbacks/current-generation maps must be absent from exported output.
 
-- [ ] **Step 9: Copy reviewed actual fingerprint into `ApprovedV1Fingerprint` and `docs/PUBLIC_API_BASELINE.md`, recording Breadcrumb as an intentional compatible addition.** Keep `AssemblyVersion` unchanged unless a separate release task changes it.
-- [ ] **Step 10: Rerun API baseline on `net8.0-windows` and `net48`; verify GREEN.**
-- [ ] **Step 11: Commit** `docs: finalize BootstrapBreadcrumb contract`.
+- [x] **Step 9: Copy reviewed actual fingerprint into `ApprovedV1Fingerprint` and `docs/PUBLIC_API_BASELINE.md`, recording Breadcrumb as an intentional compatible addition.** Keep `AssemblyVersion` unchanged unless a separate release task changes it.
+- [x] **Step 10: Rerun API baseline on `net8.0-windows` and `net48`; verify GREEN.**
+- [x] **Step 11: Commit** `docs: finalize BootstrapBreadcrumb contract`.
 
 ### Task 7: Complete dual-target verification and manual UI gate
 
 **Files:**
 - No new files expected; fix only Breadcrumb-related defects uncovered by verification.
 
-- [ ] **Step 1: Build .NET Framework 4.8:**
+- [x] **Step 1: Build .NET Framework 4.8:**
 
 ```powershell
 dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net48
@@ -788,7 +789,7 @@ dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net48
 
 Expected: zero errors.
 
-- [ ] **Step 2: Build .NET 8 Windows:**
+- [x] **Step 2: Build .NET 8 Windows:**
 
 ```powershell
 dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net8.0-windows
@@ -796,7 +797,7 @@ dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net8.0-windows
 
 Expected: zero errors.
 
-- [ ] **Step 3: Run full bounded suite:**
+- [x] **Step 3: Run full bounded suite:**
 
 ```powershell
 ./test.ps1
@@ -804,12 +805,12 @@ Expected: zero errors.
 
 Expected: both targets pass with no hang timeout, modal dialog, or blame dump.
 
-- [ ] **Step 4: Search Breadcrumb product files for prohibited infrastructure.** Confirm no `Timer`, `Task.Delay`, `Thread.Sleep`, `MessageBox.Show`, `ShowDialog`, `Application.AddMessageFilter`, global hook, top-level window, routing/data-source dependency, custom link hit-test engine, or external icon package.
-- [ ] **Step 5: Run demo/manual checks:** 0/1/2/many items; reject blank item text; mouse; Tab/Shift+Tab; native Enter activation; visible focus; live text change while an ancestor is focused; current item non-focusability; custom/empty divider; long text; `MaximumSize` wrapping; parent-constrained wrapping; repeated resize; LTR/RTL; disabled parent; Light/Dark; caller font; 100/125/150/175/200% Windows scaling.
-- [ ] **Step 6: Accessibility smoke check** with Narrator or Windows accessibility inspection: ancestor links expose full non-empty names; current item is understandable as current/non-link; dividers are not actionable; focus order contains only ancestors.
-- [ ] **Step 7: Verify stale-generation safety manually/diagnostically:** structural rebuild while retaining same item objects never permits old generated links to raise `ItemClicked`; current generated links remain functional.
-- [ ] **Step 8: Verify ownership boundary:** activating an ancestor without application handler leaves trail unchanged; demo handler that simulates navigation changes `Items` itself.
-- [ ] **Step 9: If verification requires code changes, rerun Steps 1-8 and commit** `fix: harden BootstrapBreadcrumb verification`. **If no fixes are required, do not create an empty commit.**
+- [x] **Step 4: Search Breadcrumb product files for prohibited infrastructure.** Confirm no `Timer`, `Task.Delay`, `Thread.Sleep`, `MessageBox.Show`, `ShowDialog`, `Application.AddMessageFilter`, global hook, top-level window, routing/data-source dependency, custom link hit-test engine, or external icon package.
+- [x] **Step 5: Run demo/manual checks:** 0/1/2/many items; reject blank item text; mouse; Tab/Shift+Tab; native Enter activation; visible focus; live text change while an ancestor is focused; current item non-focusability; custom/empty divider; long text; `MaximumSize` wrapping; parent-constrained wrapping; repeated resize; LTR/RTL; disabled parent; Light/Dark; caller font; 100/125/150/175/200% Windows scaling. Confirmed by the user on 2026-09-21.
+- [x] **Step 6: Accessibility smoke check** with Narrator or Windows accessibility inspection: ancestor links expose full non-empty names; current item is understandable as current/non-link; dividers are not actionable; focus order contains only ancestors. Confirmed by the user on 2026-09-21.
+- [x] **Step 7: Verify stale-generation safety manually/diagnostically:** structural rebuild while retaining same item objects never permits old generated links to raise `ItemClicked`; current generated links remain functional.
+- [x] **Step 8: Verify ownership boundary:** activating an ancestor without application handler leaves trail unchanged; demo handler that simulates navigation changes `Items` itself.
+- [x] **Step 9: If verification requires code changes, rerun Steps 1-8 and commit** `fix: harden BootstrapBreadcrumb verification`. **If no fixes are required, do not create an empty commit.**
 
 ---
 

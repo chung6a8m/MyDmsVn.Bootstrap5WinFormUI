@@ -26,7 +26,7 @@ For historical context, see [Archive](./docs/archive/).
 
 ## Component coverage
 
-The repository already contains the shared foundation plus a broad control set, including buttons/groups/toolbars, the native-backed ToolStrip/MenuStrip/ContextMenuStrip/StatusStrip family, text, numeric, and range inputs, checks/radios/switches, combo/select/lookup/input-group/date/calendar controls, cards/collapse/accordion/progress/sidebar/tree/data-grid/pagination, modal dialogs, badge/alert/tooltip/popover/tabs/dropdown/split-button/toast, and supporting infrastructure.
+The repository already contains the shared foundation plus a broad control set, including buttons/groups/toolbars, the native-backed ToolStrip/MenuStrip/ContextMenuStrip/StatusStrip family, text, numeric, and range inputs, checks/radios/switches, combo/select/lookup/input-group/date/calendar controls, cards/collapse/accordion/progress/sidebar/tree/data-grid/pagination/breadcrumb, modal dialogs, badge/alert/tooltip/popover/tabs/dropdown/split-button/toast, and supporting infrastructure. Breadcrumb activation is an application notification; routing, history, and page hosting remain caller-owned.
 
 See [docs/COMPONENTS.md](./docs/COMPONENTS.md) for component contracts and [docs/PACKAGE_README.md](./docs/PACKAGE_README.md) for detailed usage-oriented documentation.
 

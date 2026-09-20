@@ -8,9 +8,7 @@ Do not preload every plan into an agent context. Read `AGENTS.md`, `AI_CONTEXT.m
 
 1. [Bootstrap ToolStrip Family](./plans/20260907-001-bootstrap-toolstrip-family.md)
    - Add native-backed `BootstrapToolStrip`, `BootstrapMenuStrip`, `BootstrapContextMenuStrip`, and `BootstrapStatusStrip` with a shared Bootstrap renderer and no parallel menu/layout engine.
-2. [BootstrapBreadcrumb](./plans/20260907-006-bootstrap-breadcrumb.md)
-   - Add an ordered hierarchy/navigation trail built from native links/labels with deterministic wrapping, RTL layout, and native keyboard/accessibility behavior.
-3. [BootstrapPlaceholder / Skeleton](./plans/20260907-007-bootstrap-placeholder-skeleton.md)
+2. [BootstrapPlaceholder / Skeleton](./plans/20260907-007-bootstrap-placeholder-skeleton.md)
    - Add the owner-painted `BootstrapPlaceholder` primitive with Bootstrap-compatible sizing and Glow/Wave animation; Skeleton remains normal WinForms composition rather than a second framework.
 
 ## Execution rules
