@@ -6,6 +6,7 @@ using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Demo;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Demo;
@@ -59,6 +60,47 @@ public sealed class BreadcrumbDemoFormTests
             Assert.That(output.Text, Does.Contain("index 1"));
             Assert.That(output.Text, Does.Contain("Library"));
         }));
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void RuntimeThemeUpdatesTheDemoSurfaceAndScenarioText()
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            var light = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+            BootstrapThemeManager.CurrentTheme = light;
+            using var form = new BreadcrumbDemoForm();
+            var content = form.Controls.OfType<FlowLayoutPanel>().Single();
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(form.BackColor, Is.EqualTo(light.Colors.Body));
+                Assert.That(form.ForeColor, Is.EqualTo(light.Colors.Text));
+                Assert.That(content.BackColor, Is.EqualTo(light.Colors.Body));
+                Assert.That(content.ForeColor, Is.EqualTo(light.Colors.Text));
+            }));
+
+            var dark = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+            BootstrapThemeManager.CurrentTheme = dark;
+            var scenarioPanel = content.Controls.OfType<Panel>().First();
+            var scenarioText = scenarioPanel.Controls.OfType<Label>().First();
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(form.BackColor, Is.EqualTo(dark.Colors.Body));
+                Assert.That(form.ForeColor, Is.EqualTo(dark.Colors.Text));
+                Assert.That(content.BackColor, Is.EqualTo(dark.Colors.Body));
+                Assert.That(content.ForeColor, Is.EqualTo(dark.Colors.Text));
+                Assert.That(scenarioPanel.BackColor, Is.EqualTo(dark.Colors.Body));
+                Assert.That(scenarioText.ForeColor, Is.EqualTo(dark.Colors.Text));
+            }));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = originalTheme;
+        }
     }
 
     private static void Activate(LinkLabel link)

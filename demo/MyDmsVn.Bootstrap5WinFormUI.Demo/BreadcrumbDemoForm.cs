@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Demo;
 
@@ -66,6 +67,20 @@ public sealed class BreadcrumbDemoForm : DemoFormBase
         interactive.AccessibleName = "Interactive navigation breadcrumb";
         WireCallerOwnedNavigation(interactive);
         AddScenario("Caller-owned navigation", interactive, "Activating an ancestor trims this demo trail in Form code; Breadcrumb itself never navigates.");
+
+        BootstrapThemeManager.ThemeChanged += OnThemeChanged;
+        ApplyTheme(BootstrapThemeManager.CurrentTheme);
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            BootstrapThemeManager.ThemeChanged -= OnThemeChanged;
+        }
+
+        base.Dispose(disposing);
     }
 
     private BootstrapBreadcrumb CreateTrail(params string[] labels)
@@ -104,6 +119,19 @@ public sealed class BreadcrumbDemoForm : DemoFormBase
                 breadcrumb.Items.Add(item);
             }
         };
+    }
+
+    private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
+    {
+        ApplyTheme(e.NewTheme);
+    }
+
+    private void ApplyTheme(BootstrapTheme theme)
+    {
+        BackColor = theme.Colors.Body;
+        ForeColor = theme.Colors.Text;
+        _content.BackColor = theme.Colors.Body;
+        _content.ForeColor = theme.Colors.Text;
     }
 
     private void AddScenario(string title, BootstrapBreadcrumb breadcrumb, string note, Control? action = null)
