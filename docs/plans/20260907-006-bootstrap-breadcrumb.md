@@ -613,8 +613,8 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Owns/disposes every generated native child.
 - Owns `_activeLinks` and `_itemControls` as current-generation implementation details.
 
-- [ ] **Step 1: Write failing default/metadata tests** for all default state values, `[DefaultEvent(nameof(ItemClicked))]`, `Items` content serialization, `GetPreferredSize`, public type/member shape, and absence of prohibited routing/style APIs.
-- [ ] **Step 2: Write failing composition tests** for 0/1/2/3 valid items. Three items must create two LinkLabels, one current Label, and two divider Labels in semantic order.
+- [x] **Step 1: Write failing default/metadata tests** for all default state values, `[DefaultEvent(nameof(ItemClicked))]`, `Items` content serialization, `GetPreferredSize`, public type/member shape, and absence of prohibited routing/style APIs.
+- [x] **Step 2: Write failing composition tests** for 0/1/2/3 valid items. Three items must create two LinkLabels, one current Label, and two divider Labels in semantic order.
 
 ```csharp
 [Test]
@@ -637,12 +637,12 @@ public void ThreeItemsCreateTwoLinksAndOneCurrentItem()
 }
 ```
 
-- [ ] **Step 3: Write failing generated-child property tests** for exact LinkLabel/current/divider configuration from **Generated Child Contract**, including full-text link area and accessible names.
-- [ ] **Step 4: Write failing structural mutation tests** proving Add/Insert/Set/Remove/Clear rebuild as required and old framework-owned children are disposed after handlers/maps are detached/cleared.
-- [ ] **Step 5: Write failing text-mutation identity tests**: capture an ancestor LinkLabel and current Label, mutate their item `Text`, and assert same control instances remain, their `Text`/`AccessibleName` update, focus on an ancestor link is preserved, and preferred size/layout refreshes.
-- [ ] **Step 6: Write failing Tag-only tests** proving changing `Tag` preserves generated child instances and does not call layout/rebuild-visible behavior.
-- [ ] **Step 7: Write failing preferred-size width-contract tests**: positive `proposedSize.Width` wraps and increases preferred height; `MaximumSize.Width` is used when proposed width is zero; no proposed/max width measures one row; direct `Width` alone is not asserted as a wrapping API while AutoSize/GrowAndShrink is enabled.
-- [ ] **Step 8: Run focused tests with hang protection; verify RED:**
+- [x] **Step 3: Write failing generated-child property tests** for exact LinkLabel/current/divider configuration from **Generated Child Contract**, including full-text link area and accessible names.
+- [x] **Step 4: Write failing structural mutation tests** proving Add/Insert/Set/Remove/Clear rebuild as required and old framework-owned children are disposed after handlers/maps are detached/cleared.
+- [x] **Step 5: Write failing text-mutation identity tests**: capture an ancestor LinkLabel and current Label, mutate their item `Text`, and assert same control instances remain, their `Text`/`AccessibleName` update, focus on an ancestor link is preserved, and preferred size/layout refreshes.
+- [x] **Step 6: Write failing Tag-only tests** proving changing `Tag` preserves generated child instances and does not call layout/rebuild-visible behavior.
+- [x] **Step 7: Write failing preferred-size width-contract tests**: positive `proposedSize.Width` wraps and increases preferred height; `MaximumSize.Width` is used when proposed width is zero; no proposed/max width measures one row; direct `Width` alone is not asserted as a wrapping API while AutoSize/GrowAndShrink is enabled.
+- [x] **Step 8: Run focused tests with hang protection; verify RED:**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -651,9 +651,9 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
   --filter "FullyQualifiedName~BootstrapBreadcrumb"
 ```
 
-- [ ] **Step 9: Implement constructor, collection callbacks, generation rebuild, text-in-place update, exact child configuration, `GetPreferredSize`, and `OnLayout`.** Apply caller-owned outer `Padding`; use positive proposed width then `MaximumSize.Width` for preferred-size wrapping.
-- [ ] **Step 10: Run focused tests on both targets; verify GREEN.**
-- [ ] **Step 11: Commit** `feat: add BootstrapBreadcrumb composition`.
+- [x] **Step 9: Implement constructor, collection callbacks, generation rebuild, text-in-place update, exact child configuration, `GetPreferredSize`, and `OnLayout`.** Apply caller-owned outer `Padding`; use positive proposed width then `MaximumSize.Width` for preferred-size wrapping.
+- [x] **Step 10: Run focused tests on both targets; verify GREEN.**
+- [x] **Step 11: Commit** `feat: add BootstrapBreadcrumb composition`.
 
 ### Task 4: Preserve activation, accessibility, theme/font, DPI, wrapping, RTL, and lifecycle
 
