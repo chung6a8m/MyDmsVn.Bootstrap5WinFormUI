@@ -276,7 +276,7 @@ public sealed class BootstrapListGroupTests
             AutoSize = false,
             Size = new Size(240, 200)
         };
-        using var item = new BootstrapListGroupItem();
+        using var item = new BootstrapListGroupItem { Size = new Size(220, 100) };
         var child = new Label
         {
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom,
@@ -284,6 +284,7 @@ public sealed class BootstrapListGroupTests
             Text = "Stretch anchored content"
         };
         item.Controls.Add(child);
+        var childPreferredHeight = child.GetPreferredSize(Size.Empty).Height;
         group.Controls.Add(item);
         group.PerformLayout();
         var stableBounds = item.Bounds;
@@ -292,6 +293,37 @@ public sealed class BootstrapListGroupTests
         {
             group.PerformLayout();
             Assert.That(item.Bounds, Is.EqualTo(stableBounds));
+            Assert.That(child.Height, Is.GreaterThanOrEqualTo(childPreferredHeight));
+        }
+    }
+
+    [Test]
+    public void FarEdgeHorizontalAnchorPreservesUsableChildWidth()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Orientation = Orientation.Horizontal,
+            Size = new Size(400, 160)
+        };
+        using var item = new BootstrapListGroupItem { Size = new Size(220, 60) };
+        var child = new Label
+        {
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            Bounds = new Rectangle(10, 8, 80, 20),
+            Text = "Anchored"
+        };
+        item.Controls.Add(child);
+        var childPreferredWidth = child.GetPreferredSize(Size.Empty).Width;
+        group.Controls.Add(item);
+        group.PerformLayout();
+        var stableBounds = item.Bounds;
+
+        for (var pass = 0; pass < 5; pass++)
+        {
+            group.PerformLayout();
+            Assert.That(item.Bounds, Is.EqualTo(stableBounds));
+            Assert.That(child.Width, Is.GreaterThanOrEqualTo(childPreferredWidth));
         }
     }
 

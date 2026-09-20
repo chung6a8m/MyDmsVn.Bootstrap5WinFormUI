@@ -27,6 +27,7 @@ public class BootstrapListGroupItem : Panel
     private bool _hovered;
     private bool _pressed;
     private bool _spacePressed;
+    private Control? _hoveredDecorativeControl;
     private Control? _forwardingPressedControl;
     private readonly HashSet<Control> _trackedDescendants = new HashSet<Control>();
     private string? _automaticAccessibleName;
@@ -479,7 +480,7 @@ public class BootstrapListGroupItem : Panel
         }
     }
 
-    private static int GetHorizontalContentExtent(Control child, Size preferred)
+    private int GetHorizontalContentExtent(Control child, Size preferred)
     {
         switch (child.Dock)
         {
@@ -496,7 +497,8 @@ public class BootstrapListGroupItem : Panel
         var anchoredRight = (child.Anchor & AnchorStyles.Right) == AnchorStyles.Right;
         if (anchoredLeft && anchoredRight)
         {
-            return Math.Max(0, child.Left) + Math.Max(0, preferred.Width);
+            var farEdgeDistance = Math.Max(0, ClientSize.Width - child.Right);
+            return Math.Max(0, child.Left) + Math.Max(0, preferred.Width) + farEdgeDistance;
         }
 
         return anchoredRight
@@ -504,7 +506,7 @@ public class BootstrapListGroupItem : Panel
             : Math.Max(0, child.Right);
     }
 
-    private static int GetVerticalContentExtent(Control child, Size preferred)
+    private int GetVerticalContentExtent(Control child, Size preferred)
     {
         switch (child.Dock)
         {
@@ -521,7 +523,8 @@ public class BootstrapListGroupItem : Panel
         var anchoredBottom = (child.Anchor & AnchorStyles.Bottom) == AnchorStyles.Bottom;
         if (anchoredTop && anchoredBottom)
         {
-            return Math.Max(0, child.Top) + Math.Max(0, preferred.Height);
+            var farEdgeDistance = Math.Max(0, ClientSize.Height - child.Bottom);
+            return Math.Max(0, child.Top) + Math.Max(0, preferred.Height) + farEdgeDistance;
         }
 
         return anchoredBottom
@@ -539,6 +542,7 @@ public class BootstrapListGroupItem : Panel
         control.VisibleChanged += OnDescendantPreferredSizeChanged;
         if (IsDecorativeForwardingSurface(control))
         {
+            control.MouseEnter += OnDecorativeMouseEnter;
             control.MouseDown += OnDecorativeMouseDown;
             control.MouseUp += OnDecorativeMouseUp;
             control.MouseLeave += OnDecorativeMouseLeave;
@@ -555,9 +559,15 @@ public class BootstrapListGroupItem : Panel
         control.LocationChanged -= OnDescendantPreferredSizeChanged;
         control.SizeChanged -= OnDescendantPreferredSizeChanged;
         control.VisibleChanged -= OnDescendantPreferredSizeChanged;
+        control.MouseEnter -= OnDecorativeMouseEnter;
         control.MouseDown -= OnDecorativeMouseDown;
         control.MouseUp -= OnDecorativeMouseUp;
         control.MouseLeave -= OnDecorativeMouseLeave;
+        if (ReferenceEquals(_hoveredDecorativeControl, control))
+        {
+            _hoveredDecorativeControl = null;
+            _hovered = false;
+        }
         if (ReferenceEquals(_forwardingPressedControl, control)) _forwardingPressedControl = null;
     }
 
@@ -590,10 +600,28 @@ public class BootstrapListGroupItem : Panel
         Parent?.PerformLayout(this, nameof(PreferredSize));
     }
 
+    private void OnDecorativeMouseEnter(object? sender, EventArgs e)
+    {
+        if (sender is not Control control || !_actionable || !Enabled)
+        {
+            return;
+        }
+
+        _hoveredDecorativeControl = control;
+        _hovered = true;
+        UpdateResolvedForeground();
+        Invalidate();
+    }
+
     private void OnDecorativeMouseDown(object? sender, MouseEventArgs e)
     {
         if (sender is Control control && e.Button == MouseButtons.Left && _actionable && Enabled && control.ClientRectangle.Contains(e.Location))
+        {
             _forwardingPressedControl = control;
+            _pressed = true;
+            UpdateResolvedForeground();
+            Invalidate();
+        }
     }
 
     private void OnDecorativeMouseUp(object? sender, MouseEventArgs e)
@@ -601,11 +629,33 @@ public class BootstrapListGroupItem : Panel
         var activate = sender is Control control && ReferenceEquals(control, _forwardingPressedControl) &&
             e.Button == MouseButtons.Left && control.ClientRectangle.Contains(e.Location);
         _forwardingPressedControl = null;
+        _pressed = false;
+        UpdateResolvedForeground();
+        Invalidate();
         if (activate) ActivateItem();
     }
 
     private void OnDecorativeMouseLeave(object? sender, EventArgs e)
     {
-        if (ReferenceEquals(sender, _forwardingPressedControl)) _forwardingPressedControl = null;
+        var stateChanged = false;
+        if (ReferenceEquals(sender, _hoveredDecorativeControl))
+        {
+            _hoveredDecorativeControl = null;
+            _hovered = false;
+            stateChanged = true;
+        }
+
+        if (ReferenceEquals(sender, _forwardingPressedControl))
+        {
+            _forwardingPressedControl = null;
+            _pressed = false;
+            stateChanged = true;
+        }
+
+        if (stateChanged)
+        {
+            UpdateResolvedForeground();
+            Invalidate();
+        }
     }
 }

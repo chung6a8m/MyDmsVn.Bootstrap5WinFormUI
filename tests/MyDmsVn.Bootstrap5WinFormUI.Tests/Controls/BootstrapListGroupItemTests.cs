@@ -419,11 +419,95 @@ public sealed class BootstrapListGroupItemTests
         }
     }
 
+    [Test]
+    public void DecorativeChildrenForwardHoverAndPressedVisualStates()
+    {
+        var original = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            var interactionTheme = CreateInteractionStateTheme();
+            BootstrapThemeManager.CurrentTheme = interactionTheme;
+            using var item = new BootstrapListGroupItem { Actionable = true };
+            var label = new Label();
+            var badge = new BootstrapBadge { Text = "New" };
+            item.Controls.Add(label);
+            item.Controls.Add(badge);
+            var neutral = BootstrapListGroupRenderLogic.ResolvePalette(
+                interactionTheme.Colors,
+                null,
+                BootstrapListGroupVisualState.Neutral).Foreground;
+            var hover = BootstrapListGroupRenderLogic.ResolvePalette(
+                interactionTheme.Colors,
+                null,
+                BootstrapListGroupVisualState.Hover).Foreground;
+            var pressed = BootstrapListGroupRenderLogic.ResolvePalette(
+                interactionTheme.Colors,
+                null,
+                BootstrapListGroupVisualState.Pressed).Foreground;
+            var clicks = 0;
+            item.Click += (_, _) => clicks++;
+
+            foreach (var decorativeChild in new Control[] { label, badge })
+            {
+                RaiseControlMouseEvent(decorativeChild, "OnMouseEnter", EventArgs.Empty);
+                Assert.That(item.ForeColor, Is.EqualTo(hover));
+                RaiseControlMouseEvent(decorativeChild, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
+                Assert.That(item.ForeColor, Is.EqualTo(pressed));
+                RaiseControlMouseEvent(decorativeChild, "OnMouseUp", new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
+                Assert.That(item.ForeColor, Is.EqualTo(hover));
+                RaiseControlMouseEvent(decorativeChild, "OnMouseLeave", EventArgs.Empty);
+                Assert.That(item.ForeColor, Is.EqualTo(neutral));
+            }
+
+            Assert.That(clicks, Is.EqualTo(2));
+        }
+        finally
+        {
+            BootstrapThemeManager.CurrentTheme = original;
+        }
+    }
+
     private static int GetThemeSubscriptionCount()
     {
         var field = typeof(BootstrapThemeManager).GetField("ThemeChanged", BindingFlags.Static | BindingFlags.NonPublic);
         var handler = (Delegate?)field?.GetValue(null);
         return handler?.GetInvocationList().Length ?? 0;
+    }
+
+    private static BootstrapTheme CreateInteractionStateTheme()
+    {
+        var baseline = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+        var colors = baseline.Colors;
+        return new BootstrapTheme(
+            BootstrapThemeMode.Light,
+            new BootstrapThemeColors(
+                colors.Primary,
+                colors.Secondary,
+                colors.Success,
+                colors.Danger,
+                colors.Warning,
+                colors.Info,
+                Color.White,
+                Color.Black,
+                colors.Body,
+                Color.White,
+                colors.SurfaceSecondary,
+                colors.Border,
+                Color.Black,
+                colors.MutedText,
+                colors.Disabled,
+                colors.Focus,
+                Color.Black,
+                Color.White),
+            baseline.Metrics,
+            baseline.Typography);
+    }
+
+    private static void RaiseControlMouseEvent(Control control, string methodName, EventArgs eventArgs)
+    {
+        var method = typeof(Control).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null);
+        method!.Invoke(control, new object[] { eventArgs });
     }
 
     private sealed class SelectabilityProbeItem : BootstrapListGroupItem
