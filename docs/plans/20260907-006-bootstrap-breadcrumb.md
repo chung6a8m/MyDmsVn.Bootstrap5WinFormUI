@@ -731,12 +731,12 @@ Use this only for links created from valid non-empty item text; add no product t
 - Modify: `tests/MyDmsVn.Bootstrap5WinFormUI.Tests/Release/Phase16PublicApiBaselineTests.cs`
 - Modify: `docs/PUBLIC_API_BASELINE.md`
 
-- [ ] **Step 1: Update `docs/COMPONENTS.md`** with exact Breadcrumb public types/defaults, non-empty item invariant, last-item-current rule, native LinkLabel composition, width-constrained wrap contract, RTL, current-generation activation guard, text-in-place mutation, `ItemClicked` ownership boundary, accessibility semantics, and excluded scope.
-- [ ] **Step 2: Update `docs/ARCHITECTURE.md`** with `Breadcrumb -> native LinkLabel/Label + Theme/DPI + pure layout helper`; explicitly exclude routing/history/page hosting and note structural rebuild vs text-in-place update.
-- [ ] **Step 3: Update `docs/TESTING.md`** with pure layout/item tests, stale-generation regression, STA activation/accessibility/RTL/wrap/theme/font/lifecycle tests, manual real-DPI checks, and existing bounded test policy.
-- [ ] **Step 4: Update `README.md` and `docs/PACKAGE_README.md`** without claiming built-in routing/navigation history.
-- [ ] **Step 5: Add Breadcrumb under `## [Unreleased]` in `CHANGELOG.md`; do not rewrite historical releases.**
-- [ ] **Step 6: Add a dedicated public-contract test before changing global fingerprint.** Assert:
+- [x] **Step 1: Update `docs/COMPONENTS.md`** with exact Breadcrumb public types/defaults, non-empty item invariant, last-item-current rule, native LinkLabel composition, width-constrained wrap contract, RTL, current-generation activation guard, text-in-place mutation, `ItemClicked` ownership boundary, accessibility semantics, and excluded scope.
+- [x] **Step 2: Update `docs/ARCHITECTURE.md`** with `Breadcrumb -> native LinkLabel/Label + Theme/DPI + pure layout helper`; explicitly exclude routing/history/page hosting and note structural rebuild vs text-in-place update.
+- [x] **Step 3: Update `docs/TESTING.md`** with pure layout/item tests, stale-generation regression, STA activation/accessibility/RTL/wrap/theme/font/lifecycle tests, manual real-DPI checks, and existing bounded test policy.
+- [x] **Step 4: Update `README.md` and `docs/PACKAGE_README.md`** without claiming built-in routing/navigation history.
+- [x] **Step 5: Add Breadcrumb under `## [Unreleased]` in `CHANGELOG.md`; do not rewrite historical releases.**
+- [x] **Step 6: Add a dedicated public-contract test before changing global fingerprint.** Assert:
 
 ```text
 BootstrapBreadcrumb declared public properties: Divider, Items, RightToLeftDivider, WrapContents
@@ -749,7 +749,7 @@ BootstrapBreadcrumbItemClickedEventArgs declared public properties: Index, Item
 
 Also assert no current-generation map/layout/internal notification type is exported.
 
-- [ ] **Step 7: Run API baseline before changing its hash:**
+- [x] **Step 7: Run API baseline before changing its hash:**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj `
@@ -760,7 +760,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: FAIL and print deterministic actual exported fingerprint.
 
-- [ ] **Step 8: Review exported surface line-by-line.** Intentional new public types only:
+- [x] **Step 8: Review exported surface line-by-line.** Intentional new public types only:
 
 ```text
 MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapBreadcrumb : System.Windows.Forms.Panel
@@ -771,9 +771,9 @@ MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapBreadcrumbItemClickedEventArgs
 
 For `BootstrapBreadcrumbItemCollection`, explicitly verify fingerprint includes exactly four intended protected overrides `ClearItems`, `InsertItem`, `RemoveItem`, `SetItem`. Internal layout types/events/callbacks/current-generation maps must be absent from exported output.
 
-- [ ] **Step 9: Copy reviewed actual fingerprint into `ApprovedV1Fingerprint` and `docs/PUBLIC_API_BASELINE.md`, recording Breadcrumb as an intentional compatible addition.** Keep `AssemblyVersion` unchanged unless a separate release task changes it.
-- [ ] **Step 10: Rerun API baseline on `net8.0-windows` and `net48`; verify GREEN.**
-- [ ] **Step 11: Commit** `docs: finalize BootstrapBreadcrumb contract`.
+- [x] **Step 9: Copy reviewed actual fingerprint into `ApprovedV1Fingerprint` and `docs/PUBLIC_API_BASELINE.md`, recording Breadcrumb as an intentional compatible addition.** Keep `AssemblyVersion` unchanged unless a separate release task changes it.
+- [x] **Step 10: Rerun API baseline on `net8.0-windows` and `net48`; verify GREEN.**
+- [x] **Step 11: Commit** `docs: finalize BootstrapBreadcrumb contract`.
 
 ### Task 7: Complete dual-target verification and manual UI gate
 

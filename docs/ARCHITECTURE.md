@@ -365,10 +365,18 @@ ComboBox deliberately preserves native `ComboBox` exceptions/restrictions for it
 
 Dropdown rejects undefined `BootstrapVariant` values and negative logical `MinimumWidth`. `Show()` throws only when no `Target` is assigned; with an assigned target it is a no-op when already open, empty, disabled, loading, or disposed. `Close()` is idempotent. Disabled commands and separators never dispatch model `Click`, and framework activation never mutates `Checked`.
 
+### BootstrapBreadcrumb composition
+
+`BootstrapBreadcrumb` composes native `LinkLabel` ancestor controls and passive `Label` current/divider controls with the shared Theme and DPI services plus the pure internal `BootstrapBreadcrumbLayoutLogic`. Native links remain authoritative for focus, keyboard, mouse, and accessibility activation; the component adds no custom link hit-testing or input engine.
+
+The item collection is the logical source of truth. Structural collection mutations detach and dispose the complete generated control generation before rebuilding it. A non-empty `BootstrapBreadcrumbItem.Text` mutation updates the matching generated control in place, preserving focused-link identity, while `Tag` changes require no visual work. Activation is accepted only from a link in the current generation and is revalidated against the current item/index before `ItemClicked` is raised.
+
+Breadcrumb owns its generated labels/links, framework-created theme font, and theme subscription. It does not own application routing, navigation history, page hosting, a data source, timers, popups, or application commands; an application handler may mutate `Items` after receiving `ItemClicked`.
+
 ## 12. Evolution rules
 
 Before the first stable release, public APIs may change deliberately to improve consistency. Every such change must update `docs/COMPONENTS.md`, relevant examples, and `docs/DECISIONS.md` when architectural.
 
 After a stable compatibility baseline is declared, breaking public changes require an explicit compatibility policy.
 
-The Pagination, NumericBox, ComboBox, and Dropdown API additions change the proposed v1 release-candidate fingerprint intentionally. Their exported surfaces are reviewed before updating the approved fingerprint, while helper/layout/renderer types remain internal and `AssemblyVersion` stays `1.0.0.0`.
+The Pagination, NumericBox, ComboBox, Dropdown, and Breadcrumb API additions change the proposed v1 release-candidate fingerprint intentionally. Their exported surfaces are reviewed before updating the approved fingerprint, while helper/layout/renderer types remain internal and `AssemblyVersion` stays `1.0.0.0`.

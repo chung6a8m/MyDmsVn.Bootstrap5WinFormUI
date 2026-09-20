@@ -1264,6 +1264,44 @@ BootstrapStatusStrip : StatusStrip             Variant
 
 Manual verification: open **Menus / ToolStrips** in the integrated demo and exercise Ctrl+S, access keys, checked/disabled/nested commands, split main/drop-down actions, constrained-width overflow, horizontal/vertical separators, context-menu source/lifecycle logging, status Spring/borders/progress/sizing grip, Light/Dark themes, RTL, and Windows 100/150/200% scaling.
 
+## BootstrapBreadcrumb
+
+Hierarchy trail composed from native WinForms links and labels.
+
+```text
+BootstrapBreadcrumb : Panel
+BootstrapBreadcrumb.Items                         read-only content collection
+BootstrapBreadcrumb.Divider                       "/"
+BootstrapBreadcrumb.RightToLeftDivider            null (reuse Divider)
+BootstrapBreadcrumb.WrapContents                  true
+BootstrapBreadcrumb.ItemClicked
+BootstrapBreadcrumb.GetPreferredSize(Size)
+BootstrapBreadcrumbItem.Text                      "Item", non-empty/non-whitespace
+BootstrapBreadcrumbItem.Tag                       null
+BootstrapBreadcrumbItemClickedEventArgs.Item
+BootstrapBreadcrumbItemClickedEventArgs.Index
+```
+
+Behavior contract:
+
+- `Items` is ordered root-to-current. The last item is always the current location and is rendered as a passive, non-focusable `Label`; every preceding item is a full-text native `LinkLabel` and remains the keyboard, mouse, focus, and accessibility authority.
+- `Text` rejects `null`, empty, and whitespace-only values. Changing it updates the existing generated control in place, including its full link area and accessible name; changing `Tag` does not rebuild. Structural collection changes detach and dispose the old generated generation before rebuilding.
+- `ItemClicked` fires once only for an ancestor link that still belongs to the current generated generation. It reports the current logical `Item` and `Index` and never mutates `Items`. Applications own routing, history, page hosting, and any trail replacement.
+- `Divider` accepts an empty string and normalizes `null` to empty. In RTL, `RightToLeftDivider` is used when non-null; otherwise `Divider` is reused. Divider labels are passive and removed from the actionable accessibility/focus order.
+- With `WrapContents = true`, preferred size uses a positive proposed width first, then `MaximumSize.Width`, otherwise one unbounded row. Runtime layout uses the actual content width. A divider and its following item form one segment and never split across rows; an individually oversized segment remains intact. RTL mirrors placement while preserving logical root-to-current item order.
+- Link color uses the current semantic primary color; current/divider text uses muted or disabled theme color. Body typography follows runtime theme changes until the caller assigns `Font`, after which caller font ownership remains authoritative. Logical horizontal/vertical gaps scale through the shared DPI helper.
+- The control is designer-safe when empty and adds no timer, animation, custom painting, popup, routing/data source, or external icon dependency.
+
+Example:
+
+```csharp
+var breadcrumb = new BootstrapBreadcrumb { MaximumSize = new Size(320, 0) };
+breadcrumb.Items.Add(new BootstrapBreadcrumbItem("Home") { Tag = "home" });
+breadcrumb.Items.Add(new BootstrapBreadcrumbItem("Library") { Tag = "library" });
+breadcrumb.Items.Add(new BootstrapBreadcrumbItem("Data") { Tag = "data" });
+breadcrumb.ItemClicked += (_, e) => NavigateTo(e.Item.Tag);
+```
+
 ## BootstrapModal
 
 Responsibility: add Bootstrap-inspired modal presentation while keeping the native WinForms `Form` modal loop, ownership, result, validation, focus, keyboard, closing, and reuse semantics authoritative.

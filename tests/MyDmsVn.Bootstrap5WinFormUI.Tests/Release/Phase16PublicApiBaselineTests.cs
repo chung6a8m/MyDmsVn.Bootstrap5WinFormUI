@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "331dff43abbcc6a7875527f18b49c023c5f33447e4ca312dd3609cc46aebeaa3";
+    private const string ApprovedV1Fingerprint = "c6d2468d00dbacb879a4d3f6c31fd67dec681bd7db41007d6b282bfaa43c0884";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -98,6 +98,37 @@ public sealed class Phase16PublicApiBaselineTests
             {
                 Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain(name), name);
             }
+        }));
+    }
+
+    [Test]
+    public void BootstrapBreadcrumbExportsOnlyTheReviewedCompositionContract()
+    {
+        var assembly = typeof(BootstrapBreadcrumb).Assembly;
+        var breadcrumbExports = assembly.GetExportedTypes()
+            .Where(type => type.Name.IndexOf("BootstrapBreadcrumb", StringComparison.Ordinal) >= 0)
+            .Select(type => type.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(GetDeclaredPublicPropertyNames(typeof(BootstrapBreadcrumb)),
+                Is.EqualTo(new[] { "Divider", "Items", "RightToLeftDivider", "WrapContents" }));
+            Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapBreadcrumb)), Is.EqualTo(new[] { "ItemClicked" }));
+            Assert.That(GetDeclaredPublicMethodNames(typeof(BootstrapBreadcrumb)), Is.EqualTo(new[] { "GetPreferredSize" }));
+            Assert.That(GetDeclaredPublicPropertyNames(typeof(BootstrapBreadcrumbItem)), Is.EqualTo(new[] { "Tag", "Text" }));
+            Assert.That(GetDeclaredProtectedMethodNames(typeof(BootstrapBreadcrumbItemCollection)),
+                Is.EqualTo(new[] { "ClearItems", "InsertItem", "RemoveItem", "SetItem" }));
+            Assert.That(GetDeclaredPublicPropertyNames(typeof(BootstrapBreadcrumbItemClickedEventArgs)),
+                Is.EqualTo(new[] { "Index", "Item" }));
+            Assert.That(breadcrumbExports, Is.EqualTo(new[]
+            {
+                "BootstrapBreadcrumb",
+                "BootstrapBreadcrumbItem",
+                "BootstrapBreadcrumbItemClickedEventArgs",
+                "BootstrapBreadcrumbItemCollection"
+            }));
         }));
     }
 
