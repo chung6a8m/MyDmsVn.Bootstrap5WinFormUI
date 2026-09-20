@@ -548,7 +548,7 @@ Validation/geometry rules:
 - Collection declared protected surface is exactly `InsertItem`, `SetItem`, `RemoveItem`, and `ClearItems`.
 - Item visual notification is internal event `TextChangedForOwner`.
 
-- [ ] **Step 1: Write failing item tests** for parameterless default `Text="Item"`, string constructor, null/empty/whitespace rejection, preservation of non-empty caller whitespace, null `Tag`, no duplicate text-change event for equal values, exactly one event for an effective text change, and zero text-change events when only `Tag` changes.
+- [x] **Step 1: Write failing item tests** for parameterless default `Text="Item"`, string constructor, null/empty/whitespace rejection, preservation of non-empty caller whitespace, null `Tag`, no duplicate text-change event for equal values, exactly one event for an effective text change, and zero text-change events when only `Tag` changes.
 
 ```csharp
 [Test]
@@ -566,13 +566,13 @@ public void TextRejectsValuesThatCannotFormANativeAncestorLink()
 }
 ```
 
-- [ ] **Step 2: Write failing collection tests** for Add/Insert/Set/Remove/Clear exactly-once structural notification, null rejection, duplicate-reference rejection, failed-mutation rollback, text-change forwarding through `itemTextChanged` only, callback detachment after removal/replacement/clear, and no disposal of item/Tag objects.
-- [ ] **Step 3: Write a failing protected-surface contract test** asserting `BootstrapBreadcrumbItemCollection` declares exactly protected `InsertItem`, `SetItem`, `RemoveItem`, `ClearItems` and no public constructor/mutation aliases beyond inherited collection APIs.
-- [ ] **Step 4: Write failing event-args tests** for item/index preservation plus null/negative validation through internal construction.
-- [ ] **Step 5: Run item/collection tests on `net8.0-windows`; verify RED because types do not exist.**
-- [ ] **Step 6: Implement minimal three public types and exact internal wiring above.** Validate replacement/duplicate rules before changing subscriptions or collection state.
-- [ ] **Step 7: Run item/collection tests for `net8.0-windows` and `net48`; verify GREEN.**
-- [ ] **Step 8: Commit** `feat: add breadcrumb item model`.
+- [x] **Step 2: Write failing collection tests** for Add/Insert/Set/Remove/Clear exactly-once structural notification, null rejection, duplicate-reference rejection, failed-mutation rollback, text-change forwarding through `itemTextChanged` only, callback detachment after removal/replacement/clear, and no disposal of item/Tag objects.
+- [x] **Step 3: Write a failing protected-surface contract test** asserting `BootstrapBreadcrumbItemCollection` declares exactly protected `InsertItem`, `SetItem`, `RemoveItem`, `ClearItems` and no public constructor/mutation aliases beyond inherited collection APIs.
+- [x] **Step 4: Write failing event-args tests** for item/index preservation plus null/negative validation through internal construction.
+- [x] **Step 5: Run item/collection tests on `net8.0-windows`; verify RED because types do not exist.**
+- [x] **Step 6: Implement minimal three public types and exact internal wiring above.** Validate replacement/duplicate rules before changing subscriptions or collection state.
+- [x] **Step 7: Run item/collection tests for `net8.0-windows` and `net48`; verify GREEN.**
+- [x] **Step 8: Commit** `feat: add breadcrumb item model`.
 
 ### Task 2: Implement deterministic wrap and RTL layout logic
 
