@@ -399,11 +399,17 @@ public class BootstrapListGroup : Panel
             var preferred = GetPreferredSize(Size.Empty);
             if (_orientation == Orientation.Vertical)
             {
-                if (Height != preferred.Height) Height = preferred.Height;
+                var height = AutoSizeMode == AutoSizeMode.GrowOnly
+                    ? Math.Max(Height, preferred.Height)
+                    : preferred.Height;
+                if (Height != height) Height = height;
             }
-            else if (Size != preferred)
+            else
             {
-                Size = preferred;
+                var size = AutoSizeMode == AutoSizeMode.GrowOnly
+                    ? new Size(Math.Max(Width, preferred.Width), Math.Max(Height, preferred.Height))
+                    : preferred;
+                if (Size != size) Size = size;
             }
         }
     }

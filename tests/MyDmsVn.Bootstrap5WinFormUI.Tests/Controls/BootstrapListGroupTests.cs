@@ -207,6 +207,59 @@ public sealed class BootstrapListGroupTests
     }
 
     [Test]
+    public void VerticalGrowOnlyAutoSizeDoesNotShrinkAndStillGrowsForContent()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSizeMode = AutoSizeMode.GrowOnly,
+            Size = new Size(240, 120)
+        };
+        using var first = new FixedPreferredItem(80, 30);
+        using var second = new FixedPreferredItem(80, 150);
+        group.Controls.Add(first);
+        group.PerformLayout();
+
+        Assert.That(group.Size, Is.EqualTo(new Size(240, 120)));
+
+        group.Controls.Add(second);
+        group.PerformLayout();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(group.Width, Is.EqualTo(240));
+            Assert.That(group.Height, Is.GreaterThan(120));
+            Assert.That(group.Height, Is.EqualTo(group.GetPreferredSize(Size.Empty).Height));
+        }));
+    }
+
+    [Test]
+    public void HorizontalGrowOnlyAutoSizeDoesNotShrinkAndStillGrowsForContent()
+    {
+        using var group = new BootstrapListGroup
+        {
+            Orientation = Orientation.Horizontal,
+            AutoSizeMode = AutoSizeMode.GrowOnly,
+            Size = new Size(250, 120)
+        };
+        using var first = new FixedPreferredItem(80, 30);
+        using var second = new FixedPreferredItem(220, 150);
+        group.Controls.Add(first);
+        group.PerformLayout();
+
+        Assert.That(group.Size, Is.EqualTo(new Size(250, 120)));
+
+        group.Controls.Add(second);
+        group.PerformLayout();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(group.Width, Is.GreaterThan(250));
+            Assert.That(group.Height, Is.EqualTo(150));
+            Assert.That(group.Size, Is.EqualTo(group.GetPreferredSize(Size.Empty)));
+        }));
+    }
+
+    [Test]
     public void AutoSizeGroupContainsItemWithInheritedMinimumSize()
     {
         using var group = new BootstrapListGroup { Width = 220 };
@@ -238,6 +291,54 @@ public sealed class BootstrapListGroupTests
         };
 
         Assert.That(item.GetPreferredSize(Size.Empty).Width, Is.EqualTo(120));
+    }
+
+    [Test]
+    public void ClearingTemporaryMinimumSizeRestoresContentPreferredWidth()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Orientation = Orientation.Horizontal,
+            Size = new Size(480, 160)
+        };
+        using var item = new BootstrapListGroupItem { Text = "Short" };
+        var contentPreferredWidth = item.GetPreferredSize(Size.Empty).Width;
+        group.Controls.Add(item);
+        group.PerformLayout();
+        Assert.That(item.Width, Is.EqualTo(contentPreferredWidth));
+
+        item.MinimumSize = new Size(200, 0);
+        group.PerformLayout();
+        Assert.That(item.Width, Is.EqualTo(200));
+
+        item.MinimumSize = Size.Empty;
+        group.PerformLayout();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(item.GetPreferredSize(Size.Empty).Width, Is.EqualTo(contentPreferredWidth));
+            Assert.That(item.Width, Is.EqualTo(contentPreferredWidth));
+        }));
+    }
+
+    [Test]
+    public void ClearingTemporaryMaximumSizeRestoresExplicitPreferredWidth()
+    {
+        using var item = new BootstrapListGroupItem
+        {
+            AutoSize = false,
+            Size = new Size(180, 60),
+            Text = "Short"
+        };
+        Assert.That(item.GetPreferredSize(Size.Empty).Width, Is.EqualTo(180));
+
+        item.MaximumSize = new Size(120, 0);
+        Assert.That(item.GetPreferredSize(Size.Empty).Width, Is.EqualTo(120));
+
+        item.MaximumSize = Size.Empty;
+
+        Assert.That(item.GetPreferredSize(Size.Empty).Width, Is.EqualTo(180));
     }
 
     [Test]

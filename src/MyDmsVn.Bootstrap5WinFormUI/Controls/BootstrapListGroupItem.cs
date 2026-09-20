@@ -693,12 +693,32 @@ public class BootstrapListGroupItem : Panel
         var currentSize = Size;
         if (_trackExplicitSize && !AutoSize && !_applyingGroupLayoutBounds)
         {
+            var widthChanged = currentSize.Width != _lastObservedSize.Width;
+            var heightChanged = currentSize.Height != _lastObservedSize.Height;
             _explicitMinimumSize = new Size(
-                currentSize.Width != _lastObservedSize.Width ? currentSize.Width : _explicitMinimumSize.Width,
-                currentSize.Height != _lastObservedSize.Height ? currentSize.Height : _explicitMinimumSize.Height);
+                widthChanged && !IsConstraintDrivenSizeChange(
+                    _lastObservedSize.Width,
+                    currentSize.Width,
+                    MinimumSize.Width,
+                    MaximumSize.Width)
+                    ? currentSize.Width
+                    : _explicitMinimumSize.Width,
+                heightChanged && !IsConstraintDrivenSizeChange(
+                    _lastObservedSize.Height,
+                    currentSize.Height,
+                    MinimumSize.Height,
+                    MaximumSize.Height)
+                    ? currentSize.Height
+                    : _explicitMinimumSize.Height);
         }
 
         _lastObservedSize = currentSize;
+    }
+
+    private static bool IsConstraintDrivenSizeChange(int previous, int current, int minimum, int maximum)
+    {
+        return minimum > previous && current == minimum ||
+            maximum > 0 && maximum < previous && current == maximum;
     }
 
     private void OnDescendantLayout(object? sender, LayoutEventArgs e)
