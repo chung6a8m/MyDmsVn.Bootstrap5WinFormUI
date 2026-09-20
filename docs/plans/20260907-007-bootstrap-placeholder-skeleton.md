@@ -539,20 +539,20 @@ The status label is the meaningful accessibility/status surface; placeholders ar
 - Does **not** implement or test the final intrinsic size/DPI formulas yet; those belong entirely to Task 2.
 - Control construction consumes current theme Body typography but full live theme/font lifecycle is completed in Task 3.
 
-- [ ] **Step 1: Write failing default-state and enum tests.** Assert enum numeric order exactly `ExtraSmall=0`, `Small=1`, `Default=2`, `Large=3` and `None=0`, `Glow=1`, `Wave=2`. Assert a new control has Default/None/Secondary/Empty/0/2s, `AutoSize=true`, transparent background, `TabStop=false`, `AccessibleRole.None`, and wait cursor.
-- [ ] **Step 2: Write failing validation tests** for undefined size/animation/variant, semi-transparent custom color, `BorderRadius=-2`, zero/negative animation duration, and rollback to original state after every failed assignment.
-- [ ] **Step 3: Write failing explicit-bounds ownership tests.** Set `AutoSize=false`, assign a known `Size`, then change `PlaceholderSize`, `Variant`, `CustomColor`, `BorderRadius`, and `AnimationDuration`; assert the explicit bounds remain unchanged. Do not assert DPI/preferred-size math in this task.
-- [ ] **Step 4: Run focused UI tests and verify RED because the public types do not exist.**
+- [x] **Step 1: Write failing default-state and enum tests.** Assert enum numeric order exactly `ExtraSmall=0`, `Small=1`, `Default=2`, `Large=3` and `None=0`, `Glow=1`, `Wave=2`. Assert a new control has Default/None/Secondary/Empty/0/2s, `AutoSize=true`, transparent background, `TabStop=false`, `AccessibleRole.None`, and wait cursor.
+- [x] **Step 2: Write failing validation tests** for undefined size/animation/variant, semi-transparent custom color, `BorderRadius=-2`, zero/negative animation duration, and rollback to original state after every failed assignment.
+- [x] **Step 3: Write failing explicit-bounds ownership tests.** Set `AutoSize=false`, assign a known `Size`, then change `PlaceholderSize`, `Variant`, `CustomColor`, `BorderRadius`, and `AnimationDuration`; assert the explicit bounds remain unchanged. Do not assert DPI/preferred-size math in this task.
+- [x] **Step 4: Run focused UI tests and verify RED because the public types do not exist.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter BootstrapPlaceholderTests --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 5: Implement the two enums and minimal `BootstrapPlaceholder` public contract.** Use private validation helpers and same-value no-op guards. Set styles/defaults and the initial Body font using the established caller-font ownership guard pattern. Do not add any extra public state to make tests easier.
-- [ ] **Step 6: Ensure setters invalidate/reconcile presentation as appropriate without overwriting caller-owned `Size` when `AutoSize=false`.** `GetPreferredSize` may remain a minimal override delegating to base until Task 2 wires the exact formula.
-- [ ] **Step 7: Rerun the full Task 1 fixture on `net8.0-windows`; verify every Task 1 assertion is GREEN.** No test in this task may depend on a helper introduced later.
-- [ ] **Step 8: Run the same Task 1 fixture on `net48`; verify GREEN.**
-- [ ] **Step 9: Commit** `feat: add BootstrapPlaceholder public contract`.
+- [x] **Step 5: Implement the two enums and minimal `BootstrapPlaceholder` public contract.** Use private validation helpers and same-value no-op guards. Set styles/defaults and the initial Body font using the established caller-font ownership guard pattern. Do not add any extra public state to make tests easier.
+- [x] **Step 6: Ensure setters invalidate/reconcile presentation as appropriate without overwriting caller-owned `Size` when `AutoSize=false`.** `GetPreferredSize` may remain a minimal override delegating to base until Task 2 wires the exact formula.
+- [x] **Step 7: Rerun the full Task 1 fixture on `net8.0-windows`; verify every Task 1 assertion is GREEN.** No test in this task may depend on a helper introduced later.
+- [x] **Step 8: Run the same Task 1 fixture on `net48`; verify GREEN.**
+- [x] **Step 9: Commit** `feat: add BootstrapPlaceholder public contract`.
 
 ### Task 2: Implement pure Bootstrap size, color, Glow, Wave, alpha, and radius logic
 
