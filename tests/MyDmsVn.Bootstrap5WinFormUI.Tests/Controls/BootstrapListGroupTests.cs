@@ -242,6 +242,33 @@ public sealed class BootstrapListGroupTests
     }
 
     [Test]
+    public void RichChildIntrinsicPreferredSizeChangesRelayoutTheOwningGroup()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Orientation = Orientation.Horizontal,
+            Size = new Size(640, 120)
+        };
+        using var item = new BootstrapListGroupItem();
+        using var child = new IntrinsicPreferredSizeControl
+        {
+            AutoSize = false,
+            Dock = DockStyle.Top,
+            Height = 24,
+            Text = "Short"
+        };
+        item.Controls.Add(child);
+        group.Controls.Add(item);
+        group.PerformLayout();
+        var baselineItemWidth = item.Width;
+
+        child.Text = "A much longer rich-content label that requires additional horizontal space";
+
+        Assert.That(item.Width, Is.GreaterThan(baselineItemWidth));
+    }
+
+    [Test]
     public void DockedRichChildHasStableBoundsAcrossRepeatedLayoutPasses()
     {
         using var group = new BootstrapListGroup
@@ -413,5 +440,19 @@ public sealed class BootstrapListGroupTests
         public FixedPreferredItem(int width, int height) => _preferred = new Size(width, height);
 
         public override Size GetPreferredSize(Size proposedSize) => _preferred;
+    }
+
+    private sealed class IntrinsicPreferredSizeControl : Control
+    {
+        public override Size GetPreferredSize(Size proposedSize)
+        {
+            return string.IsNullOrEmpty(Text)
+                ? Size.Empty
+                : TextRenderer.MeasureText(
+                    Text,
+                    Font,
+                    Size.Empty,
+                    TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+        }
     }
 }

@@ -289,6 +289,32 @@ public sealed class BootstrapListGroupItemTests
     }
 
     [Test]
+    public void DecorativeChildActivationFocusesTheActionableItem()
+    {
+        using var form = new Form { ShowInTaskbar = false };
+        using var focusSource = new TextBox();
+        using var group = new BootstrapListGroup();
+        using var item = new BootstrapListGroupItem { Actionable = true };
+        var label = new Label { Size = new Size(40, 20) };
+        var badge = new BootstrapBadge { Text = "New", Size = new Size(40, 20) };
+        item.Controls.Add(label);
+        item.Controls.Add(badge);
+        group.Controls.Add(item);
+        form.Controls.Add(group);
+        form.Controls.Add(focusSource);
+        form.Show();
+
+        foreach (var decorativeChild in new Control[] { label, badge })
+        {
+            Assert.That(focusSource.Focus(), Is.True);
+
+            SendNativeClick(decorativeChild);
+
+            Assert.That(item.Focused, Is.True, decorativeChild.GetType().Name);
+        }
+    }
+
+    [Test]
     public void DynamicDecorativeDescendantsAreUnsubscribedOnRemoval()
     {
         using var form = new Form { ShowInTaskbar = false };

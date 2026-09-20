@@ -548,6 +548,9 @@ public class BootstrapListGroupItem : Panel
         control.LocationChanged += OnDescendantPreferredSizeChanged;
         control.SizeChanged += OnDescendantPreferredSizeChanged;
         control.VisibleChanged += OnDescendantPreferredSizeChanged;
+        control.TextChanged += OnDescendantPreferredSizeChanged;
+        control.FontChanged += OnDescendantPreferredSizeChanged;
+        control.PaddingChanged += OnDescendantPreferredSizeChanged;
         if (IsDecorativeForwardingSurface(control))
         {
             control.MouseEnter += OnDecorativeMouseEnter;
@@ -567,6 +570,9 @@ public class BootstrapListGroupItem : Panel
         control.LocationChanged -= OnDescendantPreferredSizeChanged;
         control.SizeChanged -= OnDescendantPreferredSizeChanged;
         control.VisibleChanged -= OnDescendantPreferredSizeChanged;
+        control.TextChanged -= OnDescendantPreferredSizeChanged;
+        control.FontChanged -= OnDescendantPreferredSizeChanged;
+        control.PaddingChanged -= OnDescendantPreferredSizeChanged;
         control.MouseEnter -= OnDecorativeMouseEnter;
         control.MouseDown -= OnDecorativeMouseDown;
         control.MouseUp -= OnDecorativeMouseUp;
@@ -638,6 +644,7 @@ public class BootstrapListGroupItem : Panel
     {
         if (sender is Control control && e.Button == MouseButtons.Left && _actionable && Enabled && control.ClientRectangle.Contains(e.Location))
         {
+            Focus();
             _forwardingPressedControl = control;
             _pressed = true;
             UpdateResolvedForeground();
