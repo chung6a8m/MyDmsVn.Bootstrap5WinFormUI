@@ -328,6 +328,42 @@ public sealed class BootstrapListGroupTests
     }
 
     [Test]
+    public void SingleFarEdgeAnchorsKeepChildVisibleAndUsable()
+    {
+        using var group = new BootstrapListGroup
+        {
+            AutoSize = false,
+            Orientation = Orientation.Horizontal,
+            Size = new Size(400, 160)
+        };
+        using var item = new BootstrapListGroupItem { Size = new Size(220, 100) };
+        var child = new Label
+        {
+            Anchor = AnchorStyles.Right | AnchorStyles.Bottom,
+            Bounds = new Rectangle(70, 20, 80, 30),
+            Text = "Anchored"
+        };
+        item.Controls.Add(child);
+        var childPreferred = child.GetPreferredSize(Size.Empty);
+        group.Controls.Add(item);
+        group.PerformLayout();
+        var stableBounds = item.Bounds;
+
+        for (var pass = 0; pass < 5; pass++)
+        {
+            group.PerformLayout();
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(item.Bounds, Is.EqualTo(stableBounds));
+                Assert.That(child.Left, Is.GreaterThanOrEqualTo(0));
+                Assert.That(child.Top, Is.GreaterThanOrEqualTo(0));
+                Assert.That(child.Width, Is.GreaterThanOrEqualTo(childPreferred.Width));
+                Assert.That(child.Height, Is.GreaterThanOrEqualTo(childPreferred.Height));
+            }));
+        }
+    }
+
+    [Test]
     public void NavigationUsesCurrentControlOrderAndSkipsIneligibleItems()
     {
         using var form = new Form { ShowInTaskbar = false };

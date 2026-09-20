@@ -427,7 +427,7 @@ public sealed class BootstrapListGroupItemTests
         {
             var interactionTheme = CreateInteractionStateTheme();
             BootstrapThemeManager.CurrentTheme = interactionTheme;
-            using var item = new BootstrapListGroupItem { Actionable = true };
+            using var item = new BootstrapListGroupItem { Actionable = true, Size = new Size(160, 48) };
             var label = new Label();
             var badge = new BootstrapBadge { Text = "New" };
             item.Controls.Add(label);
@@ -459,6 +459,17 @@ public sealed class BootstrapListGroupItemTests
                 Assert.That(item.ForeColor, Is.EqualTo(neutral));
             }
 
+            RaiseControlMouseEvent(label, "OnMouseEnter", EventArgs.Empty);
+            RaiseControlMouseEvent(label, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
+            item.Controls.Remove(label);
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(item.ForeColor, Is.EqualTo(neutral));
+                Assert.That(GetCenterPixel(item).ToArgb(), Is.EqualTo(interactionTheme.Colors.Surface.ToArgb()));
+            }));
+
+            RaiseControlMouseEvent(label, "OnMouseUp", new MouseEventArgs(MouseButtons.Left, 1, 2, 2, 0));
             Assert.That(clicks, Is.EqualTo(2));
         }
         finally
@@ -498,7 +509,7 @@ public sealed class BootstrapListGroupItemTests
                 colors.Disabled,
                 colors.Focus,
                 Color.Black,
-                Color.White),
+                Color.Red),
             baseline.Metrics,
             baseline.Typography);
     }
@@ -508,6 +519,13 @@ public sealed class BootstrapListGroupItemTests
         var method = typeof(Control).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.That(method, Is.Not.Null);
         method!.Invoke(control, new object[] { eventArgs });
+    }
+
+    private static Color GetCenterPixel(Control control)
+    {
+        using var bitmap = new Bitmap(control.Width, control.Height);
+        control.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+        return bitmap.GetPixel(bitmap.Width / 2, bitmap.Height / 2);
     }
 
     private sealed class SelectabilityProbeItem : BootstrapListGroupItem

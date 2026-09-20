@@ -501,9 +501,13 @@ public class BootstrapListGroupItem : Panel
             return Math.Max(0, child.Left) + Math.Max(0, preferred.Width) + farEdgeDistance;
         }
 
-        return anchoredRight
-            ? Math.Max(0, child.Width)
-            : Math.Max(0, child.Right);
+        if (anchoredRight)
+        {
+            var farEdgeDistance = Math.Max(0, ClientSize.Width - child.Right);
+            return Math.Max(0, child.Width) + farEdgeDistance;
+        }
+
+        return Math.Max(0, child.Right);
     }
 
     private int GetVerticalContentExtent(Control child, Size preferred)
@@ -527,9 +531,13 @@ public class BootstrapListGroupItem : Panel
             return Math.Max(0, child.Top) + Math.Max(0, preferred.Height) + farEdgeDistance;
         }
 
-        return anchoredBottom
-            ? Math.Max(0, child.Height)
-            : Math.Max(0, child.Bottom);
+        if (anchoredBottom)
+        {
+            var farEdgeDistance = Math.Max(0, ClientSize.Height - child.Bottom);
+            return Math.Max(0, child.Height) + farEdgeDistance;
+        }
+
+        return Math.Max(0, child.Bottom);
     }
 
     private void TrackDescendant(Control control)
@@ -563,12 +571,25 @@ public class BootstrapListGroupItem : Panel
         control.MouseDown -= OnDecorativeMouseDown;
         control.MouseUp -= OnDecorativeMouseUp;
         control.MouseLeave -= OnDecorativeMouseLeave;
+        var interactionStateChanged = false;
         if (ReferenceEquals(_hoveredDecorativeControl, control))
         {
             _hoveredDecorativeControl = null;
             _hovered = false;
+            interactionStateChanged = true;
         }
-        if (ReferenceEquals(_forwardingPressedControl, control)) _forwardingPressedControl = null;
+        if (ReferenceEquals(_forwardingPressedControl, control))
+        {
+            _forwardingPressedControl = null;
+            _pressed = false;
+            interactionStateChanged = true;
+        }
+
+        if (interactionStateChanged && !Disposing)
+        {
+            UpdateResolvedForeground();
+            Invalidate();
+        }
     }
 
     private static bool IsDecorativeForwardingSurface(Control control)
