@@ -672,26 +672,26 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Demo consumes only public Placeholder API and ordinary WinForms layout/visibility APIs.
 - Demo must not add reusable skeleton infrastructure to product code.
 
-- [ ] **Step 1: Write a failing demo construction test** that instantiates `PlaceholderDemoForm` on STA and verifies the form can create/dispose with no modal dialog, background worker, or required external service.
-- [ ] **Step 2: Write failing structural demo tests** for examples covering all four sizes, None/Glow/Wave, at least Primary/Secondary/Success/Danger variants, custom color, square/theme/large rounded radius, AutoSize and explicit-size modes, and a composed skeleton panel with several independent placeholders.
-- [ ] **Step 3: Add a failing structural assertion** proving explicit-height skeleton bars do not set `PlaceholderSize` as if it controlled their bounds, while a separate AutoSize example demonstrates `PlaceholderSize=Small`/other size variants intentionally.
-- [ ] **Step 4: Add a failing integration test** proving `MainForm` registers a page named `Placeholder / Skeleton` and can construct that page through the existing demo navigation pattern.
-- [ ] **Step 5: Run demo tests with hang protection; verify RED.**
+- [x] **Step 1: Write a failing demo construction test** that instantiates `PlaceholderDemoForm` on STA and verifies the form can create/dispose with no modal dialog, background worker, or required external service.
+- [x] **Step 2: Write failing structural demo tests** for examples covering all four sizes, None/Glow/Wave, at least Primary/Secondary/Success/Danger variants, custom color, square/theme/large rounded radius, AutoSize and explicit-size modes, and a composed skeleton panel with several independent placeholders.
+- [x] **Step 3: Add a failing structural assertion** proving explicit-height skeleton bars do not set `PlaceholderSize` as if it controlled their bounds, while a separate AutoSize example demonstrates `PlaceholderSize=Small`/other size variants intentionally.
+- [x] **Step 4: Add a failing integration test** proving `MainForm` registers a page named `Placeholder / Skeleton` and can construct that page through the existing demo navigation pattern.
+- [x] **Step 5: Run demo tests with hang protection; verify RED.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter PlaceholderDemoFormTests --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 6: Implement `PlaceholderDemoForm`.** Include these sections:
+- [x] **Step 6: Implement `PlaceholderDemoForm`.** Include these sections:
   - `Sizes` — XS/SM/Default/LG at natural AutoSize height.
   - `Colors` — semantic variants plus one opaque CustomColor.
   - `Animations` — static, Glow, Wave side-by-side; global demo Reduced motion toggle remains authoritative.
   - `Skeleton card` — circular avatar, title, 3 body lines with different percent widths, and a button-shaped placeholder composed in ordinary layout containers. Explicit-height bars use `AutoSize=false` + caller-owned height without redundant `PlaceholderSize` assignments.
   - `Application-owned swap` — one button toggles skeleton/content panel visibility and updates a native visible status label (`Loading content…` / `Content loaded.`).
-- [ ] **Step 7: Do not put `Thread.Sleep`, async fake work, timers, or auto-completion into the demo.** The swap button demonstrates ownership without making tests time-dependent.
-- [ ] **Step 8: Register `Placeholder / Skeleton` in `MainForm.ConfigurePages()` near other loading/presentation components.** Description should state static/Glow/Wave placeholders, skeleton composition, theme/reduced-motion, and application-owned content swapping.
-- [ ] **Step 9: Run demo tests on both target frameworks; verify GREEN.**
-- [ ] **Step 10: Commit** `demo: showcase placeholder skeleton patterns`.
+- [x] **Step 7: Do not put `Thread.Sleep`, async fake work, timers, or auto-completion into the demo.** The swap button demonstrates ownership without making tests time-dependent.
+- [x] **Step 8: Register `Placeholder / Skeleton` in `MainForm.ConfigurePages()` near other loading/presentation components.** Description should state static/Glow/Wave placeholders, skeleton composition, theme/reduced-motion, and application-owned content swapping.
+- [x] **Step 9: Run demo tests on both target frameworks; verify GREEN.**
+- [x] **Step 10: Commit** `demo: showcase placeholder skeleton patterns`.
 
 ### Task 6: Document the contract and deliberately approve the public API addition
 

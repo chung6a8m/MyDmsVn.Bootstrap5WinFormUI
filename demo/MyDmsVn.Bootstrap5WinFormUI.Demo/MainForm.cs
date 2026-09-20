@@ -272,6 +272,11 @@ public sealed class MainForm : DemoFormBase
                 new DemoPageSection("Button loading", () => new ButtonDemoForm())));
 
         AddPage(
+            "Placeholder / Skeleton",
+            "Static, Glow, and Wave placeholders; skeleton composition; theme/reduced-motion behavior; and application-owned content swapping.",
+            () => new PlaceholderDemoForm());
+
+        AddPage(
             "Progress",
             "Determinate, striped, animated, indeterminate, custom-color, and AnimateTo scenarios.",
             () => new ProgressDemoForm());
