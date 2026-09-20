@@ -780,7 +780,7 @@ For `BootstrapBreadcrumbItemCollection`, explicitly verify fingerprint includes 
 **Files:**
 - No new files expected; fix only Breadcrumb-related defects uncovered by verification.
 
-- [ ] **Step 1: Build .NET Framework 4.8:**
+- [x] **Step 1: Build .NET Framework 4.8:**
 
 ```powershell
 dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net48
@@ -788,7 +788,7 @@ dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net48
 
 Expected: zero errors.
 
-- [ ] **Step 2: Build .NET 8 Windows:**
+- [x] **Step 2: Build .NET 8 Windows:**
 
 ```powershell
 dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net8.0-windows
@@ -796,7 +796,7 @@ dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net8.0-windows
 
 Expected: zero errors.
 
-- [ ] **Step 3: Run full bounded suite:**
+- [x] **Step 3: Run full bounded suite:**
 
 ```powershell
 ./test.ps1
@@ -804,12 +804,12 @@ Expected: zero errors.
 
 Expected: both targets pass with no hang timeout, modal dialog, or blame dump.
 
-- [ ] **Step 4: Search Breadcrumb product files for prohibited infrastructure.** Confirm no `Timer`, `Task.Delay`, `Thread.Sleep`, `MessageBox.Show`, `ShowDialog`, `Application.AddMessageFilter`, global hook, top-level window, routing/data-source dependency, custom link hit-test engine, or external icon package.
+- [x] **Step 4: Search Breadcrumb product files for prohibited infrastructure.** Confirm no `Timer`, `Task.Delay`, `Thread.Sleep`, `MessageBox.Show`, `ShowDialog`, `Application.AddMessageFilter`, global hook, top-level window, routing/data-source dependency, custom link hit-test engine, or external icon package.
 - [ ] **Step 5: Run demo/manual checks:** 0/1/2/many items; reject blank item text; mouse; Tab/Shift+Tab; native Enter activation; visible focus; live text change while an ancestor is focused; current item non-focusability; custom/empty divider; long text; `MaximumSize` wrapping; parent-constrained wrapping; repeated resize; LTR/RTL; disabled parent; Light/Dark; caller font; 100/125/150/175/200% Windows scaling.
 - [ ] **Step 6: Accessibility smoke check** with Narrator or Windows accessibility inspection: ancestor links expose full non-empty names; current item is understandable as current/non-link; dividers are not actionable; focus order contains only ancestors.
-- [ ] **Step 7: Verify stale-generation safety manually/diagnostically:** structural rebuild while retaining same item objects never permits old generated links to raise `ItemClicked`; current generated links remain functional.
-- [ ] **Step 8: Verify ownership boundary:** activating an ancestor without application handler leaves trail unchanged; demo handler that simulates navigation changes `Items` itself.
-- [ ] **Step 9: If verification requires code changes, rerun Steps 1-8 and commit** `fix: harden BootstrapBreadcrumb verification`. **If no fixes are required, do not create an empty commit.**
+- [x] **Step 7: Verify stale-generation safety manually/diagnostically:** structural rebuild while retaining same item objects never permits old generated links to raise `ItemClicked`; current generated links remain functional.
+- [x] **Step 8: Verify ownership boundary:** activating an ancestor without application handler leaves trail unchanged; demo handler that simulates navigation changes `Items` itself.
+- [x] **Step 9: If verification requires code changes, rerun Steps 1-8 and commit** `fix: harden BootstrapBreadcrumb verification`. **If no fixes are required, do not create an empty commit.**
 
 ---
 

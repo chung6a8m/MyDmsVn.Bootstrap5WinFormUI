@@ -64,7 +64,7 @@ public sealed class BreadcrumbDemoForm : DemoFormBase
 
         var interactive = CreateTrail("Home", "Library", "Data");
         interactive.AccessibleName = "Interactive navigation breadcrumb";
-        WireActivationOutput(interactive, simulateNavigation: true);
+        WireCallerOwnedNavigation(interactive);
         AddScenario("Caller-owned navigation", interactive, "Activating an ancestor trims this demo trail in Form code; Breadcrumb itself never navigates.");
     }
 
@@ -76,11 +76,11 @@ public sealed class BreadcrumbDemoForm : DemoFormBase
             breadcrumb.Items.Add(new BootstrapBreadcrumbItem(label) { Tag = "tag:" + label.ToLowerInvariant().Replace(' ', '-') });
         }
 
-        WireActivationOutput(breadcrumb, simulateNavigation: false);
+        WireActivationOutput(breadcrumb);
         return breadcrumb;
     }
 
-    private void WireActivationOutput(BootstrapBreadcrumb breadcrumb, bool simulateNavigation)
+    private void WireActivationOutput(BootstrapBreadcrumb breadcrumb)
     {
         breadcrumb.ItemClicked += (_, e) =>
         {
@@ -89,12 +89,13 @@ public sealed class BreadcrumbDemoForm : DemoFormBase
                 e.Index,
                 e.Item.Text,
                 e.Item.Tag ?? "no tag");
+        };
+    }
 
-            if (!simulateNavigation)
-            {
-                return;
-            }
-
+    private static void WireCallerOwnedNavigation(BootstrapBreadcrumb breadcrumb)
+    {
+        breadcrumb.ItemClicked += (_, e) =>
+        {
             // Navigation state belongs to the application. The control only reports activation.
             var retainedTrail = breadcrumb.Items.Take(e.Index + 1).ToArray();
             breadcrumb.Items.Clear();
