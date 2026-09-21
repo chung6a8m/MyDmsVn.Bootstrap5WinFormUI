@@ -1,19 +1,16 @@
-# Archive
+# Documentation Archive
 
-Historical roadmaps and superseded planning context live here.
+Historical and completed development material lives here.
 
-These files are preserved for design history, audits, and understanding earlier sequencing decisions. They are **not** active implementation instructions and should not be loaded into a normal coding-agent context unless the current task explicitly needs historical reasoning.
+This directory is preserved for design history, audits, regression investigation, and understanding earlier implementation decisions. It is **not** active implementation guidance and should not be preloaded into normal coding-agent context.
 
-## Archived roadmaps
+## Structure
 
-- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — original Phase 0–16 foundation development roadmap.
-- [20260828-002-bootstrap-component-expansion-roadmap.md](20260828-002-bootstrap-component-expansion-roadmap.md) — earlier component-expansion roadmap used before the active queue was consolidated.
-- [20260910-001-integrated-demo-typography-profiles.md](20260910-001-integrated-demo-typography-profiles.md) — completed Integrated Demo typography-profile implementation plan.
-- [20260907-002-bootstrap-range-trackbar.md](20260907-002-bootstrap-range-trackbar.md) — completed native-backed `BootstrapRange` / TrackBar implementation plan.
-- [20260907-004-bootstrap-modal.md](20260907-004-bootstrap-modal.md) — completed native-backed `BootstrapModal` implementation plan.
-- [20260907-005-bootstrap-list-group.md](20260907-005-bootstrap-list-group.md) — completed lightweight `BootstrapListGroup` composition-control implementation plan.
-- [20260907-006-bootstrap-breadcrumb.md](20260907-006-bootstrap-breadcrumb.md) — completed native-link-backed `BootstrapBreadcrumb` implementation plan.
+- `roadmaps/` — completed or superseded roadmaps, including the original Phase 0–16 development plan.
+- `plans/` — completed implementation/fix plans, including all plans previously under `docs/plans/`.
+- `phases/` — completed phase-specific implementation notes that previously lived in the `docs/` root.
+- `design-history/` — superseded detailed design/planning artifacts retained for historical reasoning.
 
-Current unfinished work is tracked only in [../ROADMAP.md](../ROADMAP.md).
+Use archive material only when a current task specifically needs historical context. Prefer searching for the relevant component/decision instead of bulk-reading this directory.
 
-When an active plan is fully implemented and verified, prefer moving it out of the active queue into archival history rather than allowing `ROADMAP.md` to become a changelog.
+Current source-of-truth documents remain in the parent `docs/` directory. The active planning gate is [../ROADMAP.md](../ROADMAP.md), which may intentionally contain no active items.

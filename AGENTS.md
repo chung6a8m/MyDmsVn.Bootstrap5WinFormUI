@@ -4,14 +4,13 @@ Instructions for AI coding agents and automated contributors working in this rep
 
 ## 1. Context discipline
 
-Keep the working context small. At the start of a task, read only:
+Keep the working context small. For normal implementation work, start with only:
 
 1. `README.md`
 2. `AI_CONTEXT.md`
-3. `docs/ROADMAP.md`
-4. The single active plan named by the user or selected from the top of `docs/ROADMAP.md`
+3. The files directly relevant to the user's task
 
-Then load supporting documents only when the current task needs them:
+Load supporting documents only when needed:
 
 - `docs/ARCHITECTURE.md` for dependency or ownership questions.
 - `docs/DESIGN_SYSTEM.md` for theme, typography, metrics, or rendering decisions.
@@ -19,20 +18,19 @@ Then load supporting documents only when the current task needs them:
 - `docs/COMPATIBILITY.md` for cross-target/runtime questions.
 - `docs/TESTING.md` and `docs/WINFORMS_TEST_EXECUTION.md` when adding or running tests.
 - `docs/PUBLIC_API_BASELINE.md` when changing public/protected API.
+- `docs/ROADMAP.md` only for roadmap/planning work or when the user explicitly refers to active planned work.
 
-Do **not** bulk-read `docs/plans/`, `docs/archive/`, completed phase documents, or `idea-drafs/`. Historical material is context-on-demand only and is never authoritative for active work.
+Do **not** bulk-read `docs/archive/`, completed plans/phases, or `idea-drafs/`. Historical material is context-on-demand only and is never authoritative for current work.
 
-## 2. Active roadmap discipline
+## 2. Roadmap discipline
 
-`docs/ROADMAP.md` is the source of truth for unfinished planned work. Follow its order unless the user explicitly directs otherwise.
+`docs/ROADMAP.md` is the source of truth only for unfinished planned work. It may intentionally contain no active items.
 
-- Work on one active plan at a time.
-- Read that plan completely before implementation.
-- Track progress in the plan's existing task checkboxes/status markers when applicable.
-- Do not infer priority from archived roadmaps or filenames.
-- When a plan is fully completed, verified, and documented, remove it from the active queue and archive it rather than growing the active roadmap indefinitely.
-
-For historical context, see `docs/archive/`.
+- Never infer a next task from archived roadmaps, plans, phase notes, filenames, changelog entries, or component coverage.
+- When active work is planned, keep only unfinished plans under `docs/plans/` and link them from `docs/ROADMAP.md`.
+- Work on one active plan at a time and read only that plan completely.
+- When a plan is fully completed and verified, remove it from the active queue and move it to `docs/archive/plans/`.
+- If the roadmap is empty, wait for explicit user direction instead of selecting historical work.
 
 ## 3. Fixed project constraints
 

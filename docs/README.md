@@ -4,13 +4,16 @@ Current development documentation for `MyDmsVn.Bootstrap5WinFormUI`.
 
 ## Start here
 
-For implementation work, keep context small:
+The previous active roadmap is complete. There are currently no active plan files to preload.
 
-1. [Active Roadmap](ROADMAP.md) — ordered unfinished work only.
-2. The single active plan referenced by the roadmap.
-3. Supporting documents below only when the current task needs them.
+For normal implementation work:
 
-Historical roadmaps are under [archive/](archive/) and should not be preloaded into normal coding-agent context.
+1. Read root `AI_CONTEXT.md` and `AGENTS.md`.
+2. Read only the current task's relevant source files.
+3. Load the supporting documents below only when the task needs them.
+4. Read [ROADMAP.md](ROADMAP.md) only for planning/roadmap work or when a task explicitly refers to planned work.
+
+Historical plans, phase notes, roadmaps, and superseded design material are under [archive/](archive/) and should not be preloaded into coding-agent context.
 
 ## Product and architecture
 
@@ -35,8 +38,8 @@ Historical roadmaps are under [archive/](archive/) and should not be preloaded i
 - [RELEASING.md](RELEASING.md) — release candidate, package validation, CI artifacts, and stable promotion.
 - Component-specific guides such as [BOOTSTRAP_SELECT.md](BOOTSTRAP_SELECT.md), [BOOTSTRAP_LOOKUP_BOX.md](BOOTSTRAP_LOOKUP_BOX.md), and [BOOTSTRAP_INPUT_GROUP.md](BOOTSTRAP_INPUT_GROUP.md) should be read only when working on those areas.
 
-Completed phase documents and older plans remain useful as implementation history, but they are not part of the default reading set. The root [CHANGELOG.md](../CHANGELOG.md) remains the release-facing summary.
+The root [CHANGELOG.md](../CHANGELOG.md) remains the release-facing summary.
 
 ## Historical notes
 
-`idea-drafs/` and `archive/` contain design/development history. They may explain why a decision was made, but current user instructions, the active plan, and current architecture/product documents take precedence.
+`docs/archive/` and `idea-drafs/` are design/development history. They may explain why a decision was made, but current user instructions and current architecture/product documents take precedence.

@@ -10,13 +10,13 @@ Compact working context for AI assistants.
 - Target frameworks: `net48;net8.0-windows`
 - UI technology: native Windows Forms
 
-## Current source of truth
+## Current work state
 
-The active implementation queue is `docs/ROADMAP.md`. It contains only unfinished planned work and defines execution order unless the user explicitly overrides it.
+The previously active roadmap has been completed. `docs/ROADMAP.md` currently contains no active items.
 
-Read only the current plan being implemented. Do not preload all active plans, old phase documents, `docs/archive/`, or `idea-drafs/`.
+Do not infer new work from archived plans, old phase documents, `CHANGELOG.md`, component coverage, or `idea-drafs/`. Wait for the user's explicit task unless new unfinished work has been deliberately added to `docs/ROADMAP.md`.
 
-Historical roadmaps are archived under `docs/archive/` and are not current specifications.
+Historical roadmaps, completed plans/phases, and superseded design notes are under `docs/archive/` and are not current specifications.
 
 ## Product model
 
@@ -64,13 +64,14 @@ Foundation infrastructure is shared. Composite controls compose primitives inste
 - Tests: `docs/TESTING.md`, `docs/WINFORMS_TEST_EXECUTION.md`
 - Public/protected API changes: `docs/PUBLIC_API_BASELINE.md`
 - Product-scope ambiguity: `docs/PRD.md`, then `docs/DECISIONS.md`
+- Roadmap/planning only: `docs/ROADMAP.md`
 
 ## Precedence
 
 When information conflicts, use this order:
 
 1. Explicit current user instruction
-2. The current active plan
+2. Current active plan, if one exists and the user is working from it
 3. `docs/DECISIONS.md`
 4. `docs/PRD.md`
 5. `docs/ARCHITECTURE.md`

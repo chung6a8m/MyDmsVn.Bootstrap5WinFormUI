@@ -4,9 +4,9 @@ A Bootstrap-inspired native Windows Forms UI framework for business desktop appl
 
 ## Current development
 
-The ordered queue of unfinished work is [docs/ROADMAP.md](./docs/ROADMAP.md). Work follows that order unless an explicit user instruction changes it.
+The previously active roadmap has been completed. [docs/ROADMAP.md](./docs/ROADMAP.md) is intentionally kept as a small gate file and currently contains no active work.
 
-For historical context, see [Archive](./docs/archive/).
+Do not infer new implementation work from archived plans. New planned work should be added explicitly to the active roadmap when needed. Historical plans, roadmaps, phase notes, and design history live under [docs/archive/](./docs/archive/).
 
 ## Platform contract
 
@@ -26,7 +26,7 @@ For historical context, see [Archive](./docs/archive/).
 
 ## Component coverage
 
-The repository already contains the shared foundation plus a broad control set, including buttons/groups/toolbars, the native-backed ToolStrip/MenuStrip/ContextMenuStrip/StatusStrip family, text, numeric, and range inputs, checks/radios/switches, combo/select/lookup/input-group/date/calendar controls, cards/collapse/accordion/progress/placeholder/sidebar/tree/data-grid/pagination/breadcrumb, modal dialogs, badge/alert/tooltip/popover/tabs/dropdown/split-button/toast, and supporting infrastructure. `BootstrapPlaceholder` is a decorative building block: compose several instances in ordinary WinForms layouts for skeleton screens, while application loading state and accessible status remain caller-owned.
+The repository contains the shared foundation plus a broad control set, including buttons/groups/toolbars, the native-backed ToolStrip/MenuStrip/ContextMenuStrip/StatusStrip family, text, numeric, and range inputs, checks/radios/switches, combo/select/lookup/input-group/date/calendar controls, cards/collapse/accordion/progress/placeholder/sidebar/tree/list/data-grid/pagination/breadcrumb, modal dialogs, badge/alert/tooltip/popover/tabs/dropdown/split-button/toast, and supporting infrastructure.
 
 See [docs/COMPONENTS.md](./docs/COMPONENTS.md) for component contracts and [docs/PACKAGE_README.md](./docs/PACKAGE_README.md) for detailed usage-oriented documentation.
 
@@ -43,11 +43,12 @@ dotnet build
 
 ## Documentation
 
-Start with:
+For normal coding work, keep context intentionally small:
 
 1. [AI_CONTEXT.md](./AI_CONTEXT.md) — compact project context for AI agents.
-2. [docs/ROADMAP.md](./docs/ROADMAP.md) — active ordered work only.
-3. [docs/README.md](./docs/README.md) — documentation map by concern.
-4. [AGENTS.md](./AGENTS.md) — repository rules for coding agents.
+2. [AGENTS.md](./AGENTS.md) — repository execution rules.
+3. [docs/README.md](./docs/README.md) — current documentation map by concern.
+4. Load only the task-relevant architecture/component/testing documents.
+5. Read [docs/ROADMAP.md](./docs/ROADMAP.md) only for roadmap/planning work or when a task explicitly refers to active planned work.
 
-Detailed architecture, design-system, compatibility, testing, API, and release documents live under `docs/`. Historical roadmaps are deliberately separated under `docs/archive/` so they are not treated as current implementation instructions.
+Historical material under `docs/archive/` and `idea-drafs/` is context-on-demand only and is not authoritative for current work.
