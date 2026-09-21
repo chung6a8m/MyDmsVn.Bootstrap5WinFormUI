@@ -801,7 +801,7 @@ public class BootstrapToast : UserControl
             throw new InvalidOperationException("The toast auto-hide timer factory returned null.");
         }
 
-        EventHandler handler = (sender, args) => OnAutoHideTick(timer, generation, sender);
+        EventHandler handler = (_, _) => OnAutoHideTick(timer, generation);
         _autoHideTimer = timer;
         _autoHideTickHandler = handler;
         timer.Interval = Math.Max(1, _autoHideRemainingDelay);
@@ -842,12 +842,11 @@ public class BootstrapToast : UserControl
                !IsDisposed;
     }
 
-    private void OnAutoHideTick(IBootstrapToastAutoHideTimer timer, int generation, object? sender)
+    private void OnAutoHideTick(IBootstrapToastAutoHideTimer timer, int generation)
     {
         if (IsDisposed ||
             generation != _autoHideGeneration ||
             !ReferenceEquals(timer, _autoHideTimer) ||
-            !ReferenceEquals(sender, timer) ||
             !CanAutoHide())
         {
             return;

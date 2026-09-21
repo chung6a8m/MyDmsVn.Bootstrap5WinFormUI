@@ -111,6 +111,11 @@ internal sealed class ManualToastAutoHideTimer : IBootstrapToastAutoHideTimer
         _tick?.Invoke(this, EventArgs.Empty);
     }
 
+    public void FireWithSender(object? sender)
+    {
+        _tick?.Invoke(sender, EventArgs.Empty);
+    }
+
     public void Dispose()
     {
         if (IsDisposed)

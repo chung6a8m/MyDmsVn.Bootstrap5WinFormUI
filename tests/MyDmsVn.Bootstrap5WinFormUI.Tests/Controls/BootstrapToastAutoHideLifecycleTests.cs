@@ -132,6 +132,28 @@ public sealed class BootstrapToastAutoHideLifecycleTests
     }
 
     [Test]
+    public void CurrentTimerTickDismissesWhenEventSenderDiffersFromTimerWrapper()
+    {
+        var harness = new BootstrapToastAnimationHarness { ReducedMotion = true };
+        var timers = new List<ManualToastAutoHideTimer>();
+        using var container = new BootstrapToastContainer(harness.Create) { Size = new Size(400, 300) };
+        var toast = CreateAutoHideToast(timers);
+        var dismissed = 0;
+        toast.Dismissed += (_, _) => dismissed++;
+
+        container.ShowToast(toast);
+        var timer = timers[0];
+
+        timer.FireWithSender(new object());
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(dismissed, Is.EqualTo(1));
+            Assert.That(timer.IsDisposed, Is.True);
+        }));
+    }
+
+    [Test]
     public void ReducedMotionStillWaitsForSemanticTimerTick()
     {
         var harness = new BootstrapToastAnimationHarness { ReducedMotion = true };
