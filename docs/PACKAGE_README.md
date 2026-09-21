@@ -13,7 +13,7 @@ The library is native WinForms. It does not require a browser, WebView, Bootstra
 
 Input composition includes `BootstrapInputGroup`, `BootstrapInputGroupText`, and `BootstrapInputGroupSize`; grouped `BootstrapSelect` is Single-only in v1.
 
-`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapSplitButton`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapRange`, `BootstrapComboBox`, `BootstrapSelect`, `BootstrapLookupBox`, `BootstrapLookupColumn`, `BootstrapDatePicker`, `BootstrapCalendar`, `BootstrapCalendarPicker`, `BootstrapDropdown`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBreadcrumb`, `BootstrapModal`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabControl`, `BootstrapToast`, `BootstrapToastContainer`, and `BootstrapToastService`, plus shared Theme, Rendering, DPI, Animation, Icon, and Overlay infrastructure.
+`BootstrapButton`, `BootstrapButtonGroup`, `BootstrapButtonToolbar`, `BootstrapSplitButton`, `BootstrapTextBox`, `BootstrapNumericBox`, `BootstrapRange`, `BootstrapComboBox`, `BootstrapSelect`, `BootstrapLookupBox`, `BootstrapLookupColumn`, `BootstrapDatePicker`, `BootstrapCalendar`, `BootstrapCalendarPicker`, `BootstrapDropdown`, `BootstrapCard`, `BootstrapCollapse`, `BootstrapAccordion`, `BootstrapSpinner`, `BootstrapProgressBar`, `BootstrapPlaceholder`, `BootstrapSidebar`, `BootstrapDataGridView`, `BootstrapPagination`, `BootstrapBreadcrumb`, `BootstrapModal`, `BootstrapBadge`, `BootstrapAlert`, `BootstrapTooltip`, `BootstrapTabControl`, `BootstrapToast`, `BootstrapToastContainer`, and `BootstrapToastService`, plus shared Theme, Rendering, DPI, Animation, Icon, and Overlay infrastructure.
 
 `BootstrapNumericBox` is a native-backed numeric input. It owns one borderless WinForms `NumericUpDown` and forwards `Value`, `Minimum`, `Maximum`, `Increment`, `DecimalPlaces`, `ThousandsSeparator`, and `ReadOnly` directly, while the framework owns the themed shell, validation/focus rendering, DPI layout, single public tab stop, and `BorderRadius`. Native range exceptions, spin buttons, Up/Down keys, mouse wheel, parsing, and formatting semantics remain native.
 
@@ -33,6 +33,8 @@ Input composition includes `BootstrapInputGroup`, `BootstrapInputGroupText`, and
 
 `BootstrapBreadcrumb` presents caller-owned `BootstrapBreadcrumbItem` instances in root-to-current order. Every item except the last is a full-text native `LinkLabel`; the last item is a non-focusable current-location label. `Divider` defaults to `/`, `RightToLeftDivider` optionally supplies RTL text, and `WrapContents` defaults to `true`, wrapping only complete divider-plus-item segments when a positive proposed width, `MaximumSize.Width`, or runtime content width constrains layout. `ItemClicked` reports the current logical item and index but never changes `Items`: routing, navigation history, page hosting, and trail mutation belong to application code.
 
+`BootstrapPlaceholder` is a decorative loading shape, not application loading state and not a Spinner/Progress replacement. It defaults to `Secondary`, static presentation, a two-second animation cycle, square corners, and `AutoSize = true`. Sizes use `0.6/0.8/1/1.2 em`; Glow cycles opacity `0.5 -> 0.2 -> 0.5`, while Wave moves a subtle effective `0.5 -> 0.4 -> 0.5` trough. Semantic/custom color, theme or explicit radius, Light/Dark, DPI, and reduced motion reuse shared infrastructure. Set `AutoSize = false` for exact bounds. Skeleton screens are caller-owned layout compositions; expose a separate accessible status when loading must be announced.
+
 `BootstrapBadge` is a compact, auto-sized, non-interactive text indicator. `Variant` selects an existing semantic color; `CustomColor` accepts `Color.Empty` or a fully opaque override; `Pill` selects half-height pill geometry; `BorderRadius = -1` uses the current theme radius.
 
 `BootstrapAlert` is inline semantic feedback. It supports all `BootstrapVariant` values, an optional source-neutral `Icon`, a native keyboard-accessible close affordance through `Dismissible`, deterministic `Dismiss()` / `Dismissed` semantics, and `BorderRadius = -1` for the current theme radius. Alert has no timeout, timer, overlay, floating host, or Toast queue behavior.
@@ -44,6 +46,27 @@ Input composition includes `BootstrapInputGroup`, `BootstrapInputGroupText`, and
 `BootstrapTooltip` is a designer-safe `Component + IExtenderProvider` that delegates associations, native popup placement, and timing to one owned WinForms `ToolTip`. `Variant` defaults to `Dark`, `CustomColor` optionally overrides the semantic background, `BorderRadius = -1` uses the current theme radius, `ContentPadding` is DPI-scaled, and the native delay/state properties are forwarded directly. The owned native `ToolTip` remains private and no custom popup scheduler or theme subscription is introduced.
 
 `BootstrapTabControl` derives directly from the native WinForms `TabControl`. Applications keep normal `TabPage` composition, `TabPages`, `SelectedIndex` / `SelectedTab`, `SelectedIndexChanged`, keyboard/focus behavior, `ImageList`, tab images/tooltips, and native overflow handling; the framework owner-draws only header rectangles. `TabStyle` supports `Tabs`, `Pills`, and `Underline`; `Variant` selects the active accent; `Fill` uses uniform fixed-width headers; `BorderRadius = -1` uses the current theme radius.
+
+Compose a skeleton from ordinary layout controls and independent placeholders:
+
+```csharp
+var skeleton = new TableLayoutPanel { AutoSize = true, ColumnCount = 1 };
+skeleton.Controls.Add(new BootstrapPlaceholder
+{
+    AutoSize = false,
+    Size = new Size(220, 24),
+    PlaceholderSize = BootstrapPlaceholderSize.Large,
+    Animation = BootstrapPlaceholderAnimation.Wave,
+    BorderRadius = -1
+});
+skeleton.Controls.Add(new BootstrapPlaceholder
+{
+    AutoSize = false,
+    Size = new Size(320, 16),
+    Animation = BootstrapPlaceholderAnimation.Wave
+});
+// The application owns loading state, replacement with content, and accessible status.
+```
 
 ## Minimal example
 
@@ -261,7 +284,7 @@ The core package contains source-neutral icon contracts and built-in Segoe MDL2/
 
 ## Release candidate status
 
-`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. Advanced Dropdown adds the `HostedControl` enum member, recursive/factory item properties, and `BootstrapSplitButton`; `BootstrapSelect` adds its separate managed select/model/provider/matcher/renderer family; and Calendar adds only `BootstrapCalendarSelectionMode`, `BootstrapCalendar`, and `BootstrapCalendarPicker`. Consumers with exhaustive switches over `BootstrapDropdownItemKind` must handle the additive member. The compatibility fingerprint is re-reviewed whenever an exported surface is added, while the assembly compatibility version remains `1.0.0.0`.
+`1.0.0-rc.1` uses the reviewed proposed v1 public API baseline. Placeholder adds only `BootstrapPlaceholder`, `BootstrapPlaceholderAnimation`, and `BootstrapPlaceholderSize`; there is no exported skeleton, loading-state, render-helper, or scheduler type. Advanced Dropdown adds the `HostedControl` enum member, recursive/factory item properties, and `BootstrapSplitButton`; `BootstrapSelect` adds its separate managed select/model/provider/matcher/renderer family; and Calendar adds only `BootstrapCalendarSelectionMode`, `BootstrapCalendar`, and `BootstrapCalendarPicker`. Consumers with exhaustive switches over `BootstrapDropdownItemKind` must handle the additive member. The compatibility fingerprint is re-reviewed whenever an exported surface is added, while the assembly compatibility version remains `1.0.0.0`.
 
 The package is a release candidate, not an automatic NuGet.org publication.
 

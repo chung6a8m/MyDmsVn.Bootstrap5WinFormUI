@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "c6d2468d00dbacb879a4d3f6c31fd67dec681bd7db41007d6b282bfaa43c0884";
+    private const string ApprovedV1Fingerprint = "95796bc67c04af789782cd20399c958dcda2d24083816c3df3cffc4b18b6499d";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -129,6 +129,55 @@ public sealed class Phase16PublicApiBaselineTests
                 "BootstrapBreadcrumbItemClickedEventArgs",
                 "BootstrapBreadcrumbItemCollection"
             }));
+        }));
+    }
+
+    [Test]
+    public void BootstrapPlaceholderExportsOnlyTheReviewedDecorativeContract()
+    {
+        var assembly = typeof(BootstrapPlaceholder).Assembly;
+        var placeholderExports = assembly.GetExportedTypes()
+            .Where(type => type.Name.IndexOf("BootstrapPlaceholder", StringComparison.Ordinal) >= 0)
+            .Select(type => type.FullName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(typeof(BootstrapPlaceholder).BaseType, Is.EqualTo(typeof(Control)));
+            Assert.That(typeof(BootstrapPlaceholder).GetConstructor(Type.EmptyTypes), Is.Not.Null);
+            Assert.That(GetDeclaredPublicPropertyNames(typeof(BootstrapPlaceholder)), Is.EqualTo(new[]
+            {
+                "Animation", "AnimationDuration", "BorderRadius", "CustomColor", "PlaceholderSize", "Variant"
+            }));
+            Assert.That(GetDeclaredPublicMethodNames(typeof(BootstrapPlaceholder)), Is.EqualTo(new[] { "GetPreferredSize" }));
+            Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapPlaceholder)), Is.Empty);
+            Assert.That(GetDeclaredProtectedMethodNames(typeof(BootstrapPlaceholder)), Is.EqualTo(new[]
+            {
+                "Dispose", "OnAutoSizeChanged", "OnDpiChangedAfterParent", "OnEnabledChanged", "OnFontChanged",
+                "OnHandleCreated", "OnHandleDestroyed", "OnPaint"
+            }));
+            Assert.That(Enum.GetValues(typeof(BootstrapPlaceholderSize)), Is.EqualTo(new[]
+            {
+                BootstrapPlaceholderSize.ExtraSmall,
+                BootstrapPlaceholderSize.Small,
+                BootstrapPlaceholderSize.Default,
+                BootstrapPlaceholderSize.Large
+            }));
+            Assert.That(Enum.GetValues(typeof(BootstrapPlaceholderAnimation)), Is.EqualTo(new[]
+            {
+                BootstrapPlaceholderAnimation.None,
+                BootstrapPlaceholderAnimation.Glow,
+                BootstrapPlaceholderAnimation.Wave
+            }));
+            Assert.That(placeholderExports, Is.EqualTo(new[]
+            {
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapPlaceholder",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapPlaceholderAnimation",
+                "MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapPlaceholderSize"
+            }));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapSkeleton"));
+            Assert.That(assembly.GetExportedTypes().Select(type => type.Name), Does.Not.Contain("BootstrapPlaceholderRenderLogic"));
         }));
     }
 

@@ -57,6 +57,36 @@ Behavior:
 
 Manual verification: launch the demo and choose **Spinner**. Compare Border/Grow, all three sizes, all semantic variants, and the custom-color examples; use **Start all** / **Stop all**, switch Light/Dark, toggle Reduced motion, resize the window, and validate the page under the supported Windows DPI matrix.
 
+## BootstrapPlaceholder
+
+Responsibility: render a decorative content-shaped loading placeholder. It does not own or expose application loading state, and it is not a progress indicator. Use `BootstrapSpinner` for indeterminate activity and `BootstrapProgressBar` for measurable completion. A skeleton is an application-owned composition of several placeholders and layout controls; there is no `BootstrapSkeleton` type.
+
+```text
+BootstrapPlaceholderSize: ExtraSmall | Small | Default | Large
+BootstrapPlaceholderAnimation: None | Glow | Wave
+
+BootstrapPlaceholder.PlaceholderSize       Default
+BootstrapPlaceholder.Animation             None
+BootstrapPlaceholder.Variant               Secondary
+BootstrapPlaceholder.CustomColor           Color.Empty
+BootstrapPlaceholder.BorderRadius          0
+BootstrapPlaceholder.AnimationDuration     2 seconds
+BootstrapPlaceholder.GetPreferredSize(Size)
+```
+
+Behavior:
+
+- Intrinsic heights are `0.6 em`, `0.8 em`, `1 em`, and `1.2 em` for ExtraSmall, Small, Default, and Large. `PlaceholderSize` affects only the intrinsic/preferred height; explicit bounds remain caller-owned when `AutoSize = false`.
+- `AutoSize` defaults to `true`. Preferred width caps the 100-logical-pixel DPI-scaled intrinsic width when a positive proposed width is supplied; otherwise it uses that intrinsic width. Set `AutoSize = false` and `Bounds` for exact skeleton geometry.
+- `Variant` resolves through the current semantic theme palette. A non-empty, fully opaque `CustomColor` overrides it.
+- `BorderRadius = 0` is square, positive values are logical DPI-scaled radii, and `-1` uses the current theme radius.
+- Static presentation uses effective opacity `0.5`. Glow linearly cycles the whole surface `0.5 -> 0.2 -> 0.5`. Wave moves a 130-degree local opacity trough across the surface; its sampled mask produces an effective `0.5 -> 0.4 -> 0.5` band over the same base color. Glow and Wave default to a two-second cycle.
+- Animation uses only `BootstrapLoopAnimation`. Hiding or destroying the handle pauses scheduling while retaining logical progress; showing or recreating the handle resumes it. Disposal releases the loop and theme subscription. Reduced motion keeps a stable visible frame without continuous scheduling.
+- The control is decorative: it is non-selectable, has no tab stop, exposes `AccessibleRole.None`, and must not be the only announcement of application loading status. Applications should expose status separately when users need it.
+- Theme changes update semantic color, theme-owned typography, DPI-derived geometry, and reduced-motion behavior. A caller-assigned font remains caller-owned.
+
+Manual verification: choose **Placeholder / Skeleton** in the integrated demo. Compare all sizes, semantic/custom colors, Glow/Wave/static examples, the composed card/table skeletons, explicit bounds, Light/Dark, reduced motion, and Windows 100/125/150/175/200% scaling. Confirm the decorative placeholders do not enter Tab order or replace an application loading-status announcement.
+
 ## BootstrapButton
 
 Responsibility: themed command surface with standard native WinForms button semantics.

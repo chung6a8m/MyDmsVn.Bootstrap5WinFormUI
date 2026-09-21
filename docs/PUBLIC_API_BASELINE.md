@@ -4,17 +4,19 @@
 
 Phase 16 froze the Phase 15-reviewed exported API as the proposed v1 compatibility baseline beginning with `1.0.0-rc.1`.
 
-`BootstrapPagination`, Stages 1–9 component additions, managed Tooltip placement, the shared overlay enums, `BootstrapPopover`, the advanced Dropdown/SplitButton family, the dedicated Select2-style `BootstrapSelect` subsystem, the custom Calendar/CalendarPicker family, the global Toast service/options/history family, `BootstrapFormattedTextBox` with its pure formatting contracts, the Input Group family, the native-backed CheckBox/RadioButton/Switch family, `BootstrapTreeView`, `BootstrapListView`, and `BootstrapBreadcrumb` are intentional compatible additions made while the package remains on the release-candidate line. Each API addition was reviewed through the existing fingerprint gate before the approved baseline was updated.
+`BootstrapPagination`, Stages 1–9 component additions, managed Tooltip placement, the shared overlay enums, `BootstrapPopover`, the advanced Dropdown/SplitButton family, the dedicated Select2-style `BootstrapSelect` subsystem, the custom Calendar/CalendarPicker family, the global Toast service/options/history family, `BootstrapFormattedTextBox` with its pure formatting contracts, the Input Group family, the native-backed CheckBox/RadioButton/Switch family, `BootstrapTreeView`, `BootstrapListView`, `BootstrapBreadcrumb`, and `BootstrapPlaceholder` are intentional compatible additions made while the package remains on the release-candidate line. Each API addition was reviewed through the existing fingerprint gate before the approved baseline was updated.
 
 The baseline covers every exported type plus each declared public, protected, and protected-internal constructor, field, property, event, and method in the core assembly. Including protected surface is intentional because subclasses can depend on it.
 
 Approved SHA-256 API fingerprint:
 
 ```text
-c6d2468d00dbacb879a4d3f6c31fd67dec681bd7db41007d6b282bfaa43c0884
+95796bc67c04af789782cd20399c958dcda2d24083816c3df3cffc4b18b6499d
 ```
 
 The reviewed Pagination addition exports only `MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapPagination`. Its declared surface is the parameterless constructor, `TotalItems`, `PageSize`, `CurrentPage`, `TotalPages`, `MaxVisiblePages`, `ShowFirstLast`, `ShowPreviousNext`, `ButtonSize`, `Variant`, `BorderRadius`, `PageChanged`, and the `GetPreferredSize(Size)` override inherited as part of the control contract. Pagination layout helper types remain internal.
+
+The reviewed Placeholder addition exports exactly `BootstrapPlaceholder : Control`, `BootstrapPlaceholderAnimation` (`None = 0`, `Glow = 1`, `Wave = 2`), and `BootstrapPlaceholderSize` (`ExtraSmall = 0`, `Small = 1`, `Default = 2`, `Large = 3`). The control declares only its parameterless constructor; `Animation`, `AnimationDuration`, `BorderRadius`, `CustomColor`, `PlaceholderSize`, and `Variant`; `GetPreferredSize(Size)`; and the protected `Dispose`, AutoSize/DPI/enabled/font/handle/paint lifecycle overrides required by the custom-painted shared-loop implementation. `BootstrapPlaceholderRenderLogic`, opacity constants, wave geometry/sampling, and animation implementation details remain internal/private. No `BootstrapSkeleton`, layout collection, loading/status abstraction, timer, task, thread, scheduler, or package dependency was introduced; `AssemblyVersion` remains `1.0.0.0`.
 
 The reviewed Badge addition exports only `MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapBadge`. Its declared surface is the parameterless constructor, `Variant`, `CustomColor`, `Pill`, `BorderRadius`, `GetPreferredSize(Size)`, and the protected lifecycle/painting overrides required by the custom `Control` implementation (`Dispose`, `OnAutoSizeChanged`, `OnDpiChangedAfterParent`, `OnEnabledChanged`, `OnFontChanged`, `OnPaint`, and `OnTextChanged`). `BootstrapBadgeRenderLogic` and `BootstrapBadgePalette` remain internal; no new public enum, timer, theme service, geometry type, or dependency was introduced.
 

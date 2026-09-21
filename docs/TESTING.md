@@ -550,6 +550,8 @@ For finite and loop animation, test:
 
 Shared Phase 4 primitives additionally verify that progress is elapsed-time based rather than tick-count based, stop/resume excludes paused time, completion is emitted exactly once, loop progress wraps predictably, and event callbacks can safely stop/restart/dispose the animation.
 
+Placeholder tests cover the pure Glow triangle (`0.5 -> 0.2 -> 0.5`) and moving Bootstrap Wave mask (effective `0.5 -> 0.4 -> 0.5`), the two-second default cycle, shared-loop creation/disposal, hide/show and handle-destroy/create pause/resume with retained progress, runtime reduced-motion changes, and the absence of component-local timers/tasks/threads. Bounded STA paint tests cover static/Glow/Wave, semantic/custom color, radius, disabled state, Light/Dark switching, DPI/font changes, explicit bounds, and deterministic disposal.
+
 Animated controls must not continue producing useful work after disposal. New control-specific timers are prohibited unless an explicit documented exception is approved.
 
 Pagination is explicitly outside the animation matrix: page-state and navigation changes are immediate and it must not introduce a timer or animation owner.
@@ -871,3 +873,13 @@ Bounded STA tests cover empty/one/many-item composition, exact public contract, 
 Manual release verification uses the integrated **Breadcrumb** page for mouse and native Enter activation, Tab/Shift+Tab focus order and visible focus cues, live text mutation while focused, constrained/parent-width wrapping and resize stability, LTR/RTL, disabled state, Light/Dark, caller font, and Windows 100/125/150/175/200% scaling. Inspect the Windows accessibility tree to confirm full non-empty ancestor link names, a comprehensible passive current item, non-actionable dividers, and ancestor-only focus order. These real-display and OS-tool checks supplement rather than replace the deterministic automated assertions.
 
 Breadcrumb participates in the Phase 16 public/protected API fingerprint gate. The gate must deliberately fail against the prior approved hash before the four exported Breadcrumb types are approved. Current-generation maps, layout structs/helper, item owner notifications, and callbacks remain internal/private; `AssemblyVersion` remains `1.0.0.0`.
+
+## 16. BootstrapPlaceholder verification matrix
+
+Pure tests cover the four em-based intrinsic height multipliers, proposed/existing/fallback preferred widths, DPI rounding, semantic/custom/disabled colors, static and Glow opacity, the moving 130-degree Wave mask and alpha composition, and explicit/theme radius resolution. The Wave regression asserts the Bootstrap-compatible local trough rather than a brightness highlight.
+
+Bounded STA tests cover the exact public/default contract; AutoSize and `AutoSize = false` explicit-size layout; static, Glow, and Wave painting; Light/Dark runtime changes; caller font ownership; DPI-aware preferred size/radius; non-focusable decorative accessibility; shared-loop lifecycle; hidden/visible and handle recreation pause/resume; reduced motion; disposal; and integrated demo construction/navigation on both TFMs. Focused raw invocations retain `--blame-hang --blame-hang-timeout 5m`.
+
+Manual release verification uses the integrated **Placeholder / Skeleton** page. At Windows 100/125/150/175/200% scaling, compare ExtraSmall/Small/Default/Large, semantic and custom colors, square/theme/explicit radii, explicit-width skeleton rows, Glow/Wave/static presentation, Light/Dark, hide/show, and reduced motion. Inspect keyboard and accessibility tooling to confirm decorative placeholders are absent from Tab order and do not masquerade as the application's loading-status announcement. Skeleton replacement and status announcements remain application-owned.
+
+Placeholder participates in the Phase 16 public/protected API fingerprint gate. Only `BootstrapPlaceholder`, `BootstrapPlaceholderAnimation`, and `BootstrapPlaceholderSize` are exported; render logic, opacity constants, wave geometry, animation implementation, skeleton/layout collections, and loading/status abstractions remain internal or absent. `AssemblyVersion` remains `1.0.0.0`.
