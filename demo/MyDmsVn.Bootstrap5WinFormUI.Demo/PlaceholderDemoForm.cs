@@ -57,22 +57,22 @@ public sealed class PlaceholderDemoForm : DemoFormBase
         AddLabeledPlaceholder(row, "XS", new BootstrapPlaceholder
         {
             PlaceholderSize = BootstrapPlaceholderSize.ExtraSmall,
-            AccessibleName = "Natural size ExtraSmall"
+            Tag = "Natural size ExtraSmall"
         });
         AddLabeledPlaceholder(row, "SM", new BootstrapPlaceholder
         {
             PlaceholderSize = BootstrapPlaceholderSize.Small,
-            AccessibleName = "Natural size Small"
+            Tag = "Natural size Small"
         });
         AddLabeledPlaceholder(row, "Default", new BootstrapPlaceholder
         {
             PlaceholderSize = BootstrapPlaceholderSize.Default,
-            AccessibleName = "Natural size Default"
+            Tag = "Natural size Default"
         });
         AddLabeledPlaceholder(row, "LG", new BootstrapPlaceholder
         {
             PlaceholderSize = BootstrapPlaceholderSize.Large,
-            AccessibleName = "Natural size Large"
+            Tag = "Natural size Large"
         });
         stack.Controls.Add(row);
     }
@@ -85,6 +85,10 @@ public sealed class PlaceholderDemoForm : DemoFormBase
         AddLabeledPlaceholder(row, "Secondary / theme", CreateExplicitPlaceholder(130, 24, BootstrapVariant.Secondary, -1));
         AddLabeledPlaceholder(row, "Success / rounded", CreateExplicitPlaceholder(130, 24, BootstrapVariant.Success, 999));
         AddLabeledPlaceholder(row, "Danger", CreateExplicitPlaceholder(130, 24, BootstrapVariant.Danger, 6));
+        AddLabeledPlaceholder(row, "Warning", CreateExplicitPlaceholder(130, 24, BootstrapVariant.Warning, 6));
+        AddLabeledPlaceholder(row, "Info", CreateExplicitPlaceholder(130, 24, BootstrapVariant.Info, 6));
+        AddLabeledPlaceholder(row, "Light", CreateExplicitPlaceholder(130, 24, BootstrapVariant.Light, 6));
+        AddLabeledPlaceholder(row, "Dark", CreateExplicitPlaceholder(130, 24, BootstrapVariant.Dark, 6));
         var custom = CreateExplicitPlaceholder(130, 24, BootstrapVariant.Secondary, 6);
         custom.CustomColor = Color.FromArgb(111, 66, 193);
         AddLabeledPlaceholder(row, "Custom color", custom);
@@ -128,7 +132,7 @@ public sealed class PlaceholderDemoForm : DemoFormBase
             Size = new Size(48, 48),
             BorderRadius = 999,
             Animation = BootstrapPlaceholderAnimation.Wave,
-            AccessibleName = "Skeleton avatar"
+            Tag = "Skeleton avatar"
         };
         layout.Controls.Add(avatar, 0, 0);
 
@@ -277,7 +281,7 @@ public sealed class PlaceholderDemoForm : DemoFormBase
         };
     }
 
-    private static TableLayoutPanel CreatePercentBar(string accessibleName, int height, int columnSpan, int borderRadius = 0)
+    private static TableLayoutPanel CreatePercentBar(string tag, int height, int columnSpan, int borderRadius = 0)
     {
         var row = new TableLayoutPanel
         {
@@ -299,7 +303,7 @@ public sealed class PlaceholderDemoForm : DemoFormBase
             Height = height,
             Animation = BootstrapPlaceholderAnimation.Wave,
             BorderRadius = borderRadius,
-            AccessibleName = accessibleName,
+            Tag = tag,
             Margin = new Padding(0, 2, 4, 2)
         };
         row.Controls.Add(placeholder, 0, 0);

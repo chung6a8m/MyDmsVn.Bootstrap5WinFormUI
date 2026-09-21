@@ -550,7 +550,7 @@ For finite and loop animation, test:
 
 Shared Phase 4 primitives additionally verify that progress is elapsed-time based rather than tick-count based, stop/resume excludes paused time, completion is emitted exactly once, loop progress wraps predictably, and event callbacks can safely stop/restart/dispose the animation.
 
-Placeholder tests cover the pure Glow triangle (`0.5 -> 0.2 -> 0.5`) and moving Bootstrap Wave mask (effective `0.5 -> 0.4 -> 0.5`), the two-second default cycle, shared-loop creation/disposal, hide/show and handle-destroy/create pause/resume with retained progress, runtime reduced-motion changes, and the absence of component-local timers/tasks/threads. Bounded STA paint tests cover static/Glow/Wave, semantic/custom color, radius, disabled state, Light/Dark switching, DPI/font changes, explicit bounds, and deterministic disposal.
+Placeholder tests cover the pure cosine ease-in-out Glow cycle (`0.5 -> 0.2 -> 0.5`) and moving Bootstrap Wave mask (effective `0.5 -> 0.4 -> 0.5`), the two-second default cycle, shared-loop creation/disposal, hide/show and handle-destroy/create pause/resume with retained progress, runtime reduced-motion changes, and the absence of component-local timers/tasks/threads. Bounded STA paint tests cover static/Glow/Wave, semantic/custom color, radius, disabled state, Light/Dark switching, DPI/font changes, explicit bounds, and deterministic disposal.
 
 Animated controls must not continue producing useful work after disposal. New control-specific timers are prohibited unless an explicit documented exception is approved.
 

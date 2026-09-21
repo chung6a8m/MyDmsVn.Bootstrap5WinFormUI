@@ -52,10 +52,8 @@ public sealed class PlaceholderDemoFormTests
                 Is.EquivalentTo(Enum.GetValues(typeof(BootstrapPlaceholderAnimation)).Cast<BootstrapPlaceholderAnimation>()));
             Assert.That(
                 placeholders.Select(item => item.Variant).Distinct(),
-                Does.Contain(BootstrapVariant.Primary));
-            Assert.That(placeholders.Select(item => item.Variant), Does.Contain(BootstrapVariant.Secondary));
-            Assert.That(placeholders.Select(item => item.Variant), Does.Contain(BootstrapVariant.Success));
-            Assert.That(placeholders.Select(item => item.Variant), Does.Contain(BootstrapVariant.Danger));
+                Is.EquivalentTo(Enum.GetValues(typeof(BootstrapVariant)).Cast<BootstrapVariant>()));
+            Assert.That(placeholders.All(item => string.IsNullOrEmpty(item.AccessibleName)), Is.True);
             Assert.That(placeholders.Any(item => !item.CustomColor.IsEmpty), Is.True);
             Assert.That(placeholders.Any(item => item.BorderRadius == 0), Is.True);
             Assert.That(placeholders.Any(item => item.BorderRadius == -1), Is.True);
@@ -72,10 +70,10 @@ public sealed class PlaceholderDemoFormTests
         var skeleton = FindControls<Panel>(form).Single(panel => panel.AccessibleName == "Composed skeleton card");
         var placeholders = FindControls<BootstrapPlaceholder>(skeleton).ToArray();
         var explicitBars = placeholders
-            .Where(item => item.AccessibleName?.StartsWith("Skeleton explicit bar", StringComparison.Ordinal) == true)
+            .Where(item => item.Tag is string tag && tag.StartsWith("Skeleton explicit bar", StringComparison.Ordinal))
             .ToArray();
         var naturalSizeExamples = FindControls<BootstrapPlaceholder>(form)
-            .Where(item => item.AccessibleName?.StartsWith("Natural size", StringComparison.Ordinal) == true)
+            .Where(item => item.Tag is string tag && tag.StartsWith("Natural size", StringComparison.Ordinal))
             .ToArray();
 
         Assert.Multiple((Action)delegate
