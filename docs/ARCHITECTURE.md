@@ -309,6 +309,8 @@ Finite `Stop()` freezes current progress and `Start()` resumes it; `Restart()` a
 
 Loop `Stop()` and `Start()` freeze/resume the current cycle position; `Restart()` returns to zero. Loop animation does not expose a finite completion event.
 
+Placeholder Glow and Wave reuse `BootstrapLoopAnimation` with the control as lifecycle owner. Placeholder introduces no timer, thread, task, or scheduler. Handle destruction stops scheduling without discarding retained logical progress; handle creation reconciles and resumes the same loop. Theme changes recreate the loop only so the shared reduced-motion preference and duration are reapplied.
+
 Pagination, NumericBox, ComboBox, and Dropdown are non-animated and must not introduce scheduling solely for state, validation, focus, selection, or popup changes.
 
 ## 9. Resource ownership
@@ -333,6 +335,8 @@ Dropdown owns its one `ToolStripDropDownMenu`, transient native snapshot items, 
 
 Popover owns its internal surface, `ToolStripControlHost`, `ToolStripDropDown`, rounded regions, and open-only subscriptions. It never owns or disposes `Target` or `Content`; content is detached before owned popup infrastructure is disposed.
 
+Placeholder owns only its shared loop-animation instance, one theme subscription, and a framework-created theme font. Paint-time brushes and rounded paths are scoped. It owns no loading state, child controls, layout collection, application status, caller font, timer, task, or thread.
+
 ## 10. Designer architecture
 
 The framework must not require a service locator, DI container, or application bootstrap merely to instantiate a control in the Designer.
@@ -348,6 +352,8 @@ NumericBox follows the same rule: its parameterless constructor creates the one 
 ComboBox also has a safe parameterless constructor. The inherited native collection/binding/selection properties remain designer/runtime APIs; framework-specific designer-facing state is limited to validation, radius, and optional leading icon. `IconRenderer` is intentionally hidden from Designer serialization and defaults to the existing source-neutral renderer.
 
 Dropdown has a safe parameterless constructor, stable content-serialized `Items`, and nullable `Target`. Creating it at design time requires neither a live form handle nor application bootstrap. The native popup is private and is not designer-serialized.
+
+Placeholder construction is designer-safe and starts no animation before a runtime handle exists. Its six documented properties serialize normally; skeleton layout remains ordinary caller-owned WinForms composition.
 
 ## 11. Error handling philosophy
 
@@ -365,6 +371,14 @@ ComboBox deliberately preserves native `ComboBox` exceptions/restrictions for it
 
 Dropdown rejects undefined `BootstrapVariant` values and negative logical `MinimumWidth`. `Show()` throws only when no `Target` is assigned; with an assigned target it is a no-op when already open, empty, disabled, loading, or disposed. `Close()` is idempotent. Disabled commands and separators never dispatch model `Click`, and framework activation never mutates `Checked`.
 
+Placeholder rejects undefined size, animation, and variant values; `AnimationDuration <= TimeSpan.Zero`; `BorderRadius < -1`; and translucent non-empty custom colors. Validation occurs before state mutation.
+
+### BootstrapPlaceholder rendering
+
+`BootstrapPlaceholder` is one decorative custom-painted `Control`. It reuses Theme tokens for semantic color/typography/radius, `DpiScaler` for logical geometry, `RoundedPath` for clipping, and the shared Animation infrastructure. The internal pure `BootstrapPlaceholderRenderLogic` owns preferred-size, opacity, wave-mask, color, and radius calculations; no render helper or wave geometry is exported.
+
+Skeletons are compositions of independent placeholders in caller-owned WinForms layout. The framework deliberately adds no skeleton model, loading/status abstraction, data binding, child collection, or scheduler. Application state decides when to replace that composition with real content and supplies a separate accessible loading announcement when required.
+
 ### BootstrapBreadcrumb composition
 
 `BootstrapBreadcrumb` composes native `LinkLabel` ancestor controls and passive `Label` current/divider controls with the shared Theme and DPI services plus the pure internal `BootstrapBreadcrumbLayoutLogic`. Native links remain authoritative for focus, keyboard, mouse, and accessibility activation; the component adds no custom link hit-testing or input engine.
@@ -379,4 +393,4 @@ Before the first stable release, public APIs may change deliberately to improve 
 
 After a stable compatibility baseline is declared, breaking public changes require an explicit compatibility policy.
 
-The Pagination, NumericBox, ComboBox, Dropdown, and Breadcrumb API additions change the proposed v1 release-candidate fingerprint intentionally. Their exported surfaces are reviewed before updating the approved fingerprint, while helper/layout/renderer types remain internal and `AssemblyVersion` stays `1.0.0.0`.
+The Pagination, NumericBox, ComboBox, Dropdown, Breadcrumb, and Placeholder API additions change the proposed v1 release-candidate fingerprint intentionally. Their exported surfaces are reviewed before updating the approved fingerprint, while helper/layout/renderer types remain internal and `AssemblyVersion` stays `1.0.0.0`.

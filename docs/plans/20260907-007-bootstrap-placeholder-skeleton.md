@@ -539,20 +539,20 @@ The status label is the meaningful accessibility/status surface; placeholders ar
 - Does **not** implement or test the final intrinsic size/DPI formulas yet; those belong entirely to Task 2.
 - Control construction consumes current theme Body typography but full live theme/font lifecycle is completed in Task 3.
 
-- [ ] **Step 1: Write failing default-state and enum tests.** Assert enum numeric order exactly `ExtraSmall=0`, `Small=1`, `Default=2`, `Large=3` and `None=0`, `Glow=1`, `Wave=2`. Assert a new control has Default/None/Secondary/Empty/0/2s, `AutoSize=true`, transparent background, `TabStop=false`, `AccessibleRole.None`, and wait cursor.
-- [ ] **Step 2: Write failing validation tests** for undefined size/animation/variant, semi-transparent custom color, `BorderRadius=-2`, zero/negative animation duration, and rollback to original state after every failed assignment.
-- [ ] **Step 3: Write failing explicit-bounds ownership tests.** Set `AutoSize=false`, assign a known `Size`, then change `PlaceholderSize`, `Variant`, `CustomColor`, `BorderRadius`, and `AnimationDuration`; assert the explicit bounds remain unchanged. Do not assert DPI/preferred-size math in this task.
-- [ ] **Step 4: Run focused UI tests and verify RED because the public types do not exist.**
+- [x] **Step 1: Write failing default-state and enum tests.** Assert enum numeric order exactly `ExtraSmall=0`, `Small=1`, `Default=2`, `Large=3` and `None=0`, `Glow=1`, `Wave=2`. Assert a new control has Default/None/Secondary/Empty/0/2s, `AutoSize=true`, transparent background, `TabStop=false`, `AccessibleRole.None`, and wait cursor.
+- [x] **Step 2: Write failing validation tests** for undefined size/animation/variant, semi-transparent custom color, `BorderRadius=-2`, zero/negative animation duration, and rollback to original state after every failed assignment.
+- [x] **Step 3: Write failing explicit-bounds ownership tests.** Set `AutoSize=false`, assign a known `Size`, then change `PlaceholderSize`, `Variant`, `CustomColor`, `BorderRadius`, and `AnimationDuration`; assert the explicit bounds remain unchanged. Do not assert DPI/preferred-size math in this task.
+- [x] **Step 4: Run focused UI tests and verify RED because the public types do not exist.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter BootstrapPlaceholderTests --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 5: Implement the two enums and minimal `BootstrapPlaceholder` public contract.** Use private validation helpers and same-value no-op guards. Set styles/defaults and the initial Body font using the established caller-font ownership guard pattern. Do not add any extra public state to make tests easier.
-- [ ] **Step 6: Ensure setters invalidate/reconcile presentation as appropriate without overwriting caller-owned `Size` when `AutoSize=false`.** `GetPreferredSize` may remain a minimal override delegating to base until Task 2 wires the exact formula.
-- [ ] **Step 7: Rerun the full Task 1 fixture on `net8.0-windows`; verify every Task 1 assertion is GREEN.** No test in this task may depend on a helper introduced later.
-- [ ] **Step 8: Run the same Task 1 fixture on `net48`; verify GREEN.**
-- [ ] **Step 9: Commit** `feat: add BootstrapPlaceholder public contract`.
+- [x] **Step 5: Implement the two enums and minimal `BootstrapPlaceholder` public contract.** Use private validation helpers and same-value no-op guards. Set styles/defaults and the initial Body font using the established caller-font ownership guard pattern. Do not add any extra public state to make tests easier.
+- [x] **Step 6: Ensure setters invalidate/reconcile presentation as appropriate without overwriting caller-owned `Size` when `AutoSize=false`.** `GetPreferredSize` may remain a minimal override delegating to base until Task 2 wires the exact formula.
+- [x] **Step 7: Rerun the full Task 1 fixture on `net8.0-windows`; verify every Task 1 assertion is GREEN.** No test in this task may depend on a helper introduced later.
+- [x] **Step 8: Run the same Task 1 fixture on `net48`; verify GREEN.**
+- [x] **Step 9: Commit** `feat: add BootstrapPlaceholder public contract`.
 
 ### Task 2: Implement pure Bootstrap size, color, Glow, Wave, alpha, and radius logic
 
@@ -567,7 +567,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Consumes only values, `Size`, theme token objects, `DpiScaler`, and existing `BootstrapVariantColorResolver`; no live Control/Graphics/animation dependency.
 - This task owns **all** intrinsic sizing and virtual-DPI assertions deferred from Task 1.
 
-- [ ] **Step 1: Write failing sizing tests** for 100 logical px at 96/144/192 DPI, proposed-width capping, 0.6/0.8/1.0/1.2 Font.Height multipliers, minimum height 1, and invalid font height/size/DPI.
+- [x] **Step 1: Write failing sizing tests** for 100 logical px at 96/144/192 DPI, proposed-width capping, 0.6/0.8/1.0/1.2 Font.Height multipliers, minimum height 1, and invalid font height/size/DPI.
 
 ```csharp
 [TestCase(BootstrapPlaceholderSize.ExtraSmall, 0.6)]
@@ -588,23 +588,23 @@ public void PreferredHeightMatchesBootstrapEmScale(
 }
 ```
 
-- [ ] **Step 2: Write failing base-color tests** for all semantic variants, opaque custom-color precedence, disabled token precedence, null palette rejection, and semi-transparent custom-color rejection.
-- [ ] **Step 3: Write failing Glow tests** at progress 0/.25/.5/.75/1 with expected opacity .5/.35/.2/.35/.5, clamp tests for finite out-of-range values, and NaN/infinity rejection.
-- [ ] **Step 4: Write failing Wave tests** proving progress 0 returns `0.5` at visible positions, progress `0.5` reaches approximately `0.4` at `x=0.5`, points outside the trough return `0.5`, symmetry around the center holds, effective opacity always stays in `[0.4,0.5]`, finite bounds clamp, and non-finite inputs throw.
-- [ ] **Step 5: Add an explicit Bootstrap fidelity test** proving Wave center is derived as `OpacityMax * WaveMaskMin == 0.5 * 0.8 == 0.4`; add a regression assertion that Wave never returns Glow's direct `0.2` minimum.
-- [ ] **Step 6: Write failing alpha tests** for 0.5 => alpha 128, 0.4 => alpha 102, 0.2 => alpha 51, exact RGB preservation, finite clamp, and non-finite rejection.
-- [ ] **Step 7: Write failing radius tests** for 0, explicit logical radii at multiple DPI values, `-1` resolving `theme.Metrics.Radius`, and invalid values/null metrics.
-- [ ] **Step 8: Run pure helper tests; verify RED.**
+- [x] **Step 2: Write failing base-color tests** for all semantic variants, opaque custom-color precedence, disabled token precedence, null palette rejection, and semi-transparent custom-color rejection.
+- [x] **Step 3: Write failing Glow tests** at progress 0/.25/.5/.75/1 with expected opacity .5/.35/.2/.35/.5, clamp tests for finite out-of-range values, and NaN/infinity rejection.
+- [x] **Step 4: Write failing Wave tests** proving progress 0 returns `0.5` at visible positions, progress `0.5` reaches approximately `0.4` at `x=0.5`, points outside the trough return `0.5`, symmetry around the center holds, effective opacity always stays in `[0.4,0.5]`, finite bounds clamp, and non-finite inputs throw.
+- [x] **Step 5: Add an explicit Bootstrap fidelity test** proving Wave center is derived as `OpacityMax * WaveMaskMin == 0.5 * 0.8 == 0.4`; add a regression assertion that Wave never returns Glow's direct `0.2` minimum.
+- [x] **Step 6: Write failing alpha tests** for 0.5 => alpha 128, 0.4 => alpha 102, 0.2 => alpha 51, exact RGB preservation, finite clamp, and non-finite rejection.
+- [x] **Step 7: Write failing radius tests** for 0, explicit logical radii at multiple DPI values, `-1` resolving `theme.Metrics.Radius`, and invalid values/null metrics.
+- [x] **Step 8: Run pure helper tests; verify RED.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter BootstrapPlaceholderRenderLogicTests
 ```
 
-- [ ] **Step 9: Implement the minimal pure helper exactly as specified.** Do not use framework APIs unavailable to `net48`; keep formulas identical on both targets.
-- [ ] **Step 10: Wire `BootstrapPlaceholder.GetPreferredSize` and private `ApplyPreferredSize()` to the helper.** When `AutoSize=true`, relevant size/font/DPI/property changes may adopt `GetPreferredSize(Size.Empty)`; when false, bounds remain caller-owned.
-- [ ] **Step 11: Add/finish public-control AutoSize tests** proving `PlaceholderSize` changes intrinsic height, 100-logical-pixel width is used, and `AutoSize=false` preserves explicit bounds.
-- [ ] **Step 12: Rerun Placeholder + helper fixtures on both target frameworks; verify GREEN.**
-- [ ] **Step 13: Commit** `feat: add placeholder render logic`.
+- [x] **Step 9: Implement the minimal pure helper exactly as specified.** Do not use framework APIs unavailable to `net48`; keep formulas identical on both targets.
+- [x] **Step 10: Wire `BootstrapPlaceholder.GetPreferredSize` and private `ApplyPreferredSize()` to the helper.** When `AutoSize=true`, relevant size/font/DPI/property changes may adopt `GetPreferredSize(Size.Empty)`; when false, bounds remain caller-owned.
+- [x] **Step 11: Add/finish public-control AutoSize tests** proving `PlaceholderSize` changes intrinsic height, 100-logical-pixel width is used, and `AutoSize=false` preserves explicit bounds.
+- [x] **Step 12: Rerun Placeholder + helper fixtures on both target frameworks; verify GREEN.**
+- [x] **Step 13: Commit** `feat: add placeholder render logic`.
 
 ### Task 3: Add static painting, rounded geometry, and live theme/font/DPI adaptation
 
@@ -616,19 +616,19 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Consumes `BootstrapPlaceholderRenderLogic`, `BootstrapThemeManager`, `DpiScaler`, `CornerRadius`, and `RoundedPath`.
 - Produces no new public properties/events/methods.
 
-- [ ] **Step 1: Add failing tests** proving caller-assigned Font survives subsequent Light/Dark theme changes and is not disposed by Placeholder, while an untouched Placeholder follows current theme Body typography.
-- [ ] **Step 2: Add failing tests** proving theme-owned preferred size updates after a theme typography change, custom color/variant values survive theme change, and explicit bounds survive theme/DPI changes when `AutoSize=false`.
-- [ ] **Step 3: Add a failing paint smoke test** that renders the static `Animation=None` state into a small bitmap for square radius, theme radius, oversized radius, enabled/disabled, semantic and custom color without exception. Do not assert fragile full-image golden pixels.
-- [ ] **Step 4: Run focused UI tests with hang protection and verify RED.**
+- [x] **Step 1: Add failing tests** proving caller-assigned Font survives subsequent Light/Dark theme changes and is not disposed by Placeholder, while an untouched Placeholder follows current theme Body typography.
+- [x] **Step 2: Add failing tests** proving theme-owned preferred size updates after a theme typography change, custom color/variant values survive theme change, and explicit bounds survive theme/DPI changes when `AutoSize=false`.
+- [x] **Step 3: Add a failing paint smoke test** that renders the static `Animation=None` state into a small bitmap for square radius, theme radius, oversized radius, enabled/disabled, semantic and custom color without exception. Do not assert fragile full-image golden pixels.
+- [x] **Step 4: Run focused UI tests with hang protection and verify RED.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter BootstrapPlaceholderTests --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 5: Implement `OnPaint` for static state** using `ResolveBaseColor`, `ApplyOpacity(baseColor, OpacityMax)`, and `RoundedPath`. Keep all brushes/paths local `using` resources and restore `SmoothingMode` after rounded painting.
-- [ ] **Step 6: Implement theme subscription and Body-font ownership lifecycle** using the same value-equal Font ownership safeguard already used by themed controls. Add `OnFontChanged`, `OnAutoSizeChanged`, `OnEnabledChanged`, `OnDpiChangedAfterParent`, theme handler, and deterministic `Dispose(bool)` cleanup.
-- [ ] **Step 7: Run focused tests on both targets; verify GREEN.**
-- [ ] **Step 8: Commit** `feat: render themed placeholders`.
+- [x] **Step 5: Implement `OnPaint` for static state** using `ResolveBaseColor`, `ApplyOpacity(baseColor, OpacityMax)`, and `RoundedPath`. Keep all brushes/paths local `using` resources and restore `SmoothingMode` after rounded painting.
+- [x] **Step 6: Implement theme subscription and Body-font ownership lifecycle** using the same value-equal Font ownership safeguard already used by themed controls. Add `OnFontChanged`, `OnAutoSizeChanged`, `OnEnabledChanged`, `OnDpiChangedAfterParent`, theme handler, and deterministic `Dispose(bool)` cleanup.
+- [x] **Step 7: Run focused tests on both targets; verify GREEN.**
+- [x] **Step 8: Commit** `feat: render themed placeholders`.
 
 ### Task 4: Add Glow/Wave animation through BootstrapLoopAnimation only
 
@@ -642,24 +642,24 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Maintains exactly one private loop instance at most; no new public runtime-control API.
 - Handle recreation must preserve the existing loop object and resume captured progress via `Stop()`/`Start()` semantics.
 
-- [ ] **Step 1: Add failing behavior tests** that None is a stable static presentation, switching to Glow/Wave preserves every other public property, changing duration validates and preserves animation kind, and switching back to None remains usable across handle recreation.
-- [ ] **Step 2: Add a failing handle-recreation lifecycle test.** Create an animated control and handle, obtain the private `_animationLoop` only through test reflection (do not add product API), advance/observe non-zero progress, destroy/recreate the handle, and assert the same loop instance is retained and resumes from captured progress rather than being replaced/reset solely by handle recreation.
-- [ ] **Step 3: Add failing theme/reduced-motion tests** around public observable behavior: construct under ReducedMotion, create a handle, force multiple paints, and verify no exception/size churn/property mutation; repeat after toggling theme ReducedMotion at runtime. Rely on existing `BootstrapLoopAnimation` tests for scheduler internals.
-- [ ] **Step 4: Add failing Wave paint smoke tests** for tiny (`1x1`, `2x2`), normal, very wide, very tall, square, rounded, Light/Dark, enabled/disabled, and custom-color controls. Add targeted alpha/sample assertions only against the pure helper; do not use brittle anti-aliasing screenshots.
-- [ ] **Step 5: Add a failing public-surface contract test.** Assert declared public properties are exactly `Animation`, `AnimationDuration`, `BorderRadius`, `CustomColor`, `PlaceholderSize`, and `Variant`; the only declared public method is `GetPreferredSize`; declared public events are empty; exported Placeholder-related types are exactly the control plus the two enums; no exported type contains `BootstrapSkeleton` or `PlaceholderRenderLogic`.
-- [ ] **Step 6: Run focused tests and verify RED.**
+- [x] **Step 1: Add failing behavior tests** that None is a stable static presentation, switching to Glow/Wave preserves every other public property, changing duration validates and preserves animation kind, and switching back to None remains usable across handle recreation.
+- [x] **Step 2: Add a failing handle-recreation lifecycle test.** Create an animated control and handle, obtain the private `_animationLoop` only through test reflection (do not add product API), advance/observe non-zero progress, destroy/recreate the handle, and assert the same loop instance is retained and resumes from captured progress rather than being replaced/reset solely by handle recreation.
+- [x] **Step 3: Add failing theme/reduced-motion tests** around public observable behavior: construct under ReducedMotion, create a handle, force multiple paints, and verify no exception/size churn/property mutation; repeat after toggling theme ReducedMotion at runtime. Rely on existing `BootstrapLoopAnimation` tests for scheduler internals.
+- [x] **Step 4: Add failing Wave paint smoke tests** for tiny (`1x1`, `2x2`), normal, very wide, very tall, square, rounded, Light/Dark, enabled/disabled, and custom-color controls. Add targeted alpha/sample assertions only against the pure helper; do not use brittle anti-aliasing screenshots.
+- [x] **Step 5: Add a failing public-surface contract test.** Assert declared public properties are exactly `Animation`, `AnimationDuration`, `BorderRadius`, `CustomColor`, `PlaceholderSize`, and `Variant`; the only declared public method is `GetPreferredSize`; declared public events are empty; exported Placeholder-related types are exactly the control plus the two enums; no exported type contains `BootstrapSkeleton` or `PlaceholderRenderLogic`.
+- [x] **Step 6: Run focused tests and verify RED.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter "BootstrapPlaceholder" --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 7: Implement loop reconciliation** exactly as defined in **Animation Lifecycle Contract**. Subscribe one `ProgressChanged` handler per loop and always detach before dispose/replacement.
-- [ ] **Step 8: Implement handle recreation as pause/resume, not restart.** `OnHandleDestroyed` calls `Stop()` when applicable and leaves the loop allocated; `OnHandleCreated` calls reconciliation/`Start()`, which resumes captured progress according to existing `BootstrapLoopAnimation` semantics.
-- [ ] **Step 9: Implement Wave painting** with exactly nine `ColorBlend` samples and one `LinearGradientBrush` at `130f`. Each color's alpha comes from effective Wave opacity `[0.4,0.5]`; Glow still uses `[0.2,0.5]`. Do not cache Brushes or create Bitmaps.
-- [ ] **Step 10: Review declared protected surface.** Expected Placeholder-specific protected overrides are limited to lifecycle/render needs: `Dispose`, `OnAutoSizeChanged`, `OnDpiChangedAfterParent`, `OnEnabledChanged`, `OnFontChanged`, `OnHandleCreated`, `OnHandleDestroyed`, and `OnPaint`. If implementation introduces another protected override, either remove it or document/test why it is required before API baseline approval.
-- [ ] **Step 11: Run all Placeholder fixtures on `net8.0-windows` and `net48`; verify GREEN.**
-- [ ] **Step 12: Search product files and confirm no `Timer`, `Task.Delay`, `Thread`, `Application.Idle`, `MessageBox.Show`, or `ShowDialog` was introduced.**
-- [ ] **Step 13: Commit** `feat: animate BootstrapPlaceholder`.
+- [x] **Step 7: Implement loop reconciliation** exactly as defined in **Animation Lifecycle Contract**. Subscribe one `ProgressChanged` handler per loop and always detach before dispose/replacement.
+- [x] **Step 8: Implement handle recreation as pause/resume, not restart.** `OnHandleDestroyed` calls `Stop()` when applicable and leaves the loop allocated; `OnHandleCreated` calls reconciliation/`Start()`, which resumes captured progress according to existing `BootstrapLoopAnimation` semantics.
+- [x] **Step 9: Implement Wave painting** with exactly nine `ColorBlend` samples and one `LinearGradientBrush` at `130f`. Each color's alpha comes from effective Wave opacity `[0.4,0.5]`; Glow still uses `[0.2,0.5]`. Do not cache Brushes or create Bitmaps.
+- [x] **Step 10: Review declared protected surface.** Expected Placeholder-specific protected overrides are limited to lifecycle/render needs: `Dispose`, `OnAutoSizeChanged`, `OnDpiChangedAfterParent`, `OnEnabledChanged`, `OnFontChanged`, `OnHandleCreated`, `OnHandleDestroyed`, and `OnPaint`. If implementation introduces another protected override, either remove it or document/test why it is required before API baseline approval.
+- [x] **Step 11: Run all Placeholder fixtures on `net8.0-windows` and `net48`; verify GREEN.**
+- [x] **Step 12: Search product files and confirm no `Timer`, `Task.Delay`, `Thread`, `Application.Idle`, `MessageBox.Show`, or `ShowDialog` was introduced.**
+- [x] **Step 13: Commit** `feat: animate BootstrapPlaceholder`.
 
 ### Task 5: Add integrated Placeholder/Skeleton demo and application-owned content swap
 
@@ -672,26 +672,26 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Demo consumes only public Placeholder API and ordinary WinForms layout/visibility APIs.
 - Demo must not add reusable skeleton infrastructure to product code.
 
-- [ ] **Step 1: Write a failing demo construction test** that instantiates `PlaceholderDemoForm` on STA and verifies the form can create/dispose with no modal dialog, background worker, or required external service.
-- [ ] **Step 2: Write failing structural demo tests** for examples covering all four sizes, None/Glow/Wave, at least Primary/Secondary/Success/Danger variants, custom color, square/theme/large rounded radius, AutoSize and explicit-size modes, and a composed skeleton panel with several independent placeholders.
-- [ ] **Step 3: Add a failing structural assertion** proving explicit-height skeleton bars do not set `PlaceholderSize` as if it controlled their bounds, while a separate AutoSize example demonstrates `PlaceholderSize=Small`/other size variants intentionally.
-- [ ] **Step 4: Add a failing integration test** proving `MainForm` registers a page named `Placeholder / Skeleton` and can construct that page through the existing demo navigation pattern.
-- [ ] **Step 5: Run demo tests with hang protection; verify RED.**
+- [x] **Step 1: Write a failing demo construction test** that instantiates `PlaceholderDemoForm` on STA and verifies the form can create/dispose with no modal dialog, background worker, or required external service.
+- [x] **Step 2: Write failing structural demo tests** for examples covering all four sizes, None/Glow/Wave, at least Primary/Secondary/Success/Danger variants, custom color, square/theme/large rounded radius, AutoSize and explicit-size modes, and a composed skeleton panel with several independent placeholders.
+- [x] **Step 3: Add a failing structural assertion** proving explicit-height skeleton bars do not set `PlaceholderSize` as if it controlled their bounds, while a separate AutoSize example demonstrates `PlaceholderSize=Small`/other size variants intentionally.
+- [x] **Step 4: Add a failing integration test** proving `MainForm` registers a page named `Placeholder / Skeleton` and can construct that page through the existing demo navigation pattern.
+- [x] **Step 5: Run demo tests with hang protection; verify RED.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter PlaceholderDemoFormTests --blame-hang --blame-hang-timeout 5m
 ```
 
-- [ ] **Step 6: Implement `PlaceholderDemoForm`.** Include these sections:
+- [x] **Step 6: Implement `PlaceholderDemoForm`.** Include these sections:
   - `Sizes` — XS/SM/Default/LG at natural AutoSize height.
   - `Colors` — semantic variants plus one opaque CustomColor.
   - `Animations` — static, Glow, Wave side-by-side; global demo Reduced motion toggle remains authoritative.
   - `Skeleton card` — circular avatar, title, 3 body lines with different percent widths, and a button-shaped placeholder composed in ordinary layout containers. Explicit-height bars use `AutoSize=false` + caller-owned height without redundant `PlaceholderSize` assignments.
   - `Application-owned swap` — one button toggles skeleton/content panel visibility and updates a native visible status label (`Loading content…` / `Content loaded.`).
-- [ ] **Step 7: Do not put `Thread.Sleep`, async fake work, timers, or auto-completion into the demo.** The swap button demonstrates ownership without making tests time-dependent.
-- [ ] **Step 8: Register `Placeholder / Skeleton` in `MainForm.ConfigurePages()` near other loading/presentation components.** Description should state static/Glow/Wave placeholders, skeleton composition, theme/reduced-motion, and application-owned content swapping.
-- [ ] **Step 9: Run demo tests on both target frameworks; verify GREEN.**
-- [ ] **Step 10: Commit** `demo: showcase placeholder skeleton patterns`.
+- [x] **Step 7: Do not put `Thread.Sleep`, async fake work, timers, or auto-completion into the demo.** The swap button demonstrates ownership without making tests time-dependent.
+- [x] **Step 8: Register `Placeholder / Skeleton` in `MainForm.ConfigurePages()` near other loading/presentation components.** Description should state static/Glow/Wave placeholders, skeleton composition, theme/reduced-motion, and application-owned content swapping.
+- [x] **Step 9: Run demo tests on both target frameworks; verify GREEN.**
+- [x] **Step 10: Commit** `demo: showcase placeholder skeleton patterns`.
 
 ### Task 6: Document the contract and deliberately approve the public API addition
 
@@ -709,11 +709,11 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 - Documentation must distinguish decorative Placeholder from application loading state and from Spinner/Progress.
 - API baseline intentionally adds only the three exported Placeholder-related types.
 
-- [ ] **Step 1: Add `BootstrapPlaceholder` to `docs/COMPONENTS.md`.** Document public properties/defaults, size multipliers, Glow `0.5 -> 0.2 -> 0.5`, Wave mask semantics/effective `0.5 -> 0.4 -> 0.5`, 2s cycle, reduced-motion behavior, semantic/custom color, radius semantics, AutoSize vs explicit bounds, decorative accessibility rule, and Skeleton-as-composition rule.
-- [ ] **Step 2: Update architecture/testing docs.** Architecture states Placeholder reuses Theme/DPI/Rendering/Animation infrastructure and introduces no scheduler. Testing documents pure render-math coverage, Bootstrap Wave regression coverage, STA paint/lifecycle coverage, handle pause/resume coverage, reduced-motion/manual gates, and explicit-size layout checks.
-- [ ] **Step 3: Update README/package README/changelog** with concise usage and one skeleton composition example; do not advertise a nonexistent `BootstrapSkeleton` type or imply `PlaceholderSize` controls explicit bounds.
-- [ ] **Step 4: Add a release-contract test** in `Phase16PublicApiBaselineTests` that verifies the reviewed Placeholder public properties/method/events and keeps `BootstrapPlaceholderRenderLogic` internal.
-- [ ] **Step 5: Run API baseline before changing the approved fingerprint.**
+- [x] **Step 1: Add `BootstrapPlaceholder` to `docs/COMPONENTS.md`.** Document public properties/defaults, size multipliers, Glow `0.5 -> 0.2 -> 0.5`, Wave mask semantics/effective `0.5 -> 0.4 -> 0.5`, 2s cycle, reduced-motion behavior, semantic/custom color, radius semantics, AutoSize vs explicit bounds, decorative accessibility rule, and Skeleton-as-composition rule.
+- [x] **Step 2: Update architecture/testing docs.** Architecture states Placeholder reuses Theme/DPI/Rendering/Animation infrastructure and introduces no scheduler. Testing documents pure render-math coverage, Bootstrap Wave regression coverage, STA paint/lifecycle coverage, handle pause/resume coverage, reduced-motion/manual gates, and explicit-size layout checks.
+- [x] **Step 3: Update README/package README/changelog** with concise usage and one skeleton composition example; do not advertise a nonexistent `BootstrapSkeleton` type or imply `PlaceholderSize` controls explicit bounds.
+- [x] **Step 4: Add a release-contract test** in `Phase16PublicApiBaselineTests` that verifies the reviewed Placeholder public properties/method/events and keeps `BootstrapPlaceholderRenderLogic` internal.
+- [x] **Step 5: Run API baseline before changing the approved fingerprint.**
 
 ```powershell
 dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.Tests.csproj -c Release -f net8.0-windows --filter Phase16PublicApiBaselineTests --blame-hang --blame-hang-timeout 5m
@@ -721,7 +721,7 @@ dotnet test tests/MyDmsVn.Bootstrap5WinFormUI.Tests/MyDmsVn.Bootstrap5WinFormUI.
 
 Expected: `ExportedApiMatchesApprovedV1Baseline` fails and prints a deterministic actual exported fingerprint/API surface; the new explicit Placeholder contract test should otherwise describe the intended surface.
 
-- [ ] **Step 6: Review exported surface line-by-line.** Intentional new public types only:
+- [x] **Step 6: Review exported surface line-by-line.** Intentional new public types only:
 
 ```text
 MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapPlaceholder : System.Windows.Forms.Control
@@ -730,17 +730,17 @@ MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapPlaceholderSize
 ```
 
 Confirm there is no exported `BootstrapSkeleton`, render helper, animation implementation detail, opacity constant, wave geometry type, layout collection, or status/loading abstraction.
-- [ ] **Step 7: Review protected declared members** of `BootstrapPlaceholder`; keep only the lifecycle/render overrides justified in Task 4. Any extra visible protected member must be explicitly reviewed before accepting the fingerprint.
-- [ ] **Step 8: Copy the reviewed actual fingerprint into `ApprovedV1Fingerprint` and `docs/PUBLIC_API_BASELINE.md`, recording Placeholder as an intentional compatible addition.** Keep `AssemblyVersion` unchanged unless a separate release task changes it.
-- [ ] **Step 9: Rerun API baseline on `net8.0-windows` and `net48`; verify GREEN.**
-- [ ] **Step 10: Commit** `docs: finalize BootstrapPlaceholder contract`.
+- [x] **Step 7: Review protected declared members** of `BootstrapPlaceholder`; keep only the lifecycle/render overrides justified in Task 4. Any extra visible protected member must be explicitly reviewed before accepting the fingerprint.
+- [x] **Step 8: Copy the reviewed actual fingerprint into `ApprovedV1Fingerprint` and `docs/PUBLIC_API_BASELINE.md`, recording Placeholder as an intentional compatible addition.** Keep `AssemblyVersion` unchanged unless a separate release task changes it.
+- [x] **Step 9: Rerun API baseline on `net8.0-windows` and `net48`; verify GREEN.**
+- [x] **Step 10: Commit** `docs: finalize BootstrapPlaceholder contract`.
 
 ### Task 7: Complete dual-target verification and manual UI/accessibility gate
 
 **Files:**
 - No new files expected; fix only Placeholder-related defects uncovered by verification.
 
-- [ ] **Step 1: Build .NET Framework 4.8:**
+- [x] **Step 1: Build .NET Framework 4.8:**
 
 ```powershell
 dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net48
@@ -748,7 +748,7 @@ dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net48
 
 Expected: zero errors.
 
-- [ ] **Step 2: Build .NET 8 Windows:**
+- [x] **Step 2: Build .NET 8 Windows:**
 
 ```powershell
 dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net8.0-windows
@@ -756,7 +756,7 @@ dotnet build MyDmsVn.Bootstrap5WinFormUI.sln -c Release -f net8.0-windows
 
 Expected: zero errors.
 
-- [ ] **Step 3: Run full bounded suite:**
+- [x] **Step 3: Run full bounded suite:**
 
 ```powershell
 ./test.ps1
@@ -764,13 +764,13 @@ Expected: zero errors.
 
 Expected: both targets pass with no hang timeout, modal dialog, blame dump, or background animation left alive after disposal.
 
-- [ ] **Step 4: Search Placeholder product files for prohibited infrastructure.** Confirm no `Timer`, `Task.Delay`, `Thread.Sleep`, `Thread`, `BackgroundWorker`, `Application.Idle`, `MessageBox.Show`, `ShowDialog`, new global event hub, off-screen per-frame bitmap, or external package.
+- [x] **Step 4: Search Placeholder product files for prohibited infrastructure.** Confirm no `Timer`, `Task.Delay`, `Thread.Sleep`, `Thread`, `BackgroundWorker`, `Application.Idle`, `MessageBox.Show`, `ShowDialog`, new global event hub, off-screen per-frame bitmap, or external package.
 - [ ] **Step 5: Run demo/manual visual checks:** XS/SM/Default/LG; static/Glow/Wave; all semantic variants; CustomColor; square/theme/oversized radius; circle avatar; short/long skeleton lines; AutoSize true; explicit-size AutoSize false; Dock/Anchor/TableLayout percent sizing; repeated resize; Light/Dark live switch; global Reduced motion toggle; Enabled/disabled parent; caller Font; 100/125/150/175/200% Windows scaling.
-- [ ] **Step 6: Verify animation lifecycle manually/diagnostically:** None schedules nothing; Glow/Wave start only at runtime; hide/show pauses/resumes through shared owner lifecycle; handle recreation stops and resumes the existing loop without reset/replacement; changing duration or theme/reduced-motion may recreate the loop where specified; disposing an animated page leaves no later callback into the disposed control.
+- [x] **Step 6: Verify animation lifecycle manually/diagnostically:** None schedules nothing; Glow/Wave start only at runtime; hide/show pauses/resumes through shared owner lifecycle; handle recreation stops and resumes the existing loop without reset/replacement; changing duration or theme/reduced-motion may recreate the loop where specified; disposing an animated page leaves no later callback into the disposed control.
 - [ ] **Step 7: Accessibility smoke check** with Narrator or Windows accessibility inspection: placeholders do not enter Tab order and are not announced as actionable controls; the demo's native loading status text is understandable; loaded content becomes the meaningful accessible surface after swap.
-- [ ] **Step 8: Verify application ownership boundary:** toggling demo skeleton/content changes only demo panel visibility/status; Placeholder itself never changes application loading state, starts async work, or emits completion events.
+- [x] **Step 8: Verify application ownership boundary:** toggling demo skeleton/content changes only demo panel visibility/status; Placeholder itself never changes application loading state, starts async work, or emits completion events.
 - [ ] **Step 9: Verify Bootstrap fidelity visually:** static opacity appears equivalent to 50% current/semantic color; Glow reaches a visibly dim midpoint near 20% and returns smoothly; Wave presents a subtler moving band whose effective opacity is approximately 50% outside and 40% at center, matching the Bootstrap mask concept rather than Glow's 20% minimum; reduced motion is stable rather than blank.
-- [ ] **Step 10: If verification requires code changes, rerun Steps 1-9 and commit** `fix: harden BootstrapPlaceholder verification`. **If no fixes are required, do not create an empty commit.**
+- [x] **Step 10: If verification requires code changes, rerun Steps 1-9 and commit** `fix: harden BootstrapPlaceholder verification`. **If no fixes are required, do not create an empty commit.**
 
 ---
 

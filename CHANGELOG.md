@@ -6,6 +6,8 @@ All notable release-facing changes to this project are documented here.
 
 ### Added
 
+- `BootstrapPlaceholder`, `BootstrapPlaceholderSize`, and `BootstrapPlaceholderAnimation` for decorative static, Glow, and Wave loading shapes with semantic/custom color, theme or explicit radius, em-based intrinsic sizes, explicit-bounds support, shared reduced-motion-aware animation, and no loading-state or skeleton abstraction.
+- Integrated **Placeholder / Skeleton** demo and dual-target pure/STA coverage for render math, Bootstrap Wave behavior, paint/lifecycle/handle recreation, reduced motion, explicit sizing, accessibility, and caller-owned skeleton composition.
 - `BootstrapBreadcrumb`, `BootstrapBreadcrumbItem`, `BootstrapBreadcrumbItemCollection`, and `BootstrapBreadcrumbItemClickedEventArgs` for native `LinkLabel` ancestor activation, a non-link current item, segment-safe width-constrained wrapping, RTL divider support, accessible full-text links, and caller-owned navigation without routing/history/page-hosting infrastructure.
 - Integrated **Breadcrumb** demo and dual-target automated coverage for items, layout, stale generated links, activation ownership, accessibility, RTL, wrapping, theme/font/DPI, and lifecycle behavior.
 - `BootstrapListGroup`, `BootstrapListGroupItem`, and `BootstrapListGroupItemEventArgs` for short static/actionable WinForms composition with authoritative `Controls` child-index ordering, explicit active state, real selectable rows, nullable semantic variants, rich-content activation isolation, connected vertical/horizontal layout, vertical flush, accessibility, and shared theme/DPI rendering without ListView-style data or virtualization APIs.
@@ -55,6 +57,7 @@ All notable release-facing changes to this project are documented here.
 
 ### Changed
 
+- Reviewed the additive Placeholder public/protected reflection surface and synchronized the approved v1 API fingerprint to `95796bc67c04af789782cd20399c958dcda2d24083816c3df3cffc4b18b6499d`; render math, wave geometry, opacity constants, animation implementation, layout/status abstractions, and skeleton composition remain non-public or application-owned, and `AssemblyVersion` remains `1.0.0.0`.
 - Reviewed the additive Breadcrumb public/protected reflection surface and synchronized the approved v1 API fingerprint to `c6d2468d00dbacb879a4d3f6c31fd67dec681bd7db41007d6b282bfaa43c0884`; generation/layout/owner-notification internals remain non-public and `AssemblyVersion` remains `1.0.0.0`.
 - Reviewed the additive `BootstrapModal` public/protected reflection surface and synchronized the approved v1 API fingerprint to `6aeaf8195bb3fc76ff2f1f7c03b8f202e65f6e13e00399f58f9345cf51000dc8`; modal layout/render/owner/backdrop/transition helpers remain non-public, inherited native Form APIs are not redeclared, and `AssemblyVersion` remains `1.0.0.0`.
 - Reviewed the additive `BootstrapRange` public/protected reflection surface and synchronized the approved v1 API fingerprint to `78ba3b8becd0e9cad99540b8bf1d7950eba9b1ad28d152f9eff44d642bc8737d`; native custom-draw interop and range render/state/geometry helpers remain non-public, and `AssemblyVersion` remains `1.0.0.0`.
