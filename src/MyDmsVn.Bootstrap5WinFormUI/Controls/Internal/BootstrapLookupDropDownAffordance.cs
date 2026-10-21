@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
@@ -9,7 +9,8 @@ internal sealed class BootstrapLookupDropDownAffordance : Control
 {
     internal BootstrapLookupDropDownAffordance()
     {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, false);
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        SetStyle(ControlStyles.Selectable, false);
         TabStop = false;
         AccessibleRole = AccessibleRole.PushButton;
         AccessibleName = "Open lookup results";
