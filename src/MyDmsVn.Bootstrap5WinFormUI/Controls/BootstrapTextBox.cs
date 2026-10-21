@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -138,6 +138,7 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
             _frameworkTrailingAccessory = accessory;
             Controls.Add(accessory);
             accessory.BringToFront();
+            ApplyTheme();
         }
 
         PerformLayout();
@@ -637,6 +638,12 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
         _clearButton.BackColor = surface;
         _clearButton.ForeColor = colors.MutedText;
         _clearButton.Invalidate();
+        if (_frameworkTrailingAccessory is not null)
+        {
+            _frameworkTrailingAccessory.BackColor = surface;
+            _frameworkTrailingAccessory.ForeColor = foreground;
+            _frameworkTrailingAccessory.Invalidate();
+        }
     }
 
     private void ApplyThemeFont()
