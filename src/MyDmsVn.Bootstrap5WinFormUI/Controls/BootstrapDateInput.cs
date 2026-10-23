@@ -44,6 +44,7 @@ public class BootstrapDateInput : UserControl
         if (_entry.NativeEditor.IsHandleCreated) _imeMonitor.AssignHandle(_entry.NativeEditor.Handle);
         _calendar.SelectionChanged += OnCalendarSelectionChanged;
         _calendar.SelectionAccepted += OnCalendarSelectionAccepted;
+        _calendar.Opened += OnCalendarOpened;
         _calendar.Closed += OnCalendarClosed;
         AccessibleRole = AccessibleRole.Text;
         Size = new Size(240, Math.Max(_entry.Height, _calendar.Height));
@@ -154,6 +155,14 @@ public class BootstrapDateInput : UserControl
     public void ShowCalendar()
     {
         if (ReadOnly || !Enabled || _popupSnapshot != null) return;
+        PrepareCalendarSnapshot();
+        try { _calendar.ShowDropDown(); }
+        catch { _popupSnapshot = null; throw; }
+    }
+
+    private void PrepareCalendarSnapshot()
+    {
+        if (_popupSnapshot != null) return;
         _popupSnapshot = _pendingText;
         _popupCaret = _entry.NativeEditor.SelectionStart;
         _popupAccepted = false;
@@ -168,8 +177,6 @@ public class BootstrapDateInput : UserControl
             _calendar.SelectedDate = parsed.State == InputParseState.Valid ? parsed.Value : _value;
         }
         finally { _synchronizingCalendar = false; }
-        try { _calendar.ShowDropDown(); }
-        catch { _popupSnapshot = null; throw; }
     }
 
     internal TextBox NativeEditor => _entry.NativeEditor;
@@ -202,6 +209,7 @@ public class BootstrapDateInput : UserControl
             _imeMonitor.ReleaseHandle();
             _calendar.SelectionChanged -= OnCalendarSelectionChanged;
             _calendar.SelectionAccepted -= OnCalendarSelectionAccepted;
+            _calendar.Opened -= OnCalendarOpened;
             _calendar.Closed -= OnCalendarClosed;
         }
         base.Dispose(disposing);
@@ -286,6 +294,11 @@ public class BootstrapDateInput : UserControl
     {
         if (_synchronizingCalendar || _popupSnapshot == null || !_calendar.SelectedDate.HasValue) return;
         PreviewCalendarSelection();
+    }
+
+    private void OnCalendarOpened(object? sender, EventArgs e)
+    {
+        if (!ReadOnly && Enabled) PrepareCalendarSnapshot();
     }
 
     private void OnCalendarSelectionAccepted(object? sender, EventArgs e)

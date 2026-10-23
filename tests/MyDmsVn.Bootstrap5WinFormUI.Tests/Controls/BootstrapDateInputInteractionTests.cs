@@ -78,6 +78,22 @@ public sealed class BootstrapDateInputInteractionTests
     }
 
     [Test]
+    public void Child_calendar_open_route_captures_and_restores_raw_candidate()
+    {
+        using var form = Host(out var input);
+        input.Text = "5/11";
+        input.Calendar.ShowDropDown();
+        Application.DoEvents();
+        Assert.That(input.Calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 11, 5)));
+        input.Calendar.SelectedDate = new DateTime(2026, 11, 6);
+        Assert.That(input.PendingText, Is.EqualTo("06/11/2026"));
+        input.Calendar.CloseDropDown();
+        Application.DoEvents();
+        Assert.That(input.PendingText, Is.EqualTo("5/11"));
+        Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 23)));
+    }
+
+    [Test]
     public void Segment_arrows_preserve_invalid_candidate_and_refuse_impossible_month()
     {
         using var form = Host(out var input);
