@@ -16,6 +16,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 public sealed class BootstrapDateInputInteractionTests
 {
     [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr handle, int message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool PostMessage(IntPtr handle, int message, IntPtr wParam, IntPtr lParam);
     private const int WmChar = 0x0102;
     private const int WmKeyDown = 0x0100;
     private const int WmImeStartComposition = 0x010D;
@@ -61,6 +62,9 @@ public sealed class BootstrapDateInputInteractionTests
         Application.DoEvents();
         Assert.That(input.PendingText, Is.EqualTo("5/11"));
         Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 23)));
+        input.NativeEditor.Focus();
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Escape, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("23/10/2026"));
 
         input.ProjectAcceptedValue(new DateTime(2026, 10, 23));
         input.ShowCalendar();
@@ -137,6 +141,44 @@ public sealed class BootstrapDateInputInteractionTests
         SendMessage(input.NativeEditor.Handle, WmImeEndComposition, IntPtr.Zero, IntPtr.Zero);
         SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Enter, IntPtr.Zero);
         Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 11, 5)));
+    }
+
+    [Test]
+    public void Native_tab_keeps_invalid_candidate_and_commits_valid_candidate_before_focus_moves()
+    {
+        using var form = Host(out var input);
+        var next = new Button { Text = "Next", Dock = DockStyle.Bottom, TabIndex = 1 };
+        form.Controls.Add(next);
+        input.TabIndex = 0;
+        input.NativeEditor.Focus();
+        input.Text = "31/11";
+        Assert.That(PostMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Tab, IntPtr.Zero), Is.True);
+        Application.DoEvents();
+        Assert.That(input.NativeEditor.Focused, Is.True);
+        Assert.That(input.PendingText, Is.EqualTo("31/11"));
+        input.Text = "5/11";
+        Assert.That(PostMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Tab, IntPtr.Zero), Is.True);
+        Application.DoEvents();
+        Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 11, 5)));
+        Assert.That(next.Focused, Is.True);
+    }
+
+    [Test]
+    public void Native_f4_opens_calendar_without_committing_pending_date()
+    {
+        using var form = Host(out var input);
+        input.Text = "5/11";
+        var opened = 0;
+        input.Calendar.Opened += (_, _) => opened++;
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.F4, IntPtr.Zero);
+        Application.DoEvents();
+        Assert.That(opened, Is.EqualTo(1));
+        Assert.That(input.PendingText, Is.EqualTo("5/11"));
+        Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 23)));
+        input.Calendar.CloseDropDown();
+        SendMessage(input.NativeEditor.Handle, 0x020A, (IntPtr)(120 << 16), IntPtr.Zero); // WM_MOUSEWHEEL
+        Assert.That(input.PendingText, Is.EqualTo("5/11"));
+        Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 23)));
     }
 
     private static Form Host(out BootstrapDateInput input)
