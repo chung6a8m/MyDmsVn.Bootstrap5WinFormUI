@@ -116,6 +116,23 @@ public sealed class BootstrapDateInputInteractionTests
     }
 
     [Test]
+    public void Popup_after_local_midnight_uses_the_edit_sessions_original_reference_date()
+    {
+        using var form = Host(out var input);
+        var now = new DateTime(2026, 10, 23, 23, 59, 59);
+        input.ReferenceDateProvider = () => now;
+        input.BeginEditSession(new DateTime(2026, 10, 23));
+        input.Text = "5";
+        now = new DateTime(2026, 11, 1);
+        input.ShowCalendar();
+        Application.DoEvents();
+        Assert.That(input.Calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 10, 5)));
+        input.Calendar.CloseDropDown();
+        Assert.That(input.TryParsePending().Value, Is.EqualTo(new DateTime(2026, 10, 5)));
+        Assert.That(input.PendingText, Is.EqualTo("5"));
+    }
+
+    [Test]
     public void Segment_arrows_preserve_invalid_candidate_and_refuse_impossible_month()
     {
         using var form = Host(out var input);
