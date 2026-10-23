@@ -33,6 +33,7 @@ internal sealed class BootstrapDecimalEditingControl : BootstrapDecimalInput, ID
             _sessionProfile = column.Profile;
             EditingControlRowIndex = rowIndex;
             BeginEditSession(value is DBNull ? null : (decimal?)value, _sessionProfile);
+            ValidationState = BootstrapValidationState.None;
             EditingControlValueChanged = false;
             if (!ReferenceEquals(_host, EditingControlDataGridView))
             {

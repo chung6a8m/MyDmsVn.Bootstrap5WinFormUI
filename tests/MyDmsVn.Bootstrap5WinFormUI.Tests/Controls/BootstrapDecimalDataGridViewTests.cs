@@ -126,6 +126,7 @@ public sealed class BootstrapDecimalDataGridViewTests
         using var host = new GridHost();
         var first = host.BeginEdit();
         first.Text = "invalid";
+        first.ValidationState = BootstrapValidationState.Invalid;
         host.Grid.CancelEdit();
         host.NullableColumn.Profile = new DecimalInputProfile(CultureInfo.GetCultureInfo("vi-VN"), true, 2, -100m, 100m);
 
@@ -133,6 +134,11 @@ public sealed class BootstrapDecimalDataGridViewTests
         Assert.That(second, Is.SameAs(first));
         Assert.That(second.PendingText, Is.Empty);
         Assert.That(second.Value, Is.Null);
+        Assert.That(second.ValidationState, Is.EqualTo(BootstrapValidationState.None));
+        var native = second.Controls.OfType<TextBox>().Single();
+        var undo = Message.Create(native.Handle, 0x0100, (IntPtr)(int)(Keys.Control | Keys.Z), IntPtr.Zero);
+        native.PreProcessMessage(ref undo);
+        Assert.That(second.PendingText, Is.Empty);
         second.Text = "12,5";
         Assert.That(host.Grid.EndEdit(), Is.True);
         Assert.Multiple((Action)(() =>
@@ -140,6 +146,20 @@ public sealed class BootstrapDecimalDataGridViewTests
             Assert.That(host.Row.NullableAmount, Is.EqualTo(12.5m));
             Assert.That(host.Row.NullableWriteCount, Is.EqualTo(1));
         }));
+    }
+
+    [TestCase(".5", "0.5")]
+    [TestCase("1.00000", "1")]
+    [TestCase("0", "0")]
+    public void BoundHostUsesExactSharedDecimalGrammar(string candidate, string expected)
+    {
+        using var host = new GridHost();
+        var editor = host.BeginEdit();
+        editor.Text = candidate;
+
+        Assert.That(host.Grid.EndEdit(), Is.True);
+        Assert.That(host.Row.Amount, Is.EqualTo(decimal.Parse(expected, CultureInfo.InvariantCulture)));
+        Assert.That(host.Row.WriteCount, Is.EqualTo(1));
     }
 
     [Test]
