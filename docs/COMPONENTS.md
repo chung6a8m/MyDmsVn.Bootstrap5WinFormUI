@@ -1383,6 +1383,26 @@ BootstrapModal.FooterPanel
 
 Manual verification: open **Modal** in the integrated demo and exercise every size/backdrop mode, native OK/Cancel results, header/backdrop/Escape dismissal, `CloseOnEscape = false`, long body scrolling, initial focus, Tab/Shift+Tab, Enter, Alt/Alt+Tab, runtime Light/Dark and reduced motion, RTL, owner movement/resize/close, monitor-edge clamping, and Windows 100/125/150/175/200% scaling. Confirm the owner is natively disabled while open, the backdrop stays clickable, unrelated applications can cover both windows, and no backdrop remains in the taskbar/task switcher or `Application.OpenForms` after exit.
 
+## BootstrapBusyHost
+
+`BootstrapBusyHost` wraps one unparented content control and owns that control. Its overlay is an opaque, theme-colored native panel limited to the host's bounds. The existing `BootstrapSpinner` animates only while the overlay is shown. The host does not disable children or restore focus.
+
+```csharp
+var host = new BootstrapBusyHost(content) { Dock = DockStyle.Fill };
+parent.Controls.Add(host);
+IDisposable token = host.Begin(new BusyPresentation("Saving…", () => cancellationSource.Cancel()));
+try
+{
+    await SaveAsync();
+}
+finally
+{
+    token.Dispose(); // on the owning UI thread
+}
+```
+
+Each call to `Begin` owns a separate idempotent token. The newest live token supplies the message and optional Cancel button; releasing an older token cannot hide a newer presentation. Initial display waits 150 ms, with no minimum hold after release. Hide, handle destruction and disposal cancel pending display; re-show and handle recreation schedule again if an operation remains live. The Cancel button invokes the current callback only and does not release the token or promise rollback. Callers must continue to enforce keyboard, UIA and command admission while the overlay is pending or visible. Token acquisition/release is UI-thread-affine.
+
 ## Deferred components
 
 Skeleton and other unimplemented components are not part of the initial foundation contract.
