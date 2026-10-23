@@ -224,6 +224,8 @@ Manual verification: launch the demo and choose **TextBox / Card**. Exercise pla
 
 ## BootstrapFormattedTextBox
 
+The separate `DecimalInputParser` is a pure candidate parser for future decimal controls. A `DecimalInputProfile` freezes a defensive culture clone, nullability, effective scale and caller-supplied inclusive bounds. `TryParsePending` returns Empty, Incomplete, Invalid or Valid plus an exact nullable value and structured failure. It accepts only ASCII digits, literal culture sign/decimal tokens and outer whitespace; meaningful excess precision, external grouping, currency, exponent and unrepresentable values reject before any rounding. Parsing never edits text or commits a control/model value. Existing formatted Numeral behavior and defaults remain unchanged.
+
 Responsibility: format native text input as it is edited while exposing a stable canonical string separately from its presentation.
 
 `BootstrapFormattedTextBox` derives from `BootstrapTextBox`. `Text` is always the final formatted display value; `RawValue` is the canonical unformatted value. Date, Time, Numeral, and CreditCard canonical numeric content accepts only ASCII digits `0-9`; Unicode decimal digits are ignored rather than transliterated. `RawValueChanged` follows `TextChanged` when one edit changes both values, and `CreditCardTypeChanged` reports effective card-family changes without implying Luhn or business validation.

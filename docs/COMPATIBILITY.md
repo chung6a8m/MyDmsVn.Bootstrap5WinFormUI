@@ -106,6 +106,8 @@ Do not use target directives merely to avoid writing a small shared compatibilit
 
 ## 10. Build matrix
 
+The pure decimal parser introduced for UIN-T04a uses the same source and exported surface on both targets. Its culture is cloned at profile construction and returned as a defensive read-only clone, so a caller changing `CurrentCulture` or its original `NumberFormat` cannot reinterpret a pending candidate. Limits remain caller supplied. The parser uses exact coefficient construction rather than `decimal.TryParse` rounding; it adds no runtime dependency or native-control behavior.
+
 At minimum, CI/local verification must include:
 
 ```text
