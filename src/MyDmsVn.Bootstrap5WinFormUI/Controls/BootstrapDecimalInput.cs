@@ -17,6 +17,8 @@ public class BootstrapDecimalInput : BootstrapTextBox
     private const int WmUndo = 0x0304;
     private const int WmImeStartComposition = 0x010D;
     private const int WmImeEndComposition = 0x010E;
+    private const int WmChar = 0x0102;
+    private const int WmKeyDown = 0x0100;
 
     private readonly FormattedTextHistory _history = new FormattedTextHistory();
     private readonly DecimalEditorWindow _nativeWindow;
@@ -29,6 +31,7 @@ public class BootstrapDecimalInput : BootstrapTextBox
     private bool _composing;
     private bool _pendingEdit;
     private FormattedTextSnapshot? _compositionStart;
+    private NativeEditHint? _nativeEditHint;
 
     /// <summary>Creates a decimal input around the themed native editor.</summary>
     public BootstrapDecimalInput()
@@ -120,7 +123,10 @@ public class BootstrapDecimalInput : BootstrapTextBox
         }
 
         var prior = CurrentProjection;
-        var changed = FindChange(prior.DisplayText, Editor.Text);
+        var changed = _nativeEditHint.HasValue && TryHintChange(prior.DisplayText, Editor.Text,
+                _nativeEditHint.Value, out var hinted)
+            ? hinted
+            : FindChange(prior.DisplayText, Editor.Text);
         var start = prior.ToCandidateBoundary(changed.OldStart);
         var end = prior.ToCandidateBoundary(changed.OldEnd);
         var insertion = Editor.Text.Substring(changed.NewStart, changed.NewEnd - changed.NewStart);
@@ -231,6 +237,15 @@ public class BootstrapDecimalInput : BootstrapTextBox
 
     private void ProcessNativeMessage(ref Message message, ActionRef dispatch)
     {
+        if (!_composing && (message.Msg == WmChar ||
+            message.Msg == WmKeyDown && message.WParam.ToInt32() == (int)Keys.Delete))
+        {
+            var priorHint = _nativeEditHint;
+            _nativeEditHint = new NativeEditHint(Editor.SelectionStart, Editor.SelectionLength);
+            try { dispatch(ref message); }
+            finally { _nativeEditHint = priorHint; }
+            return;
+        }
         if (message.Msg == WmImeStartComposition)
         {
             var snapshot = CurrentSnapshot();
@@ -308,6 +323,33 @@ public class BootstrapDecimalInput : BootstrapTextBox
             newEnd--;
         }
         return new TextChange(prefix, oldEnd, prefix, newEnd);
+    }
+
+    private static bool TryHintChange(string oldText, string newText, NativeEditHint hint, out TextChange changed)
+    {
+        var insertionLength = newText.Length - oldText.Length + hint.DisplayLength;
+        var oldEnd = hint.DisplayStart + hint.DisplayLength;
+        if (hint.DisplayStart < 0 || oldEnd > oldText.Length || insertionLength < 0 ||
+            hint.DisplayStart + insertionLength > newText.Length ||
+            !newText.StartsWith(oldText.Substring(0, hint.DisplayStart), StringComparison.Ordinal) ||
+            !newText.EndsWith(oldText.Substring(oldEnd), StringComparison.Ordinal))
+        {
+            changed = default;
+            return false;
+        }
+        changed = new TextChange(hint.DisplayStart, oldEnd, hint.DisplayStart, hint.DisplayStart + insertionLength);
+        return true;
+    }
+
+    private readonly struct NativeEditHint
+    {
+        internal NativeEditHint(int displayStart, int displayLength)
+        {
+            DisplayStart = displayStart;
+            DisplayLength = displayLength;
+        }
+        internal int DisplayStart { get; }
+        internal int DisplayLength { get; }
     }
 
     private readonly struct TextChange

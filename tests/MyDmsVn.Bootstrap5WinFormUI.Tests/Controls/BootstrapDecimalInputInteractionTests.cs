@@ -51,6 +51,18 @@ public sealed class BootstrapDecimalInputInteractionTests
     }
 
     [Test]
+    public void NativeMiddleInsertionOfRepeatedDigitKeepsCaretAtActualEditSite()
+    {
+        using var host = CreateHost(out var input);
+        input.BeginEditSession(1111m);
+        input.NativeEditor.Select(3, 0);
+        SendMessage(input.NativeEditor.Handle, WmChar, (IntPtr)'1', IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("11111"));
+        Assert.That(input.Text, Is.EqualTo("11,111"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(4));
+    }
+
+    [Test]
     public void GeneratedSeparatorDeletionTargetsAdjacentCandidateDigitAndIsUndoable()
     {
         using var host = CreateHost(out var input);
