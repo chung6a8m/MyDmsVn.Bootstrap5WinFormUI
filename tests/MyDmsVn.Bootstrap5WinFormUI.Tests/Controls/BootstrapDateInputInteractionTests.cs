@@ -181,6 +181,27 @@ public sealed class BootstrapDateInputInteractionTests
         Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 23)));
     }
 
+    [Test]
+    public void Theme_switch_and_popup_disposal_preserve_raw_date_until_owner_closes()
+    {
+        var previous = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            using var form = Host(out var input);
+            input.Text = "5/11";
+            input.NativeEditor.SelectionStart = 2;
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+            Application.DoEvents();
+            Assert.That(input.PendingText, Is.EqualTo("5/11"));
+            Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(2));
+            input.ShowCalendar();
+            Application.DoEvents();
+            form.Dispose();
+            Assert.That(input.IsDisposed, Is.True);
+        }
+        finally { BootstrapThemeManager.CurrentTheme = previous; }
+    }
+
     private static Form Host(out BootstrapDateInput input)
     {
         var form = new Form { Width = 420, Height = 150, ShowInTaskbar = false };
