@@ -14,7 +14,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Release;
 [TestFixture]
 public sealed class Phase16PublicApiBaselineTests
 {
-    private const string ApprovedV1Fingerprint = "702dbc491fa2022903e6fca0c6722375e34a6c154046967fc676d21251c6c779";
+    private const string ApprovedV1Fingerprint = "82b06f761848921f9f1116db1d235a482dde830579e6c79fd10207a24138fdf5";
 
     [Test]
     public void ExportedApiMatchesApprovedV1Baseline()
@@ -532,7 +532,7 @@ public sealed class Phase16PublicApiBaselineTests
                 "ClearSelection", "CloseDropDown", "SetRange", "SetSelectedDates", "ShowDropDown"
             }));
             Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapCalendar)), Is.EqualTo(new[] { "DisplayMonthChanged", "SelectionChanged" }));
-            Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapCalendarPicker)), Is.EqualTo(new[] { "Closed", "Opened", "SelectionChanged" }));
+            Assert.That(GetDeclaredPublicEventNames(typeof(BootstrapCalendarPicker)), Is.EqualTo(new[] { "Closed", "Opened", "SelectionAccepted", "SelectionChanged" }));
             Assert.That(typeof(BootstrapCalendar).GetEvent("SelectionActivated", BindingFlags.Instance | BindingFlags.Public), Is.Null);
             Assert.That(typeof(BootstrapCalendar).GetProperty("FocusedDate", BindingFlags.Instance | BindingFlags.Public), Is.Null);
             Assert.That(typeof(BootstrapCalendarPicker).GetProperty("ActiveCalendar", BindingFlags.Instance | BindingFlags.Public), Is.Null);
