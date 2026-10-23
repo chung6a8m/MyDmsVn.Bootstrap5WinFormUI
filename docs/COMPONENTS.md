@@ -236,6 +236,12 @@ The separate `DecimalInputParser` is a pure candidate parser for future decimal 
 
 Manual verification: on real Windows at 100% and 125% display scaling, type through the first grouping boundary and edit in the middle; replace ranges across generated separators; paste external grouped and invalid text; Copy/Cut partial and invalid pending selections; undo/redo; compose through Vietnamese IME; switch Light/Dark and font while focused; repeat read-only/disabled and dispose/reuse paths. Observe `PendingText`, display, caret/range, focus and accepted model value after each edit.
 
+## BootstrapDecimalColumn
+
+`BootstrapDecimalColumn : DataGridViewColumn` hosts `BootstrapDecimalInput` in a native `DataGridView`. Bind `DataPropertyName` to a `decimal` or `decimal?` property and set `Profile` with the field's culture, nullability, scale and inclusive bounds. The column clones its profile reference, which is immutable; each edit captures that profile and resets the reused editor's candidate/history. A changed column profile applies to the next edit, not the current candidate. Non-edit display uses the profile's culture and reversible grouping projection.
+
+The internal cell parses the raw pending candidate without accepting it. Native `DataGridView` conversion/validation and binding perform the only model write; a failed parse or canceled validation retains raw text and the prior model. Null is rejected for a non-nullable bound property and mapped to `DBNull` for a nullable `DataRowView` column. Accepted completion and cancellation project the current bound model value without raising another dirty notification. Tab/Shift+Tab skip hidden/read-only cells, while Enter, Escape, DataError and new-row behavior remain under the native grid lifecycle. A canceled edit can project an externally updated bound property; callers must use normal binding notifications to refresh the displayed cell. This column is a library/demo consumer and does not enable editing in existing receipt grids, which remain SourceGrid.
+
 ## BootstrapFormattedTextBox
 
 Responsibility: format native text input as it is edited while exposing a stable canonical string separately from its presentation.

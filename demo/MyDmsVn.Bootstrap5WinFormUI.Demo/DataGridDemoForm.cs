@@ -1,8 +1,10 @@
 using System;
 using System.Data;
 using System.Drawing;
+using System.Globalization;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
+using MyDmsVn.Bootstrap5WinFormUI.Formatting;
 using MyDmsVn.Bootstrap5WinFormUI.Rendering;
 using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
@@ -112,11 +114,12 @@ public sealed class DataGridDemoForm : DemoFormBase
             DataPropertyName = "Status",
             Width = 120
         });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn
+        _grid.Columns.Add(new BootstrapDecimalColumn
         {
             Name = "TotalColumn",
             HeaderText = "Total",
             DataPropertyName = "Total",
+            Profile = new DecimalInputProfile(CultureInfo.GetCultureInfo("en-US"), true, 2, 0m, 999999999m),
             Width = 130,
             DefaultCellStyle = new DataGridViewCellStyle
             {
