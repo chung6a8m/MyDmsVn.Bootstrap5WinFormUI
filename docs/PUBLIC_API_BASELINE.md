@@ -116,6 +116,8 @@ The BootstrapBreadcrumb fingerprint was approved only after the compatibility ga
 
 ## Version compatibility policy
 
+The UI-NEXT T07 close-request addition was reviewed after the gate reported fingerprint `265d4448582740117ee95df2845ae23f701f6167f7c65bf4d22ec1ba5064240b` against the prior `82b06f761848921f9f1116db1d235a482dde830579e6c79fd10207a24138fdf5`. The additive surface is `BootstrapTabControl.TabCloseRequested`, `SetTabClosable(TabPage,bool)`, `IsTabClosable(TabPage)`, `RequestTabClose(TabPage,TabCloseReason)`, protected `GetTabCloseButtonBounds(int)`, `TabCloseReason` and `TabCloseRequestedEventArgs`. Mouse and keyboard overrides implement request routing; native page collection, selection and disposal remain owner controlled. No page wrapper, docking model or persistence API was introduced.
+
 - `1.0.0-rc.*`: release-candidate validation of the proposed v1 surface. Any API change requires explicit review, documentation, and an intentional baseline update.
 - `1.0.0` and later `1.x`: breaking changes to the frozen public/protected surface are not allowed. Compatible additions use a minor version; compatible fixes use a patch version.
 - A deliberate breaking change after stable v1 requires the next major version.

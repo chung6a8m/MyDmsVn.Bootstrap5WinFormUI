@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
@@ -76,6 +77,10 @@ public sealed class BootstrapTabControlTests
             ".ctor",
             "BorderRadius",
             "Fill",
+            "IsTabClosable",
+            "RequestTabClose",
+            "SetTabClosable",
+            "TabCloseRequested",
             "TabStyle",
             "Variant"
         }));
@@ -87,6 +92,140 @@ public sealed class BootstrapTabControlTests
         var attribute = typeof(BootstrapTabControl).GetCustomAttribute<DefaultEventAttribute>();
 
         Assert.That(attribute?.Name, Is.EqualTo(nameof(TabControl.SelectedIndexChanged)));
+    }
+
+    [Test]
+    public void Close_request_is_opt_in_and_never_removes_or_disposes_a_page()
+    {
+        using var tabs = new BootstrapTabControl();
+        var first = new TabPage("One");
+        var second = new TabPage("Two");
+        tabs.TabPages.Add(first);
+        tabs.TabPages.Add(second);
+        tabs.SelectedTab = second;
+        TabCloseRequestedEventArgs? received = null;
+        tabs.TabCloseRequested += (_, args) => received = args;
+
+        Assert.That(tabs.RequestTabClose(first, TabCloseReason.Keyboard), Is.False);
+        Assert.That(received, Is.Null);
+
+        tabs.SetTabClosable(first, true);
+        Assert.That(tabs.RequestTabClose(first, TabCloseReason.Keyboard), Is.True);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(received?.Page, Is.SameAs(first));
+            Assert.That(received?.Reason, Is.EqualTo(TabCloseReason.Keyboard));
+            Assert.That(tabs.TabPages.Count, Is.EqualTo(2));
+            Assert.That(tabs.SelectedTab, Is.SameAs(second));
+            Assert.That(first.IsDisposed, Is.False);
+        }));
+    }
+
+    [Test]
+    public void CtrlW_requests_only_the_selected_closable_page()
+    {
+        using var tabs = new CommandProbeTabs();
+        var first = new TabPage("One");
+        var second = new TabPage("Two");
+        tabs.TabPages.Add(first);
+        tabs.TabPages.Add(second);
+        tabs.SetTabClosable(first, true);
+        tabs.SelectedTab = second;
+        var requested = new System.Collections.Generic.List<TabPage>();
+        tabs.TabCloseRequested += (_, args) => requested.Add(args.Page);
+
+        Assert.That(tabs.SendShortcut(Keys.Control | Keys.W), Is.False);
+        tabs.SelectedTab = first;
+        Assert.That(tabs.SendShortcut(Keys.Control | Keys.W), Is.True);
+        Assert.That(requested, Is.EqualTo(new[] { first }));
+        Assert.That(tabs.TabPages.Count, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void Pointer_close_requests_before_native_focus_validation_or_selection()
+    {
+        using var host = new Form { Size = new Size(600, 300) };
+        using var tabs = new BootstrapTabControl { Dock = DockStyle.Fill };
+        using var editor = new TextBox { Dock = DockStyle.Bottom };
+        var first = new TabPage("One");
+        var second = new TabPage("Two");
+        tabs.TabPages.Add(first);
+        tabs.TabPages.Add(second);
+        tabs.SetTabClosable(first, true);
+        tabs.SelectedTab = second;
+        host.Controls.Add(tabs);
+        host.Controls.Add(editor);
+        host.Show();
+        editor.Focus();
+        var validated = 0;
+        editor.Validating += (_, _) => validated++;
+        TabCloseRequestedEventArgs? requested = null;
+        tabs.TabCloseRequested += (_, args) => requested = args;
+        var header = tabs.GetTabRect(0);
+        var point = new Point(header.Right - 13, header.Top + header.Height / 2);
+        var coordinates = (IntPtr)((point.Y << 16) | (point.X & 0xffff));
+
+        SendMessage(tabs.Handle, 0x0201, (IntPtr)1, coordinates);
+        SendMessage(tabs.Handle, 0x0202, IntPtr.Zero, coordinates);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(requested?.Page, Is.SameAs(first));
+            Assert.That(requested?.Reason, Is.EqualTo(TabCloseReason.Pointer));
+            Assert.That(validated, Is.Zero);
+            Assert.That(tabs.SelectedTab, Is.SameAs(second));
+        }));
+    }
+
+    [Test]
+    public void Closable_tab_exposes_an_accessible_close_menu_command()
+    {
+        using var tabs = new BootstrapTabControl();
+        var page = new TabPage("Orders");
+        tabs.TabPages.Add(page);
+        tabs.SetTabClosable(page, true);
+        TabCloseRequestedEventArgs? requested = null;
+        tabs.TabCloseRequested += (_, args) => requested = args;
+
+        var menu = tabs.ContextMenuStrip;
+        Assert.That(menu, Is.Not.Null);
+        var close = menu!.Items.OfType<ToolStripMenuItem>().Single();
+        Assert.That(close.AccessibleName, Is.EqualTo("Close tab Orders"));
+        close.PerformClick();
+
+        Assert.That(requested?.Page, Is.SameAs(page));
+        Assert.That(requested?.Reason, Is.EqualTo(TabCloseReason.Accessibility));
+        Assert.That(tabs.TabPages.Count, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Keyboard_close_menu_keeps_selected_page_when_pointer_is_over_another_header()
+    {
+        using var host = new Form { Size = new Size(600, 300) };
+        using var tabs = new CommandProbeTabs { Dock = DockStyle.Fill };
+        var first = new TabPage("One");
+        var second = new TabPage("Two");
+        tabs.TabPages.Add(first);
+        tabs.TabPages.Add(second);
+        tabs.SetTabClosable(first, true);
+        tabs.SetTabClosable(second, true);
+        tabs.SelectedTab = second;
+        host.Controls.Add(tabs);
+        host.Show();
+        var previousPointer = Cursor.Position;
+        try
+        {
+            Cursor.Position = tabs.PointToScreen(tabs.GetTabRect(0).Location + new Size(5, 5));
+            TabCloseRequestedEventArgs? requested = null;
+            tabs.TabCloseRequested += (_, args) => requested = args;
+            Assert.That(tabs.SendShortcut(Keys.Shift | Keys.F10), Is.True);
+            var menu = tabs.ContextMenuStrip!;
+            menu.Items.OfType<ToolStripMenuItem>().Single().PerformClick();
+            Assert.That(requested?.Page, Is.SameAs(second));
+            Assert.That(requested?.Reason, Is.EqualTo(TabCloseReason.Accessibility));
+            menu.Close();
+        }
+        finally { Cursor.Position = previousPointer; }
     }
 
     [Test]
@@ -453,4 +592,16 @@ public sealed class BootstrapTabControlTests
         using var bitmap = new Bitmap(control.Width, control.Height);
         control.DrawToBitmap(bitmap, control.ClientRectangle);
     }
+
+    private sealed class CommandProbeTabs : BootstrapTabControl
+    {
+        public bool SendShortcut(Keys keys)
+        {
+            var message = Message.Create(IntPtr.Zero, 0, IntPtr.Zero, IntPtr.Zero);
+            return ProcessCmdKey(ref message, keys);
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
 }
