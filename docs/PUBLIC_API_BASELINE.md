@@ -11,7 +11,7 @@ The baseline covers every exported type plus each declared public, protected, an
 Approved SHA-256 API fingerprint:
 
 ```text
-a275ddba930aa8d07d73db5fc6f32f7568c926e9d08df7a5bd33bbf554a5b36b
+702dbc491fa2022903e6fca0c6722375e34a6c154046967fc676d21251c6c779
 ```
 
 The reviewed Pagination addition exports only `MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapPagination`. Its declared surface is the parameterless constructor, `TotalItems`, `PageSize`, `CurrentPage`, `TotalPages`, `MaxVisiblePages`, `ShowFirstLast`, `ShowPreviousNext`, `ButtonSize`, `Variant`, `BorderRadius`, `PageChanged`, and the `GetPreferredSize(Size)` override inherited as part of the control contract. Pagination layout helper types remain internal.
@@ -87,6 +87,10 @@ The reviewed additive surface exports `InputParseState` (Empty, Incomplete, Inva
 ## UIN-T04b reversible decimal projection addition
 
 The second reviewed addition exports static `DecimalInputProjection.Project(string, DecimalInputProfile)` and `DecimalProjectionResult` with read-only `CandidateText`, `DisplayText`, `IsIdentity`, `ToDisplayBoundary(int, bool)`, `ToCandidateBoundary(int)` and `IsGeneratedCharacter(int)`. The before/after boundary choice is explicit at a generated separator; the reverse map preserves the source candidate boundary. These are pure results, not a control, parser fallback or acceptance route. The reviewed fingerprint changed from T04a's `aa03c5193f587ce2182b410621d05896c4acd165cebcccfd3e387821106e07c4` to `a275ddba930aa8d07d73db5fc6f32f7568c926e9d08df7a5bd33bbf554a5b36b`. Existing exports and `AssemblyVersion=1.0.0.0` remain unchanged.
+
+## UIN-T05a native decimal input addition
+
+The deliberate compatibility-gate failure printed `702dbc491fa2022903e6fca0c6722375e34a6c154046967fc676d21251c6c779`. Review of the exported delta found only non-sealed `BootstrapDecimalInput : BootstrapTextBox`: parameterless constructor; `Profile`, read-only `PendingText` and `Value`; `PendingTextChanged`; `TryParsePending()`; `BeginEditSession(decimal?)` and atomic reused-editor `BeginEditSession(decimal?, DecimalInputProfile)`; `ProjectAcceptedValue(decimal?)`; and protected `OnEditorTextChanged`, `OnEditorKeyDown` and `Dispose` overrides. The native TextBox remains available only through the pre-existing protected `Editor` seam. Message interception, history, projection, clipboard and composition state remain private/internal. No existing API, formatted-input behavior, dependency, or `AssemblyVersion=1.0.0.0` changed. The reviewed fingerprint is `702dbc491fa2022903e6fca0c6722375e34a6c154046967fc676d21251c6c779`.
 
 The custom-result-rendering update deliberately failed the formatted-input baseline before approval. Review of the compiled export confirmed the only addition is the `System.Int32 BootstrapSelect.ResultRowHeight` property. `IBootstrapSelectRenderer` and its render contexts are unchanged; variable-height measurement/template APIs and product-specific types remain non-exported; and the popup DPI lifecycle is implemented internally through the inherited event subscription rather than a newly declared public/protected DPI member. The reviewed fingerprint is `8bf5a56063e1b0f758577474c2be2243fc32ee848fe675032a5e1d7bae88230b`.
 
