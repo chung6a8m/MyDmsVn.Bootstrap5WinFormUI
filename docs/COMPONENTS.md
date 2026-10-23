@@ -1383,6 +1383,21 @@ BootstrapModal.FooterPanel
 
 Manual verification: open **Modal** in the integrated demo and exercise every size/backdrop mode, native OK/Cancel results, header/backdrop/Escape dismissal, `CloseOnEscape = false`, long body scrolling, initial focus, Tab/Shift+Tab, Enter, Alt/Alt+Tab, runtime Light/Dark and reduced motion, RTL, owner movement/resize/close, monitor-edge clamping, and Windows 100/125/150/175/200% scaling. Confirm the owner is natively disabled while open, the backdrop stays clickable, unrelated applications can cover both windows, and no backdrop remains in the taskbar/task switcher or `Application.OpenForms` after exit.
 
+## BootstrapPanel and BootstrapLabel (UI-NEXT T09)
+
+`BootstrapPanel` extends the native `Panel`; its public `Controls` collection holds application-owned content. `SurfaceRole` selects `Body`, `Surface`, or `Alternate` from the current theme's body/surface/surface-secondary colors. The panel retains native docking, scrolling, layout, focus and accessibility behavior. Its default font follows the theme's `Body` typography token.
+
+`BootstrapLabel` extends the native `Label`; `TextRole` selects `Body`, `Muted`, `Success`, `Warning`, or `Danger` from the current theme's text and semantic colors. Its default font follows the theme's `Label` token. AutoSize, wrapping, mnemonic processing, and accessibility properties remain native. The label does not assign a background color, so the caller can keep it transparent or set one explicitly.
+
+Both controls update theme-owned colors and fonts on theme changes. An explicit caller assignment to a color or font takes precedence on subsequent role/theme changes; caller-provided `Font` instances remain caller-owned and are never disposed by the controls. Their own theme-created fonts and theme subscriptions are released on disposal. The application can assign its own density/typography font directly. Semantic text color does not by itself communicate an error: use native `AccessibleRole`, a message, and existing validation state as appropriate.
+
+```csharp
+var surface = new BootstrapPanel { SurfaceRole = BootstrapSurfaceRole.Surface, Dock = DockStyle.Fill };
+var message = new BootstrapLabel { TextRole = BootstrapTextRole.Warning, AutoSize = true,
+    Text = "Check this value", AccessibleRole = AccessibleRole.Alert };
+surface.Controls.Add(message);
+```
+
 ## BootstrapBusyHost
 
 `BootstrapBusyHost` wraps one unparented content control and owns that control. Its overlay is an opaque, theme-colored native panel limited to the host's bounds. The existing `BootstrapSpinner` animates only while the overlay is shown. The host does not disable children or restore focus.
