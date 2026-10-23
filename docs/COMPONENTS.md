@@ -1048,7 +1048,7 @@ BootstrapCalendar : Control
 BootstrapCalendarPicker : Control
   SelectionMode, MinDate, MaxDate, SelectedDate, RangeStart, RangeEnd,
   SelectedDates, DateFormat, PlaceholderText, ValidationState, BorderRadius,
-  SelectionChanged, Opened, Closed,
+  SelectionChanged, SelectionAccepted, Opened, Closed,
   SetRange(...), SetSelectedDates(...), ClearSelection(),
   ShowDropDown(), CloseDropDown()
 ```
@@ -1066,6 +1066,12 @@ Behavior:
 - The hosted calendar, ToolStrip menu, selection model, activation/completion signal, focus state, layout types, and synchronization wiring are implementation details. There is no public popup overload, native host accessor, active-calendar reference, timer, parser, culture override, or second native DatePicker surface.
 
 Manual verification: use the calendar demo scenarios for empty/default, single, range preview/completion, multiple toggle, constrained safe-domain boundaries, leap February, Monday/Sunday culture week starts, keyboard-only navigation, repeated open/close, Light/Dark, disabled/validation states, and 100/125/150/175/200% real Windows scaling. Confirm that `BootstrapDatePicker` remains the separate native `DateTimePicker` wrapper with OS-owned calendar behavior.
+
+## BootstrapDateInput (UI-NEXT T06)
+
+`BootstrapDateInput` composes an editable `BootstrapTextBox` with the existing `BootstrapCalendarPicker`. Configure an immutable `DateInputProfile` (required/optional and inclusive date-only bounds), then call `BeginEditSession(currentValue)` at an admitted document boundary. That call captures one local reference date from `ReferenceDateProvider`. `PendingText` retains each native character; `TryParsePending()` is pure, and `TryCommitPending()` accepts a valid candidate. `ProjectAcceptedValue()` projects an authoritative model value and intentionally clears pending text, so hosts must call it only after an admitted document change or an actual model change.
+
+The fixed DMY grammar accepts `d`, `d/M`, and `d/M/yyyy`; omitted components come from the captured reference date. A four-digit year is required when present. Accepted values display `dd/MM/yyyy` at midnight with `DateTimeKind.Unspecified`. Invalid dates and out-of-bounds values stay pending. The calendar previews a choice, and a completed single-date activation raises `SelectionAccepted` even when the selected date was already current. Dismissal restores the exact pre-popup candidate. F4/Alt+Down opens the popup; Enter and Tab attempt commit; Escape first dismisses the popup, then cancels the text edit; segment arrows step one day/month/year without clamping impossible results. The wheel does not change a date.
 
 ## BootstrapRange
 

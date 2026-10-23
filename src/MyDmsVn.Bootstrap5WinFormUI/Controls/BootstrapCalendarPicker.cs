@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -191,6 +191,9 @@ public sealed class BootstrapCalendarPicker : Control
 
     /// <summary>Occurs when the effective logical selection changes.</summary>
     public event EventHandler? SelectionChanged;
+
+    /// <summary>Occurs when a single date is explicitly activated, including the already-selected date.</summary>
+    public event EventHandler? SelectionAccepted;
 
     /// <summary>Occurs after the hosted calendar opens.</summary>
     public event EventHandler? Opened;
@@ -403,6 +406,8 @@ public sealed class BootstrapCalendarPicker : Control
         _lastDisplayMonth = ClampMonth(e.Date);
         CopySelectionFromCalendar(calendar, originatingMode);
         if (e.Changed) OnSelectionChanged(EventArgs.Empty);
+        if (e.Completed && originatingMode == BootstrapCalendarSelectionMode.Single)
+            SelectionAccepted?.Invoke(this, EventArgs.Empty);
         Invalidate();
         if (shouldClose) CloseDropDown();
     }
