@@ -8,6 +8,7 @@ using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Formatting;
 using MyDmsVn.Bootstrap5WinFormUI.Tests.Infrastructure;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -175,6 +176,39 @@ public sealed class BootstrapDecimalDataGridViewTests
         host.Grid.Refresh();
 
         Assert.That(host.Grid.Rows[0].Cells[2].FormattedValue, Is.EqualTo("1.234,5"));
+    }
+
+    [TestCase(BootstrapThemeMode.Light)]
+    [TestCase(BootstrapThemeMode.Dark)]
+    public void ThemeChangeKeepsInvalidPendingTextCaretAndAcceptedModel(BootstrapThemeMode mode)
+    {
+        var originalTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+            using var host = new GridHost();
+            var editor = host.BeginEdit();
+            editor.Text = "12x";
+            var native = editor.Controls.OfType<TextBox>().Single();
+            native.Focus();
+            native.Select(1, 1);
+            var focused = native.Focused;
+
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(
+                mode == BootstrapThemeMode.Light ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            Application.DoEvents();
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(editor.PendingText, Is.EqualTo("12x"));
+                Assert.That(editor.Value, Is.EqualTo(12m));
+                Assert.That(native.SelectionStart, Is.EqualTo(1));
+                Assert.That(native.SelectionLength, Is.EqualTo(1));
+                Assert.That(native.Focused, Is.EqualTo(focused));
+                Assert.That(host.Row.WriteCount, Is.Zero);
+            }));
+        }
+        finally { BootstrapThemeManager.CurrentTheme = originalTheme; }
     }
 
     [Test]
