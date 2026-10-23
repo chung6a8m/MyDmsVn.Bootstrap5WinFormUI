@@ -182,6 +182,21 @@ public sealed class BootstrapDateInputInteractionTests
     }
 
     [Test]
+    public void Native_alt_down_opens_calendar_without_accepting_candidate()
+    {
+        using var form = Host(out var input);
+        input.Text = "5/11";
+        input.NativeEditor.Focus();
+        var opened = 0;
+        input.Calendar.Opened += (_, _) => opened++;
+        SendKeys.SendWait("%{DOWN}");
+        Application.DoEvents();
+        Assert.That(opened, Is.EqualTo(1));
+        Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 23)));
+        input.Calendar.CloseDropDown();
+    }
+
+    [Test]
     public void Theme_switch_and_popup_disposal_preserve_raw_date_until_owner_closes()
     {
         var previous = BootstrapThemeManager.CurrentTheme;
