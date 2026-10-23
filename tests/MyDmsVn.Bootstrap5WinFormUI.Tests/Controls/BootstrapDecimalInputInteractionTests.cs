@@ -60,6 +60,12 @@ public sealed class BootstrapDecimalInputInteractionTests
         Assert.That(input.PendingText, Is.EqualTo("11111"));
         Assert.That(input.Text, Is.EqualTo("11,111"));
         Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(4));
+
+        input.BeginEditSession(1111m);
+        input.NativeEditor.Select(3, 0);
+        input.NativeEditor.SelectedText = "1";
+        Assert.That(input.PendingText, Is.EqualTo("11111"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(4));
     }
 
     [Test]

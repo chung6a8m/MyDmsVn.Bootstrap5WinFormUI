@@ -19,6 +19,8 @@ public class BootstrapDecimalInput : BootstrapTextBox
     private const int WmImeEndComposition = 0x010E;
     private const int WmChar = 0x0102;
     private const int WmKeyDown = 0x0100;
+    private const int WmClear = 0x0303;
+    private const int EmReplaceSel = 0x00C2;
 
     private readonly FormattedTextHistory _history = new FormattedTextHistory();
     private readonly DecimalEditorWindow _nativeWindow;
@@ -181,7 +183,8 @@ public class BootstrapDecimalInput : BootstrapTextBox
     private DecimalProjectionResult CurrentProjection => _projection ?? DecimalInputProjection.Project(_pendingText, ActiveProfile);
 
     private static string FormatValue(decimal? value, DecimalInputProfile profile) =>
-        value.HasValue ? value.Value.ToString("G29", profile.Culture) : string.Empty;
+        // G29 emits exponent syntax for tiny values, which the pending grammar rejects.
+        value.HasValue ? value.Value.ToString("0.############################", profile.Culture) : string.Empty;
 
     private void ApplyCandidate(string candidate, int selectionStart, int selectionLength, bool recordHistory,
         FormattedTextSnapshot? previous, bool notifyPending = false)
@@ -237,7 +240,7 @@ public class BootstrapDecimalInput : BootstrapTextBox
 
     private void ProcessNativeMessage(ref Message message, ActionRef dispatch)
     {
-        if (!_composing && (message.Msg == WmChar ||
+        if (!_composing && (message.Msg == WmChar || message.Msg == WmClear || message.Msg == EmReplaceSel ||
             message.Msg == WmKeyDown && message.WParam.ToInt32() == (int)Keys.Delete))
         {
             var priorHint = _nativeEditHint;

@@ -89,6 +89,17 @@ public sealed class BootstrapDecimalInputTests
         Assert.That(input.TryParsePending().Value, Is.EqualTo(1234.5m));
     }
 
+    [Test]
+    public void SessionProjectionOfTinyExactDecimalNeverUsesExponentSyntax()
+    {
+        using var input = new DecimalProbe();
+        var tiny = 0.0000000000000000000000000001m;
+        input.BeginEditSession(tiny, new DecimalInputProfile(
+            CultureInfo.GetCultureInfo("en-US"), false, 28, 0m, 1m));
+        Assert.That(input.PendingText, Is.EqualTo("0.0000000000000000000000000001"));
+        Assert.That(input.TryParsePending().Value, Is.EqualTo(tiny));
+    }
+
     private static DecimalInputProfile Profile(string culture, bool nullable) =>
         new DecimalInputProfile(CultureInfo.GetCultureInfo(culture), nullable, 4, 0m, 99999999999999.9999m);
 
