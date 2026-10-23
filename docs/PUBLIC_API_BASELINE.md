@@ -11,7 +11,7 @@ The baseline covers every exported type plus each declared public, protected, an
 Approved SHA-256 API fingerprint:
 
 ```text
-aa03c5193f587ce2182b410621d05896c4acd165cebcccfd3e387821106e07c4
+a275ddba930aa8d07d73db5fc6f32f7568c926e9d08df7a5bd33bbf554a5b36b
 ```
 
 The reviewed Pagination addition exports only `MyDmsVn.Bootstrap5WinFormUI.Controls.BootstrapPagination`. Its declared surface is the parameterless constructor, `TotalItems`, `PageSize`, `CurrentPage`, `TotalPages`, `MaxVisiblePages`, `ShowFirstLast`, `ShowPreviousNext`, `ButtonSize`, `Variant`, `BorderRadius`, `PageChanged`, and the `GetPreferredSize(Size)` override inherited as part of the control contract. Pagination layout helper types remain internal.
@@ -82,7 +82,11 @@ The formatted-input fingerprint was approved only after the public-API gate deli
 
 ## UIN-T04a decimal parser addition
 
-The reviewed additive surface exports `InputParseState` (Empty, Incomplete, Invalid, Valid), `InputParseFailureCode` (Required, Incomplete, Syntax, Precision, OutOfRange, Unrepresentable), `InputParseFailure` (Code, Position), `DecimalParseResult` (State, Value, Failure), `DecimalInputProfile` (Culture, IsNullable, Scale, Minimum, Maximum and its five-argument constructor) and static `DecimalInputParser.TryParsePending(string, DecimalInputProfile)`. The public API fingerprint changed from `95796bc67c04af789782cd20399c958dcda2d24083816c3df3cffc4b18b6499d` to `aa03c5193f587ce2182b410621d05896c4acd165cebcccfd3e387821106e07c4` after review of the compiled export. No existing signature or assembly version changed. T04b will review the projection addition separately.
+The reviewed additive surface exports `InputParseState` (Empty, Incomplete, Invalid, Valid), `InputParseFailureCode` (Required, Incomplete, Syntax, Precision, OutOfRange, Unrepresentable), `InputParseFailure` (Code, Position), `DecimalParseResult` (State, Value, Failure), `DecimalInputProfile` (Culture, IsNullable, Scale, Minimum, Maximum and its five-argument constructor) and static `DecimalInputParser.TryParsePending(string, DecimalInputProfile)`. The public API fingerprint changed from `95796bc67c04af789782cd20399c958dcda2d24083816c3df3cffc4b18b6499d` to `aa03c5193f587ce2182b410621d05896c4acd165cebcccfd3e387821106e07c4` after review of the compiled export. No existing signature or assembly version changed. T04b's projection addition is reviewed separately below.
+
+## UIN-T04b reversible decimal projection addition
+
+The second reviewed addition exports static `DecimalInputProjection.Project(string, DecimalInputProfile)` and `DecimalProjectionResult` with read-only `CandidateText`, `DisplayText`, `IsIdentity`, `ToDisplayBoundary(int, bool)`, `ToCandidateBoundary(int)` and `IsGeneratedCharacter(int)`. The before/after boundary choice is explicit at a generated separator; the reverse map preserves the source candidate boundary. These are pure results, not a control, parser fallback or acceptance route. The reviewed fingerprint changed from T04a's `aa03c5193f587ce2182b410621d05896c4acd165cebcccfd3e387821106e07c4` to `a275ddba930aa8d07d73db5fc6f32f7568c926e9d08df7a5bd33bbf554a5b36b`. Existing exports and `AssemblyVersion=1.0.0.0` remain unchanged.
 
 The custom-result-rendering update deliberately failed the formatted-input baseline before approval. Review of the compiled export confirmed the only addition is the `System.Int32 BootstrapSelect.ResultRowHeight` property. `IBootstrapSelectRenderer` and its render contexts are unchanged; variable-height measurement/template APIs and product-specific types remain non-exported; and the popup DPI lifecycle is implemented internally through the inherited event subscription rather than a newly declared public/protected DPI member. The reviewed fingerprint is `8bf5a56063e1b0f758577474c2be2243fc32ee848fe675032a5e1d7bae88230b`.
 

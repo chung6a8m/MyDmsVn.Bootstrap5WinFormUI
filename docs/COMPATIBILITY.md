@@ -108,6 +108,8 @@ Do not use target directives merely to avoid writing a small shared compatibilit
 
 The pure decimal parser introduced for UIN-T04a uses the same source and exported surface on both targets. Its culture is cloned at profile construction and returned as a defensive read-only clone, so a caller changing `CurrentCulture` or its original `NumberFormat` cannot reinterpret a pending candidate. Limits remain caller supplied. The parser uses exact coefficient construction rather than `decimal.TryParse` rounding; it adds no runtime dependency or native-control behavior.
 
+UIN-T04b's projection also uses one pure source path on both targets. It preserves every source character and records generated grouping separately, with explicit caret/selection boundary maps; invalid, incomplete, outer-whitespace and unreversible forms use identity display. No existing `BootstrapFormattedTextBox`, `InputCaretMapper` or `FormattedTextHistory` behavior changes. Native edit, paste, IME, undo and final acceptance are deferred to the T05 control/host integration.
+
 At minimum, CI/local verification must include:
 
 ```text

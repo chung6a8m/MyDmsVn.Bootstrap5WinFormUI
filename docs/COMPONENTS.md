@@ -222,9 +222,13 @@ Behavior:
 
 Manual verification: launch the demo and choose **TextBox / Card**. Exercise placeholder, leading/trailing icons, clear, valid/invalid, read-only, password, and disabled examples. Tab into inputs, type/select/copy text, verify focus/validation border priority, switch Light/Dark, and repeat at each supported Windows DPI setting.
 
-## BootstrapFormattedTextBox
+## Decimal input core
 
 The separate `DecimalInputParser` is a pure candidate parser for future decimal controls. A `DecimalInputProfile` freezes a defensive culture clone, nullability, effective scale and caller-supplied inclusive bounds. `TryParsePending` returns Empty, Incomplete, Invalid or Valid plus an exact nullable value and structured failure. It accepts only ASCII digits, literal culture sign/decimal tokens and outer whitespace; meaningful excess precision, external grouping, currency, exponent and unrepresentable values reject before any rounding. Parsing never edits text or commits a control/model value. Existing formatted Numeral behavior and defaults remain unchanged.
+
+`DecimalInputProjection.Project` may insert grouping into an exact valid ungrouped candidate. Its result retains the original lexical text, a display string, boundary maps in both directions and per-character generated-separator provenance. It falls back to identity for invalid, intermediate or ambiguous candidates. For example, generated `1234` → `1,234` and pasted external `1,234` can have equal displays but only the former marks the comma as generated. A host must carry candidate/provenance through edits, including a paste with unchanged visible display. Projection does not parse away, accept or commit source punctuation.
+
+## BootstrapFormattedTextBox
 
 Responsibility: format native text input as it is edited while exposing a stable canonical string separately from its presentation.
 
