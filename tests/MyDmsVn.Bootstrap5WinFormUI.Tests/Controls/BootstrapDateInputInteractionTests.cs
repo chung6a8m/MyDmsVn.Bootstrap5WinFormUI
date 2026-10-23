@@ -94,6 +94,24 @@ public sealed class BootstrapDateInputInteractionTests
     }
 
     [Test]
+    public void Reused_calendar_accepts_disjoint_profile_bounds_in_both_directions()
+    {
+        using var form = Host(out var input);
+        input.Profile = new DateInputProfile(false, new DateTime(2027, 1, 1), new DateTime(2027, 1, 31));
+        input.BeginEditSession(new DateTime(2027, 1, 5));
+        input.ShowCalendar();
+        Application.DoEvents();
+        Assert.That(input.Calendar.MinDate, Is.EqualTo(new DateTime(2027, 1, 1)));
+        input.Calendar.CloseDropDown();
+        input.Profile = new DateInputProfile(false, new DateTime(1900, 1, 1), new DateTime(1900, 1, 31));
+        input.BeginEditSession(new DateTime(1900, 1, 5));
+        input.ShowCalendar();
+        Application.DoEvents();
+        Assert.That(input.Calendar.MaxDate, Is.EqualTo(new DateTime(1900, 1, 31)));
+        input.Calendar.CloseDropDown();
+    }
+
+    [Test]
     public void Segment_arrows_preserve_invalid_candidate_and_refuse_impossible_month()
     {
         using var form = Host(out var input);
