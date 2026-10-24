@@ -53,6 +53,7 @@ public class BootstrapDateInput : UserControl
         _calendar.SelectionAccepted += OnCalendarSelectionAccepted;
         _calendar.Opened += OnCalendarOpened;
         _calendar.Closed += OnCalendarClosed;
+        _calendar.MouseUp += OnCalendarTriggerMouseUp;
         AccessibleRole = AccessibleRole.Text;
         Size = new Size(240, preferredHeight);
         _referenceDate = DateTime.Today;
@@ -223,6 +224,7 @@ public class BootstrapDateInput : UserControl
             _calendar.SelectionAccepted -= OnCalendarSelectionAccepted;
             _calendar.Opened -= OnCalendarOpened;
             _calendar.Closed -= OnCalendarClosed;
+            _calendar.MouseUp -= OnCalendarTriggerMouseUp;
         }
         base.Dispose(disposing);
     }
@@ -420,6 +422,15 @@ public class BootstrapDateInput : UserControl
         var form = FindForm();
         if (form is null || form.IsDisposed || !ReferenceEquals(Form.ActiveForm, form)) return;
         _entry.NativeEditor.Focus();
+    }
+
+    private void OnCalendarTriggerMouseUp(object? sender, MouseEventArgs e)
+    {
+        // A click on the trigger can dismiss an F4 popup before the picker
+        // takes focus on mouse-up, so the close callback alone cannot see it.
+        if (e.Button != MouseButtons.Left || _popupSnapshot != null || !_calendar.Focused ||
+            !IsHandleCreated || IsDisposed || Disposing) return;
+        BeginInvoke((MethodInvoker)RestoreEditorFocusAfterDismissal);
     }
 
     private void PreviewCalendarSelection()

@@ -77,6 +77,23 @@ public sealed class BootstrapDateInputInteractionTests
     }
 
     [Test]
+    public void DateInputCorrection_F4_popup_closed_by_trigger_restores_native_editor_focus()
+    {
+        using var form = Host(out var input);
+        input.Text = "5/11";
+        input.NativeEditor.Focus();
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.F4, IntPtr.Zero);
+        Application.DoEvents();
+        Assert.That(input.Calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 11, 5)));
+
+        Assert.That(PostMessage(input.Calendar.Handle, WmLButtonDown, (IntPtr)1, IntPtr.Zero), Is.True);
+        Assert.That(PostMessage(input.Calendar.Handle, WmLButtonUp, IntPtr.Zero, IntPtr.Zero), Is.True);
+        Application.DoEvents();
+        Assert.That(input.NativeEditor.Focused, Is.True);
+        Assert.That(input.PendingText, Is.EqualTo("5/11"));
+    }
+
+    [Test]
     public void DateInputCorrection_External_dismissal_does_not_steal_new_focus()
     {
         using var form = Host(out var input);
