@@ -222,6 +222,28 @@ Behavior:
 
 Manual verification: launch the demo and choose **TextBox / Card**. Exercise placeholder, leading/trailing icons, clear, valid/invalid, read-only, password, and disabled examples. Tab into inputs, type/select/copy text, verify focus/validation border priority, switch Light/Dark, and repeat at each supported Windows DPI setting.
 
+## Decimal input core
+
+The separate `DecimalInputParser` is a pure candidate parser for future decimal controls. A `DecimalInputProfile` freezes a defensive culture clone, nullability, effective scale and caller-supplied inclusive bounds. `TryParsePending` returns Empty, Incomplete, Invalid or Valid plus an exact nullable value and structured failure. It accepts only ASCII digits, literal culture sign/decimal tokens and outer whitespace; meaningful excess precision, external grouping, currency, exponent and unrepresentable values reject before any rounding. Parsing never edits text or commits a control/model value. Existing formatted Numeral behavior and defaults remain unchanged.
+
+`DecimalInputProjection.Project` may insert grouping into an exact valid ungrouped candidate. Its result retains the original lexical text, a display string, boundary maps in both directions and per-character generated-separator provenance. It falls back to identity for invalid, intermediate or ambiguous candidates. For example, generated `1234` → `1,234` and pasted external `1,234` can have equal displays but only the former marks the comma as generated. A host must carry candidate/provenance through edits, including a paste with unchanged visible display. Projection does not parse away, accept or commit source punctuation.
+
+## BootstrapDecimalInput
+
+`BootstrapDecimalInput : BootstrapTextBox` composes the existing native editor and T04 parser/projection. `PendingText` is the exact lexical candidate; inherited `Text` is its current display. The read-only `Value` is the last value explicitly supplied by the host and does not change while typing or parsing. `TryParsePending()` returns the pure parse result without accepting it. The host calls `BeginEditSession(currentValue)` after edit admission, or `BeginEditSession(currentValue, profile)` when reusing an editor for another profile. Both reset candidate and undo history. `ProjectAcceptedValue(value)` is for an explicit accepted model application or admitted cancel; it clears the old pending state and history. A direct change to `Profile` during a pending edit throws; a new session may atomically replace it.
+
+`PendingTextChanged` fires once for each lexical edit, including an external grouped paste whose visible text equals the previous generated display, and once for undo/redo. Initialization and accepted-value projection do not fire this event. `TextChanged` follows visible display changes and is not a substitute for pending candidate notification. The control intercepts native clipboard messages so Copy/Cut use the selected pending text, excluding only its generated grouping; external punctuation remains source text. Paste retains external punctuation and invalid candidates exactly. Backspace/Delete beside a generated separator remove the neighboring candidate digit. Native IME composition remains unformatted until it ends. The inherited theme, validation border, focus, font, DPI and read-only shell remain in force; business limits, error messages, model application and final commit admission belong to the host.
+
+`SetRawCandidate(candidate)` admits a whole-value accessibility or host input without treating generated display grouping as source text. It keeps invalid punctuation verbatim in `PendingText` for the normal parser and commit boundary; it rejects disabled/read-only controls and an active IME composition.
+
+Manual verification: on real Windows at 100% and 125% display scaling, type through the first grouping boundary and edit in the middle; replace ranges across generated separators; paste external grouped and invalid text; Copy/Cut partial and invalid pending selections; undo/redo; compose through Vietnamese IME; switch Light/Dark and font while focused; repeat read-only/disabled and dispose/reuse paths. Observe `PendingText`, display, caret/range, focus and accepted model value after each edit.
+
+## BootstrapDecimalColumn
+
+`BootstrapDecimalColumn : DataGridViewColumn` hosts `BootstrapDecimalInput` in a native `DataGridView`. Bind `DataPropertyName` to a `decimal` or `decimal?` property and set `Profile` with the field's culture, nullability, scale and inclusive bounds. The column clones its profile reference, which is immutable; each edit captures that profile and resets the reused editor's candidate/history. A changed column profile applies to the next edit, not the current candidate. Non-edit display uses the profile's culture and reversible grouping projection.
+
+The internal cell parses the raw pending candidate without accepting it. Native `DataGridView` conversion/validation and binding perform the only model write; a failed parse or canceled validation retains raw text and the prior model. Null is rejected for a non-nullable bound property and mapped to `DBNull` for a nullable `DataRowView` column. Accepted completion and cancellation project the current bound model value without raising another dirty notification. Tab/Shift+Tab skip hidden/read-only cells, while Enter, Escape, DataError and new-row behavior remain under the native grid lifecycle. A canceled edit can project an externally updated bound property; callers must use normal binding notifications to refresh the displayed cell. This column is a library/demo consumer and does not enable editing in existing receipt grids, which remain SourceGrid.
+
 ## BootstrapFormattedTextBox
 
 Responsibility: format native text input as it is edited while exposing a stable canonical string separately from its presentation.
@@ -818,6 +840,7 @@ BootstrapTabControl.BorderRadius
 Behavior:
 
 - `BootstrapTabControl` derives directly from native `TabControl`. `TabPage`, `TabPages`, `SelectedIndex`, `SelectedTab`, `SelectedIndexChanged`, arrow/Ctrl+Tab behavior, mouse hit-testing/selection, accessibility, `ImageList`, `ImageKey`/`ImageIndex`, `ToolTipText`, and native overflow remain WinForms-owned rather than being mirrored or wrapped.
+- UI-NEXT T07 adds optional per-page close requests through `SetTabClosable`, `IsTabClosable`, `RequestTabClose` and `TabCloseRequested`. A close request reports the original `TabPage` and pointer/keyboard/accessibility/programmatic reason; the control never removes or disposes a page. The close hit target is inspected before native mouse-down focus and selection. Ctrl+W requests the selected closable page; a standard accessible context-menu command offers the same request. The owner still decides whether and when to close.
 - The control forces `DrawMode = OwnerDrawFixed` and `SizeMode = Fixed`, then paints only rectangles supplied by the native `DrawItem` event / `GetTabRect`. It never paints or recolors the selected page content area and introduces no custom page host/window.
 - `TabStyle` defaults to `Tabs`; `Variant` defaults to `Primary`; `Fill` defaults to `false`; `BorderRadius = -1` uses the current theme radius. Undefined style/variant values and radius values below `-1` are rejected before mutation.
 - `Tabs` uses rounded top corners and a semantic selected border/text accent; `Pills` uses a rounded semantic selected surface with contrast-selected foreground; `Underline` stays visually minimal and paints only a DPI-scaled selected accent at the header bottom.
@@ -1034,7 +1057,7 @@ BootstrapCalendar : Control
 BootstrapCalendarPicker : Control
   SelectionMode, MinDate, MaxDate, SelectedDate, RangeStart, RangeEnd,
   SelectedDates, DateFormat, PlaceholderText, ValidationState, BorderRadius,
-  SelectionChanged, Opened, Closed,
+  SelectionChanged, SelectionAccepted, Opened, Closed,
   SetRange(...), SetSelectedDates(...), ClearSelection(),
   ShowDropDown(), CloseDropDown()
 ```
@@ -1052,6 +1075,14 @@ Behavior:
 - The hosted calendar, ToolStrip menu, selection model, activation/completion signal, focus state, layout types, and synchronization wiring are implementation details. There is no public popup overload, native host accessor, active-calendar reference, timer, parser, culture override, or second native DatePicker surface.
 
 Manual verification: use the calendar demo scenarios for empty/default, single, range preview/completion, multiple toggle, constrained safe-domain boundaries, leap February, Monday/Sunday culture week starts, keyboard-only navigation, repeated open/close, Light/Dark, disabled/validation states, and 100/125/150/175/200% real Windows scaling. Confirm that `BootstrapDatePicker` remains the separate native `DateTimePicker` wrapper with OS-owned calendar behavior.
+
+## BootstrapDateInput (UI-NEXT T06)
+
+`BootstrapDateInput` composes an editable `BootstrapTextBox` with the existing `BootstrapCalendarPicker`. Configure an immutable `DateInputProfile` (required/optional and inclusive date-only bounds), then call `BeginEditSession(currentValue)` at an admitted document boundary. `ReferenceDateProvider` is captured when a fresh pending candidate begins through text entry or a successful Up/Down segment step, so a tab left open across midnight uses the date at entry time; that reference remains fixed while the candidate is pending. Opening the calendar without a pending candidate likewise reads the current date. `PendingText` retains each native character; `TryParsePending()` is pure, and `TryCommitPending()` accepts a valid candidate. `ProjectAcceptedValue()` projects an authoritative model value and intentionally clears pending text, so hosts must call it only after an admitted document change or an actual model change.
+
+The composite presents one themed editor surface. A centered calendar icon has a theme-scaled small-control hit area inside that surface; the selected date is drawn only by the native text editor. The standalone `BootstrapCalendarPicker` continues drawing its date summary and dropdown chevron. DateInput starts at the themed control height before docking, and an explicit larger host font grows the editor's minimum height from the native text measurement so glyphs remain readable. The trigger keeps its accessible calendar action. Light/Dark, validation, focus and disabled colors come from the existing theme tokens.
+
+The fixed DMY grammar accepts `d`, `d/M`, and `d/M/yyyy`; omitted components come from the captured reference date. A four-digit year is required when present. Accepted values display `dd/MM/yyyy` at midnight with `DateTimeKind.Unspecified`. Invalid dates and out-of-bounds values stay pending. The calendar previews a choice, and a completed single-date activation raises `SelectionAccepted` even when the selected date was already current. In DateInput's popup, the visibly active day follows keyboard focus while the selected date and accepted input remain unchanged until activation; a standalone CalendarPicker keeps its existing selected-date rendering. Dismissal restores the exact pre-popup candidate and native caret or selection range before notifying the host; focus returns to the editor when dismissal leaves focus on this input's calendar trigger, without reclaiming focus from another control. F4/Alt+Down opens the popup; Enter and Tab attempt commit; Escape first dismisses the popup, then cancels the text edit; segment arrows step one day/month/year without clamping impossible results. The wheel does not change a date.
 
 ## BootstrapRange
 
@@ -1361,6 +1392,41 @@ BootstrapModal.FooterPanel
 - Modeless `Show()` receives only the visual Form shell and creates no backdrop; modeless behavior is not a V1 contract. Nested Bootstrap modals, fullscreen variants, draggable/resizable custom chrome, DWM effects, MDI-special behavior, custom message loops, global input hooks, and async result wrappers are excluded.
 
 Manual verification: open **Modal** in the integrated demo and exercise every size/backdrop mode, native OK/Cancel results, header/backdrop/Escape dismissal, `CloseOnEscape = false`, long body scrolling, initial focus, Tab/Shift+Tab, Enter, Alt/Alt+Tab, runtime Light/Dark and reduced motion, RTL, owner movement/resize/close, monitor-edge clamping, and Windows 100/125/150/175/200% scaling. Confirm the owner is natively disabled while open, the backdrop stays clickable, unrelated applications can cover both windows, and no backdrop remains in the taskbar/task switcher or `Application.OpenForms` after exit.
+
+## BootstrapPanel and BootstrapLabel (UI-NEXT T09)
+
+`BootstrapPanel` extends the native `Panel`; its public `Controls` collection holds application-owned content. `SurfaceRole` selects `Body`, `Surface`, or `Alternate` from the current theme's body/surface/surface-secondary colors. The panel retains native docking, scrolling, layout, focus and accessibility behavior. Its default font follows the theme's `Body` typography token.
+
+`BootstrapLabel` extends the native `Label`; `TextRole` selects `Body`, `Muted`, `Success`, `Warning`, or `Danger` from the current theme's text and semantic colors. Its default font follows the theme's `Label` token. AutoSize, wrapping, mnemonic processing, and accessibility properties remain native. The label does not assign a background color, so the caller can keep it transparent or set one explicitly.
+
+Both controls update theme-owned colors and fonts on theme changes. An explicit caller assignment through the concrete `BootstrapPanel` or `BootstrapLabel` property takes precedence on subsequent role/theme changes, including an assignment equal to the currently displayed value. Native `Control`/`Label` color and font setters are not virtual: a same-value assignment through a base-typed reference cannot be observed as an override. Keep a concrete reference when explicitly taking ownership; a different-value base-typed assignment raises a change event and is observed. Caller-provided `Font` instances remain caller-owned and are never disposed by the controls. Their own theme-created fonts and theme subscriptions are released on disposal. The application can assign its own density/typography font directly. Semantic text color does not by itself communicate an error: use native `AccessibleRole`, a message, and existing validation state as appropriate.
+
+```csharp
+var surface = new BootstrapPanel { SurfaceRole = BootstrapSurfaceRole.Surface, Dock = DockStyle.Fill };
+var message = new BootstrapLabel { TextRole = BootstrapTextRole.Warning, AutoSize = true,
+    Text = "Check this value", AccessibleRole = AccessibleRole.Alert };
+surface.Controls.Add(message);
+```
+
+## BootstrapBusyHost
+
+`BootstrapBusyHost` wraps one unparented content control and owns that control. Its overlay is an opaque, theme-colored native panel limited to the host's bounds. The existing `BootstrapSpinner` animates only while the overlay is shown. The host does not disable children or restore focus.
+
+```csharp
+var host = new BootstrapBusyHost(content) { Dock = DockStyle.Fill };
+parent.Controls.Add(host);
+IDisposable token = host.Begin(new BusyPresentation("Saving…", () => cancellationSource.Cancel()));
+try
+{
+    await SaveAsync();
+}
+finally
+{
+    token.Dispose(); // on the owning UI thread
+}
+```
+
+Each call to `Begin` owns a separate idempotent token. The newest live token supplies the message and optional Cancel button; releasing an older token cannot hide a newer presentation. Initial display waits 150 ms, with no minimum hold after release. Hide, handle destruction and disposal cancel pending display; re-show and handle recreation schedule again if an operation remains live. The Cancel button invokes the current callback only and does not release the token or promise rollback. Callers must continue to enforce keyboard, UIA and command admission while the overlay is pending or visible. Token acquisition/release is UI-thread-affine.
 
 ## Deferred components
 

@@ -35,6 +35,7 @@ public sealed class DataGridDemoFormTests
         {
             Assert.That(grid.AutoGenerateColumns, Is.False);
             Assert.That(grid.Columns.Count, Is.GreaterThanOrEqualTo(5));
+            Assert.That(grid.Columns["TotalColumn"], Is.TypeOf<BootstrapDecimalColumn>());
             Assert.That(table, Is.Not.Null, "Demo should use a real tabular binding source.");
             Assert.That(table!.Rows.Count, Is.GreaterThan(0), "Demo should start with sample rows.");
         }));

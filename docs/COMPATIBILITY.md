@@ -68,6 +68,8 @@ Stage 9 therefore introduces no target-specific `MonthCalendar`, popup `Form`, P
 
 `BootstrapCalendarPicker` presents a fresh custom calendar through the existing native `ToolStripDropDownMenu` infrastructure. Native ToolStrip remains responsible for screen working-area placement, focus transfer, Escape/outside-click dismissal, and disposal of the hosted snapshot. When the popup opens, the hosted calendar must receive focus before its arrow, PageUp/PageDown, Home/End, Enter, and Space keys can participate in the normal WinForms key route; the picker restores its collapsed keyboard entry points without exposing the hosted control or ToolStrip types. Both behaviors are verified on `net48` and `net8.0-windows`; Windows/culture-specific text measurement and ToolStrip placement may still differ naturally between runtimes and OS versions.
 
+UI-NEXT T06's `BootstrapDateInput` uses native TextBox editing for the raw DMY candidate and the existing themed CalendarPicker for date choice. Its date-only parser and segment steps are shared across `net48` and `net8.0-windows`; the host supplies document admission and authoritative projection. `SelectionAccepted` distinguishes an explicit same-date activation from popup dismissal without exposing the ToolStrip host. The initial composite height comes from the children's themed preferred heights before docking; WinForms docking must not inflate it to the default `UserControl` height. Native focus, IME and DPI behavior should be exercised on the actual target Windows scale.
+
 The custom calendar family reads `CurrentCulture` at formatting and layout time without caching or mutating it. If the culture's active calendar cannot represent a safe-domain date, summaries, month titles, and calendar accessibility names use a cloned culture with a representable optional Gregorian calendar where available, then another representable optional calendar, with `InvariantCulture` as the last fallback. This preserves an active calendar such as `UmAlQuraCalendar` for dates it supports while keeping the exact WinForms `DateTimePicker` domain usable. First-day-of-week, weekday labels, and integer day labels deliberately remain direct `CurrentCulture` behavior.
 
 ## 7. System.Drawing
@@ -105,6 +107,12 @@ Use conditional compilation only for real target differences, for example:
 Do not use target directives merely to avoid writing a small shared compatibility helper.
 
 ## 10. Build matrix
+
+The pure decimal parser introduced for UIN-T04a uses the same source and exported surface on both targets. Its culture is cloned at profile construction and returned as a defensive read-only clone, so a caller changing `CurrentCulture` or its original `NumberFormat` cannot reinterpret a pending candidate. Limits remain caller supplied. The parser uses exact coefficient construction rather than `decimal.TryParse` rounding; it adds no runtime dependency or native-control behavior.
+
+UIN-T05a adds one native `BootstrapTextBox` subclass on the same shared source path for `net48` and `net8.0-windows`. It retains the existing protected native `Editor` seam and internal formatted-history store; a private `NativeWindow` intercepts clipboard, undo and IME messages and is attached/released with the inner editor handle. No existing `BootstrapFormattedTextBox` or Numeral behavior changes, no new runtime dependency or public native child accessor is introduced. `PendingTextChanged` is the lexical notification even when display bytes do not change. A real interactive Windows session is required to establish a native DPI/IME result; pure parser/projection tests alone do not do so.
+
+UIN-T04b's projection also uses one pure source path on both targets. It preserves every source character and records generated grouping separately, with explicit caret/selection boundary maps; invalid, incomplete, outer-whitespace and unreversible forms use identity display. No existing `BootstrapFormattedTextBox`, `InputCaretMapper` or `FormattedTextHistory` behavior changes. Native edit, paste, IME, undo and final acceptance are deferred to the T05 control/host integration.
 
 At minimum, CI/local verification must include:
 

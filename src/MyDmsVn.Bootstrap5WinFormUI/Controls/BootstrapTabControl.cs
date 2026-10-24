@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -25,6 +26,39 @@ public class BootstrapTabControl : TabControl
     private bool _updatingItemSize;
     private Size[] _sizedTabImageSizes = Array.Empty<Size>();
     private Font? _themeFont;
+    private readonly HashSet<TabPage> _closablePages = new();
+    private bool _suppressCloseMouseUp;
+    private ContextMenuStrip? _closeMenu;
+    private ToolStripMenuItem? _closeMenuItem;
+    private TabPage? _closeMenuPage;
+    private TabPage? _keyboardCloseMenuPage;
+
+    /// <summary>Requests that the owner close a page. The collection and page lifetime remain owner controlled.</summary>
+    public event EventHandler<TabCloseRequestedEventArgs>? TabCloseRequested;
+
+    /// <summary>Enables or disables the optional close affordance for one native page.</summary>
+    public void SetTabClosable(TabPage page, bool closable)
+    {
+        if (page is null) throw new ArgumentNullException(nameof(page));
+        if (!TabPages.Contains(page)) throw new ArgumentException("The page must belong to this tab control.", nameof(page));
+        if (closable) _closablePages.Add(page);
+        else _closablePages.Remove(page);
+        if (closable) EnsureCloseMenu();
+        UpdateCloseMenuPage(SelectedTab ?? page);
+        ApplyHeaderItemSize();
+        Invalidate();
+    }
+
+    /// <summary>Gets whether an owned page can request a close.</summary>
+    public bool IsTabClosable(TabPage page) => page != null && TabPages.Contains(page) && _closablePages.Contains(page);
+
+    /// <summary>Raises a close request for an enabled, closable page without removing or selecting it.</summary>
+    public bool RequestTabClose(TabPage page, TabCloseReason reason = TabCloseReason.Programmatic)
+    {
+        if (!Enabled || page is null || !page.Enabled || !IsTabClosable(page)) return false;
+        TabCloseRequested?.Invoke(this, new TabCloseRequestedEventArgs(page, reason));
+        return true;
+    }
 
     /// <summary>
     /// Initializes a designer-safe Bootstrap-inspired tab control using native WinForms tab pages and selection behavior.
@@ -174,10 +208,66 @@ public class BootstrapTabControl : TabControl
                 DetachTabPage(page);
             }
 
+            _closablePages.Clear();
+            if (ReferenceEquals(ContextMenuStrip, _closeMenu)) ContextMenuStrip = null;
+            _closeMenu?.Dispose();
+            _closeMenu = null;
+
             DisposeThemeFont();
         }
 
         base.Dispose(disposing);
+    }
+
+    /// <inheritdoc />
+    protected override bool ProcessCmdKey(ref Message message, Keys keyData)
+    {
+        if (keyData == (Keys.Control | Keys.W) && SelectedTab is TabPage selected &&
+            RequestTabClose(selected, TabCloseReason.Keyboard)) return true;
+        if (keyData == (Keys.Shift | Keys.F10) && SelectedTab is TabPage contextPage &&
+            IsTabClosable(contextPage) && _closeMenu != null)
+        {
+            _keyboardCloseMenuPage = contextPage;
+            UpdateCloseMenuPage(contextPage);
+            _closeMenu.Show(this, GetTabRect(SelectedIndex).Location);
+            return true;
+        }
+        return base.ProcessCmdKey(ref message, keyData);
+    }
+
+    /// <inheritdoc />
+    protected override void WndProc(ref Message message)
+    {
+        if (message.Msg == 0x0201 && Enabled)
+        {
+            var value = message.LParam.ToInt64();
+            var location = new Point(unchecked((short)(value & 0xffff)), unchecked((short)((value >> 16) & 0xffff)));
+            for (var index = 0; index < TabPages.Count; index++)
+            {
+                var page = TabPages[index];
+                if (!IsTabClosable(page) || !GetTabCloseButtonBounds(index).Contains(location)) continue;
+                _suppressCloseMouseUp = true;
+                RequestTabClose(page, TabCloseReason.Pointer);
+                message.Result = IntPtr.Zero;
+                return;
+            }
+        }
+        if (message.Msg == 0x0202 && _suppressCloseMouseUp)
+        {
+            _suppressCloseMouseUp = false;
+            message.Result = IntPtr.Zero;
+            return;
+        }
+        base.WndProc(ref message);
+    }
+
+    /// <summary>Returns the DPI-scaled close hit target within a native header.</summary>
+    protected Rectangle GetTabCloseButtonBounds(int index)
+    {
+        if (index < 0 || index >= TabPages.Count || !IsTabClosable(TabPages[index])) return Rectangle.Empty;
+        var header = GetTabRect(index);
+        var size = Math.Min(header.Height - 4, Math.Max(12, DpiScaler.Scale(16, GetCurrentDpi())));
+        return new Rectangle(header.Right - size - 4, header.Top + (header.Height - size) / 2, size, size);
     }
 
     private void OnDrawTabItem(object? sender, DrawItemEventArgs e)
@@ -228,18 +318,36 @@ public class BootstrapTabControl : TabControl
             }
         }
 
-        if (layout.TextBounds.Width > 0 && layout.TextBounds.Height > 0)
+        var textBounds = layout.TextBounds;
+        if (IsTabClosable(page))
+        {
+            var close = GetTabCloseButtonBounds(e.Index);
+            textBounds.Width = Math.Max(0, Math.Min(textBounds.Right, close.Left - 4) - textBounds.Left);
+        }
+        if (textBounds.Width > 0 && textBounds.Height > 0)
         {
             TextRenderer.DrawText(
                 e.Graphics,
                 page.Text ?? string.Empty,
                 Font,
-                layout.TextBounds,
+                textBounds,
                 palette.Foreground,
                 TextFormatFlags.HorizontalCenter |
                 TextFormatFlags.VerticalCenter |
                 TextFormatFlags.SingleLine |
                 TextFormatFlags.EndEllipsis);
+        }
+
+        if (IsTabClosable(page))
+        {
+            var close = GetTabCloseButtonBounds(e.Index);
+            if (!close.IsEmpty)
+            {
+                using var pen = new Pen(palette.Foreground, Math.Max(1, metrics.BorderWidth));
+                var inset = Math.Max(3, close.Width / 4);
+                e.Graphics.DrawLine(pen, close.Left + inset, close.Top + inset, close.Right - inset, close.Bottom - inset);
+                e.Graphics.DrawLine(pen, close.Right - inset, close.Top + inset, close.Left + inset, close.Bottom - inset);
+            }
         }
 
         if (e.Index == SelectedIndex && Focused && ShowFocusCues && enabled)
@@ -348,6 +456,8 @@ public class BootstrapTabControl : TabControl
         if (e.Control is TabPage page)
         {
             DetachTabPage(page);
+            _closablePages.Remove(page);
+            if (ReferenceEquals(_closeMenuPage, page)) UpdateCloseMenuPage(SelectedTab);
             ApplyHeaderItemSize();
             UpdateHoveredIndex(-1);
             Invalidate();
@@ -370,6 +480,7 @@ public class BootstrapTabControl : TabControl
 
     private void OnTabPagePresentationChanged(object? sender, EventArgs e)
     {
+        if (ReferenceEquals(sender, _closeMenuPage)) UpdateCloseMenuPage(_closeMenuPage);
         ApplyHeaderItemSize();
         Invalidate();
     }
@@ -424,7 +535,45 @@ public class BootstrapTabControl : TabControl
 
     private void OnTabSelectedIndexChanged(object? sender, EventArgs e)
     {
+        UpdateCloseMenuPage(SelectedTab);
         Invalidate();
+    }
+
+    private void EnsureCloseMenu()
+    {
+        if (_closeMenu != null) return;
+        _closeMenu = new ContextMenuStrip();
+        _closeMenuItem = new ToolStripMenuItem("Close tab");
+        _closeMenuItem.Click += (_, _) =>
+        {
+            var page = _closeMenuPage ?? SelectedTab;
+            if (page != null) RequestTabClose(page, TabCloseReason.Accessibility);
+        };
+        _closeMenu.Items.Add(_closeMenuItem);
+        _closeMenu.Opening += (_, args) =>
+        {
+            if (_keyboardCloseMenuPage != null)
+            {
+                UpdateCloseMenuPage(_keyboardCloseMenuPage);
+                _keyboardCloseMenuPage = null;
+            }
+            else
+            {
+                var index = HitTestTab(PointToClient(MousePosition));
+                UpdateCloseMenuPage(index >= 0 ? TabPages[index] : SelectedTab);
+            }
+            if (_closeMenuPage == null || !IsTabClosable(_closeMenuPage)) args.Cancel = true;
+        };
+        _closeMenu.Closed += (_, _) => _keyboardCloseMenuPage = null;
+        if (ContextMenuStrip == null) ContextMenuStrip = _closeMenu;
+    }
+
+    private void UpdateCloseMenuPage(TabPage? page)
+    {
+        _closeMenuPage = page;
+        if (_closeMenuItem == null) return;
+        _closeMenuItem.Enabled = page != null && IsTabClosable(page);
+        _closeMenuItem.AccessibleName = "Close tab " + (page?.Text ?? string.Empty);
     }
 
     private void OnThemeChanged(object? sender, BootstrapThemeChangedEventArgs e)
@@ -486,13 +635,14 @@ public class BootstrapTabControl : TabControl
     {
         var textWidth = MeasureTabTextWidth(page.Text, metrics.Height);
         var image = ResolveTabImage(page);
+        var closeWidth = IsTabClosable(page) ? DpiScaler.Scale(24, GetCurrentDpi()) : 0;
         if (image is null)
         {
-            return textWidth;
+            return textWidth + closeWidth;
         }
 
         var spacing = textWidth > 0 ? metrics.ContentSpacing : 0;
-        return image.Width + spacing + textWidth;
+        return image.Width + spacing + textWidth + closeWidth;
     }
 
     private int MeasureTabTextWidth(string? text, int height)

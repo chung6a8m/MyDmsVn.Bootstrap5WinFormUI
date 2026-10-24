@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -251,7 +251,7 @@ public sealed class BootstrapCalendarPickerTests
         Assert.Multiple((Action)(() =>
         {
             Assert.That(typeof(BootstrapCalendarPicker).GetCustomAttribute<DefaultEventAttribute>()!.Name, Is.EqualTo("SelectionChanged"));
-            Assert.That(typeof(BootstrapCalendarPicker).GetEvents(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Select(e => e.Name), Is.EquivalentTo(new[] { "SelectionChanged", "Opened", "Closed" }));
+            Assert.That(typeof(BootstrapCalendarPicker).GetEvents(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Select(e => e.Name), Is.EquivalentTo(new[] { "SelectionChanged", "SelectionAccepted", "Opened", "Closed" }));
             Assert.That(typeof(BootstrapCalendarPicker).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Where(m => !m.IsSpecialName).Select(m => m.Name), Is.EquivalentTo(new[] { "SetRange", "SetSelectedDates", "ClearSelection", "ShowDropDown", "CloseDropDown" }));
             Assert.That(picker.MinDate, Is.EqualTo(BootstrapCalendarSelectionModel.MinimumSupportedDate));
             Assert.That(picker.MaxDate, Is.EqualTo(BootstrapCalendarSelectionModel.MaximumSupportedDate));
@@ -896,6 +896,26 @@ public sealed class BootstrapCalendarPickerTests
             Assert.That(closed, Is.EqualTo(1));
             Assert.That(GetActiveCalendar(picker), Is.Null);
         }));
+    }
+
+    [Test]
+    public void Explicit_same_date_activation_reports_acceptance_without_a_selection_change()
+    {
+        using var form = CreatePickerHost(out var picker);
+        var date = new DateTime(2026, 8, 30);
+        picker.SelectedDate = date;
+        var changes = 0;
+        var accepted = 0;
+        picker.SelectionChanged += (_, _) => changes++;
+        picker.SelectionAccepted += (_, _) => accepted++;
+        picker.ShowDropDown();
+        Application.DoEvents();
+        ActivateDate(GetActiveCalendar(picker)!, date);
+        Application.DoEvents();
+        Assert.That(changes, Is.Zero);
+        Assert.That(accepted, Is.EqualTo(1));
+        Assert.That(picker.SelectedDate, Is.EqualTo(date));
+        Assert.That(GetActiveCalendar(picker), Is.Null);
     }
 
     [Test]

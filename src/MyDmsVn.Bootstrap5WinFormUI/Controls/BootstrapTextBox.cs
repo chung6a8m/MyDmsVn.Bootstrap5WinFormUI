@@ -24,6 +24,7 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
     private readonly Label _placeholder = new Label();
     private readonly Button _clearButton = new Button();
     private Control? _frameworkTrailingAccessory;
+    private bool _frameworkTrailingAccessoryCompactHitArea;
     private string _placeholderText = string.Empty;
     private BootstrapValidationState _applicationValidationState = BootstrapValidationState.None;
     private BootstrapValidationState? _transientValidationState;
@@ -117,7 +118,7 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
     /// </summary>
     protected TextBox Editor => _editor;
 
-    internal void SetFrameworkTrailingAccessory(Control? accessory)
+    internal void SetFrameworkTrailingAccessory(Control? accessory, bool compactHitArea = false)
     {
         if (ReferenceEquals(_frameworkTrailingAccessory, accessory))
         {
@@ -126,6 +127,7 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
 
         var previous = _frameworkTrailingAccessory;
         _frameworkTrailingAccessory = null;
+        _frameworkTrailingAccessoryCompactHitArea = compactHitArea;
         if (previous is not null)
         {
             Controls.Remove(previous);
@@ -735,6 +737,9 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
         var horizontalPadding = DpiScaler.Scale(GetLogicalHorizontalPadding(theme.Metrics), dpi);
         var spacing = DpiScaler.Scale(theme.Metrics.SpacingXS, dpi);
         var iconExtent = DpiScaler.Scale(theme.Metrics.SpacingLG, dpi);
+        var accessoryExtent = _frameworkTrailingAccessoryCompactHitArea
+            ? DpiScaler.Scale(theme.Metrics.ControlHeightSmall, dpi)
+            : iconExtent;
 
         var left = horizontalPadding;
         if (_icon is not null)
@@ -745,8 +750,9 @@ public class BootstrapTextBox : UserControl, IBootstrapConnectedControl
         var right = Math.Max(left, ClientSize.Width - horizontalPadding);
         if (_frameworkTrailingAccessory is not null)
         {
-            var accessoryLeft = Math.Max(left, right - iconExtent);
-            _frameworkTrailingAccessory.Bounds = new Rectangle(accessoryLeft, (ClientSize.Height - iconExtent) / 2, iconExtent, iconExtent);
+            var accessoryLeft = Math.Max(left, right - accessoryExtent);
+            var accessoryHeight = Math.Min(accessoryExtent, Math.Max(1, ClientSize.Height - 2));
+            _frameworkTrailingAccessory.Bounds = new Rectangle(accessoryLeft, (ClientSize.Height - accessoryHeight) / 2, accessoryExtent, accessoryHeight);
             right = Math.Max(left, accessoryLeft - spacing);
         }
 
