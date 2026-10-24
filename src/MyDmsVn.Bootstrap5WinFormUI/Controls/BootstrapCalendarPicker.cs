@@ -371,6 +371,7 @@ public sealed class BootstrapCalendarPicker : Control
         try
         {
             calendar = new BootstrapCalendar();
+            calendar.EmphasizeFocusedDate = _embeddedIconOnly;
             calendar.SelectionMode = SelectionMode;
             calendar.MinDate = MinDate;
             calendar.MaxDate = MaxDate;

@@ -82,6 +82,8 @@ public class BootstrapCalendar : Control
     private Font? _themeFont;
     private bool _themeSubscribed;
 
+    internal bool EmphasizeFocusedDate { get; set; }
+
     /// <summary>Initializes a designer-safe calendar using the current theme and supported date domain.</summary>
     public BootstrapCalendar()
     {
@@ -593,6 +595,8 @@ public class BootstrapCalendar : Control
     {
         var dpi = GetCurrentDpi();
         var outlines = ResolveDayOutlineMetrics(theme.Metrics, dpi);
+        var focusPreview = EmphasizeFocusedDate && Focused && SelectionMode == BootstrapCalendarSelectionMode.Single &&
+            _focusedDate != SelectedDate;
         foreach (var cell in layout.DayCells)
         {
             var state = ClassifyDay(cell.Date, cell.IsCurrentMonth, cell.IsEnabled && Enabled, cell.IsToday,
@@ -603,13 +607,15 @@ public class BootstrapCalendar : Control
                 FillCell(graphics, cell.Bounds, theme.Colors.Hover);
             if ((state & BootstrapCalendarDayRenderState.Selected) != 0)
             {
-                FillCell(graphics, cell.Bounds, theme.Colors.Active);
+                if (!focusPreview) FillCell(graphics, cell.Bounds, theme.Colors.Active);
                 DrawCellOutline(graphics, cell.Bounds, theme.Colors.Primary, outlines.SelectionWidth);
             }
+            if (focusPreview && cell.Date == _focusedDate) FillCell(graphics, cell.Bounds, theme.Colors.Active);
             if ((state & BootstrapCalendarDayRenderState.Today) != 0) DrawCellOutline(graphics, cell.Bounds, theme.Colors.Primary, outlines.SelectionWidth);
             var color = (state & BootstrapCalendarDayRenderState.Disabled) != 0 || (state & BootstrapCalendarDayRenderState.AdjacentMonth) != 0 ? theme.Colors.MutedText : theme.Colors.Text;
             DrawCentered(graphics, cell.Date.Day.ToString(CultureInfo.CurrentCulture), cell.Bounds, color);
-            if (Focused && ShowFocusCues && cell.Date == _focusedDate) DrawCellOutline(graphics, cell.Bounds, theme.Colors.Focus, outlines.FocusWidth);
+            if (Focused && (ShowFocusCues || EmphasizeFocusedDate) && cell.Date == _focusedDate)
+                DrawCellOutline(graphics, cell.Bounds, theme.Colors.Focus, outlines.FocusWidth);
         }
     }
 

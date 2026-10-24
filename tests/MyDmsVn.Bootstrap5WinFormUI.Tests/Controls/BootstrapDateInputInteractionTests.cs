@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -25,6 +26,83 @@ public sealed class BootstrapDateInputInteractionTests
     private const int WmLButtonUp = 0x0202;
     private const int WmImeStartComposition = 0x010D;
     private const int WmImeEndComposition = 0x010E;
+
+    [TestCase(BootstrapThemeMode.Light)]
+    [TestCase(BootstrapThemeMode.Dark)]
+    public void DateInputCorrection_F4_calendar_keyboard_preview_moves_visible_day_without_committing(BootstrapThemeMode mode)
+    {
+        var previousTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+            using var form = Host(out var input);
+            var accepted = input.Value;
+            SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.F4, IntPtr.Zero);
+            Application.DoEvents();
+            var field = typeof(BootstrapCalendarPicker).GetField("_activeCalendar", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var calendar = (BootstrapCalendar)field.GetValue(input.Calendar)!;
+            Assert.That(calendar.Focused, Is.True);
+            Assert.That(calendar.SelectedDate, Is.EqualTo(accepted));
+            var origin = calendar.FocusedDate;
+            var target = origin.AddDays(7);
+            var activeColor = BootstrapThemeManager.CurrentTheme.Colors.Active;
+            var originCell = calendar.ResolveLayout(calendar.DeviceDpi).DayCells.Single(cell => cell.Date == origin);
+            var targetCell = calendar.ResolveLayout(calendar.DeviceDpi).DayCells.Single(cell => cell.Date == target);
+            var originPoint = new Point(originCell.Bounds.Left + 5, originCell.Bounds.Top + 5);
+            var targetPoint = new Point(targetCell.Bounds.Left + 5, targetCell.Bounds.Top + 5);
+            using var initial = Capture(calendar);
+            Assert.That(initial.GetPixel(originPoint.X, originPoint.Y), Is.EqualTo(activeColor));
+
+            SendMessage(calendar.Handle, WmKeyDown, (IntPtr)Keys.Down, IntPtr.Zero);
+            Application.DoEvents();
+            using var afterDown = Capture(calendar);
+            Assert.That(calendar.FocusedDate, Is.EqualTo(target));
+            Assert.That(afterDown.GetPixel(targetPoint.X, targetPoint.Y), Is.EqualTo(activeColor),
+                "The keyboard focus day needs the visible active highlight before Enter.");
+            Assert.That(afterDown.GetPixel(originPoint.X, originPoint.Y), Is.Not.EqualTo(activeColor),
+                "The old selected date must not keep the active fill during keyboard preview.");
+            Assert.That(calendar.SelectedDate, Is.EqualTo(accepted));
+            Assert.That(input.Value, Is.EqualTo(accepted));
+
+            SendMessage(calendar.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+            Application.DoEvents();
+            using var afterUp = Capture(calendar);
+            Assert.That(calendar.FocusedDate, Is.EqualTo(origin));
+            Assert.That(afterUp.GetPixel(originPoint.X, originPoint.Y), Is.EqualTo(activeColor));
+            Assert.That(input.Value, Is.EqualTo(accepted));
+            input.Calendar.CloseDropDown();
+        }
+        finally { BootstrapThemeManager.CurrentTheme = previousTheme; }
+    }
+
+    [Test]
+    public void DateInputCorrection_Standalone_picker_keeps_selected_day_highlight_during_keyboard_focus()
+    {
+        using var form = new Form { Width = 420, Height = 150, ShowInTaskbar = false };
+        using var picker = new BootstrapCalendarPicker
+        {
+            SelectedDate = new DateTime(2026, 10, 23),
+            Dock = DockStyle.Top
+        };
+        form.Controls.Add(picker);
+        form.Show();
+        form.Activate();
+        picker.ShowDropDown();
+        Application.DoEvents();
+        var field = typeof(BootstrapCalendarPicker).GetField("_activeCalendar", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var calendar = (BootstrapCalendar)field.GetValue(picker)!;
+        var selected = calendar.SelectedDate!.Value;
+        var selectedCell = calendar.ResolveLayout(calendar.DeviceDpi).DayCells.Single(cell => cell.Date == selected);
+        var selectedPoint = new Point(selectedCell.Bounds.Left + 5, selectedCell.Bounds.Top + 5);
+        SendMessage(calendar.Handle, WmKeyDown, (IntPtr)Keys.Down, IntPtr.Zero);
+        Application.DoEvents();
+        using var afterDown = Capture(calendar);
+        Assert.That(calendar.FocusedDate, Is.EqualTo(selected.AddDays(7)));
+        Assert.That(afterDown.GetPixel(selectedPoint.X, selectedPoint.Y),
+            Is.EqualTo(BootstrapThemeManager.CurrentTheme.Colors.Active),
+            "A standalone picker keeps its selected-date rendering while keyboard focus moves.");
+        picker.CloseDropDown();
+    }
 
     [TestCase(1, 0, false)]
     [TestCase(1, 0, true)]
