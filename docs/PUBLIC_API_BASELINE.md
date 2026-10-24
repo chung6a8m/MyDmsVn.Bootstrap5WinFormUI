@@ -124,6 +124,8 @@ The UI-NEXT T09 semantic surface/text addition deliberately failed the API gate 
 
 The UI-NEXT T10 decimal DGV addition deliberately failed the API gate against T09 and reported fingerprint `2e6616c512076a4eff3892039eb4eb41c6942da3f02d76be9c7de5da5361d530`. The reviewed export adds only `BootstrapDecimalColumn : DataGridViewColumn` with its parameterless constructor, `Profile: DecimalInputProfile` and `Clone(): object`. The cell and `IDataGridViewEditingControl` implementation remain internal. Existing lookup, decimal input, SourceGrid adapter and assembly version remain unchanged.
 
+The PR #45 review correction deliberately failed the API gate against T10 and reported `5016acec10c7efdafe03387de2c8f182a2e96c49f473f1bcb8bc6e5932dfa6cb`. Review of the exported delta found only `BootstrapDecimalInput.SetRawCandidate(string)` for admitted whole-value accessibility input. This method preserves the lexical candidate exactly, including invalid grouping, and leaves parsing and model acceptance with the host. No existing signature or assembly version changed. The gate approves this fingerprint for the correction.
+
 - `1.0.0-rc.*`: release-candidate validation of the proposed v1 surface. Any API change requires explicit review, documentation, and an intentional baseline update.
 - `1.0.0` and later `1.x`: breaking changes to the frozen public/protected surface are not allowed. Compatible additions use a minor version; compatible fixes use a patch version.
 - A deliberate breaking change after stable v1 requires the next major version.

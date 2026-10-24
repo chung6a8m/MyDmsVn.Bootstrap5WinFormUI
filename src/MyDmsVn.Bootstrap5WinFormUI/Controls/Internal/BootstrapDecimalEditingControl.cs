@@ -139,7 +139,8 @@ internal sealed class BootstrapDecimalEditingControl : BootstrapDecimalInput, ID
             if (column < 0 || column >= grid.Columns.Count)
             {
                 row += reverse ? -1 : 1;
-                column = reverse ? grid.Columns.Count - 1 : 0;
+                // The loop advances column before inspecting it on the next iteration.
+                column = reverse ? grid.Columns.Count : -1;
                 continue;
             }
             var candidate = grid.Rows[row].Cells[column];

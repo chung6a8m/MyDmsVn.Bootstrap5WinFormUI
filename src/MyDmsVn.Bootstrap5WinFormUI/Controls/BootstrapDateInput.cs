@@ -68,7 +68,7 @@ public class BootstrapDateInput : UserControl
         }
     }
 
-    /// <summary>Clock used only when a new edit session is admitted.</summary>
+    /// <summary>Clock captured for each new pending candidate or calendar opening without pending input.</summary>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Func<DateTime> ReferenceDateProvider
@@ -156,6 +156,7 @@ public class BootstrapDateInput : UserControl
     public void ShowCalendar()
     {
         if (ReadOnly || !Enabled || _popupSnapshot != null) return;
+        if (!_pendingEdit) _referenceDate = _referenceDateProvider().Date;
         PrepareCalendarSnapshot();
         try { _calendar.ShowDropDown(); }
         catch { _popupSnapshot = null; throw; }
@@ -233,6 +234,7 @@ public class BootstrapDateInput : UserControl
         if (_applying) return;
         var candidate = _entry.Text;
         if (_pendingText == candidate) return;
+        if (!_pendingEdit) _referenceDate = _referenceDateProvider().Date;
         _pendingText = candidate;
         _pendingEdit = true;
         PendingTextChanged?.Invoke(this, EventArgs.Empty);

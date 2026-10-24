@@ -92,4 +92,20 @@ public sealed class BootstrapDateInputTests
         Assert.That(input.TryCommitPending(), Is.True);
         Assert.That(input.Value, Is.EqualTo(new DateTime(2027, 1, 5)));
     }
+
+    [Test]
+    public void New_candidate_in_same_session_recaptures_month_but_pending_candidate_keeps_its_reference()
+    {
+        using var input = new BootstrapDateInput { Profile = Required };
+        var today = new DateTime(2026, 10, 31);
+        input.ReferenceDateProvider = () => today;
+        input.BeginEditSession(null);
+        input.Text = "5";
+        today = new DateTime(2026, 11, 1);
+        Assert.That(input.TryParsePending().Value, Is.EqualTo(new DateTime(2026, 10, 5)));
+        Assert.That(input.TryCommitPending(), Is.True);
+
+        input.Text = "6";
+        Assert.That(input.TryParsePending().Value, Is.EqualTo(new DateTime(2026, 11, 6)));
+    }
 }

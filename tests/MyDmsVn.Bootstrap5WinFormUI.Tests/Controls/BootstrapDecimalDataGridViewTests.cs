@@ -290,6 +290,29 @@ public sealed class BootstrapDecimalDataGridViewTests
     }
 
     [Test]
+    public void NativeTabAndShiftTabIncludeBoundaryCellsAcrossRows()
+    {
+        using var host = new GridHost(twoRows: true);
+        var editor = host.BeginEdit(columnIndex: 2);
+        editor.Text = "7.5";
+        var native = editor.Controls.OfType<TextBox>().Single();
+        var message = Message.Create(native.Handle, 0x0100, (IntPtr)(int)Keys.Tab, IntPtr.Zero);
+        native.PreProcessMessage(ref message);
+        Application.DoEvents();
+        Assert.That(host.Grid.CurrentCell!.RowIndex, Is.EqualTo(1));
+        Assert.That(host.Grid.CurrentCell!.ColumnIndex, Is.Zero);
+
+        Assert.That(host.Grid.BeginEdit(true), Is.True);
+        editor = (BootstrapDecimalInput)host.Grid.EditingControl!;
+        native = editor.Controls.OfType<TextBox>().Single();
+        message = Message.Create(native.Handle, 0x0100, (IntPtr)(int)(Keys.Shift | Keys.Tab), IntPtr.Zero);
+        native.PreProcessMessage(ref message);
+        Application.DoEvents();
+        Assert.That(host.Grid.CurrentCell!.RowIndex, Is.Zero);
+        Assert.That(host.Grid.CurrentCell!.ColumnIndex, Is.EqualTo(2));
+    }
+
+    [Test]
     public void NativeNewRowCreatesOneTypedBoundRow()
     {
         using var host = new GridHost(empty: true);

@@ -90,6 +90,23 @@ public sealed class BootstrapDecimalInputTests
     }
 
     [Test]
+    public void WholeValueAssignmentDoesNotTreatExistingGroupingAsAnEditHint()
+    {
+        using var input = new DecimalProbe();
+        input.BeginEditSession(1234m, Profile("en-US", false));
+        Assert.That(input.Text, Is.EqualTo("1,234"));
+
+        input.SetRawCandidate("1,2345");
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(input.PendingText, Is.EqualTo("1,2345"));
+            Assert.That(input.TryParsePending().State, Is.EqualTo(InputParseState.Invalid));
+            Assert.That(input.Value, Is.EqualTo(1234m));
+        }));
+    }
+
+    [Test]
     public void SessionProjectionOfTinyExactDecimalNeverUsesExponentSyntax()
     {
         using var input = new DecimalProbe();

@@ -103,6 +103,16 @@ public class BootstrapDecimalInput : BootstrapTextBox
         ApplyCandidate(candidate, candidate.Length, 0, false, null);
     }
 
+    /// <summary>Replaces the pending lexical candidate verbatim for an admitted whole-value input.</summary>
+    public void SetRawCandidate(string candidate)
+    {
+        if (candidate is null) throw new ArgumentNullException(nameof(candidate));
+        if (!Enabled || ReadOnly) throw new InvalidOperationException("The decimal input is not editable.");
+        if (_composing) throw new InvalidOperationException("An IME composition is still active.");
+        _nativeEditHint = null;
+        ApplyCandidate(candidate, candidate.Length, 0, true, CurrentSnapshot(), true);
+    }
+
     /// <summary>Parses the pending lexical candidate without modifying the accepted value.</summary>
     public DecimalParseResult TryParsePending() => DecimalInputParser.TryParsePending(_pendingText, ActiveProfile);
 
