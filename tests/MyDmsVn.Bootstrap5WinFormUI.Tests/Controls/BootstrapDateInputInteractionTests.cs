@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -251,6 +252,158 @@ public sealed class BootstrapDateInputInteractionTests
             Assert.That(input.IsDisposed, Is.True);
         }
         finally { BootstrapThemeManager.CurrentTheme = previous; }
+    }
+
+    [Test]
+    public void DateInputCorrection_Repeated_month_and_year_arrows_keep_native_caret_before_notification()
+    {
+        using var form = Host(out var input);
+        input.ProjectAcceptedValue(new DateTime(2026, 10, 12));
+        input.NativeEditor.SelectionStart = 4;
+        var notifications = 0;
+        var notifiedSelectionStarts = new List<int>();
+        var notifiedSelectionLengths = new List<int>();
+        EventHandler onPending = (_, _) =>
+        {
+            notifications++;
+            notifiedSelectionStarts.Add(input.NativeEditor.SelectionStart);
+            notifiedSelectionLengths.Add(input.NativeEditor.SelectionLength);
+        };
+        input.PendingTextChanged += onPending;
+        foreach (var (key, expected) in new[]
+        {
+            (Keys.Up, "12/11/2026"), (Keys.Up, "12/12/2026"), (Keys.Down, "12/11/2026")
+        })
+        {
+            SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)key, IntPtr.Zero);
+            Assert.That(input.PendingText, Is.EqualTo(expected));
+            Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(4));
+            Assert.That(input.NativeEditor.SelectionLength, Is.Zero);
+            Assert.That(notifiedSelectionStarts[notifications - 1], Is.EqualTo(4));
+            Assert.That(notifiedSelectionLengths[notifications - 1], Is.Zero);
+            Assert.That(input.NativeEditor.Focused, Is.True);
+            Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 12)));
+        }
+        Assert.That(notifications, Is.EqualTo(3));
+
+        input.ProjectAcceptedValue(new DateTime(2026, 10, 12));
+        input.NativeEditor.SelectionStart = 8;
+        input.PendingTextChanged -= onPending;
+        foreach (var (key, expected) in new[]
+        {
+            (Keys.Up, "12/10/2027"), (Keys.Up, "12/10/2028"), (Keys.Down, "12/10/2027")
+        })
+        {
+            SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)key, IntPtr.Zero);
+            Assert.That(input.PendingText, Is.EqualTo(expected));
+            Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(8));
+            Assert.That(input.NativeEditor.SelectionLength, Is.Zero);
+            Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 12)));
+        }
+    }
+
+    [Test]
+    public void DateInputCorrection_Short_date_maps_month_caret_and_cross_separator_selection()
+    {
+        using var form = Host(out var input);
+        input.Text = "5/1";
+        input.NativeEditor.SelectionStart = 2;
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("05/02/2026"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(3));
+        Assert.That(input.NativeEditor.SelectionLength, Is.Zero);
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("05/03/2026"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(3));
+
+        input.Text = "5/1";
+        input.NativeEditor.Select(2, 1);
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("05/02/2026"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(3));
+        Assert.That(input.NativeEditor.SelectionLength, Is.EqualTo(2));
+
+        input.Text = "5/1";
+        input.NativeEditor.Select(1, 2);
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("06/01/2026"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(2));
+        Assert.That(input.NativeEditor.SelectionLength, Is.EqualTo(3));
+    }
+
+    [TestCase(Keys.Up, 1, "13/10/2026")]
+    [TestCase(Keys.Down, 1, "11/10/2026")]
+    [TestCase(Keys.Up, 4, "12/11/2026")]
+    [TestCase(Keys.Down, 4, "12/09/2026")]
+    [TestCase(Keys.Up, 8, "12/10/2027")]
+    [TestCase(Keys.Down, 8, "12/10/2025")]
+    public void DateInputCorrection_Each_segment_and_direction_preserves_collapsed_caret(Keys key, int caret, string expected)
+    {
+        using var form = Host(out var input);
+        input.ProjectAcceptedValue(new DateTime(2026, 10, 12));
+        input.NativeEditor.SelectionStart = caret;
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)key, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo(expected));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(caret));
+        Assert.That(input.NativeEditor.SelectionLength, Is.Zero);
+        Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 12)));
+    }
+
+    [Test]
+    public void DateInputCorrection_Rejected_and_readonly_arrows_preserve_raw_selection_and_value()
+    {
+        using var form = Host(out var input);
+        input.Text = "31/11/2026";
+        input.NativeEditor.Select(3, 2);
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("31/11/2026"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(3));
+        Assert.That(input.NativeEditor.SelectionLength, Is.EqualTo(2));
+
+        input.ProjectAcceptedValue(new DateTime(2026, 10, 23));
+        input.NativeEditor.Select(3, 2);
+        input.ReadOnly = true;
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("23/10/2026"));
+        Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 23)));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(3));
+        Assert.That(input.NativeEditor.SelectionLength, Is.EqualTo(2));
+
+        input.ReadOnly = false;
+        input.NativeEditor.Select(3, 2);
+        SendMessage(input.NativeEditor.Handle, WmImeStartComposition, IntPtr.Zero, IntPtr.Zero);
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("23/10/2026"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(3));
+        Assert.That(input.NativeEditor.SelectionLength, Is.EqualTo(2));
+        SendMessage(input.NativeEditor.Handle, WmImeEndComposition, IntPtr.Zero, IntPtr.Zero);
+
+        input.Enabled = false;
+        input.NativeEditor.Select(3, 2);
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("23/10/2026"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(3));
+        Assert.That(input.NativeEditor.SelectionLength, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void DateInputCorrection_Out_of_bounds_and_impossible_year_step_keep_selection()
+    {
+        using var form = Host(out var input);
+        input.Profile = new DateInputProfile(false, new DateTime(2024, 1, 1), new DateTime(2026, 12, 31));
+        input.BeginEditSession(new DateTime(2024, 2, 29));
+        input.NativeEditor.Select(6, 4);
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("29/02/2024"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(6));
+        Assert.That(input.NativeEditor.SelectionLength, Is.EqualTo(4));
+
+        input.ProjectAcceptedValue(new DateTime(2026, 12, 31));
+        input.NativeEditor.Select(6, 4);
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("31/12/2026"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(6));
+        Assert.That(input.NativeEditor.SelectionLength, Is.EqualTo(4));
     }
 
     private static Form Host(out BootstrapDateInput input)

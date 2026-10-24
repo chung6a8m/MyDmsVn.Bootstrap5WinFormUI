@@ -242,7 +242,12 @@ public class BootstrapDateInput : UserControl
 
     private void OnEntryKeyDown(object? sender, KeyEventArgs e)
     {
-        if (_imeComposing) return;
+        if (_imeComposing)
+        {
+            if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down)
+                e.Handled = e.SuppressKeyPress = true;
+            return;
+        }
         if (e.KeyCode == Keys.F4 || (e.Alt && e.KeyCode == Keys.Down))
         {
             ShowCalendar();
@@ -264,16 +269,27 @@ public class BootstrapDateInput : UserControl
         }
         if (!e.Alt && e.Modifiers == Keys.None && (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down))
         {
+            // A rejected step is still handled: native TextBox arrow navigation must not
+            // move the caret or collapse a selection on an unchanged candidate.
+            e.Handled = e.SuppressKeyPress = true;
+            if (ReadOnly || !Enabled) return;
             var parsed = TryParsePending();
             if (parsed.State != InputParseState.Valid || !parsed.Value.HasValue) return;
             var step = QuickDateParser.Step(parsed.Value.Value, CurrentSegment(), e.KeyCode == Keys.Up ? 1 : -1, ActiveProfile);
             if (step.State == InputParseState.Valid)
             {
+                var source = _pendingText;
+                var editor = _entry.NativeEditor;
+                var selectionStart = editor.SelectionStart;
+                var selectionEnd = selectionStart + editor.SelectionLength;
                 if (!_pendingEdit) _referenceDate = _referenceDateProvider().Date;
-                SetCandidate(Format(step.Value), true);
+                var candidate = Format(step.Value);
+                SetCandidate(candidate, true);
+                var mappedStart = MapSelectionEndpoint(source, candidate, selectionStart);
+                var mappedEnd = MapSelectionEndpoint(source, candidate, selectionEnd);
+                editor.Select(mappedStart, mappedEnd - mappedStart);
                 PendingTextChanged?.Invoke(this, EventArgs.Empty);
             }
-            e.Handled = e.SuppressKeyPress = true;
         }
     }
 
@@ -292,6 +308,41 @@ public class BootstrapDateInput : UserControl
         var second = first < 0 ? -1 : _pendingText.IndexOf('/', first + 1);
         if (first < 0 || caret <= first) return DateSegment.Day;
         return second < 0 || caret <= second ? DateSegment.Month : DateSegment.Year;
+    }
+
+    private static int MapSelectionEndpoint(string source, string target, int position)
+    {
+        var first = source.IndexOf('/');
+        var second = first < 0 ? -1 : source.IndexOf('/', first + 1);
+        var targetFirst = target.IndexOf('/');
+        var targetSecond = target.IndexOf('/', targetFirst + 1);
+        var clamped = Math.Max(0, Math.Min(position, source.Length));
+        int sourceStart, sourceEnd, targetStart, targetEnd;
+        if (first < 0 || clamped <= first)
+        {
+            sourceStart = targetStart = 0;
+            sourceEnd = first < 0 ? source.Length : first;
+            targetEnd = targetFirst;
+        }
+        else if (second < 0 || clamped <= second)
+        {
+            sourceStart = first + 1;
+            sourceEnd = second < 0 ? source.Length : second;
+            targetStart = targetFirst + 1;
+            targetEnd = targetSecond;
+        }
+        else
+        {
+            sourceStart = second + 1;
+            sourceEnd = source.Length;
+            targetStart = targetSecond + 1;
+            targetEnd = target.Length;
+        }
+
+        // A segment boundary follows its new width; an interior caret keeps
+        // its offset, clamped when the normalized segment becomes shorter.
+        if (clamped == sourceEnd) return targetEnd;
+        return targetStart + Math.Min(clamped - sourceStart, targetEnd - targetStart);
     }
 
     private void OnCalendarSelectionChanged(object? sender, EventArgs e)
