@@ -4,6 +4,8 @@ using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Formatting;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 
@@ -34,12 +36,15 @@ public class BootstrapDateInput : UserControl
     {
         _entry = new DateEntryTextBox(this) { Dock = DockStyle.Fill, AccessibleDescription = "Type day, day/month or day/month/four-digit-year." };
         _imeMonitor = new DateImeMonitor(this);
-        _calendar = new BootstrapCalendarPicker { Dock = DockStyle.Right, Width = 38, TabStop = false, AccessibleName = "Open calendar" };
-        var preferredHeight = Math.Max(_entry.Height, _calendar.Height);
+        _calendar = new BootstrapCalendarPicker { EmbeddedIconOnly = true, TabStop = false, AccessibleName = "Open calendar" };
+        _entry.SetFrameworkTrailingAccessory(_calendar, compactHitArea: true);
+        var preferredHeight = _entry.Height;
         Controls.Add(_entry);
-        Controls.Add(_calendar);
         _entry.TextChanged += OnEntryTextChanged;
         _entry.KeyDown += OnEntryKeyDown;
+        _entry.FontChanged += OnEntryFontChanged;
+        _entry.Layout += OnEntryLayout;
+        FontChanged += OnInputFontChanged;
         _entry.NativeEditor.HandleCreated += OnEditorHandleCreated;
         _entry.NativeEditor.HandleDestroyed += OnEditorHandleDestroyed;
         if (_entry.NativeEditor.IsHandleCreated) _imeMonitor.AssignHandle(_entry.NativeEditor.Handle);
@@ -206,6 +211,9 @@ public class BootstrapDateInput : UserControl
         {
             _entry.TextChanged -= OnEntryTextChanged;
             _entry.KeyDown -= OnEntryKeyDown;
+            _entry.FontChanged -= OnEntryFontChanged;
+            _entry.Layout -= OnEntryLayout;
+            FontChanged -= OnInputFontChanged;
             _entry.NativeEditor.HandleCreated -= OnEditorHandleCreated;
             _entry.NativeEditor.HandleDestroyed -= OnEditorHandleDestroyed;
             _imeMonitor.ReleaseHandle();
@@ -219,6 +227,28 @@ public class BootstrapDateInput : UserControl
 
     private DateInputProfile ActiveProfile => _activeProfile ?? _profile;
     private static string Format(DateTime? value) => value?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? string.Empty;
+
+    private void OnEntryFontChanged(object? sender, EventArgs e) => EnsureReadableHeight();
+    private void OnEntryLayout(object? sender, LayoutEventArgs e) => EnsureReadableHeight();
+    private void OnInputFontChanged(object? sender, EventArgs e)
+    {
+        if (_entry is null || _entry.IsDisposed) return;
+        _entry.Font = Font;
+        EnsureReadableHeight();
+    }
+
+    private void EnsureReadableHeight()
+    {
+        if (_entry is null || _entry.IsDisposed) return;
+        var dpi = DeviceDpi > 0 ? DeviceDpi : DpiScaler.DefaultDpi;
+        var themeHeight = DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.ControlHeight, dpi);
+        var editorHeight = _entry.NativeEditor.PreferredHeight + Math.Max(2, DpiScaler.Scale(2, dpi));
+        var needed = Math.Max(themeHeight, editorHeight);
+        var formerMinimum = MinimumSize.Height;
+        if (MinimumSize.Height != needed) MinimumSize = new Size(MinimumSize.Width, needed);
+        if (Height < needed) Height = needed;
+        else if (formerMinimum > needed && Height == formerMinimum) Height = needed;
+    }
 
     private void SetCandidate(string candidate, bool pending)
     {

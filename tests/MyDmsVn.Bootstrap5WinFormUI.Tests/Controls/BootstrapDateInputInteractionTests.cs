@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -22,6 +23,145 @@ public sealed class BootstrapDateInputInteractionTests
     private const int WmKeyDown = 0x0100;
     private const int WmImeStartComposition = 0x010D;
     private const int WmImeEndComposition = 0x010E;
+
+    [Test]
+    public void DateInputCorrection_Embedded_trigger_never_renders_date_summary()
+    {
+        using var form = Host(out var input);
+        input.Calendar.SelectedDate = new DateTime(2026, 10, 12);
+        using var first = Capture(input.Calendar);
+        Assert.That(BitmapHasInk(first, input.Calendar.BackColor), Is.True, "The trigger must paint a visible calendar icon.");
+        input.Calendar.SelectedDate = new DateTime(2026, 10, 22);
+        using var second = Capture(input.Calendar);
+
+        Assert.That(second.Size, Is.EqualTo(first.Size));
+        for (var y = 0; y < first.Height; y++)
+            for (var x = 0; x < first.Width; x++)
+                Assert.That(second.GetPixel(x, y), Is.EqualTo(first.GetPixel(x, y)),
+                    $"The embedded trigger painted calendar summary pixels at ({x}, {y}).");
+
+        using var standalone = new BootstrapCalendarPicker { Size = new Size(240, input.Height), SelectedDate = new DateTime(2026, 10, 12) };
+        using var standaloneFirst = Capture(standalone);
+        standalone.SelectedDate = new DateTime(2026, 10, 22);
+        using var standaloneSecond = Capture(standalone);
+        Assert.That(BitmapsEqual(standaloneFirst, standaloneSecond), Is.False,
+            "The standalone picker must keep painting its date summary.");
+    }
+
+    [Test]
+    public void DateInputCorrection_Unified_surface_has_one_border_and_compact_hit_area()
+    {
+        using var form = Host(out var input);
+        Assert.That(input.Controls.Count, Is.EqualTo(1), "The outer DateInput must contain one painted editor surface.");
+        Assert.That(input.Calendar.Parent, Is.SameAs(input.Controls[0]), "The calendar action belongs inside the editor surface.");
+        var scale = input.DeviceDpi / 96d;
+        Assert.That(input.Calendar.Width / scale, Is.InRange(28d, 32d));
+        Assert.That(input.Calendar.Height / scale, Is.InRange(28d, 32d));
+
+        using var neutral = Capture(input.Controls[0]);
+        input.ValidationState = BootstrapValidationState.Invalid;
+        using var invalid = Capture(input.Controls[0]);
+        Assert.That(invalid.GetPixel(0, invalid.Height / 2),
+            Is.Not.EqualTo(neutral.GetPixel(0, neutral.Height / 2)),
+            "Validation must tint the one exterior editor border.");
+
+        var before = input.Height;
+        var preferredBefore = input.GetPreferredSize(Size.Empty).Height;
+        input.Dock = DockStyle.Fill;
+        form.PerformLayout();
+        input.Dock = DockStyle.Top;
+        form.PerformLayout();
+        Assert.That(input.Height, Is.EqualTo(before), "Docking must not inflate the date field height.");
+        Assert.That(input.GetPreferredSize(Size.Empty).Height, Is.EqualTo(preferredBefore),
+            "Preferred height must be stable before and after docking.");
+    }
+
+    [TestCase(BootstrapThemeMode.Light)]
+    [TestCase(BootstrapThemeMode.Dark)]
+    public void DateInputCorrection_Larger_font_keeps_native_date_and_trigger_readable(BootstrapThemeMode mode)
+    {
+        var previousTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode);
+            using var largeFont = new Font(SystemFonts.DefaultFont.FontFamily, SystemFonts.DefaultFont.SizeInPoints + 12f);
+            using var form = Host(out var input);
+            input.Font = largeFont;
+            form.PerformLayout();
+
+            Assert.That(input.NativeEditor.Font.SizeInPoints, Is.GreaterThanOrEqualTo(largeFont.SizeInPoints - 0.1f));
+            Assert.That(input.Height, Is.GreaterThanOrEqualTo(input.NativeEditor.PreferredHeight + 2));
+            Assert.That(input.NativeEditor.Bounds.Height, Is.GreaterThanOrEqualTo(input.NativeEditor.PreferredHeight));
+            Assert.That(input.GetPreferredSize(Size.Empty).Height,
+                Is.GreaterThanOrEqualTo(input.NativeEditor.PreferredHeight + 2));
+            Assert.That(input.Calendar.Bottom, Is.LessThan(input.Height));
+            Assert.That(input.Calendar.Top, Is.GreaterThan(0));
+            Assert.That(input.PendingText, Is.EqualTo("23/10/2026"));
+
+            input.Text = "5/11";
+            input.NativeEditor.SelectionStart = 2;
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(mode == BootstrapThemeMode.Light ? BootstrapThemeMode.Dark : BootstrapThemeMode.Light);
+            Application.DoEvents();
+            Assert.That(input.PendingText, Is.EqualTo("5/11"));
+            Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(2));
+            Assert.That(input.Height, Is.GreaterThanOrEqualTo(input.NativeEditor.PreferredHeight + 2));
+
+            input.Font = SystemFonts.DefaultFont;
+            form.PerformLayout();
+            Assert.That(input.Height, Is.EqualTo(32 * input.DeviceDpi / 96),
+                "Returning to the normal font must release the height expanded for large text.");
+        }
+        finally { BootstrapThemeManager.CurrentTheme = previousTheme; }
+    }
+
+    [Test]
+    public void DateInputCorrection_Default_theme_font_remains_theme_owned()
+    {
+        var previousTheme = BootstrapThemeManager.CurrentTheme;
+        try
+        {
+            BootstrapThemeManager.CurrentTheme = BootstrapTheme.CreateDefault(BootstrapThemeMode.Light);
+            using var form = Host(out var input);
+            var dark = BootstrapTheme.CreateDefault(BootstrapThemeMode.Dark);
+            BootstrapThemeManager.CurrentTheme = new BootstrapTheme(
+                BootstrapThemeMode.Dark, dark.Colors, dark.Metrics,
+                new BootstrapThemeTypography(
+                    new BootstrapFontToken("Segoe UI", 12f),
+                    dark.Typography.BodySmall,
+                    dark.Typography.Label,
+                    dark.Typography.HeadingSmall,
+                    dark.Typography.HeadingMedium));
+            Application.DoEvents();
+            Assert.That(input.NativeEditor.Font.SizeInPoints, Is.EqualTo(12f).Within(0.05f));
+            Assert.That(input.NativeEditor.Bounds.Height, Is.GreaterThanOrEqualTo(input.NativeEditor.PreferredHeight));
+            Assert.That(input.PendingText, Is.EqualTo("23/10/2026"));
+        }
+        finally { BootstrapThemeManager.CurrentTheme = previousTheme; }
+    }
+
+    private static Bitmap Capture(Control control)
+    {
+        var bitmap = new Bitmap(control.Width, control.Height);
+        control.DrawToBitmap(bitmap, new Rectangle(Point.Empty, control.Size));
+        return bitmap;
+    }
+
+    private static bool BitmapsEqual(Bitmap left, Bitmap right)
+    {
+        if (left.Size != right.Size) return false;
+        for (var y = 0; y < left.Height; y++)
+            for (var x = 0; x < left.Width; x++)
+                if (left.GetPixel(x, y) != right.GetPixel(x, y)) return false;
+        return true;
+    }
+
+    private static bool BitmapHasInk(Bitmap bitmap, Color background)
+    {
+        for (var y = 0; y < bitmap.Height; y++)
+            for (var x = 0; x < bitmap.Width; x++)
+                if (bitmap.GetPixel(x, y) != background) return true;
+        return false;
+    }
 
     [TestCase(BootstrapThemeMode.Light)]
     [TestCase(BootstrapThemeMode.Dark)]

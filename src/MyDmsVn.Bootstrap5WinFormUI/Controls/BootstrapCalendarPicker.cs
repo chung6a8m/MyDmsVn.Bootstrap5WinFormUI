@@ -16,6 +16,7 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Controls;
 public sealed class BootstrapCalendarPicker : Control
 {
     private static readonly IconDescriptor DropDownIcon = IconDescriptor.Framework(FrameworkIconGlyph.ChevronDown);
+    private static readonly IconDescriptor CalendarIcon = IconDescriptor.SegoeMdl2('\uE787');
     private readonly BootstrapCalendarSelectionModel _selectionModel;
     private readonly BootstrapDropdown _dropdown;
     private readonly IIconRenderer _iconRenderer;
@@ -33,6 +34,18 @@ public sealed class BootstrapCalendarPicker : Control
     private bool _settingThemeFont;
     private bool _useThemeFont = true;
     private Font? _themeFont;
+    private bool _embeddedIconOnly;
+
+    internal bool EmbeddedIconOnly
+    {
+        get => _embeddedIconOnly;
+        set
+        {
+            if (_embeddedIconOnly == value) return;
+            _embeddedIconOnly = value;
+            Invalidate();
+        }
+    }
 
     /// <summary>Initializes a designer-safe picker with an empty single-date selection.</summary>
     public BootstrapCalendarPicker()
@@ -305,6 +318,14 @@ public sealed class BootstrapCalendarPicker : Control
         base.OnPaint(e);
         var theme = BootstrapThemeManager.CurrentTheme;
         var dpi = GetCurrentDpi();
+        if (_embeddedIconOnly)
+        {
+            var calendarIconSize = DpiScaler.Scale(theme.Metrics.SpacingLG, dpi);
+            _iconRenderer.TryRender(e.Graphics, CalendarIcon,
+                new Rectangle((Width - calendarIconSize) / 2, (Height - calendarIconSize) / 2, calendarIconSize, calendarIconSize),
+                Enabled ? theme.Colors.MutedText : theme.Colors.Disabled);
+            return;
+        }
         var borderWidth = Math.Max(1f, DpiScaler.Scale((float)(ContainsFocus ? theme.Metrics.FocusBorderWidth : theme.Metrics.BorderWidth), dpi));
         var inset = borderWidth / 2f;
         var bounds = new RectangleF(inset, inset, Math.Max(0f, ClientSize.Width - borderWidth), Math.Max(0f, ClientSize.Height - borderWidth));
@@ -379,6 +400,7 @@ public sealed class BootstrapCalendarPicker : Control
     private void OnPickerFocusChanged(object? sender, EventArgs e)
     {
         Invalidate();
+        if (_embeddedIconOnly) Parent?.Invalidate();
     }
 
     private void OnDropDownOpened(object? sender, EventArgs e)
