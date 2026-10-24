@@ -21,8 +21,80 @@ public sealed class BootstrapDateInputInteractionTests
     [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool PostMessage(IntPtr handle, int message, IntPtr wParam, IntPtr lParam);
     private const int WmChar = 0x0102;
     private const int WmKeyDown = 0x0100;
+    private const int WmLButtonDown = 0x0201;
+    private const int WmLButtonUp = 0x0202;
     private const int WmImeStartComposition = 0x010D;
     private const int WmImeEndComposition = 0x010E;
+
+    [TestCase(1, 0, false)]
+    [TestCase(1, 0, true)]
+    [TestCase(0, 3, false)]
+    [TestCase(0, 3, true)]
+    public void DateInputCorrection_Canceled_popup_restores_native_range_before_notification(int start, int length, bool pointer)
+    {
+        using var form = Host(out var input);
+        input.Text = "5/11";
+        input.NativeEditor.Select(start, length);
+        var restoredInNotification = false;
+        input.PendingTextChanged += (_, _) =>
+        {
+            if (input.PendingText == "5/11")
+                restoredInNotification = input.NativeEditor.SelectionStart == start && input.NativeEditor.SelectionLength == length;
+        };
+
+        if (pointer)
+        {
+            SendMessage(input.Calendar.Handle, WmLButtonDown, (IntPtr)1, IntPtr.Zero);
+            SendMessage(input.Calendar.Handle, WmLButtonUp, IntPtr.Zero, IntPtr.Zero);
+        }
+        else SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.F4, IntPtr.Zero);
+        Application.DoEvents();
+        input.Calendar.SelectedDate = new DateTime(2026, 11, 6);
+        Assert.That(input.PendingText, Is.EqualTo("06/11/2026"));
+        input.Calendar.CloseDropDown();
+        Application.DoEvents();
+
+        Assert.That(input.PendingText, Is.EqualTo("5/11"));
+        Assert.That(input.NativeEditor.SelectionStart, Is.EqualTo(start));
+        Assert.That(input.NativeEditor.SelectionLength, Is.EqualTo(length));
+        Assert.That(restoredInNotification, Is.True);
+        Assert.That(input.Value, Is.EqualTo(new DateTime(2026, 10, 23)));
+    }
+
+    [Test]
+    public void DateInputCorrection_Pointer_calendar_cancel_returns_focus_to_native_editor()
+    {
+        using var form = Host(out var input);
+        input.Text = "5/11";
+        SendMessage(input.Calendar.Handle, WmLButtonDown, (IntPtr)1, IntPtr.Zero);
+        SendMessage(input.Calendar.Handle, WmLButtonUp, IntPtr.Zero, IntPtr.Zero);
+        Application.DoEvents();
+        Assert.That(input.Calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 11, 5)));
+        input.Calendar.CloseDropDown();
+        Application.DoEvents();
+        Assert.That(input.NativeEditor.Focused, Is.True);
+        Assert.That(input.PendingText, Is.EqualTo("5/11"));
+    }
+
+    [Test]
+    public void DateInputCorrection_External_dismissal_does_not_steal_new_focus()
+    {
+        using var form = Host(out var input);
+        using var next = new Button { Text = "Next", Dock = DockStyle.Bottom };
+        form.Controls.Add(next);
+        input.Text = "5/11";
+        SendMessage(input.Calendar.Handle, WmLButtonDown, (IntPtr)1, IntPtr.Zero);
+        SendMessage(input.Calendar.Handle, WmLButtonUp, IntPtr.Zero, IntPtr.Zero);
+        Application.DoEvents();
+        Assert.That(input.Calendar.SelectedDate, Is.EqualTo(new DateTime(2026, 11, 5)));
+
+        next.Focus();
+        Application.DoEvents();
+        input.Calendar.CloseDropDown();
+        Application.DoEvents();
+        Assert.That(next.Focused, Is.True);
+        Assert.That(input.PendingText, Is.EqualTo("5/11"));
+    }
 
     [Test]
     public void DateInputCorrection_Embedded_trigger_never_renders_date_summary()

@@ -25,6 +25,7 @@ public class BootstrapDateInput : UserControl
     private string _pendingText = string.Empty;
     private string? _popupSnapshot;
     private int _popupCaret;
+    private int _popupSelectionLength;
     private bool _popupAccepted;
     private bool _applying;
     private bool _pendingEdit;
@@ -172,6 +173,7 @@ public class BootstrapDateInput : UserControl
         if (_popupSnapshot != null) return;
         _popupSnapshot = _pendingText;
         _popupCaret = _entry.NativeEditor.SelectionStart;
+        _popupSelectionLength = _entry.NativeEditor.SelectionLength;
         _popupAccepted = false;
         _synchronizingCalendar = true;
         try
@@ -396,13 +398,28 @@ public class BootstrapDateInput : UserControl
 
     private void OnCalendarClosed(object? sender, EventArgs e)
     {
+        var restoreEditorFocus = _calendar.Focused && IsHandleCreated && !IsDisposed && !Disposing && !_entry.IsDisposed;
         var snapshot = _popupSnapshot;
         _popupSnapshot = null;
-        if (snapshot == null || _popupAccepted) return;
-        var changed = !string.Equals(_pendingText, snapshot, StringComparison.Ordinal);
-        SetCandidate(snapshot, !string.Equals(snapshot, Format(_value), StringComparison.Ordinal));
-        _entry.NativeEditor.SelectionStart = Math.Min(_popupCaret, _entry.NativeEditor.TextLength);
-        if (changed) PendingTextChanged?.Invoke(this, EventArgs.Empty);
+        if (snapshot != null && !_popupAccepted)
+        {
+            var changed = !string.Equals(_pendingText, snapshot, StringComparison.Ordinal);
+            SetCandidate(snapshot, !string.Equals(snapshot, Format(_value), StringComparison.Ordinal));
+            var start = Math.Min(_popupCaret, _entry.NativeEditor.TextLength);
+            var length = Math.Min(_popupSelectionLength, _entry.NativeEditor.TextLength - start);
+            _entry.NativeEditor.Select(start, length);
+            if (changed) PendingTextChanged?.Invoke(this, EventArgs.Empty);
+        }
+        // Let an outside click finish moving focus before reclaiming it from this trigger.
+        if (restoreEditorFocus) BeginInvoke((MethodInvoker)RestoreEditorFocusAfterDismissal);
+    }
+
+    private void RestoreEditorFocusAfterDismissal()
+    {
+        if (IsDisposed || Disposing || _entry.IsDisposed || _popupSnapshot != null || !_calendar.Focused || !Enabled) return;
+        var form = FindForm();
+        if (form is null || form.IsDisposed || !ReferenceEquals(Form.ActiveForm, form)) return;
+        _entry.NativeEditor.Focus();
     }
 
     private void PreviewCalendarSelection()
