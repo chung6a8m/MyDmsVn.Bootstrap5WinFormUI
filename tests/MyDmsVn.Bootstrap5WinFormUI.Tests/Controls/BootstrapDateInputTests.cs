@@ -2,6 +2,8 @@
 using System.Windows.Forms;
 using MyDmsVn.Bootstrap5WinFormUI.Controls;
 using MyDmsVn.Bootstrap5WinFormUI.Formatting;
+using MyDmsVn.Bootstrap5WinFormUI.Rendering;
+using MyDmsVn.Bootstrap5WinFormUI.Theme;
 using NUnit.Framework;
 
 namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
@@ -12,6 +14,15 @@ namespace MyDmsVn.Bootstrap5WinFormUI.Tests.Controls;
 public sealed class BootstrapDateInputTests
 {
     private static DateInputProfile Required => new DateInputProfile(false, new DateTime(1900, 1, 1), new DateTime(2100, 12, 31));
+
+    [Test]
+    public void Default_height_fits_themed_text_and_calendar_children()
+    {
+        using var input = new BootstrapDateInput();
+        var expectedHeight = DpiScaler.Scale(BootstrapThemeManager.CurrentTheme.Metrics.ControlHeight, input.DeviceDpi);
+        Assert.That(input.Height, Is.InRange(expectedHeight, expectedHeight + 2),
+            "The date input must use its preferred control height before docking children expands them to the UserControl default height.");
+    }
 
     [Test]
     public void Session_captures_reference_and_rejects_profile_change_with_pending_text()

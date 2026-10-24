@@ -35,6 +35,7 @@ public class BootstrapDateInput : UserControl
         _entry = new DateEntryTextBox(this) { Dock = DockStyle.Fill, AccessibleDescription = "Type day, day/month or day/month/four-digit-year." };
         _imeMonitor = new DateImeMonitor(this);
         _calendar = new BootstrapCalendarPicker { Dock = DockStyle.Right, Width = 38, TabStop = false, AccessibleName = "Open calendar" };
+        var preferredHeight = Math.Max(_entry.Height, _calendar.Height);
         Controls.Add(_entry);
         Controls.Add(_calendar);
         _entry.TextChanged += OnEntryTextChanged;
@@ -47,7 +48,7 @@ public class BootstrapDateInput : UserControl
         _calendar.Opened += OnCalendarOpened;
         _calendar.Closed += OnCalendarClosed;
         AccessibleRole = AccessibleRole.Text;
-        Size = new Size(240, Math.Max(_entry.Height, _calendar.Height));
+        Size = new Size(240, preferredHeight);
         _referenceDate = DateTime.Today;
     }
 

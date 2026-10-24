@@ -1078,6 +1078,8 @@ Manual verification: use the calendar demo scenarios for empty/default, single, 
 
 `BootstrapDateInput` composes an editable `BootstrapTextBox` with the existing `BootstrapCalendarPicker`. Configure an immutable `DateInputProfile` (required/optional and inclusive date-only bounds), then call `BeginEditSession(currentValue)` at an admitted document boundary. That call captures one local reference date from `ReferenceDateProvider`. `PendingText` retains each native character; `TryParsePending()` is pure, and `TryCommitPending()` accepts a valid candidate. `ProjectAcceptedValue()` projects an authoritative model value and intentionally clears pending text, so hosts must call it only after an admitted document change or an actual model change.
 
+The composite starts at the themed input height. Its preferred height is captured before the text and calendar children are docked, so a compact host can place the editor without clipping its native text or enlarging the calendar button.
+
 The fixed DMY grammar accepts `d`, `d/M`, and `d/M/yyyy`; omitted components come from the captured reference date. A four-digit year is required when present. Accepted values display `dd/MM/yyyy` at midnight with `DateTimeKind.Unspecified`. Invalid dates and out-of-bounds values stay pending. The calendar previews a choice, and a completed single-date activation raises `SelectionAccepted` even when the selected date was already current. Dismissal restores the exact pre-popup candidate. F4/Alt+Down opens the popup; Enter and Tab attempt commit; Escape first dismisses the popup, then cancels the text edit; segment arrows step one day/month/year without clamping impossible results. The wheel does not change a date.
 
 ## BootstrapRange
