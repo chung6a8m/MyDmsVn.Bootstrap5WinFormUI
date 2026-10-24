@@ -269,6 +269,7 @@ public class BootstrapDateInput : UserControl
             var step = QuickDateParser.Step(parsed.Value.Value, CurrentSegment(), e.KeyCode == Keys.Up ? 1 : -1, ActiveProfile);
             if (step.State == InputParseState.Valid)
             {
+                if (!_pendingEdit) _referenceDate = _referenceDateProvider().Date;
                 SetCandidate(Format(step.Value), true);
                 PendingTextChanged?.Invoke(this, EventArgs.Empty);
             }

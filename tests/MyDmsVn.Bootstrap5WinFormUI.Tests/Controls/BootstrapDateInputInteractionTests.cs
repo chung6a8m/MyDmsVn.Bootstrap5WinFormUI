@@ -147,6 +147,25 @@ public sealed class BootstrapDateInputInteractionTests
     }
 
     [Test]
+    public void New_candidate_started_by_arrow_captures_current_year_and_keeps_it_while_pending()
+    {
+        using var form = Host(out var input);
+        var now = new DateTime(2026, 12, 31);
+        input.ReferenceDateProvider = () => now;
+        input.BeginEditSession(new DateTime(2026, 12, 31));
+        now = new DateTime(2027, 1, 1);
+        input.NativeEditor.SelectionStart = 1;
+        SendMessage(input.NativeEditor.Handle, WmKeyDown, (IntPtr)Keys.Up, IntPtr.Zero);
+        Assert.That(input.PendingText, Is.EqualTo("01/01/2027"));
+
+        now = new DateTime(2027, 2, 1);
+        input.Text = "5";
+        Assert.That(input.TryParsePending().Value, Is.EqualTo(new DateTime(2027, 1, 5)));
+        Assert.That(input.TryCommitPending(), Is.True);
+        Assert.That(input.Value, Is.EqualTo(new DateTime(2027, 1, 5)));
+    }
+
+    [Test]
     public void Ime_composition_defers_enter_acceptance_until_composition_ends()
     {
         using var form = Host(out var input);
